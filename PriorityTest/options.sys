@@ -1,0 +1,12 @@
+#define	ECOG_SIM		0
+#define	DIAG_MESSAGES		2	/* System messages to UART */
+#define	UART_DRIVER		2	/* Both UARTs present */
+#define	LEDS_DRIVER		1	/* LED driver present */
+#define	LCD_DRIVER		1	/* LCD driver present */
+#define	TCV_PRESENT		0	/* No TCV */
+#define	TCV_TIMERS		0	/* */
+#define	TCV_HOOKS		0	/* */
+#define	ETHERNET_DRIVER		0	/* No Ethernet */
+#define	SDRAM_PRESENT		1	/* SDRAM present, malloc using SDRAM */
+#define	CODE_LONG_INTS		1	/* 'ld' 'lu' 'lx' in formats */
+#define	MALLOC_SAFE		1

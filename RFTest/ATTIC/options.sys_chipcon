@@ -1,0 +1,30 @@
+#ifndef	__MSP430__
+
+// eCOG
+#define	ECOG_SIM		0
+#define	LCD_DRIVER		1	/* LCD driver */
+#define	ETHERNET_DRIVER		0	/* Ethernet driver absent */
+#define	SDRAM_PRESENT		1	/* SDRAM */
+#define	LEDS_DRIVER		1	/* LED driver */
+
+#else
+// MSP430
+
+#define	MALLOC_SINGLEPOOL	1
+
+#endif
+
+#define	DIAG_MESSAGES		2	/* System messages to UART */
+#define	UART_DRIVER		1	/* UART A + B */
+#define	TCV_PRESENT		1	/* TCV present */
+#define	TCV_TIMERS		0	/* TCV timers not needed */
+#define	TCV_HOOKS		0	/* TCV hooks not needed */
+#define	CODE_LONG_INTS		1	/* 'ld' 'lu' 'lx' in formats */
+#define	MALLOC_SAFE		1
+
+#define CHIPCON 		1
+#define CHIPCON_FREQ 		868
+
+#define	RADIO_DRIVER		0
+
+#define	STACK_GUARD		1
