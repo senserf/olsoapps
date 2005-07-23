@@ -221,11 +221,6 @@ int snd_stop (void) {
 
 #define	RS_RRA		100
 
-#if CHIPCON || DM2100
-const static word parm_rssc [2] = { 4, 2 };
-const static word parm_rssi [2] = { 5, 2 };
-#endif
-
 #if CHIPCON
 const static word parm_power = 1;
 #endif
@@ -244,11 +239,11 @@ process (root, int)
 
 #if CHIPCON
 	// Configure CHIPCON for 19,200 bps
-	phys_chipcon (0, 0, MAXPLEN, 192 /* 192 768 384 */);
+	phys_chipcon (0, MAXPLEN, 192 /* 192 768 384 */);
 #endif
 
 #if DM2100
-	phys_dm2100 (0, 0, MAXPLEN);
+	phys_dm2100 (0, MAXPLEN);
 #endif
 
 #if RADIO_DRIVER
@@ -262,12 +257,6 @@ process (root, int)
 		diag ("Cannot open tcv interface");
 		halt ();
 	}
-
-#if CHIPCON || DM2100
-	// Collect RSSI and return via the checksum
-	tcv_control (sfd, PHYSOPT_SETPARAM, (address) parm_rssi);
-	tcv_control (sfd, PHYSOPT_SETPARAM, (address) parm_rssc);
-#endif
 
 #if CHIPCON
 	tcv_control (sfd, PHYSOPT_SETPOWER, (address) &parm_power);
