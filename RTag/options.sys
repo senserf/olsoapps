@@ -17,9 +17,9 @@
 #define	LEDS_DRIVER		1	/* LED driver */
 #endif
 
-#define CHIPCON 		1
+#define CHIPCON 		0
 #define CHIPCON_FREQ 		433
 
-#define	DM2100			0
+#define	DM2100			1
 
 #define	STACK_GUARD		1
