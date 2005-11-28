@@ -22,10 +22,10 @@
 #define	MALLOC_SAFE		1
 #define	MALLOC_STATS		1
 #define ETHERNET_DRIVER         0       /* Ethernet driver absent */
-#define CHIPCON 		0
+#define CC1000  		0
 #define DM2100 			1
 #define	ENTROPY_COLLECTION	1
-#define CHIPCON_FREQ 		433
+#define CC1000_FREQ 		433
 #define	RADIO_DRIVER		0
 #define	STACK_GUARD		1
 

@@ -23,9 +23,9 @@
 #define	MALLOC_SAFE		1
 #define	MALLOC_STATS		1
 
-#define CHIPCON 		0
+#define CC1000	 		0
 #define DM2100 			1
-#define CHIPCON_FREQ 		868
+#define CC1000_FREQ 		868
 
 #define	RADIO_DRIVER		0
 

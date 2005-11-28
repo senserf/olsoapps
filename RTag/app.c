@@ -17,8 +17,8 @@
 heapmem {70, 30}; // how to find out a good ratio?
 
 // elsewhere may be a better place for this:
-#if CHIPCON
-#define INFO_PHYS_DEV INFO_PHYS_CHIPCON
+#if CC1000
+#define INFO_PHYS_DEV INFO_PHYS_CC1000
 #else
 #if DM2100
 #define INFO_PHYS_DEV INFO_PHYS_DM2100
@@ -311,7 +311,7 @@ process (root, void)
 		}
 		net_opt (PHYSOPT_RXON, NULL);
 		net_opt (PHYSOPT_TXON, NULL);
-#if CHIPCON
+#if CC1000
 		net_opt (PHYSOPT_SETPOWER, &pow_level);
 #endif
 		(void) fork (rcv, NULL);
@@ -395,7 +395,7 @@ process (root, void)
 					case 'p':
 					  scan (cmd_line+2, "%u", &in_pl);
 					  if (in_pl && in_pl != pow_level) {
-#if CHIPCON
+#if CC1000
 					    pow_level = in_pl;
 					    net_opt (PHYSOPT_SETPOWER,
 							&pow_level);

@@ -29,8 +29,8 @@ extern word zz_rrates [];
 #include "serf.h"
 #include "form.h"
 
-#if CHIPCON
-#include "phys_chipcon.h"
+#if CC1000
+#include "phys_cc1000.h"
 #endif
 
 #if DM2100
@@ -72,7 +72,7 @@ process (receiver, void)
 
   entry (RC_SHOW)
 
-#if     CHIPCON || DM2100
+#if     CC1000 || DM2100
  	// Show RSSI
 	ser_outf (RC_SHOW, "RCV: (len = %d), pow = %x:", tcv_left (packet),
 		packet [(tcv_left (packet) >> 1) - 1]);
@@ -202,7 +202,7 @@ int snd_stop (void) {
 
 #define	RS_RRA		100
 
-#if CHIPCON
+#if CC1000
 const static word parm_power = 1;
 #endif
 
@@ -218,9 +218,9 @@ process (root, int)
 	ibuf = (char*) umalloc (IBUFLEN);
 	ibuf [0] = 0xff;
 
-#if CHIPCON
-	// Configure CHIPCON for 19,200 bps
-	phys_chipcon (0, MAXPLEN, 192 /* 192 768 384 */);
+#if CC1000
+	// Configure CC1000 for 19,200 bps
+	phys_cc1000 (0, MAXPLEN, 192 /* 192 768 384 */);
 #endif
 
 #if DM2100
@@ -239,7 +239,7 @@ process (root, int)
 		halt ();
 	}
 
-#if CHIPCON
+#if CC1000
 	tcv_control (sfd, PHYSOPT_SETPOWER, (address) &parm_power);
 #endif
 
@@ -251,7 +251,7 @@ process (root, int)
 		"s intvl  -> start/reset sending interval (2 secs default)\r\n"
 		"r        -> start receiver\r\n"
 		"d i v    -> change phys parameter i to v\r\n"
-#if CHIPCON == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0
 		// Not available
 		"c btime  -> recalibrate the transceiver\r\n"
 #endif
@@ -303,7 +303,7 @@ process (root, int)
 		proceed (RS_STK);
 #endif
 
-#if CHIPCON == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0
 	if (ibuf [0] == 'c')
 		proceed (RS_CAL);
 #endif
@@ -353,7 +353,7 @@ process (root, int)
 	n1 = 0;
 	scan (ibuf + 1, "%d", &n1);
 
-#if CHIPCON == 0
+#if CC1000 == 0
 	io (NONE, RADIO, CONTROL, (char*) &n1, RADIO_CNTRL_SETPOWER);
 #else
 	// There's no RADIO device, SETPOWER is available via
@@ -371,10 +371,10 @@ process (root, int)
 
   entry (RS_RCP)
 
-#if CHIPCON == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0
 	n1 = io (NONE, RADIO, CONTROL, NULL, RADIO_CNTRL_READPOWER);
 #else
-	// No RADIO device for CHIPCON & DM2100
+	// No RADIO device for CC1000 & DM2100
 	n1 = tcv_control (sfd, PHYSOPT_GETPOWER, NULL);
 #endif
 
@@ -431,7 +431,7 @@ process (root, int)
 
 	proceed (RS_RCMD);
 
-#if CHIPCON == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0
 
   entry (RS_CAL)
 

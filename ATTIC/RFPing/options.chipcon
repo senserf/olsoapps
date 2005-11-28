@@ -10,6 +10,6 @@
 #define	CODE_LONG_INTS		1	/* 'ld' 'lu' 'lx' in formats */
 #define	MALLOC_SAFE		1
 
-#define CHIPCON 		1
+#define CC1000	 		1
 #define	LEDS_DRIVER		1	/* LED driver */
 #define	RADIO_DRIVER		0

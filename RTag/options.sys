@@ -17,8 +17,8 @@
 #define	LEDS_DRIVER		1	/* LED driver */
 #endif
 
-#define CHIPCON 		0
-#define CHIPCON_FREQ 		433
+#define CC1000 	 		0
+#define CC1000_FREQ 		433
 
 #define	DM2100			1
 

@@ -16,8 +16,8 @@
 heapmem {80, 20}; // how to find or guess the right ratio?
 
 // elsewhere may be a better place for this:
-#if CHIPCON
-#define INFO_PHYS_DEV INFO_PHYS_CHIPCON
+#if CC1000
+#define INFO_PHYS_DEV INFO_PHYS_CC1000
 #else
 #define INFO_PHYS_DEV INFO_PHYS_RADIO
 #endif

@@ -8,7 +8,7 @@
 #include "msg_rtag.h"
 #include "net.h"
 
-#if CHIPCON
+#if CC1000
 #define DEF_PLEV	9
 #else
 #define DEF_PLEV	0
