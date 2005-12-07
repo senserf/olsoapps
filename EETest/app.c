@@ -22,9 +22,9 @@ heapmem {10, 90};
 #define	RS_WRI		80
 #define	RS_REA		90
 
-word	a, w, len;
+word	a, w, len, bs, nt, sl, ss;
 lword	lw;
-byte	str [129];
+byte	str [129], *blk;
 char	ibuf [132];
 
 process (root, int)
@@ -43,7 +43,7 @@ process (root, int)
 		"e adr        -> read lword\r\n"
 		"f adr n      -> read string\r\n"
 		"g adr n p    -> write n longwords with p starting at adr\r\n"
-		"h adr n      -> read n longwords starting at adr\r\n"
+		"h adr n b t  -> read n blks of b starting at adr t times\r\n"
 		);
 
   entry (RS_RCMD)
@@ -150,6 +150,7 @@ process (root, int)
 
   entry (RS_WRI)
 
+	len = 0;
 	scan (ibuf + 1, "%u %u %lu", &a, &len, &lw);
 	if (len == 0)
 		proceed (RS_RCMD+1);
@@ -166,12 +167,29 @@ Done:
 
   entry (RS_REA)
 
-	scan (ibuf + 1, "%u %u", &a, &len);
+	len = 0;
+	bs = 0;
+	nt = 0;
+	scan (ibuf + 1, "%u %u %u %u", &a, &len, &bs, &nt);
 	if (len == 0)
 		proceed (RS_RCMD+1);
-	while (len--) {
-		ee_read (a, (byte*)(&lw), 4);
-		a += 4;
+	if (bs == 0)
+		bs = 4;
+
+	if (nt == 0)
+		nt = 1;
+
+	blk = umalloc (bs);
+
+	while (nt--) {
+
+		sl = len;
+		ss = a;
+		while (sl--) {
+			ee_read (ss, blk, bs);
+			ss += bs;
+		}
+
 	}
 
 	goto Done;
