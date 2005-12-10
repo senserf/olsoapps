@@ -21,6 +21,8 @@ heapmem {10, 90};
 #define	RS_RST		70
 #define	RS_WRI		80
 #define	RS_REA		90
+#define	RS_LED		100
+#define	RS_BLI		110
 
 word	a, w, len, bs, nt, sl, ss;
 lword	lw;
@@ -44,6 +46,8 @@ process (root, int)
 		"f adr n      -> read string\r\n"
 		"g adr n p    -> write n longwords with p starting at adr\r\n"
 		"h adr n b t  -> read n blks of b starting at adr t times\r\n"
+		"i led w      -> led status [w = 0, 1, 2]\r\n"
+		"j w          -> blinkrate 0-low, 1-high\r\n"
 		);
 
   entry (RS_RCMD)
@@ -73,6 +77,12 @@ process (root, int)
 
 	if (ibuf [0] == 'h')
 		proceed (RS_REA);
+
+	if (ibuf [0] == 'i')
+		proceed (RS_LED);
+
+	if (ibuf [0] == 'j')
+		proceed (RS_BLI);
 
   entry (RS_RCMD+1)
 
@@ -193,5 +203,17 @@ Done:
 	}
 
 	goto Done;
+
+  entry (RS_LED)
+
+	scan (ibuf + 1, "%u %u", &bs, &nt);
+	leds (bs, nt);
+	proceed (RS_RCMD);
+
+  entry (RS_BLI)
+
+	scan (ibuf + 1, "%u", &bs);
+	fastblink (bs);
+	proceed (RS_RCMD);
 
 endprocess (1)
