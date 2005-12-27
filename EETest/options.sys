@@ -2,7 +2,7 @@
 
 #define	LEDS_DRIVER		1
 #define	LEDS_BLINKING		1
-#define	DIAG_MESSAGES		2	/* System messages to UART */
+#define	DIAG_MESSAGES		4096
 #define	UART_DRIVER		1	/* UART A + B */
 #define	TCV_PRESENT		0	/* TCV present */
 #define	TCV_TIMERS		0	/* TCV timers not needed */

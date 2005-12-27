@@ -23,8 +23,10 @@ heapmem {10, 90};
 #define	RS_REA		90
 #define	RS_LED		100
 #define	RS_BLI		110
+#define	RS_DIA		120
+#define	RS_DUM		130
 
-word	a, w, len, bs, nt, sl, ss;
+word	a, w, len, bs, nt, sl, ss, dcnt;
 lword	lw;
 byte	str [129], *blk;
 char	ibuf [132];
@@ -48,6 +50,10 @@ process (root, int)
 		"h adr n b t  -> read n blks of b starting at adr t times\r\n"
 		"i led w      -> led status [w = 0, 1, 2]\r\n"
 		"j w          -> blinkrate 0-low, 1-high\r\n"
+		"k m          -> write a diag message\r\n"
+#if DIAG_MESSAGES > 2
+		"l            -> dump diag\r\n"
+#endif
 		);
 
   entry (RS_RCMD)
@@ -83,6 +89,14 @@ process (root, int)
 
 	if (ibuf [0] == 'j')
 		proceed (RS_BLI);
+
+	if (ibuf [0] == 'k')
+		proceed (RS_DIA);
+
+#if DIAG_MESSAGES > 2
+	if (ibuf [0] == 'l')
+		proceed (RS_DUM);
+#endif
 
   entry (RS_RCMD+1)
 
@@ -130,7 +144,7 @@ process (root, int)
 
   entry (RS_RWO+1)
 
-	ser_outf (RS_SST+1, "Read %u from %u\r\n", w, a);
+	ser_outf (RS_SST+1, "Read %u (%x) from %u\r\n", w, w, a);
 	proceed (RS_RCMD);
 
   entry (RS_RLW)
@@ -140,7 +154,7 @@ process (root, int)
 
   entry (RS_RLW+1)
 
-	ser_outf (RS_SST+1, "Read %lu from %u\r\n", lw, a);
+	ser_outf (RS_SST+1, "Read %lu (%lx) from %u\r\n", lw, lw, a);
 	proceed (RS_RCMD);
 
   entry (RS_RST)
@@ -189,7 +203,7 @@ Done:
 	if (nt == 0)
 		nt = 1;
 
-	blk = umalloc (bs);
+	blk = (byte*) umalloc (bs);
 
 	while (nt--) {
 
@@ -215,5 +229,19 @@ Done:
 	scan (ibuf + 1, "%u", &bs);
 	fastblink (bs);
 	proceed (RS_RCMD);
+
+  entry (RS_DIA)
+
+	diag ("MSG %d (%x) %u: %s", dcnt, dcnt, dcnt, ibuf+1);
+	dcnt++;
+	proceed (RS_RCMD);
+
+#if DIAG_MESSAGES > 2
+
+  entry (RS_DUM)
+
+	diag_dump ();
+	proceed (RS_RCMD);
+#endif
 
 endprocess (1)
