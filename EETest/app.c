@@ -25,6 +25,11 @@ heapmem {10, 90};
 #define	RS_BLI		110
 #define	RS_DIA		120
 #define	RS_DUM		130
+#define	RS_FLR		140
+#define	RS_FLW		150
+#define	RS_FLE		160
+#define	RS_SYS		170
+#define	RS_MAL		180
 
 word	a, w, len, bs, nt, sl, ss, dcnt;
 lword	lw;
@@ -54,6 +59,11 @@ process (root, int)
 #if DIAG_MESSAGES > 2
 		"l            -> dump diag\r\n"
 #endif
+		"m adr w      -> write word to info flash\r\n"
+		"n adr        -> read word from info flash\r\n"
+		"o            -> erase info flash\r\n"
+		"p            -> trigger syserror\r\n"
+		"q            -> malloc reset test\r\n"
 		);
 
   entry (RS_RCMD)
@@ -97,6 +107,21 @@ process (root, int)
 	if (ibuf [0] == 'l')
 		proceed (RS_DUM);
 #endif
+
+	if (ibuf [0] == 'm')
+		proceed (RS_FLW);
+
+	if (ibuf [0] == 'n')
+		proceed (RS_FLR);
+
+	if (ibuf [0] == 'o')
+		proceed (RS_FLE);
+
+	if (ibuf [0] == 'p')
+		proceed (RS_SYS);
+
+	if (ibuf [0] == 'q')
+		proceed (RS_MAL);
 
   entry (RS_RCMD+1)
 
@@ -243,5 +268,35 @@ Done:
 	diag_dump ();
 	proceed (RS_RCMD);
 #endif
+
+  entry (RS_FLR)
+
+	scan (ibuf + 1, "%u", &a);
+	if (a >= IFLASH_SIZE)
+		proceed (RS_RCMD+1);
+	diag ("IF [%u] = %x", a, IFLASH [a]);
+	proceed (RS_RCMD);
+
+  entry (RS_FLW)
+
+	scan (ibuf + 1, "%u %u", &a, &bs);
+	if (a >= IFLASH_SIZE)
+		proceed (RS_RCMD+1);
+	if_write (a, bs);
+	goto Done;
+
+  entry (RS_FLE)
+
+	if_erase ();
+	goto Done;
+
+  entry (RS_SYS)
+
+	syserror (111, "error");
+
+  entry (RS_MAL)
+
+	umalloc (16);
+	delay (100, RS_MAL);
 
 endprocess (1)
