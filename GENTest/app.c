@@ -95,10 +95,10 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 
 	// Clone the packet
 	for (i = 0; i < CloneCount; i++) {
-        	if ((dup = tcvp_new (len-2, TCV_DSP_XMT, *ses)) == NULL) {
+        	if ((dup = tcvp_new (len, TCV_DSP_XMT, *ses)) == NULL) {
 	        	diag ("Clone failed");
         	} else {
-            		memcpy ((char*) dup, (char*) p, len-2);
+            		memcpy ((char*) dup, (char*) p, len);
 	        } 
 	}
 
