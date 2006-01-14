@@ -41,7 +41,7 @@
 
 #define	STACK_GUARD		1
 
-#define	UART_RATE		9600
+#define	UART_RATE		19200
 #define	CRYSTAL_RATE		8000000
 #define	UART_BITS		8
 #define	UART_PARITY		0
@@ -55,5 +55,9 @@
 #define	INFO_FLASH		1
 #define	RESET_ON_SYSERR		1
 #define RESET_ON_MALLOC		1
-#define	TCV_LIMIT_XMT		4
-#define	TCV_LIMIT_RCV		3
+// #define	TCV_LIMIT_XMT		4
+// #define	TCV_LIMIT_RCV		3
+
+#define	DUMP_MEM		1
+
+#define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nPecunia non olet"

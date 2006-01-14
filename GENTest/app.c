@@ -9,6 +9,9 @@
 
 heapmem {10, 90};
 
+void	dmp_mem (void);
+void	tcv_dumpqueues (void);
+
 #include "ser.h"
 #include "serf.h"
 #include "form.h"
@@ -27,13 +30,25 @@ static int sfd;
 
 static word ME, YOU, ReceiverDelay = 0, CloneCount = 1, SendInterval = 1024;
 
+static word rndseed = 12345;
+
+#define	rnd_cycle 	rndseed = (entropy + 1 + rndseed) * 6751
+
 static word gen_packet_length (void) {
 
-	static	word	rndseed = 12345;
-
-	rndseed = (entropy + 1 + rndseed) * 6751;
+	rnd_cycle;
 	return ((rndseed % (MAX_PACKET_LENGTH - MIN_PACKET_LENGTH + 1)) +
 			MIN_PACKET_LENGTH) & 0xFFE;
+}
+
+static word delta (void) {
+
+	rnd_cycle;
+
+	if ((rndseed & 0x100))
+		return (rndseed | 0xff00) + 1;
+	else
+		return (rndseed & 0x00ff);
 }
 
 static int tcv_ope (int, int, va_list);
@@ -87,11 +102,25 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 	int i;
 	address dup;
 
+	// Simulate processing time
+	mdelay (len);
+
 	if (desc == NULL || (*ses = desc [phy]) == NONE)
 		return TCV_DSP_PASS;
 
-	if (RCV (p) != ME)
+	if (RCV (p) != ME) {
+		diag ("ME BAD: %x", (word)p);
+		dmp_mem ();
+		tcv_dumpqueues ();
 		return TCV_DSP_DROP;
+	}
+
+	if (len < MIN_PACKET_LENGTH || len > MAX_PACKET_LENGTH) {
+		diag ("ME OK: %x", (word)p);
+		dmp_mem ();
+		tcv_dumpqueues ();
+		goto SkipClone;
+	}
 
 	// Clone the packet
 	for (i = 0; i < CloneCount; i++) {
@@ -101,6 +130,8 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
             		memcpy ((char*) dup, (char*) p, len);
 	        } 
 	}
+
+SkipClone:
 
 	bounds->head = bounds->tail = 0;
 
@@ -137,6 +168,11 @@ process (receiver, void)
 	diag ("RCV: %d len = %u, sn = %u", RCV (packet), tcv_left (packet),
 		SER (packet));
 
+	if (RCV (packet) != ME || tcv_left (packet) < 18) {
+		dmp_mem ();
+		tcv_dumpqueues ();
+	}
+
 	tcv_endp (packet);
 
 	delay (ReceiverDelay, 0);
@@ -150,12 +186,17 @@ process (sender, void)
 
 	static word PLen, Sernum;
 	address packet;
+	int i;
 
 	nodata;
 
   entry (SN_SEND)
 
 	PLen = gen_packet_length ();
+	if (PLen < MIN_PACKET_LENGTH)
+		PLen = MIN_PACKET_LENGTH;
+	else if (PLen > MAX_PACKET_LENGTH)
+		PLen = MAX_PACKET_LENGTH;
 
   entry (SN_NEXT)
 
@@ -165,11 +206,15 @@ process (sender, void)
 
 	RCV (packet) = YOU;
 	SER (packet) = Sernum;
+
+	for (i = 6; i < PLen; i++)
+		((byte*) packet) [i] = (byte)i;
+
 	tcv_endp (packet);
 	diag ("SNT: %u [%u]", Sernum, PLen);
 	Sernum ++;
 
-	delay (SendInterval, SN_SEND);
+	delay (SendInterval + delta (), SN_SEND);
 
 endprocess (1)
 
@@ -202,12 +247,13 @@ void do_quit () {
 #define	RS_SCI		60
 #define	RS_SRD		65
 #define	RS_STA		70
+#define	RS_DUM		75
 #define	RS_QUI		80
 
 process (root, int)
 
 	static char *ibuf;
-	word n;
+	int n;
 
   entry (RS_INIT)
 
@@ -232,6 +278,7 @@ process (root, int)
 		"d n      -> set receiver delay\r\n"
 		"s        -> start\r\n"
 		"q        -> stop\r\n"
+		"f        -> ram dump\r\n"
 	);
 
   entry (RS_RCMD)
@@ -253,6 +300,8 @@ process (root, int)
 		proceed (RS_STA);
 	if (ibuf [0] == 'q')
 		proceed (RS_QUI);
+	if (ibuf [0] == 'f')
+		proceed (RS_DUM);
 
   entry (RS_RCMD+1)
 
@@ -316,6 +365,12 @@ process (root, int)
   entry (RS_QUI)
 
 	do_quit ();
+	proceed (RS_DON);
+
+  entry (RS_DUM)
+
+	dmp_mem ();
+	tcv_dumpqueues ();
 	proceed (RS_DON);
 
 endprocess (1)
