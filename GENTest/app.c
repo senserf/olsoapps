@@ -46,9 +46,9 @@ static word delta (void) {
 	rnd_cycle;
 
 	if ((rndseed & 0x100))
-		return (rndseed | 0xff00) + 1;
+		return (rndseed | 0xfff0) + 1;
 	else
-		return (rndseed & 0x00ff);
+		return (rndseed & 0x000f);
 }
 
 static int tcv_ope (int, int, va_list);
@@ -159,14 +159,25 @@ static int tcv_xmt (address p) {
 process (receiver, void)
 
 	static address packet;
+	static word SerNum = 0;
+	word ser;
 
 	nodata;
 
   entry (0)
 
 	packet = tcv_rnp (0, sfd);
-	diag ("RCV: %d len = %u, sn = %u", RCV (packet), tcv_left (packet),
-		SER (packet));
+	ser = SER (packet);
+
+	if (ser != SerNum) {
+		diag ("RCV(E): %d len = %u, sn = %u [%u]", RCV (packet),
+			tcv_left (packet), ser, SerNum);
+	} else {
+		diag ("RCV: %d len = %u, sn = %u", RCV (packet),
+			tcv_left (packet), ser);
+	}
+
+	SerNum = ser + 1;
 
 	if (RCV (packet) != ME || tcv_left (packet) < 18) {
 		dmp_mem ();
@@ -187,6 +198,7 @@ process (sender, void)
 	static word PLen, Sernum;
 	address packet;
 	int i;
+	word w;
 
 	nodata;
 
@@ -218,16 +230,19 @@ process (sender, void)
 
 endprocess (1)
 
-void do_start () {
+void do_start (int mode) {
 
-	if (!running (receiver))
-		fork (receiver, NULL);
+	if (mode == 0 || mode == 2) {
+		if (!running (receiver))
+			fork (receiver, NULL);
+		tcv_control (sfd, PHYSOPT_RXON, NULL);
+	}
 
-	if (!running (sender))
-		fork (sender, NULL);
-
-	tcv_control (sfd, PHYSOPT_RXON, NULL);
-	tcv_control (sfd, PHYSOPT_TXON, NULL);
+	if (mode == 1 || mode == 2) {
+		if (!running (sender))
+			fork (sender, NULL);
+		tcv_control (sfd, PHYSOPT_TXON, NULL);
+	}
 }
 
 void do_quit () {
@@ -274,9 +289,9 @@ process (root, int)
 		"m n      -> set own ID\r\n"
 		"y n      -> set other ID\r\n"
 		"c n      -> set clone count\r\n"
-		"i n      -> set send interval (seconds)\r\n"
-		"d n      -> set receiver delay\r\n"
-		"s        -> start\r\n"
+		"i n      -> set send interval (msec)\r\n"
+		"d n      -> set receiver delay (msec)\r\n"
+		"s n      -> start (0-rc, 1-xm, 2-both)\r\n"
 		"q        -> stop\r\n"
 		"f        -> ram dump\r\n"
 	);
@@ -345,7 +360,7 @@ process (root, int)
 	scan (ibuf + 1, "%d", &n);
 	if (n <= 0)
 		proceed (RS_RCMD+1);
-	SendInterval = n * 1024;
+	SendInterval = n;
 	proceed (RS_DON);
 
   entry (RS_SRD)
@@ -354,12 +369,16 @@ process (root, int)
 	scan (ibuf + 1, "%d", &n);
 	if (n < 0)
 		proceed (RS_RCMD+1);
-	ReceiverDelay = n * 1024;
+	ReceiverDelay = n;
 	proceed (RS_DON);
 
   entry (RS_STA)
 
-	do_start ();
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 2)
+		proceed (RS_RCMD+1);
+	do_start (n);
 	proceed (RS_DON);
 
   entry (RS_QUI)
