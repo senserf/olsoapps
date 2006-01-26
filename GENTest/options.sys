@@ -61,3 +61,5 @@
 #define	DUMP_MEM		1
 
 #define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nPecunia non olet"
+
+#define	UART_INPUT_BUFFER_LENGTH	32

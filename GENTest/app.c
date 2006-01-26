@@ -18,7 +18,7 @@ void	tcv_dumpqueues (void);
 
 #include "phys_cc1100.h"
 
-#define	IBUFLEN			24
+#define	IBUFLEN			64
 #define	MIN_PACKET_LENGTH	20
 #define	MAX_PACKET_LENGTH	32
 #define	MAXPLEN			48
@@ -263,7 +263,10 @@ void do_quit () {
 #define	RS_SRD		65
 #define	RS_STA		70
 #define	RS_DUM		75
-#define	RS_QUI		80
+#define	RS_ECO		78
+#define	RS_SEC		80
+#define	RS_SHC		85
+#define	RS_QUI		90
 
 process (root, int)
 
@@ -294,6 +297,9 @@ process (root, int)
 		"s n      -> start (0-rc, 1-xm, 2-both)\r\n"
 		"q        -> stop\r\n"
 		"f        -> ram dump\r\n"
+		"g xx..xx -> echo UART input to the terminal\r\n"
+		"k n      -> select channel n\r\n"
+		"l        -> show channel\r\n"
 	);
 
   entry (RS_RCMD)
@@ -317,6 +323,12 @@ process (root, int)
 		proceed (RS_QUI);
 	if (ibuf [0] == 'f')
 		proceed (RS_DUM);
+	if (ibuf [0] == 'g')
+		proceed (RS_ECO);
+	if (ibuf [0] == 'k')
+		proceed (RS_SEC);
+	if (ibuf [0] == 'l')
+		proceed (RS_SHC);
 
   entry (RS_RCMD+1)
 
@@ -390,6 +402,27 @@ process (root, int)
 
 	dmp_mem ();
 	tcv_dumpqueues ();
+	proceed (RS_DON);
+
+  entry (RS_ECO)
+
+	ser_out (RS_ECO, ibuf + 1);
+
+  entry (RS_ECO+1)
+
+	ser_out (RS_ECO+1, "\r\n");
+	proceed (RS_DON);
+
+  entry (RS_SEC)
+
+	scan (ibuf + 1, "%d", &n);
+	tcv_control (sfd, PHYSOPT_SETCHANNEL, (address)(&n));
+	proceed (RS_DON);
+
+  entry (RS_SHC)
+
+	tcv_control (sfd, PHYSOPT_GETCHANNEL, (address)(&n));
+	diag ("CH = %d", n);
 	proceed (RS_DON);
 
 endprocess (1)
