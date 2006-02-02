@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005                    */
+/* Copyright (C) Olsonet Communications, 2002 - 2006                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -25,10 +25,24 @@ void	tcv_dumpqueues (void);
 
 #define	RCV(a)	((a) [1])
 #define	SER(a)	((a) [2])
+#define	BOA(a)	((a) [3])
+
+static	lword	CntSent = 0, CntRcvd = 0;
 
 static int sfd;
 
-static word ME, YOU, ReceiverDelay = 0, CloneCount = 1, SendInterval = 1024;
+static word 	ME = 7,
+		YOU = 7,
+		ReceiverDelay = 0,
+		BounceDelay = 0,
+		CloneCount = 0,
+		SendInterval = 4096,
+		SendRndPat = 0,
+		BounceBackoff = 0;
+		SendRnd = 0,
+		BID = 0;
+
+static byte	Action = 0, Channel = 0, Mode = 0, SndRnd = 0, BkfRnd;
 
 static word rndseed = 12345;
 
@@ -41,14 +55,31 @@ static word gen_packet_length (void) {
 			MIN_PACKET_LENGTH) & 0xFFE;
 }
 
-static word delta (void) {
+static word gen_backoff (void) {
 
 	rnd_cycle;
+	return (rndseed & BounceBackoff);
+}
 
-	if ((rndseed & 0x100))
-		return (rndseed | 0xfff0) + 1;
+static word send_delay (void) {
+
+	int n;
+
+	if (SendRnd == 0)
+		return SendInterval;
+
+	// Randomize
+	rnd_cycle;
+
+	if ((rndseed & 0x8000))
+		n = (int) (SendInterval + (rndseed & SendRndPat));
 	else
-		return (rndseed & 0x000f);
+		n = (int) (SendInterval - (rndseed & SendRndPat));
+
+	if (n < 0)
+		n = 0;
+
+	return (word) n;
 }
 
 static int tcv_ope (int, int, va_list);
@@ -109,14 +140,16 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 		return TCV_DSP_PASS;
 
 	if (RCV (p) != ME) {
+#if 0
 		diag ("ME BAD: %x", (word)p);
 		dmp_mem ();
 		tcv_dumpqueues ();
+#endif
 		return TCV_DSP_DROP;
 	}
 
 	if (len < MIN_PACKET_LENGTH || len > MAX_PACKET_LENGTH) {
-		diag ("ME OK: %x", (word)p);
+		diag ("ME OK, PL BAD: %x", (word)p);
 		dmp_mem ();
 		tcv_dumpqueues ();
 		goto SkipClone;
@@ -156,35 +189,42 @@ static int tcv_xmt (address p) {
 
 /* ======================================================================= */
 
+#define	RC_WAIT		0
+#define	RC_DISP		1
+
 process (receiver, void)
 
 	static address packet;
 	static word SerNum = 0;
-	word ser;
 
 	nodata;
 
-  entry (0)
+  entry (RC_WAIT)
 
-	packet = tcv_rnp (0, sfd);
-	ser = SER (packet);
+	packet = tcv_rnp (RC_WAIT, sfd);
 
-	if (ser != SerNum) {
-		diag ("RCV(E): %d len = %u, sn = %u [%u]", RCV (packet),
-			tcv_left (packet), ser, SerNum);
-	} else {
-		diag ("RCV: %d len = %u, sn = %u", RCV (packet),
-			tcv_left (packet), ser);
-	}
+  entry (RC_DISP)
 
-	SerNum = ser + 1;
+	if (SER (packet) != SerNum) 
+		ser_outf (RC_DISP, "RCV(E): B%d %d len = %u, sn = %u [%u]\r\n",
+			BOA (packet),
+			RCV (packet), tcv_left (packet), SER (packet), SerNum);
+	else
+		ser_outf (RC_DISP, "RCV(K): B%d %d len = %u, sn = %u\r\n",
+			BOA (packet),
+			RCV (packet), tcv_left (packet), SER (packet));
 
+	SerNum = SER (packet) + 1;
+
+#if 0
 	if (RCV (packet) != ME || tcv_left (packet) < 18) {
 		dmp_mem ();
 		tcv_dumpqueues ();
 	}
+#endif
 
 	tcv_endp (packet);
+	CntRcvd++;
 
 	delay (ReceiverDelay, 0);
 
@@ -218,29 +258,76 @@ process (sender, void)
 
 	RCV (packet) = YOU;
 	SER (packet) = Sernum;
+	BOA (packet) = BID;
 
-	for (i = 6; i < PLen; i++)
+	for (i = 8; i < PLen; i++)
 		((byte*) packet) [i] = (byte)i;
 
 	tcv_endp (packet);
 	diag ("SNT: %u [%u]", Sernum, PLen);
+	CntSent++;
 	Sernum ++;
 
-	delay (SendInterval + delta (), SN_SEND);
+	delay (send_delay (), SN_SEND);
+
+endprocess (1)
+
+#define	BN_WAIT		0
+#define	BN_SEND		2
+
+process (bouncer, void)
+
+	static address packet;
+	address outpacket;
+	word	bkf;
+
+  entry (BN_WAIT)
+
+	packet = tcv_rnp (BN_WAIT, sfd);
+	if (RCV (packet) != ME) {
+		tcv_endp (packet);
+		proceed (BN_WAIT);
+	}
+
+  entry (BN_SEND)
+
+	outpacket = tcv_wnp (BN_SEND, sfd, tcv_left (packet));
+	memcpy ((char*) outpacket, (char*) packet, tcv_left (packet));
+	tcv_endp (packet);
+	RCV (outpacket) = YOU;
+	BOA (outpacket) = BID;
+
+	if (BounceDelay)
+		mdelay (BounceDelay);
+
+	if (BounceBackoff) {
+		bkf = gen_backoff ();
+		tcv_control (sfd, PHYSOPT_CAV, &bkf);
+	}
+
+	tcv_endp (outpacket);
+	proceed (BN_WAIT);
 
 endprocess (1)
 
 void do_start (int mode) {
 
-	if (mode == 0 || mode == 2) {
+	if (mode & 2) {
 		if (!running (receiver))
 			fork (receiver, NULL);
 		tcv_control (sfd, PHYSOPT_RXON, NULL);
 	}
 
-	if (mode == 1 || mode == 2) {
+	if (mode & 1) {
 		if (!running (sender))
 			fork (sender, NULL);
+		tcv_control (sfd, PHYSOPT_TXON, NULL);
+	}
+
+	if (mode == 4) {
+		if (!running (bouncer))
+			fork (bouncer, NULL);
+		tcv_control (sfd, PHYSOPT_RXON, NULL);
 		tcv_control (sfd, PHYSOPT_TXON, NULL);
 	}
 }
@@ -251,6 +338,7 @@ void do_quit () {
 	tcv_control (sfd, PHYSOPT_TXOFF, NULL);
 	killall (receiver);
 	killall (sender);
+	killall (bouncer);
 }
 
 #define	RS_INIT		00
@@ -260,18 +348,25 @@ void do_quit () {
 #define	RS_SYI		40
 #define	RS_SCC		50
 #define	RS_SCI		60
+#define	RS_SRC		62
 #define	RS_SRD		65
+#define RS_RPC		67
+#define RS_SPC		68
+#define RS_BID		69
 #define	RS_STA		70
+#define	RS_BKF		71
+#define	RS_BND		73
 #define	RS_DUM		75
 #define	RS_ECO		78
 #define	RS_SEC		80
-#define	RS_SHC		85
-#define	RS_QUI		90
+#define	RS_SMO		86
+#define	RS_SRE		87
 
 process (root, int)
 
 	static char *ibuf;
-	int n;
+	int n, v;
+	byte ba [4];
 
   entry (RS_INIT)
 
@@ -286,20 +381,30 @@ process (root, int)
 
   entry (RS_RCMD-2)
 
-	ser_out (RS_RCMD-2,
-		"\r\nTCV Clone Test\r\n"
-		"Commands:\r\n"
-		"m n      -> set own ID\r\n"
-		"y n      -> set other ID\r\n"
-		"c n      -> set clone count\r\n"
-		"i n      -> set send interval (msec)\r\n"
-		"d n      -> set receiver delay (msec)\r\n"
-		"s n      -> start (0-rc, 1-xm, 2-both)\r\n"
-		"q        -> stop\r\n"
-		"f        -> ram dump\r\n"
-		"g xx..xx -> echo UART input to the terminal\r\n"
-		"k n      -> select channel n\r\n"
-		"l        -> show channel\r\n"
+	ser_outf (RS_RCMD-2,
+	"\r\nTCV Clone Test\r\n"
+	"Commands:\r\n"
+	"m n      -> set own ID [%u]\r\n"
+	"y n      -> set other ID [%u]\r\n"
+	"c n      -> set clone count [%u]\r\n"
+	"i n      -> set send interval (msec) [%u]\r\n"
+	"j n      -> randomized component of send int (LS bits) [%u]\r\n"
+	"d n      -> set receiver delay (msec) [%u]\r\n"
+	"s n      -> start (0-stop, 1-xm, 2-rcv, 3-both, 4-bnc) [%u]\r\n"
+	"b n      -> bounce delay (fixed) msec [%u]\r\n"
+	"e        -> reset packet counters\r\n"
+	"p        -> show packet counters [%lu, %lu]\r\n"
+	"q n      -> set board ID [%u]\r\n"
+	"t n      -> set bounce backoff (LS bits) [%u]\r\n"
+	"f        -> ram dump\r\n"
+	"g xx..xx -> echo UART input to the terminal\r\n"
+	"k n      -> select channel n [%u]\r\n"
+	"o n      -> set mode [%u]\r\n"
+	"r n v    -> set CC1100 reg n to v\r\n"
+	,
+		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
+		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Channel,
+		Mode
 	);
 
   entry (RS_RCMD)
@@ -315,20 +420,32 @@ process (root, int)
 		proceed (RS_SCC);
 	if (ibuf [0] == 'i')
 		proceed (RS_SCI);
+	if (ibuf [0] == 'j')
+		proceed (RS_SRC);
 	if (ibuf [0] == 'd')
 		proceed (RS_SRD);
 	if (ibuf [0] == 's')
 		proceed (RS_STA);
-	if (ibuf [0] == 'q')
-		proceed (RS_QUI);
+	if (ibuf [0] == 'b')
+		proceed (RS_BND);
 	if (ibuf [0] == 'f')
 		proceed (RS_DUM);
+	if (ibuf [0] == 'e')
+		proceed (RS_RPC);
+	if (ibuf [0] == 'p')
+		proceed (RS_SPC);
+	if (ibuf [0] == 'q')
+		proceed (RS_BID);
+	if (ibuf [0] == 't')
+		proceed (RS_BKF);
 	if (ibuf [0] == 'g')
 		proceed (RS_ECO);
 	if (ibuf [0] == 'k')
 		proceed (RS_SEC);
-	if (ibuf [0] == 'l')
-		proceed (RS_SHC);
+	if (ibuf [0] == 'o')
+		proceed (RS_SMO);
+	if (ibuf [0] == 'r')
+		proceed (RS_SRE);
 
   entry (RS_RCMD+1)
 
@@ -337,10 +454,8 @@ process (root, int)
 
   entry (RS_SOI)
 
-	n = -1;
+	n = 7;
 	scan (ibuf + 1, "%d", &n);
-	if (n < 0)
-		proceed (RS_RCMD+1);
 	ME = n;
 	
   entry (RS_DON)
@@ -375,6 +490,30 @@ process (root, int)
 	SendInterval = n;
 	proceed (RS_DON);
 
+  entry (RS_SRC)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 15)
+		proceed (RS_RCMD+1);
+	SendRnd = (word) n;
+	SendRndPat = 0;
+	while (n--)
+		SendRndPat |= (1 << n);
+	proceed (RS_DON);
+
+  entry (RS_BKF)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 15)
+		proceed (RS_RCMD+1);
+	BkfRnd = (word) n;
+	BounceBackoff = 0;
+	while (n--)
+		BounceBackoff |= (1 << n);
+	proceed (RS_DON);
+
   entry (RS_SRD)
 
 	n = -1;
@@ -386,16 +525,21 @@ process (root, int)
 
   entry (RS_STA)
 
-	n = -1;
+	n = 0;
 	scan (ibuf + 1, "%d", &n);
-	if (n < 0 || n > 2)
+	if (n < 0 || n > 4)
 		proceed (RS_RCMD+1);
-	do_start (n);
+	Action = (word) n;
+	do_quit ();
+	if (n != 0)
+		do_start (n);
 	proceed (RS_DON);
 
-  entry (RS_QUI)
+  entry (RS_BND)
 
-	do_quit ();
+	n = 0;
+	scan (ibuf + 1, "%d", &n);
+	BounceDelay = (word) n;
 	proceed (RS_DON);
 
   entry (RS_DUM)
@@ -403,6 +547,16 @@ process (root, int)
 	dmp_mem ();
 	tcv_dumpqueues ();
 	proceed (RS_DON);
+
+  entry (RS_RPC)
+
+	CntSent = CntRcvd = 0;
+	proceed (RS_DON);
+
+  entry (RS_SPC)
+
+	ser_outf (RS_SPC, "Sent = %lu, Received = %lu\r\n", CntSent, CntRcvd);
+	proceed (RS_RCMD);
 
   entry (RS_ECO)
 
@@ -413,16 +567,43 @@ process (root, int)
 	ser_out (RS_ECO+1, "\r\n");
 	proceed (RS_DON);
 
+  entry (RS_BID)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n == -1)
+		proceed (RS_RCMD+1);
+	BID = n;
+	proceed (RS_DON);
+
   entry (RS_SEC)
 
 	scan (ibuf + 1, "%d", &n);
+	Channel = (byte) (n &= 0xff);
 	tcv_control (sfd, PHYSOPT_SETCHANNEL, (address)(&n));
 	proceed (RS_DON);
 
-  entry (RS_SHC)
+  entry (RS_SMO)
 
-	tcv_control (sfd, PHYSOPT_GETCHANNEL, (address)(&n));
-	diag ("CH = %d", n);
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 2)
+		proceed (RS_RCMD+1);
+	Mode = (byte) n;
+	tcv_control (sfd, PHYSOPT_SETMODE, (address)(&n));
+	proceed (RS_DON);
+
+  entry (RS_SRE)
+
+	v = -1;
+	scan (ibuf + 1, "%x %x", &n, &v);
+	if (v < 0)
+		proceed (RS_RCMD+1);
+	ba [0] = (byte) n;
+	ba [1] = (byte) v;
+	ba [2] = 255;
+
+	tcv_control (sfd, PHYSOPT_SETPARAM, (address)ba);
 	proceed (RS_DON);
 
 endprocess (1)
