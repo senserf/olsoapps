@@ -7,15 +7,6 @@
 #include "tcvphys.h"
 
 /*
- * You should run this application on two boards at the same time. When
- * started (the 's' command), it will periodically send a packet over
- * the radio channel awaiting an acknowledgment from the other board
- * before proceeding with the next packet. Also, it will be responding
- * with acknowledgments to packets received from the other board.
- *
- * If no command is entered over the serial interface within 10 seconds,
- * the application starts with "s 1024\nr", i.e., it turns the receiver
- * on and begins to send packets at 1 sec intervals.
  *
  */
 
@@ -35,6 +26,10 @@ extern word zz_rrates [];
 
 #if DM2100
 #include "phys_dm2100.h"
+#endif
+
+#if DM2200
+#include "phys_dm2200.h"
 #endif
 
 #if RADIO_DRIVER
@@ -72,7 +67,7 @@ process (receiver, void)
 
   entry (RC_SHOW)
 
-#if     CC1000 || DM2100
+#if     CC1000 || DM2100 || DM2200
  	// Show RSSI
 	ser_outf (RC_SHOW, "RCV: (len = %d), pow = %x:", tcv_left (packet),
 		packet [(tcv_left (packet) >> 1) - 1]);
@@ -227,11 +222,14 @@ process (root, int)
 	phys_dm2100 (0, MAXPLEN);
 #endif
 
+#if DM2200
+	phys_dm2200 (0, MAXPLEN);
+#endif
+
 #if RADIO_DRIVER
 	// Generic
 	phys_radio (0, 0, MAXPLEN);
 #endif
-
 	tcv_plug (0, &plug_null);
 	sfd = tcv_open (NONE, 0, 0);
 	if (sfd < 0) {
@@ -251,12 +249,12 @@ process (root, int)
 		"s intvl  -> start/reset sending interval (2 secs default)\r\n"
 		"r        -> start receiver\r\n"
 		"d i v    -> change phys parameter i to v\r\n"
-#if CC1000 == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0 && DM2200 == 0
 		// Not available
 		"c btime  -> recalibrate the transceiver\r\n"
 #endif
 
-#if DM2100 == 0
+#if DM2100 == 0 && DM2200 == 0
 		"p v      -> set transmit power\r\n"
 #endif
 
@@ -303,12 +301,12 @@ process (root, int)
 		proceed (RS_STK);
 #endif
 
-#if CC1000 == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0 && DM2200 == 0
 	if (ibuf [0] == 'c')
 		proceed (RS_CAL);
 #endif
 
-#if DM2100 == 0
+#if DM2100 == 0 && DM2200 == 0
 	if (ibuf [0] == 'p')
 		proceed (RS_POW);
 #endif
@@ -346,7 +344,7 @@ process (root, int)
 	rcv_start ();
 	proceed (RS_RCMD);
 
-#if DM2100 == 0
+#if DM2100 == 0 && DM2200 == 0
   entry (RS_POW)
 
 	/* Default */
@@ -371,7 +369,7 @@ process (root, int)
 
   entry (RS_RCP)
 
-#if CC1000 == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0 && DM2200 == 0
 	n1 = io (NONE, RADIO, CONTROL, NULL, RADIO_CNTRL_READPOWER);
 #else
 	// No RADIO device for CC1000 & DM2100
@@ -431,7 +429,7 @@ process (root, int)
 
 	proceed (RS_RCMD);
 
-#if CC1000 == 0 && DM2100 == 0
+#if CC1000 == 0 && DM2100 == 0 && DM2200 == 0
 
   entry (RS_CAL)
 

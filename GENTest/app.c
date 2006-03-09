@@ -16,7 +16,13 @@ void	tcv_dumpqueues (void);
 #include "serf.h"
 #include "form.h"
 
+#if	CC1100
 #include "phys_cc1100.h"
+#endif
+
+#if	DM2200
+#include "phys_dm2200.h"
+#endif
 
 #define	IBUFLEN			64
 #define	MIN_PACKET_LENGTH	20
@@ -32,7 +38,7 @@ static	lword	CntSent = 0, CntRcvd = 0;
 static int sfd;
 
 static word 	ME = 7,
-		YOU = 7,
+		YOU = 1,
 		ReceiverDelay = 0,
 		BounceDelay = 0,
 		CloneCount = 0,
@@ -42,7 +48,7 @@ static word 	ME = 7,
 		SendRnd = 0,
 		BID = 0;
 
-static byte	Action = 0, Channel = 0, Mode = 0, SndRnd = 0, BkfRnd;
+static byte	Action = 4, Channel = 0, Mode = 0, SndRnd = 0, BkfRnd;
 
 static word rndseed = 12345;
 
@@ -196,6 +202,7 @@ process (receiver, void)
 
 	static address packet;
 	static word SerNum = 0;
+	word len, pow;
 
 	nodata;
 
@@ -205,14 +212,20 @@ process (receiver, void)
 
   entry (RC_DISP)
 
+	len = tcv_left (packet) - 2;
+	pow = packet [len >> 1];
 	if (SER (packet) != SerNum) 
-		ser_outf (RC_DISP, "RCV(E): B%d %d len = %u, sn = %u [%u]\r\n",
+		ser_outf (RC_DISP,
+		    "RCV(E): <%x> B%d %d len = %u, sn = %u [%u]\r\n",
+			pow,
 			BOA (packet),
-			RCV (packet), tcv_left (packet), SER (packet), SerNum);
+			RCV (packet), len, SER (packet), SerNum);
 	else
-		ser_outf (RC_DISP, "RCV(K): B%d %d len = %u, sn = %u\r\n",
+		ser_outf (RC_DISP,
+		    "RCV(K): <%x> B%d %d len = %u, sn = %u\r\n",
+			pow,
 			BOA (packet),
-			RCV (packet), tcv_left (packet), SER (packet));
+			RCV (packet), len, SER (packet));
 
 	SerNum = SER (packet) + 1;
 
@@ -371,13 +384,21 @@ process (root, int)
   entry (RS_INIT)
 
 	ibuf = (char*) umalloc (IBUFLEN);
+#if CC1100
 	phys_cc1100 (0, MAXPLEN);
+#endif
+#if DM2200
+	phys_dm2200 (0, MAXPLEN);
+#endif
 	tcv_plug (0, &plug_test);
 	sfd = tcv_open (NONE, 0, 0);
 	if (sfd < 0) {
 		diag ("Cannot open tcv interface");
 		halt ();
 	}
+
+	if (Action)
+		do_start (Action);
 
   entry (RS_RCMD-2)
 
@@ -398,9 +419,11 @@ process (root, int)
 	"t n      -> set bounce backoff (LS bits) [%u]\r\n"
 	"f        -> ram dump\r\n"
 	"g xx..xx -> echo UART input to the terminal\r\n"
-	"k n      -> select channel n [%u]\r\n"
 	"o n      -> set mode [%u]\r\n"
+#if CC1100
+	"k n      -> select channel n [%u]\r\n"
 	"r n v    -> set CC1100 reg n to v\r\n"
+#endif
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
 		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Channel,
@@ -440,12 +463,14 @@ process (root, int)
 		proceed (RS_BKF);
 	if (ibuf [0] == 'g')
 		proceed (RS_ECO);
-	if (ibuf [0] == 'k')
-		proceed (RS_SEC);
 	if (ibuf [0] == 'o')
 		proceed (RS_SMO);
+#if CC1100
+	if (ibuf [0] == 'k')
+		proceed (RS_SEC);
 	if (ibuf [0] == 'r')
 		proceed (RS_SRE);
+#endif
 
   entry (RS_RCMD+1)
 
@@ -576,21 +601,31 @@ process (root, int)
 	BID = n;
 	proceed (RS_DON);
 
+  entry (RS_SMO)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+
+	if (n < 0 || n >
+#if CC1100
+2
+#endif
+#if DM2200
+3
+#endif
+	)
+		proceed (RS_RCMD+1);
+	Mode = (byte) n;
+	tcv_control (sfd, PHYSOPT_SETMODE, (address)(&n));
+	proceed (RS_DON);
+
+#if CC1100
+
   entry (RS_SEC)
 
 	scan (ibuf + 1, "%d", &n);
 	Channel = (byte) (n &= 0xff);
 	tcv_control (sfd, PHYSOPT_SETCHANNEL, (address)(&n));
-	proceed (RS_DON);
-
-  entry (RS_SMO)
-
-	n = -1;
-	scan (ibuf + 1, "%d", &n);
-	if (n < 0 || n > 2)
-		proceed (RS_RCMD+1);
-	Mode = (byte) n;
-	tcv_control (sfd, PHYSOPT_SETMODE, (address)(&n));
 	proceed (RS_DON);
 
   entry (RS_SRE)
@@ -605,5 +640,6 @@ process (root, int)
 
 	tcv_control (sfd, PHYSOPT_SETPARAM, (address)ba);
 	proceed (RS_DON);
+#endif
 
 endprocess (1)

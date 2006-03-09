@@ -28,11 +28,13 @@
 
 #define	UART_TCV		0
 
-#define	TARGET_BOARD		BOARD_GENESIS
+#define	TARGET_BOARD		BOARD_VERSA2
+//#define	TARGET_BOARD		BOARD_GENESIS
 
 #define CC1000 			0	
-#define	CC1100			1
+#define	CC1100			0
 #define DM2100 			0
+#define	DM2200			1
 #define RF24G 			0
 #define	ENTROPY_COLLECTION	1
 #define CC1000_FREQ 		868
@@ -46,20 +48,20 @@
 #define	UART_BITS		8
 #define	UART_PARITY		0
 
-#define	LBT_DELAY		0
-// #define	LBT_DELAY		8
-// This is 0-16
+//#define	LBT_DELAY		0
+#define	LBT_DELAY		8 	// This is 0-16
 #define	LBT_THRESHOLD		2
 
-#define	EEPROM_DRIVER		1
-#define	INFO_FLASH		1
-#define	RESET_ON_SYSERR		1
-#define RESET_ON_MALLOC		1
+#define	EEPROM_DRIVER		0
+#define	INFO_FLASH		0
+#define	RESET_ON_SYSERR		0
+#define RESET_ON_MALLOC		0
 // #define	TCV_LIMIT_XMT		4
 // #define	TCV_LIMIT_RCV		3
 
 #define	DUMP_MEM		1
 
-#define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nPecunia non olet"
+//#define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nPecunia non olet"
+#define	BANNER	"RFM VersaMESH2(tm) v0.1\r\nTest version"
 
 #define	UART_INPUT_BUFFER_LENGTH	32
