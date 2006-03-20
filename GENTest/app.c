@@ -48,7 +48,7 @@ static word 	ME = 7,
 		SendRnd = 0,
 		BID = 0;
 
-static byte	Action = 4, Channel = 0, Mode = 0, SndRnd = 0, BkfRnd;
+static byte	Action = 1, Channel = 0, Mode = 0, SndRnd = 0, BkfRnd;
 
 static word rndseed = 12345;
 
