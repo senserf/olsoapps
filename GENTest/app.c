@@ -374,6 +374,7 @@ void do_quit () {
 #define	RS_SEC		80
 #define	RS_SMO		86
 #define	RS_SRE		87
+#define	RS_PDO		95
 
 process (root, int)
 
@@ -424,6 +425,7 @@ process (root, int)
 	"k n      -> select channel n [%u]\r\n"
 	"r n v    -> set CC1100 reg n to v\r\n"
 #endif
+	"u d      -> enter power-down mode for d seconds\r\n"
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
 		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Channel,
@@ -471,6 +473,8 @@ process (root, int)
 	if (ibuf [0] == 'r')
 		proceed (RS_SRE);
 #endif
+	if (ibuf [0] == 'u')
+		proceed (RS_PDO);
 
   entry (RS_RCMD+1)
 
@@ -641,5 +645,31 @@ process (root, int)
 	tcv_control (sfd, PHYSOPT_SETPARAM, (address)ba);
 	proceed (RS_DON);
 #endif
+
+  entry (RS_PDO)
+
+	v = -1;
+	scan (ibuf + 1, "%d", &v);
+	if (v < 0)
+		proceed (RS_RCMD+1);
+
+	powerdown ();
+	CntSent = seconds () + v;
+	CntRcvd = 0;
+
+  entry (RS_PDO+1)
+
+	if (seconds () >= CntSent) {
+		powerup ();
+		proceed (RS_PDO+2);
+	}
+	CntRcvd++;
+	delay (20, RS_PDO+1);
+	release;
+
+  entry (RS_PDO+2)
+
+	ser_outf (RS_PDO+2, "Done, %lu wakeups\r\n", CntRcvd);
+	proceed (RS_RCMD);
 
 endprocess (1)
