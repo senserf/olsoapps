@@ -375,12 +375,16 @@ void do_quit () {
 #define	RS_SMO		86
 #define	RS_SRE		87
 #define	RS_PDO		95
+#define	RS_FLW		100
+#define	RS_FLR		110
+#define	RS_FLE		120
 
 process (root, int)
 
 	static char *ibuf;
 	int n, v;
 	byte ba [4];
+	word a, b;
 
   entry (RS_INIT)
 
@@ -426,6 +430,9 @@ process (root, int)
 	"r n v    -> set CC1100 reg n to v\r\n"
 #endif
 	"u d      -> enter power-down mode for d seconds\r\n"
+	"w adr 2  -> write word to info flash\r\n"
+	"v adr    -> read word from info flash\r\n"
+        "x        -> erase info flash\r\n"
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
 		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Channel,
@@ -475,6 +482,12 @@ process (root, int)
 #endif
 	if (ibuf [0] == 'u')
 		proceed (RS_PDO);
+	if (ibuf [0] == 'w')
+		proceed (RS_FLW);
+	if (ibuf [0] == 'v')
+		proceed (RS_FLR);
+	if (ibuf [0] == 'x')
+		proceed (RS_FLE);
 
   entry (RS_RCMD+1)
 
@@ -670,6 +683,27 @@ process (root, int)
   entry (RS_PDO+2)
 
 	ser_outf (RS_PDO+2, "Done, %lu wakeups\r\n", CntRcvd);
+	proceed (RS_RCMD);
+
+  entry (RS_FLW)
+
+	scan (ibuf + 1, "%u %u", &a, &b);
+	if (a >= IFLASH_SIZE)
+		proceed (RS_RCMD+1);
+	if_write (a, b);
+	proceed (RS_RCMD);
+
+  entry (RS_FLR)
+
+	scan (ibuf + 1, "%u", &a);
+	if (a >= IFLASH_SIZE)
+		proceed (RS_RCMD+1);
+	diag ("IF [%u] = %x", a, IFLASH [a]);
+	proceed (RS_RCMD);
+
+  entry (RS_FLE)
+
+	if_erase ();
 	proceed (RS_RCMD);
 
 endprocess (1)
