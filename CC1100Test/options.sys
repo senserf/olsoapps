@@ -1,7 +1,7 @@
 #define	MALLOC_SINGLEPOOL	1
 #define	LEDS_DRIVER		1
 #define	LEDS_BLINKING		1
-#define	USE_LEDS		1
+#define	RADIO_USE_LEDS		1
 #define	DIAG_MESSAGES		2	/* System messages to UART */
 #define	UART_DRIVER		1	/* UART A + B */
 #define	TCV_PRESENT		1	/* TCV present */
