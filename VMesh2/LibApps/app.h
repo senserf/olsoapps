@@ -5,7 +5,6 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "sysio.h"
-#include "eep_esn.h"
 #include "msg_tarp.h"
 
 // CMD_HEAD_LEN: nid_t 1 1
@@ -34,7 +33,11 @@ typedef struct cmdCtrlStruct {
 #define con_bad		((connect >> 8) &0x0F)
 #define con_miss	(connect & 0x00FF)
 
-#define CON_LED 0 
+#if TARGET_BOARD == BOARD_GENESIS
+#define CON_LED 0
+#else
+#define CON_LED 1
+#endif
 #define LED_ON	1
 #define LED_OFF 0
 #define LED_BLINK 2

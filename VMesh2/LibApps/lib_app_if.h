@@ -6,15 +6,12 @@
 /* ==================================================================== */
 #include "app.h"
 #include "msg_tarp.h"
-
 #include "app_tarp_if.h"
 
-//+++ "app_tarp.c" "lib_app.c" "msg_io.c" "oss_io.c" "eep_esn.c" "app_ser.c"
+//+++ "app_tarp.c" "lib_app.c" "msg_io.c" "oss_io.c" "app_ser.c"
 
 extern const lword ESN;
 extern nid_t net_id;
-extern lword esns[];
-extern word esn_count;
 extern word app_flags;
 extern word l_rssi;
 extern word freqs;
@@ -89,18 +86,4 @@ extern void oss_snack_in ();
 extern void oss_sens_in ();
 extern void oss_reset_in ();
 extern void oss_locale_in ();
-
-//extern void oss_info_in (word state);
-//extern void oss_info_out (char * buf, word fmt);
-
-extern int lookup_esn (lword * esn);
-extern int lookup_esn_st (lword * esn);
-extern int get_next (lword * esn, word st);
-extern bool load_esns (char * buf);
-extern void set_svec (int i, bool what);
-extern int add_esn (lword * esn, int * pos);
-extern int era_esn (lword * esn);
-extern void app_reset (word lev);
-extern word count_esn();
-extern word s_count();
 #endif

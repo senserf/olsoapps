@@ -1,4 +1,7 @@
+#include "nvm.h"
+#if EEPROM_DRIVER
 #include "eeprom.h"
+#endif
 #include "app.h"
 #include "codes.h"
 #include "msg_gene.h"
@@ -8,10 +11,57 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#define EE_NILLW	0xFFFFFFFF
+#define NVM_NILLW	0xFFFFFFFF
 lword esns [2] = {0, 0};
 word  svec [SVEC_SIZE];
 word esn_count = 0;
+
+void nvm_read (word pos, word * d, word wlen) {
+	if (wlen == 0 || pos + wlen >=
+#if EEPROM_DRIVER
+		EE_SIZE >> 1
+#else
+		IFLASH_SIZE
+#endif
+	) {
+		dbg_2 (0xE000 | (byte)wlen);
+		return;
+	}
+#if EEPROM_DRIVER
+	ee_read (pos << 1, (byte *)d, wlen << 1);
+#else
+	while (wlen--)
+		*d++ = IFLASH [pos++];
+#endif
+}
+
+void nvm_write (word pos, const word * s, word wlen) {
+	if (wlen == 0 || pos + wlen >=
+#if EEPROM_DRIVER
+		EE_SIZE >> 1
+#else
+		IFLASH_SIZE
+#endif
+	) {
+		dbg_2 (0xE100 | (byte)wlen);
+		return;
+	}
+
+#if EEPROM_DRIVER
+	ee_write (pos << 1, (const byte *)s, wlen << 1);
+#else
+	while (wlen--)
+		if_write (pos++, *s++);
+#endif
+}
+
+void nvm_erase() {
+#if EEPROM_DRIVER
+	ee_erase();
+#else
+	if_erase();
+#endif
+}
 
 extern brCtrlType br_ctrl;
 
@@ -20,13 +70,13 @@ static void read_esnt (word pos, lword * d, word n) {
 		memset (d, 0xff, n << 2);
 		n = ESN_SIZE - pos;
 	}
-	ee_read (EE_PAGE_SIZE * ESN_OSET + (pos << 2), (byte *)d, n << 2);
+	nvm_read (NVM_PAGE_SIZE * ESN_OSET + (pos << 1), (word *)d, n << 1);
 }
 
 static void write_esnt (word pos, lword * s, word n) {
 	if (pos + n > ESN_SIZE)
 		 n = ESN_SIZE - pos;
-	ee_write (EE_PAGE_SIZE * ESN_OSET + (pos << 2), (byte *)s, n << 2);
+	nvm_write (NVM_PAGE_SIZE * ESN_OSET + (pos << 1), (word *)s, n << 1);
 }
 
 void clr_esn () {
@@ -45,8 +95,8 @@ void clr_esn () {
 			}
 			read_esnt (bp = i, buf, ESN_BSIZE);
 		}
-		if (buf[i - bp] != EE_NILLW) {
-			buf[i - bp] = EE_NILLW;
+		if (buf[i - bp] != NVM_NILLW) {
+			buf[i - bp] = NVM_NILLW;
 			write_back = YES;
 			esn_count--;
 		}
@@ -66,7 +116,7 @@ word count_esn () {
 	while (i < ESN_SIZE) {
 		if (i >= bp + ESN_BSIZE)
 			read_esnt (bp = i, buf, ESN_BSIZE);
-		if (buf[i - bp] != EE_NILLW)
+		if (buf[i - bp] != NVM_NILLW)
 			cnt++;
 		i++;
 	}
@@ -84,7 +134,7 @@ int lookup_esn (lword * e) {
 			read_esnt (bp = i, buf, ESN_BSIZE);
 		if (buf[i - bp] == *e)
 			return i;
-		if (buf[i - bp] != EE_NILLW)
+		if (buf[i - bp] != NVM_NILLW)
 			rr++;
 		i++;
 	}
@@ -119,12 +169,12 @@ int get_next (lword * e, word st) {
 
 	read_esnt (0, buf, ESN_BSIZE);
 	bp = i = rr = 0;
-	lw = EE_NILLW;
+	lw = NVM_NILLW;
 	while (i < ESN_SIZE && rr < esn_count) {
 		if (i >= bp + ESN_BSIZE)
 			read_esnt (bp = i, buf, ESN_BSIZE);
 		j = i - bp;
-		if (buf[j] != EE_NILLW) {
+		if (buf[j] != NVM_NILLW) {
 			rr++;
 			if (buf[j] > *e && buf[j] < lw) {
 				b = (svec[i >> 4] >> (i & 15)) & 1;
@@ -153,7 +203,7 @@ bool load_esns (char * msg) {
 		if (i >= bp + ESN_BSIZE)
 			read_esnt (bp = i, buf, ESN_BSIZE);
 		j = i - bp;
-		if (buf[j] != EE_NILLW) {
+		if (buf[j] != NVM_NILLW) {
 			rr++;
 			if (buf[j] > esns[0]) {
 				if ((br_ctrl.rep_freq & 1) != 
@@ -188,7 +238,7 @@ bool load_esns (char * msg) {
 	}
 	in_st(msg, count) = cnt;
 	if (cnt == 0) {
-		esns[1] = EE_NILLW;
+		esns[1] = NVM_NILLW;
 		return NO;
 	}
 	memcpy (msg + sizeof(msgStType), (char *)lpack, cnt << 2);
@@ -219,7 +269,7 @@ int add_esn (lword * e, int * pos) {
 			*pos = i;
 			return RC_ERES;
 		}
-		if ( buf[i - bp] == EE_NILLW) {
+		if ( buf[i - bp] == NVM_NILLW) {
 			if (*pos == -1)
 				*pos = i;
 		} else
@@ -248,7 +298,7 @@ int era_esn (lword * e) {
 			 read_esnt (bp = i, buf, ESN_BSIZE);
 		if (buf[i - bp] == *e) {
 			svec[i >> 4] &= ~(1 << (i & 15));
-			buf[0] = EE_NILLW; // need an address
+			buf[0] = NVM_NILLW; // need an address
 			write_esnt (i, buf, 1);
 			esn_count--;
 			return i;
@@ -271,10 +321,10 @@ word s_count () {
 }
 
 void app_reset (word lev) {
-	byte a[6];
+	word a[4];
 	if (lev & 8) {
 		memset (a, 0xFF, 8);
-		ee_write (EE_NID, a, 8);
+		nvm_write (NVM_NID, a, 4);
 		clr_esn();
 		reset();
 	}
@@ -285,5 +335,5 @@ void app_reset (word lev) {
 	if (lev & 4)
 		 reset();
 }
-#undef EE_NILLW
+#undef NVM_NILLW
 

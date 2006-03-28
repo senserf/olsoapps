@@ -5,6 +5,7 @@
 #include "sysio.h"
 #include "net.h"
 #include "tarp.h"
+#include "nvm.h"
 #include "msg_gene.h"
 #include "lib_app_if.h"
 #include "codes.h"
@@ -365,7 +366,7 @@ extern tarpCtrlType tarp_ctrl;
 static void read_eprom_and_init() {
 	word w[4];
 
-	ee_read (EE_NID, (byte *)w, 8);
+	nvm_read (NVM_NID, w, 4);
 	if (w[0] == 0xFFFF)
 		net_id = 0;
 	else
@@ -443,10 +444,10 @@ static bool valid_input () {
 #define RS_RETOUT	60
 
 
-#if DM2100
-#define INFO_PHYS_	INFO_PHYS_DM2100
+#if DM2200
+#define INFO_PHYS_	INFO_PHYS_DM2200
 #else
-// assumed CC1100
+// assumed CC1100.. DM2100 isa bad (?)
 #define INFO_PHYS_	INFO_PHYS_CC1100
 #endif
 
@@ -455,7 +456,6 @@ process (root, void)
 	nodata;
 
 	entry (RS_INIT)
-
 		if (net_init (INFO_PHYS_, INFO_PLUG_TARP) < 0) {
 			dbg_0 (0x1000); // net_init failed, reset
 			reset();
@@ -492,11 +492,12 @@ process (root, void)
 			if (cmd_ctrl.oprc == RC_ECMD || 
 				cmd_ctrl.opcode == CMD_LOCALE)
 				proceed (RS_RETOUT);
-			if (cmd_ctrl.oprc != RC_OK || cmd_ctrl.opref & 0x80)
+			if (cmd_ctrl.oprc != RC_OK || cmd_ctrl.opref & 0x80) {
 				if (cmd_ctrl.s == local_host)
 					proceed (RS_RETOUT);
 				else
 					proceed (RS_CMDOUT); // send ret
+			}
 			proceed (RS_FREE);
 		} else if (net_id == 0) { // no point
 			cmd_ctrl.oprc = RC_ENET;

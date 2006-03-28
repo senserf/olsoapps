@@ -8,6 +8,7 @@
 #include "tarp.h"
 #include "codes.h"
 #include "net.h"
+#include "nvm.h"
 
 void msg_cmd_in (word state, char * buf) {
 	if (cmd_line != NULL) {
@@ -62,7 +63,7 @@ void msg_master_in (char * buf) {
 	}
 	if (is_master_chg) {
 		clr_master_chg;
-		ee_write (EE_MID, (byte *)&master_host, 2);
+		nvm_write (NVM_MID, &master_host, 1);
 		if (!running (st_rep) && br_ctrl.rep_freq >> 1)
 			fork (st_rep, NULL);
 	}
@@ -164,13 +165,13 @@ void msg_bind_in (char * buf) {
 		local_host = in_bind(buf, lh);
 	// else leave it as is
 
-	// write to eeprom
+	// write to nvm
 	w[0] = net_id;
 	w[1] = local_host;
 	w[2] = master_host = in_bind(buf, mid);
 	w[3] = in_bind(buf, encr);
 	set_encr_data(in_bind(buf, encr));
-	ee_write (EE_NID, (byte *)w, 8);
+	nvm_write (NVM_NID, w, 4);
 
 	connect = in_bind(buf, con) << 8;
 	freqs = in_bind(buf, con) & 0xFF00; // also kills unbound beacon:

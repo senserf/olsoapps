@@ -6,6 +6,7 @@
 #include "app.h"
 #include "msg_gene.h"
 #include "net.h"
+#include "nvm.h"
 
 brCtrlType br_ctrl;
 
