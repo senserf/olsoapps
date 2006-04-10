@@ -44,7 +44,7 @@ static word 	ME = 7,
 		CloneCount = 0,
 		SendInterval = 4096,
 		SendRndPat = 0,
-		BounceBackoff = 0;
+		BounceBackoff = 0,
 		SendRnd = 0,
 		BID = 0;
 
@@ -354,6 +354,58 @@ void do_quit () {
 	killall (bouncer);
 }
 
+#if	PULSE_MONITOR
+
+void	out_pmon_state () {
+
+	lword lw;
+
+	diag ("PMON STATE: %x", pmon_get_state ());
+	lw = pmon_get_cnt ();
+	diag ("CNT: %x %x",
+		(word)((lw >> 16) & 0xffff),
+		(word)((lw      ) & 0xffff) );
+	lw = pmon_get_cmp ();
+	diag ("CMP: %x %x",
+		(word)((lw >> 16) & 0xffff),
+		(word)((lw      ) & 0xffff) );
+}
+
+#define	PM_START	0
+#define	PM_NOTIFIER	1
+#define	PM_COUNTER	2
+
+process (pulse_monitor, void)
+
+	entry (PM_START)
+
+		if (pmon_pending_not ())
+			diag ("NOTIFIER PENDING 1");
+
+		if (pmon_pending_cnt ())
+			diag ("COUNTER PENDING 1");
+
+		wait (PMON_NOTEVENT, PM_NOTIFIER);
+		wait (PMON_CNTEVENT, PM_COUNTER);
+		release;
+
+	entry (PM_NOTIFIER)
+
+		diag ("NOTIFIER EVENT");
+		out_pmon_state ();
+		pmon_pending_not ();
+		proceed (PM_START);
+
+	entry (PM_COUNTER);
+
+		diag ("COMPARATOR EVENT");
+		out_pmon_state ();
+		pmon_pending_cnt ();
+		proceed (PM_START);
+endprocess (1)
+
+#endif	/* PULSE_MONITOR */
+
 #define	RS_INIT		00
 #define	RS_RCMD		10
 #define	RS_SOI		20
@@ -378,13 +430,22 @@ void do_quit () {
 #define	RS_FLW		100
 #define	RS_FLR		110
 #define	RS_FLE		120
+#define	RS_SPI		130
+#define	RS_GPI		140
+#define	RS_ADC		150
+#define	RS_CNT		160
+#define	RS_SCN		170
+#define	RS_SCM		180
+#define	RS_NOT		190
+#define	RS_CNS		200
 
 process (root, int)
 
 	static char *ibuf;
 	int n, v;
 	byte ba [4];
-	word a, b;
+	static word a, b;
+	long lw;
 
   entry (RS_INIT)
 
@@ -402,12 +463,18 @@ process (root, int)
 		halt ();
 	}
 
+#if	PULSE_MONITOR
+
+	fork (pulse_monitor, NULL);
+#endif
+
 	if (Action)
 		do_start (Action);
 
   entry (RS_RCMD-2)
 
-	ser_outf (RS_RCMD-2,
+//	ser_outf (RS_RCMD-2,
+diag (
 	"\r\nTCV Clone Test\r\n"
 	"Commands:\r\n"
 	"m n      -> set own ID [%u]\r\n"
@@ -433,6 +500,16 @@ process (root, int)
 	"w adr 2  -> write word to info flash\r\n"
 	"v adr    -> read word from info flash\r\n"
         "x        -> erase info flash\r\n"
+	"a n v    -> set pin n to v (see phys_dm2200.c)\r\n"
+	"z n      -> read pin n\r\n"
+	"l p d    -> read analog pin p with delay d\r\n"
+#if PULSE_MONITOR
+	"C 1/0 e  -> switch counter on/off rising = 1/falling = 0\r\n"
+	"S v      -> set counter to v\r\n"
+	"M v      -> set comparator to v (-1 turns off)\r\n"
+	"N 1/0 e  -> switch notifier on/off edge\r\n"
+	"O        -> show status\r\n"
+#endif
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
 		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Channel,
@@ -488,6 +565,24 @@ process (root, int)
 		proceed (RS_FLR);
 	if (ibuf [0] == 'x')
 		proceed (RS_FLE);
+	if (ibuf [0] == 'a')
+		proceed (RS_SPI);	// Set pin
+	if (ibuf [0] == 'z')
+		proceed (RS_GPI);	// Get pin
+	if (ibuf [0] == 'l')
+		proceed (RS_ADC);	// Get analog pin
+#if 	PULSE_MONITOR
+	if (ibuf [0] == 'C')
+		proceed (RS_CNT);
+	if (ibuf [0] == 'S')
+		proceed (RS_SCN);
+	if (ibuf [0] == 'M')
+		proceed (RS_SCM);
+	if (ibuf [0] == 'N')
+		proceed (RS_NOT);
+	if (ibuf [0] == 'O')
+		proceed (RS_CNS);
+#endif
 
   entry (RS_RCMD+1)
 
@@ -705,5 +800,77 @@ process (root, int)
 
 	if_erase ();
 	proceed (RS_RCMD);
+
+  entry (RS_SPI)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+	pin_write (a, b);
+	proceed (RS_DON);
+
+  entry (RS_GPI)
+
+	a = 0;
+	scan (ibuf + 1, "%d", &a);
+	diag ("PIN [%u] = %x", a, pin_read (a));
+	proceed (RS_RCMD);
+
+  entry (RS_ADC)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+
+  entry (RS_ADC+1)
+
+	n = pin_read_adc (RS_ADC+1, a, 1, b);
+
+	diag ("PIN [%u] = %d [%x]", a, n, n);
+	proceed (RS_RCMD);
+
+#if	PULSE_MONITOR
+
+  entry (RS_CNT)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+	if (a) {
+		pmon_init_cnt (b != 0);
+	} else {
+		pmon_stop_cnt ();
+	}
+	proceed (RS_DON);
+
+  entry (RS_SCN)
+
+	lw = -1;
+	scan (ibuf + 1, "%ld", &lw);
+	pmon_start_cnt (lw);
+	proceed (RS_DON);
+
+  entry (RS_SCM)
+
+	lw = -1;
+	scan (ibuf + 1, "%ld", &lw);
+	pmon_set_cmp (lw);
+	proceed (RS_DON);
+
+  entry (RS_NOT)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+	if (a) {
+		pmon_init_not (b != 0);
+		pmon_start_not ();
+	} else {
+		pmon_stop_not ();
+	}
+	proceed (RS_DON);
+
+  entry (RS_CNS)
+
+	out_pmon_state ();
+	proceed (RS_RCMD);
+	
+#endif	/* PULSE_MONITOR */
 
 endprocess (1)
