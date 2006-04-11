@@ -504,8 +504,8 @@ diag (
 	"z n      -> read pin n\r\n"
 	"l p d    -> read analog pin p with delay d\r\n"
 #if PULSE_MONITOR
-	"C 1/0 e  -> switch counter on/off rising = 1/falling = 0\r\n"
-	"S v      -> set counter to v\r\n"
+	"C v e    -> counter on, v = value, e = edge: rising = 1\r\n"
+	"S        -> stop counter\r\n"
 	"M v      -> set comparator to v (-1 turns off)\r\n"
 	"N 1/0 e  -> switch notifier on/off edge\r\n"
 	"O        -> show status\r\n"
@@ -831,20 +831,15 @@ diag (
 
   entry (RS_CNT)
 
-	a = b = 0;
-	scan (ibuf + 1, "%d %d", &a, &b);
-	if (a) {
-		pmon_init_cnt (b != 0);
-	} else {
-		pmon_stop_cnt ();
-	}
+	lw = -1;
+	b = 0;
+	scan (ibuf + 1, "%ld %d", &lw, &b);
+	pmon_start_cnt (lw, b != 0);
 	proceed (RS_DON);
 
   entry (RS_SCN)
 
-	lw = -1;
-	scan (ibuf + 1, "%ld", &lw);
-	pmon_start_cnt (lw);
+	pmon_stop_cnt ();
 	proceed (RS_DON);
 
   entry (RS_SCM)
@@ -859,8 +854,7 @@ diag (
 	a = b = 0;
 	scan (ibuf + 1, "%d %d", &a, &b);
 	if (a) {
-		pmon_init_not (b != 0);
-		pmon_start_not ();
+		pmon_start_not (b != 0);
 	} else {
 		pmon_stop_not ();
 	}
