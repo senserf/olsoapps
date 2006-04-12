@@ -33,11 +33,11 @@ typedef struct cmdCtrlStruct {
 #define con_bad		((connect >> 8) &0x0F)
 #define con_miss	(connect & 0x00FF)
 
-#if TARGET_BOARD == BOARD_GENESIS
+//#if TARGET_BOARD == BOARD_GENESIS
 #define CON_LED 0
-#else
-#define CON_LED 1
-#endif
+//#else
+//#define CON_LED 1
+//#endif
 #define LED_ON	1
 #define LED_OFF 0
 #define LED_BLINK 2
