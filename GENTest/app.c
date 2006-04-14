@@ -438,6 +438,7 @@ endprocess (1)
 #define	RS_SCM		180
 #define	RS_NOT		190
 #define	RS_CNS		200
+#define	RS_SUR		210
 
 process (root, int)
 
@@ -509,6 +510,10 @@ diag (
 	"M v      -> set comparator to v (-1 turns off)\r\n"
 	"N 1/0 e  -> switch notifier on/off edge\r\n"
 	"O        -> show status\r\n"
+#endif
+
+#if UART_RATE_SETTABLE
+	"R n      -> set UART rate\r\n"
 #endif
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
@@ -582,6 +587,11 @@ diag (
 		proceed (RS_NOT);
 	if (ibuf [0] == 'O')
 		proceed (RS_CNS);
+#endif
+
+#if UART_RATE_SETTABLE
+	if (ibuf [0] == 'R')
+		proceed (RS_SUR);
 #endif
 
   entry (RS_RCMD+1)
@@ -864,7 +874,21 @@ diag (
 
 	out_pmon_state ();
 	proceed (RS_RCMD);
-	
+
 #endif	/* PULSE_MONITOR */
+
+#if UART_RATE_SETTABLE
+
+  entry (RS_SUR)
+
+	a = 0;
+	scan (ibuf + 1, "%u", &a);
+
+	if (a == 0)
+		proceed (RS_RCMD+1);
+
+	ion (UART, CONTROL, (char*)(&a), UART_CNTRL_SETRATE);
+	proceed (RS_RCMD);
+#endif
 
 endprocess (1)

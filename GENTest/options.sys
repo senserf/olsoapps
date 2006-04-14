@@ -16,7 +16,7 @@
 
 #define	LEDS_DRIVER		1
 #define	LEDS_BLINKING		1
-#define	RADIO_USE_LEDS		6
+#define	RADIO_USE_LEDS		7
 #define	DIAG_MESSAGES		2
 #define	UART_DRIVER		1	/* UART A + B */
 #define	TCV_PRESENT		1	/* TCV present */
@@ -68,3 +68,4 @@
 #define	BANNER	"RFM VersaMESH2(tm) v0.1\r\nDual Crystal"
 
 #define	UART_INPUT_BUFFER_LENGTH	32
+#define	UART_RATE_SETTABLE		1
