@@ -68,4 +68,3 @@
 #define	BANNER	"RFM VersaMESH2(tm) v0.1\r\nDual Crystal"
 
 #define	UART_INPUT_BUFFER_LENGTH	32
-#define	UART_RATE_SETTABLE		1
