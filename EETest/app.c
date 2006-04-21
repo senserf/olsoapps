@@ -32,6 +32,7 @@ heapmem {10, 90};
 #define	RS_MAL		180
 
 word	a, w, len, bs, nt, sl, ss, dcnt;
+int	b;
 lword	lw;
 byte	str [129], *blk;
 char	ibuf [132];
@@ -61,7 +62,7 @@ process (root, int)
 #endif
 		"m adr w      -> write word to info flash\r\n"
 		"n adr        -> read word from info flash\r\n"
-		"o            -> erase info flash\r\n"
+		"o adr        -> erase info flash\r\n"
 		"p            -> trigger syserror\r\n"
 		"q            -> malloc reset test\r\n"
 		);
@@ -282,12 +283,17 @@ Done:
 	scan (ibuf + 1, "%u %u", &a, &bs);
 	if (a >= IFLASH_SIZE)
 		proceed (RS_RCMD+1);
-	if_write (a, bs);
+	if (if_write (a, bs))
+		diag ("FAILED");
+	else
+		diag ("OK");
 	goto Done;
 
   entry (RS_FLE)
 
-	if_erase ();
+	b = -1;
+	scan (ibuf + 1, "%d", &b);
+	if_erase (b);
 	goto Done;
 
   entry (RS_SYS)
