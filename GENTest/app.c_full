@@ -382,7 +382,7 @@ process (pulse_monitor, void)
 		if (pmon_pending_not ())
 			diag ("NOTIFIER PENDING 1");
 
-		if (pmon_pending_cnt ())
+		if (pmon_pending_cmp ())
 			diag ("COUNTER PENDING 1");
 
 		wait (PMON_NOTEVENT, PM_NOTIFIER);
@@ -400,7 +400,7 @@ process (pulse_monitor, void)
 
 		diag ("COMPARATOR EVENT");
 		out_pmon_state ();
-		pmon_pending_cnt ();
+		pmon_pending_cmp ();
 		proceed (PM_START);
 endprocess (1)
 
@@ -798,7 +798,7 @@ diag (
 
   entry (RS_FLE)
 
-	if_erase ();
+	if_erase (-1);
 	proceed (RS_RCMD);
 
   entry (RS_SPI)

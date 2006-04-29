@@ -798,7 +798,7 @@ diag (
 
   entry (RS_FLE)
 
-	if_erase ();
+	if_erase (-1);
 	proceed (RS_RCMD);
 
   entry (RS_SPI)

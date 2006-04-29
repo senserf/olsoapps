@@ -47,7 +47,7 @@
 
 #define	UART_RATE		9600
 #define	CRYSTAL_RATE		32768
-#define	CRYSTAL2_RATE		8000000
+#define	CRYSTAL2_RATE		6000000
 #define	UART_BITS		8
 #define	UART_PARITY		0
 
