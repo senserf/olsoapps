@@ -50,21 +50,15 @@ static word 	ME = 7,
 
 static byte	Action = 1, Channel = 0, Mode = 0, SndRnd = 0, BkfRnd;
 
-static word rndseed = 12345;
-
-#define	rnd_cycle 	rndseed = (entropy + 1 + rndseed) * 6751
-
 static word gen_packet_length (void) {
 
-	rnd_cycle;
-	return ((rndseed % (MAX_PACKET_LENGTH - MIN_PACKET_LENGTH + 1)) +
+	return ((rnd () % (MAX_PACKET_LENGTH - MIN_PACKET_LENGTH + 1)) +
 			MIN_PACKET_LENGTH) & 0xFFE;
 }
 
 static word gen_backoff (void) {
 
-	rnd_cycle;
-	return (rndseed & BounceBackoff);
+	return (rnd () & BounceBackoff);
 }
 
 static word send_delay (void) {
@@ -75,12 +69,11 @@ static word send_delay (void) {
 		return SendInterval;
 
 	// Randomize
-	rnd_cycle;
 
-	if ((rndseed & 0x8000))
-		n = (int) (SendInterval + (rndseed & SendRndPat));
+	if ((rnd () & 0x80))
+		n = (int) (SendInterval + (rnd () & SendRndPat));
 	else
-		n = (int) (SendInterval - (rndseed & SendRndPat));
+		n = (int) (SendInterval - (rnd () & SendRndPat));
 
 	if (n < 0)
 		n = 0;
