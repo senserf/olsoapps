@@ -1,7 +1,7 @@
-#ifndef __msg_geneStructs_h
-#define __msg_geneStructs_h
+#ifndef __msg_vmeshStructs_h
+#define __msg_vmeshStructs_h
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -13,6 +13,7 @@
 typedef struct msgMasterStruct {
 	headerType	header;
 	word		con;
+	word		cyc;
 } msgMasterType;
 #define in_master(buf, field)   (((msgMasterType *)(buf))->field)
 
@@ -100,5 +101,17 @@ typedef struct msgStNackStruct {
 	headerType	header;
 } msgStNackType;
 #define in_stNack(buf, field)  (((msgStNackType *)(buf))->field)
+
+typedef struct msgIoStruct {
+	headerType	header;
+	lword		pload;
+} msgIoType;
+#define in_io(buf, field)	(((msgIoType *)(buf))->field)
+
+typedef struct msgIoAckStruct {
+	headerType	header;
+	lword		pload;
+} msgIoAckType;
+#define in_ioAck(buf, field)	(((msgIoAckType *)(buf))->field)
 
 #endif

@@ -4,7 +4,7 @@
 /* ==================================================================== */
 #include "sysio.h"
 #include "msg_tarp.h"
-#include "msg_gene.h"
+#include "msg_vmesh.h"
 
 nid_t	local_host, master_host;
 

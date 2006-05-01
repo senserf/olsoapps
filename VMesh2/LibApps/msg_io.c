@@ -4,7 +4,7 @@
 /* ==================================================================== */
 #include "sysio.h"
 #include "lib_app_if.h"
-#include "msg_gene.h"
+#include "msg_vmesh.h"
 #include "tarp.h"
 #include "codes.h"
 #include "net.h"
@@ -66,6 +66,10 @@ void msg_master_in (char * buf) {
 		nvm_write (NVM_MID, &master_host, 1);
 		if (!running (st_rep) && br_ctrl.rep_freq >> 1)
 			fork (st_rep, NULL);
+		if (running (cyc_man)) {
+			kill (running (cyc_man));
+			cyc_ctrl.st = CYC_ST_ENA;
+		}
 	}
 
 	// clear missed, set warn, bad and audit_freq
@@ -82,6 +86,32 @@ void msg_master_in (char * buf) {
 			trigger (CON_TRIG);
 	} else if (audit_freq != 0)
 		fork (con_man, NULL);
+
+	if (in_master(buf, cyc) == 0xDFFF) { // specialties
+		if (running (cyc_man))
+			kill (running (cyc_man));
+		if (cyc_ctrl.st != CYC_ST_DIS) {
+			cyc_ctrl.st = CYC_ST_DIS;
+			nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
+		}
+		return;
+	}
+	if (in_master(buf, cyc) == 0xEFFF) {
+		if (running (cyc_man))
+			kill (running (cyc_man));
+		if (cyc_ctrl.st != CYC_ST_ENA && cyc_ctrl.st != CYC_ST_DIS)
+			cyc_ctrl.st = CYC_ST_ENA;
+		return;
+	}	
+
+	if (in_master(buf, cyc) != 0 && cyc_ctrl.st == CYC_ST_ENA) {
+		if (running (cyc_man)) { // bad
+			dbg_2 (0xC200 | cyc_ctrl.st);
+			kill (running (cyc_man));
+		}
+		cyc_ctrl.prep = in_master(buf, cyc);
+		fork (cyc_man, NULL);
+	}
 }
 
 void msg_master_out (word state, char** buf_out) {
@@ -94,7 +124,7 @@ void msg_master_out (word state, char** buf_out) {
 	in_header(*buf_out, msg_type) = msg_master;
 	in_header(*buf_out, rcv) = cmd_ctrl.t;
 	in_header(*buf_out, hco) = 0;
-	in_master(*buf_out, con) = freqs & 0xFF00 | (connect >> 8);
+	//in_master(*buf_out, con) = freqs & 0xFF00 | (connect >> 8);
 }
 
 void msg_traceAck_in (word state, char * buf) {
@@ -148,7 +178,7 @@ void msg_trace_out (word state, char** buf_out) {
 }
 
 void msg_bind_in (char * buf) {
-	word w[4];
+	word w[5];
 	
 	// nid from the chip is either 0 or the same as the message's
 	if (net_id == in_bind(buf, nid))
@@ -171,7 +201,8 @@ void msg_bind_in (char * buf) {
 	w[2] = master_host = in_bind(buf, mid);
 	w[3] = in_bind(buf, encr);
 	set_encr_data(in_bind(buf, encr));
-	nvm_write (NVM_NID, w, 4);
+	w[4] = encr_data;
+	nvm_write (NVM_NID, w, 5);
 
 	connect = in_bind(buf, con) << 8;
 	freqs = in_bind(buf, con) & 0xFF00; // also kills unbound beacon:
@@ -286,6 +317,13 @@ void msg_st_in (char * buf) {
 		oss_st_out (buf, NO);
 }
 
+void msg_io_in (char * buf) {
+	if (is_autoack && msg_ioAck_out (buf))
+		oss_io_out (buf, YES);
+	else
+		oss_io_out (buf, NO);
+}
+
 int msg_st_out () {
 	char * buf_out = get_mem (NONE, sizeof(msgStType) + (ESN_PACK << 2));
 	if (buf_out == NULL)
@@ -299,6 +337,19 @@ int msg_st_out () {
 	in_header(buf_out, hco) = 0;
 	in_st(buf_out, con) = connect;
 	send_msg (buf_out, sizeof(msgStType) +(in_st(buf_out, count) << 2));
+	ufree (buf_out);
+	return YES;
+}
+
+bool msg_io_out () {
+	char * buf_out = get_mem (NONE, sizeof(msgIoType));
+	if (buf_out == NULL)
+		return NO;
+	in_header(buf_out, msg_type) = msg_io;
+	in_header(buf_out, rcv) = master_host;
+	in_header(buf_out, hco) = 0;
+	in_io(buf_out, pload) = io_pload;
+	send_msg (buf_out, sizeof(msgIoType));
 	ufree (buf_out);
 	return YES;
 }
@@ -394,4 +445,29 @@ bool msg_stNack_out (nid_t dest) {
 	return YES;
 }
 	
+void msg_ioAck_in (char * buf) {
+	if (is_ioACK || io_pload != in_ioAck(buf, pload))
+		return;
+	set_ioACK;
+	trigger (IO_ACK_TRIG);
+}
+
+bool msg_ioAck_out (char * buf) {
+	char * buf_out = get_mem (NONE, sizeof(msgIoAckType));
+	if (buf_out == NULL)
+		return NO;
+	in_header(buf_out, msg_type) = msg_ioAck;
+	in_header(buf_out, hco) = 0;
+	if (buf == NULL) { // cmd line
+		in_header(buf_out, rcv) = cmd_ctrl.t;
+		memcpy (&in_ioAck(buf_out, pload), cmd_line +1, 4);
+	} else { // msg_io in
+		in_header(buf_out, rcv) = in_header(buf, snd);
+		in_ioAck(buf_out, pload) = in_io(buf, pload);
+	}
+	send_msg (buf_out, sizeof(msgIoAckType));
+	ufree (buf_out);
+	return YES;
+}
+
 

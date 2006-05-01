@@ -4,20 +4,28 @@
 /* ==================================================================== */
 #include "sysio.h"
 #include "app.h"
-#include "msg_gene.h"
+#include "msg_vmesh.h"
 #include "net.h"
 #include "nvm.h"
-
-brCtrlType br_ctrl;
+#if DM2200 && PULSE_MONITOR
+#include "phys_dm2200.h"
+#endif
 
 const	lword	ESN = 0xBACA0001;
+lword	cyc_sp;
+lword	cyc_left = 0;
+lword	io_creg; // LSB: nvm_freq :6, cmp oper :2; creg :24
+lword	io_pload = 0xFFFFFFFF;
 
 nid_t	net_id;
 word	app_flags, freqs, connect, l_rssi;
+byte * cmd_line  = NULL;
 
-char * cmd_line  = NULL;
 cmdCtrlType cmd_ctrl = {0, 0x00, 0x00, 0x00, 0x00};
+brCtrlType br_ctrl;
+cycCtrlType cyc_ctrl;
 
+int cyc_man (word, address);
 int beacon (word, address);
 
 char * get_mem (word state, int len);
@@ -28,8 +36,10 @@ extern nid_t local_host;
 extern nid_t master_host;
 extern bool msg_br_out();
 extern int msg_st_out();
+extern bool msg_io_out();
 extern lword esns[];
 extern word  svec[];
+extern void oss_io_out (char * buf, bool acked);
 
 #define SRS_ITER	00
 #define SRS_BR		10
@@ -104,6 +114,135 @@ endprocess (1)
 #undef SRS_NEXT
 #undef SRS_FIN
 
+#define IRS_ITER	0
+#define IRS_IRUPT	10
+#define IRS_REP		20
+#define IRS_NVM		30
+#define IRS_FIN		40
+process (io_rep, void)
+	static int left;
+	lword lw;
+	nodata;
+
+	entry (IRS_ITER)
+		wait (PMON_CMPEVENT, IRS_IRUPT);
+		wait (PMON_NOTEVENT, IRS_IRUPT);
+		if (io_creg >> 26) // nvm writes
+			delay ((word)(io_creg >> 26) << 10, IRS_NVM);
+		if ((lw = pmon_get_state()) & PMON_STATE_CMP_PENDING ||
+				lw & PMON_STATE_NOT_PENDING)
+			proceed (IRS_IRUPT);
+		release;
+
+	entry (IRS_IRUPT)
+		io_pload = pmon_get_cnt() << 8 | pmon_get_state();
+		if (io_pload & PMON_STATE_CMP_PENDING) {
+			switch (io_creg & 3) {
+				case 1:
+					pmon_add_cmp (io_creg >> 8);
+					break;
+				case 2:
+					pmon_sub_cnt (io_creg >> 8);
+					break;
+				case 3:
+					pmon_dec_cnt ();
+			} // 0 is nop
+			pmon_pending_cmp();
+		}
+		if (io_pload & PMON_STATE_NOT_PENDING)
+			pmon_pending_not();
+		left = ack_retries + 1; // +1 makes "tries" from "retries"
+
+	entry (IRS_REP)
+		if (left-- <= 0)
+			proceed (IRS_FIN);
+
+		// this is different from br_rep: report locally as well
+		if (master_host == 0 || master_host == local_host) {
+			oss_io_out(NULL, YES);
+			proceed (IRS_FIN);
+		}
+
+		clr_ioACK;
+		if (msg_io_out())
+			wait (IO_ACK_TRIG, IRS_FIN);
+		delay (ack_tout << 10, IRS_REP);
+		wait (PMON_CMPEVENT, IRS_IRUPT);
+		wait (PMON_NOTEVENT, IRS_IRUPT);
+		release;
+
+	entry (IRS_NVM)
+		nvm_io_backup();
+		proceed (IRS_ITER);
+
+	entry (IRS_FIN)
+		io_pload = 0xFFFFFFFF;
+		proceed (IRS_ITER);
+
+endprocess (1)
+#undef IRS_ITER
+#undef IRS_IRUPT
+#undef IRS_REP
+#undef IRS_NVM
+#undef IRS_FIN
+
+
+#define CS_INIT         00
+#define CS_ACT          10
+process (cyc_man, void)
+	word a;
+	nodata;
+
+	entry (CS_INIT)
+		if (cyc_ctrl.st == CYC_ST_DIS || cyc_ctrl.mod == CYC_MOD_PON ||
+			cyc_ctrl.mod == CYC_MOD_POFF || cyc_sp == 0) {
+			cyc_left = 0;
+			kill (0);
+		}
+
+		if (cyc_ctrl.st == CYC_ST_SLEEP || cyc_ctrl.st == CYC_ST_ENA)
+			cyc_left = cyc_sp;
+		else
+			cyc_left = cyc_ctrl.prep;
+
+	entry (CS_ACT)
+		if (cyc_ctrl.st == CYC_ST_DIS || cyc_ctrl.mod == CYC_MOD_PON ||
+                        cyc_ctrl.mod == CYC_MOD_POFF || cyc_ctrl.prep == 0 ||
+			cyc_sp == 0) {
+			cyc_left = 0;
+                        kill (0);
+		}
+		if (cyc_left == 0) {
+			switch (cyc_ctrl.st) {
+				case CYC_ST_ENA:
+					cyc_ctrl.st = CYC_ST_PREP;
+					break;
+				case CYC_ST_PREP:
+					if (master_host == local_host)
+						cyc_ctrl.st = CYC_ST_ENA;
+					else
+						cyc_ctrl.st = CYC_ST_SLEEP;
+					break;
+				default:  // also CYC_ST_SLEEP
+					cyc_left = 0;
+					kill (0);
+			}
+			proceed (CS_INIT);
+		}
+		if (cyc_left < 64) {
+			a = (word)cyc_left;
+			cyc_left = 0;
+			delay (a << 10, CS_ACT);
+		} else {
+			a = (word)(cyc_left >> 6);
+			cyc_left -= (lword)a;
+			ldelay (a, CS_ACT);
+		}
+		release;
+endprocess (1)
+#undef CS_INIT
+#undef CS_ACT
+
 #define BS_ITER 00
 #define BS_ACT  10
 process (beacon, char)
@@ -124,7 +263,7 @@ process (beacon, char)
 				ufree (data);
 				kill (0);
 			}
-			in_master(data, con) = freqs & 0xFF00 | (connect >> 8);
+			//in_master(data, con) = freqs & 0xFF00 | (connect >> 8);
 			send_msg (data, sizeof(msgMasterType));
 			break;
 // not needed, out:
@@ -198,6 +337,30 @@ char * get_mem (word state, int len) {
 	return buf;
 }
 
+static word get_prep () {
+	word v1, v2, v3;
+	if (cyc_ctrl.mod)
+		return (cyc_ctrl.mod & 1 ? 0xDFFF : 0xEFFF);
+
+	if (cyc_ctrl.st == CYC_ST_DIS || cyc_ctrl.prep == 0 ||
+			(v1 = running (cyc_man)) == 0)
+		return 0;
+
+	if ((v2 = ldleft (v1, &v3)) != MAX_UINT)
+		v3 += v2 << 6;
+	else {
+		if ((v3 = dleft (v1)) == MAX_UINT)
+			v3 = 0;
+		else
+			v3 >>= 10;
+	}
+	if ((v3 += cyc_left) >= cyc_sp) {
+		dbg_2 (0xC2F4);
+		return 0;
+	}
+	return v3;
+}
+
 void send_msg (char * buf, int size) {
 
 	// this shouldn't be... but saves time in debugging
@@ -206,13 +369,13 @@ void send_msg (char * buf, int size) {
 		return;
 	}
 
+	// master inserts are convenient here, as the beacon is prominent...
+	if (in_header(buf, msg_type) == msg_master) {
+		in_master(buf, con) = freqs & 0xFF00 | (connect >> 8);
+		in_master(buf, cyc) = get_prep();
+	}
+
 	if (net_tx (NONE, buf, size, encr_data) != 0) {
-#if 0
-		// dupa: remove with the new driver
-		net_opt (PHYSOPT_RXOFF, NULL);
-		net_opt (PHYSOPT_TXON, NULL);
-		net_opt (PHYSOPT_RXON, NULL);
-#endif
 		dbg_a (0x0500 | in_header(buf, msg_type)); // Tx failed
 	}
 }

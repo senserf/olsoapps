@@ -33,7 +33,7 @@
 //#define RF24G			0
 //#define CC1000_FREQ		433
 
-#define CRYSTAL2_RATE		8000000
+#define CRYSTAL2_RATE		6000000
 #define CRYSTAL_RATE		32768
 
 #define LBT_DELAY		0
@@ -52,3 +52,5 @@
 #define RESET_ON_MALLOC		1
 #define UART_INPUT_BUFFER_LENGTH 32
 #define MSK_BACKOFF		0xFF
+#define PULSE_MONITOR		1
+

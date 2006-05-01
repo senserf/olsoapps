@@ -3,11 +3,16 @@
 #include "eeprom.h"
 #endif
 #include "app.h"
+#include "app_tarp_if.h"
 #include "codes.h"
-#include "msg_gene.h"
+#include "msg_vmesh.h"
+#include "lib_app_if.h"
+#if DM2200 && PULSE_MONITOR
+#include "phys_dm2200.h"
+#endif
 
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -16,8 +21,18 @@ lword esns [2] = {0, 0};
 word  svec [SVEC_SIZE];
 word esn_count = 0;
 
-void nvm_read (word pos, word * d, word wlen) {
-	if (wlen == 0 || pos + wlen >=
+
+#if EEPROM_DRIVER
+#define nvm_erase(a)	ee_erase()
+#else
+#define nvm_erase(a)	do { \
+				if_erase(a); \
+				dbg_f(0xF000 | (a)); \
+			} while (0)
+#endif
+
+void nvm_read (word pos, address d, word wlen) {
+	if (wlen == 0 || pos + wlen >
 #if EEPROM_DRIVER
 		EE_SIZE >> 1
 #else
@@ -35,6 +50,33 @@ void nvm_read (word pos, word * d, word wlen) {
 #endif
 }
 
+#if !EEPROM_DRIVER
+static void fpage_reset (word p) {
+	lword lw;
+	if (p & 0xFFC0) { // ESN page: should not be
+		dbg_2 (0xE200 | p);
+		nvm_erase (-1);
+	} else
+		nvm_erase (p);
+	if_write (NVM_NID, net_id);
+	if_write (NVM_LH, local_host);
+	if_write (NVM_MID, master_host);
+	if_write (NVM_APP, encr_data);
+	memcpy (&lw, &cyc_ctrl, 2);
+	if_write (NVM_CYC_CTRL, (word)lw);
+	if_write (NVM_CYC_SP, (word)cyc_sp);
+	if_write (NVM_CYC_SP +1, (word)(cyc_sp >> 16));
+	lw = pmon_get_cmp();
+	if_write (NVM_IO_CMP, (word)lw);
+	if_write (NVM_IO_CMP +1, (word)(lw >> 16));
+	if_write (NVM_IO_CREG, (word)io_creg);
+	if_write (NVM_IO_CREG +1, (word)(io_creg >> 16));
+	lw = pmon_get_cnt() << 8 | pmon_get_state();
+	if_write (NVM_IO_STATE, (word)lw);
+	if_write (NVM_IO_STATE +1, (word)(lw >> 16));
+}
+#endif
+
 void nvm_write (word pos, const word * s, word wlen) {
 	if (wlen == 0 || pos + wlen >=
 #if EEPROM_DRIVER
@@ -50,16 +92,18 @@ void nvm_write (word pos, const word * s, word wlen) {
 #if EEPROM_DRIVER
 	ee_write (pos << 1, (const byte *)s, wlen << 1);
 #else
-	while (wlen--)
-		if_write (pos++, *s++);
-#endif
-}
-
-void nvm_erase() {
-#if EEPROM_DRIVER
-	ee_erase();
-#else
-	if_erase();
+	while (wlen--) {
+		if (IFLASH [pos] == *s) {
+			pos++; s++;
+			continue;
+		}
+		if (if_write (pos, *s) != 0) {
+			fpage_reset (pos);
+			return;
+		} else {
+			 pos++; s++;
+		}
+	}
 #endif
 }
 
@@ -70,16 +114,17 @@ static void read_esnt (word pos, lword * d, word n) {
 		memset (d, 0xff, n << 2);
 		n = ESN_SIZE - pos;
 	}
-	nvm_read (NVM_PAGE_SIZE * ESN_OSET + (pos << 1), (word *)d, n << 1);
+	nvm_read (NVM_PAGE_SIZE * ESN_OSET + (pos << 1), (address)d, n << 1);
 }
 
 static void write_esnt (word pos, lword * s, word n) {
 	if (pos + n > ESN_SIZE)
 		 n = ESN_SIZE - pos;
-	nvm_write (NVM_PAGE_SIZE * ESN_OSET + (pos << 1), (word *)s, n << 1);
+	nvm_write (NVM_PAGE_SIZE * ESN_OSET + (pos << 1), (address)s, n << 1);
 }
 
 void clr_esn () {
+#if EEPROM_DRIVER
 	lword buf [ESN_BSIZE];
 	word bp, i, rr;
 	bool write_back;
@@ -105,6 +150,9 @@ void clr_esn () {
 	if (write_back)
 		write_esnt (bp, buf, ESN_BSIZE);
 	memset (svec, 0, SVEC_SIZE << 1);
+#else
+	nvm_erase (69);
+#endif
 }
 
 word count_esn () {
@@ -321,11 +369,8 @@ word s_count () {
 }
 
 void app_reset (word lev) {
-	word a[4];
 	if (lev & 8) {
-		memset (a, 0xFF, 8);
-		nvm_write (NVM_NID, a, 4);
-		clr_esn();
+		nvm_erase(-1);
 		reset();
 	}
 	if (lev & 2)
@@ -334,6 +379,37 @@ void app_reset (word lev) {
 		memset (svec, 0, SVEC_SIZE << 1);
 	if (lev & 4)
 		 reset();
+}
+
+void nvm_io_backup () {
+#if EEPROM_DRIVER
+	lword lw = pmon_get_cmp();
+	nvm_write (NVM_IO_CMP, (address)&lw, 2);
+	nvm_write (NVM_IO_CREG, (address)&io_creg, 2);
+	lw = pmon_get_cnt() << 8 | pmon_get_state();
+	nvm_write (NVM_IO_STATE, (address)&lw, 2);
+#else
+/*
+	lword lw;
+	word i = NVM_IO_STATE;
+	while (IFLASH[i] != 0xFFFF) {
+		if ((i += 2) >=  NVM_PAGE_SIZE -1) {
+			fpage_reset (0);
+			return;
+		}
+	}
+	lw = pmon_get_cnt() << 8 | pmon_get_state();
+	nvm_write (i, (address)&lw, 2);
+*/
+	lword lw = pmon_get_cnt() << 8 | pmon_get_state();
+	word i = NVM_IO_STATE;
+	while (if_write (i, (word)lw) == -1 ||
+		if_write (i +1, (word)(lw >> 16)) == -1)
+			if ((i += 2) >=  NVM_PAGE_SIZE -1) {
+				fpage_reset (0);
+				return;
+			}
+#endif
 }
 #undef NVM_NILLW
 

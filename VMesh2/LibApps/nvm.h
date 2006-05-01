@@ -11,8 +11,8 @@
 #define ESN_SIZE	1008
 #define NVM_PAGE_SIZE	(EE_PAGE_SIZE >> 1)
 #else
-#define ESN_SIZE	48
-#define NVM_PAGE_SIZE	16
+#define ESN_SIZE	32
+#define NVM_PAGE_SIZE	64
 #endif
 
 #define SVEC_SIZE	(ESN_SIZE >> 4)
@@ -21,15 +21,27 @@
 #define ESN_PACK	5
 
 // IMPORTANT: always keep them TOGETHER and away from the ESN's space
+#define NVM_BOOT_LEN	13
 #define NVM_NID		0
 #define NVM_LH		(NVM_NID + 1)
 #define NVM_MID		(NVM_NID + 2)
 #define NVM_APP		(NVM_NID + 3)
 // NVM_APP: b0-b2: encr; b3-b15 spare
+// if we run out of this page, all we need for duty cycles are 2 bits for mod
+// and dis/ena flag, so we can add them to NVM_APP... all together, we should
+// have 13 + 14 + (8 or even whole NVM_IO_CMP) spares here...
+#define NVM_CYC_CTRL    (NVM_NID + 4)
 
-extern void nvm_read (word pos, word * d, word wlen);
+#define NVM_CYC_SP	(NVM_NID + 5)
+
+#define NVM_IO_CMP	(NVM_NID + 7)
+#define NVM_IO_CREG	(NVM_NID + 9)
+#define NVM_IO_STATE	(NVM_NID + 11)
+
+extern void nvm_read (word pos, address d, word wlen);
 extern void nvm_write (word pos, const word * s, word wlen);
 extern void nvm_erase();
+extern void nvm_io_backup();
 extern word esn_count;
 extern lword esns[];
 extern int lookup_esn (lword * esn);

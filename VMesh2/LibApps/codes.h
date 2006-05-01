@@ -16,6 +16,8 @@
 #define CMD_SENS	0x08
 #define CMD_RESET	0x09
 #define CMD_LOCALE	0x0A
+#define CMD_IO		0x0B
+#define CMD_IOACK	0x0C
 
 #define CMD_MSGOUT	0xFF
 #define CMD_SENSIN	0xFE
@@ -62,5 +64,11 @@
 #define PAR_ENCR_K	24
 #define PAR_ENCR_D	25
 #define ATTR_SYSVER	26
+#define PAR_UART	27
+#define PAR_CYC_CTRL	28
+#define PAR_CYC_SLEEP	29
+#define PAR_CYC_M_SYNC	30
+#define PAR_CYC_M_REST	31
+#define ATTR_CYC_LEFT	32
 
 #endif

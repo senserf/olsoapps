@@ -33,11 +33,7 @@ typedef struct cmdCtrlStruct {
 #define con_bad		((connect >> 8) &0x0F)
 #define con_miss	(connect & 0x00FF)
 
-//#if TARGET_BOARD == BOARD_GENESIS
 #define CON_LED 0
-//#else
-//#define CON_LED 1
-//#endif
 #define LED_ON	1
 #define LED_OFF 0
 #define LED_BLINK 2
@@ -52,19 +48,22 @@ typedef struct brCtrlStruct {
 #define ST_ACKS	((word)&br_ctrl)
 #define ST_REPTRIG ((word)&br_ctrl.rep_freq)
 
-#define	BR_ON		1
-#define BR_REP		2
+#define IO_ACK_TRIG ((word)&io_pload)
+
+#define	BR_SPARE	1
+#define IO_ACK		2
 #define BR_STACK	4
 #define BR_STNACK	8
 
-// I don't know yet if BR_ON, BR_REP would be useful
-#define is_brON		(br_ctrl.flags & BR_ON)
-#define set_brON	(br_ctrl.flags |= BR_ON)
-#define clr_brON	(br_ctrl.flags &= ~BR_ON)
+// br_ctrl meant "bridge control" in Genesis, but we use
+// spare bits for identical reliable delivery for VMesh IO
+#define is_brSPARE	(br_ctrl.flags & BR_SPARE)
+#define set_brSPARE	(br_ctrl.flags |= BR_SPARE)
+#define clr_brSPARE	(br_ctrl.flags &= ~BR_SPARE)
 
-#define is_brREP	(br_ctrl.flags & BR_REP)
-#define set_brREP	(br_ctrl.flags |= BR_REP)
-#define clr_brREP	(br_ctrl.flags &= ~BR_REP)
+#define is_ioACK	(br_ctrl.flags & IO_ACK)
+#define set_ioACK	(br_ctrl.flags |= IO_ACK)
+#define clr_ioACK	(br_ctrl.flags &= ~IO_ACK)
 
 #define is_brSTACK      (br_ctrl.flags & BR_STACK)
 #define set_brSTACK     (br_ctrl.flags |= BR_STACK)
@@ -74,6 +73,25 @@ typedef struct brCtrlStruct {
 #define set_brSTNACK    (br_ctrl.flags |= BR_STNACK)
 #define clr_brSTNACK    (br_ctrl.flags &= ~BR_STNACK)
 
+typedef struct cycCtrlStruct {
+	word	mod	:2;
+	word	st	:2;
+	word	prep	:12;
+} cycCtrlType;
+#define CYC_ST_DIS  0
+#define CYC_ST_ENA  1
+#define CYC_ST_PREP 2
+#define CYC_ST_SLEEP 3
+#define CYC_MOD_NET 0
+#define CYC_MOD_PNET 1
+#define CYC_MOD_PON 2
+#define CYC_MOD_POFF 3
+
+// 90 s default sleep time, master sync & rest, mode, and state 
+#define DEFAULT_CYC_SP  	90 
+#define DEFAULT_CYC_M_SYNC	60
+#define DEFAULT_CYC_M_REST	30
+
 /* app_flags ---------------------------
 b0 - autoack
 b1 - master changed (in tarp) flag
@@ -82,10 +100,11 @@ b4    - encryption mode
 b5-b7 - spare
 b8-b11 - timeout for reliable msgs
 b12-15 0 # of retries  -"-
-
-All set in app.c::read_eprom_and_init()
----------------------------------------*/
-
+---------------------------------------
+DEF: retries 3, tout 10, 3b spare, encr data 0, 00, master chg 0, autoack 1
+Set in app.c::read_eprom_and_init()
+--------------------------------------*/ 
+#define DEFAULT_APP_FLAGS	0x3A01
 #define is_autoack	(app_flags & 1)
 #define set_autoack	(app_flags |= 1)
 #define clr_autoack	(app_flags &= ~1)

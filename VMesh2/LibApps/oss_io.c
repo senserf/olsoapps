@@ -1,9 +1,9 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2006.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 #include "sysio.h"
-#include "msg_geneStructs.h"
+#include "msg_vmeshStructs.h"
 #include "lib_app_if.h"
 #include "net.h"
 #include "tarp.h"
@@ -11,6 +11,9 @@
 #include "nvm.h"
 #if DM2100
 #include "phys_dm2100.h"
+#endif
+#if DM2200 && PULSE_MONITOR
+#include "phys_dm2200.h"
 #endif
 
 extern tarpCtrlType tarp_ctrl;
@@ -178,7 +181,7 @@ void oss_set_in () {
 			cmd_ctrl.oprc = RC_ELEN;
 			break;
 		}
-		if (cmd_line[2] < 0 || cmd_line[2] > 3) {
+		if (cmd_line[2] > 3) {
 			cmd_ctrl.oprc = RC_EVAL;
 			break;
 		}
@@ -254,6 +257,150 @@ void oss_set_in () {
 		else
 			clr_autoack;
 		cmd_ctrl.oprc = RC_OK; 
+		break;
+
+	case PAR_UART:
+		if (cmd_ctrl.oplen != 3) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if (val != 12 && val != 24 && val != 48 && val != 96 &&
+				val != 192 && val != 384) {
+			cmd_ctrl.oprc = RC_EVAL;
+			break;
+		}
+		memcpy (&val, cmd_line +2, 2);
+		ion (UART, CONTROL, (char*)&val, UART_CNTRL_SETRATE);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+		
+	 case PAR_CYC_CTRL:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if ((val = cmd_line[2] >> 4) > 3 ||
+			(word)(cmd_line[2] & 0x0F) > 3) {
+			cmd_ctrl.oprc = RC_EVAL;
+			break;
+		}
+		if (local_host == master_host) {
+			if (val == cyc_ctrl.st || val == CYC_ST_SLEEP || 
+				(cmd_line[2] & 3) != CYC_MOD_NET) {
+				cmd_ctrl.oprc = RC_EMAS;
+				break;
+			}
+			if (val != CYC_ST_DIS && cyc_ctrl.st != CYC_ST_DIS) {
+				cmd_ctrl.oprc = RC_ERES;
+				break;
+			}
+			cyc_ctrl.st = val;
+			// don't, it is overloaded:
+		       //	cyc_ctrl.mod = cmd_line[2] & 3;
+			nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
+			cmd_ctrl.oprc = RC_OK;
+
+			// no matter what, kill the old one:
+			if ((val = running (cyc_man)) != 0)
+				 kill (val);
+			if (cyc_ctrl.st == CYC_ST_DIS) {
+				if (val == 0) // old cyc_man should be there
+					dbg_2 (0xC2F1);
+			} else {
+				if (val != 0) // should not
+					dbg_2 (0xC2F2);
+				fork (cyc_man, NULL);
+			}
+			break;
+
+		}
+		// not master
+		if (cyc_ctrl.mod != (cmd_line[2] & 3) &&
+				cyc_ctrl.st != CYC_ST_DIS) {
+			cmd_ctrl.oprc = RC_ERES;
+			break;
+		}
+		if (val != cyc_ctrl.st &&
+			(val != CYC_ST_DIS && val != CYC_ST_ENA ||
+				val == CYC_ST_ENA &&
+				(cmd_line[2] & 3) != CYC_MOD_NET &&
+				(cmd_line[2] & 3) != CYC_MOD_PNET)) {
+			cmd_ctrl.oprc = RC_EVAL;
+			break;
+		}
+		if (cyc_ctrl.st == CYC_ST_PREP ||
+			cyc_ctrl.st == CYC_ST_SLEEP && 
+				cyc_ctrl.mod != CYC_MOD_PNET) {
+			cmd_ctrl.oprc = RC_ERES;
+			break;
+		}
+		if (running (cyc_man)) {
+			dbg_2 (0xC2F3);
+			kill (running (cyc_man));
+		}
+		cyc_ctrl.st = val;
+		cyc_ctrl.mod = cmd_line[2] & 3;
+		nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	 case PAR_CYC_SLEEP:
+		if (cmd_ctrl.oplen != 5) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if (local_host == master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			break;
+		}
+		if (cyc_ctrl.st != CYC_ST_DIS) {
+			cmd_ctrl.oprc = RC_ERES;
+			break;
+		}
+		memcpy (&cyc_sp, cmd_line +2, 4);
+		nvm_write (NVM_CYC_SP, (address)&cyc_sp, 2);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	 case PAR_CYC_M_SYNC:
+		if (cmd_ctrl.oplen != 3) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if (local_host != master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			break;
+		}
+		memcpy (&val, cmd_line +2, 2);
+		if (cyc_ctrl.st == CYC_ST_PREP &&
+			val != 0 &&  val != 0xEFFF && val != 0xDFFF) {
+			cmd_ctrl.oprc = RC_ERES;
+			break;
+		}
+		if (val > 0x0FFF && val != 0xEFFF && val != 0xDFFF) {
+			cmd_ctrl.oprc = RC_EVAL;
+			break;
+		}
+		cyc_ctrl.prep = val;
+		cyc_ctrl.mod = val >> 12; // E-> 10; D-> 01; x-> 00.
+		nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	 case PAR_CYC_M_REST:
+		if (cmd_ctrl.oplen != 5) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if (local_host == master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			break;
+		}
+		memcpy (&cyc_sp, cmd_line +2, 4);
+		if (cyc_sp == 0 && (val = running (cyc_man)) != 0)
+			kill (val);
+		nvm_write (NVM_CYC_SP, (address)&cyc_sp, 2);
+		cmd_ctrl.oprc = RC_OK;
 		break;
 
 	default:
@@ -355,6 +502,12 @@ void oss_get_in (word state) {
 		 cmd_line[2] = is_autoack;
 		 return;
 
+	  case PAR_UART:
+		cmd_ctrl.oplen += 2;
+		ion (UART, CONTROL, (char*) p, UART_CNTRL_GETRATE);
+		memcpy (cmd_line +2, &p, 2);
+		return;
+		 
 	  case ATTR_UPTIME:
 		 cmd_ctrl.oplen += 4;
 		 l = seconds();
@@ -419,6 +572,58 @@ void oss_get_in (word state) {
 #endif
 		return;
 
+	  case PAR_CYC_CTRL:
+		cmd_ctrl.oplen += 2;
+		cmd_line[2] = cyc_ctrl.st;
+		cmd_line[3] = cyc_ctrl.mod;
+		return;
+
+	  case PAR_CYC_SLEEP:
+		if (local_host == master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			return;
+		}
+		cmd_ctrl.oplen += 4;
+		memcpy (cmd_line +2, &cyc_sp, 4);
+		return;
+
+	  case PAR_CYC_M_REST:
+		if (local_host != master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			return;
+		}
+		cmd_ctrl.oplen += 4;
+		memcpy (cmd_line +2, &cyc_sp, 4);
+		return;
+
+	  case PAR_CYC_M_SYNC:
+		if (local_host != master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			return;
+		}
+		cmd_ctrl.oplen += 2;
+		memcpy (cmd_line +2, &cyc_ctrl, 2);
+
+	  case ATTR_CYC_LEFT:
+		cmd_ctrl.oplen += 4;
+		if ((p = running (cyc_man)) == 0)
+			l = 0;
+		else {
+			if ((l = ldleft (p, &p1)) == MAX_UINT) {
+				if ((l = dleft (p)) == MAX_UINT) {
+					l = 0;
+				} else {
+					l >>= 10;
+				}
+			} else {
+				l = (l << 6) + p1;
+			}
+		}
+		l += cyc_left;
+		memcpy (cmd_line +2, &l, 4);
+		cmd_line[2] &= (cyc_ctrl.st << 6) | (cyc_ctrl.mod << 4);
+		return;
+
 	  default:
 		cmd_ctrl.oprc = RC_EPAR;
 	}
@@ -472,7 +677,7 @@ void oss_master_in (word state) {
 		ufree (out_buf);
 	} else {
 		if (fork (beacon, out_buf) == 0) {
-			dbg_2 (0xC405); // master beacon fork filed
+			dbg_2 (0xC405); // master beacon fork failed
 			ufree (out_buf);
 			cmd_ctrl.oprc = RC_EFORK;
 		} // beacon frees out_buf at exit
@@ -584,6 +789,31 @@ void oss_br_out (char * buf, bool acked) {
 #endif
 }
 
+void oss_io_out (char * buf, bool acked) {
+#if UART_DRIVER
+	char * lbuf = get_mem (NONE, 4 + 7 +1);
+	if (lbuf == NULL)
+		return;
+	lbuf[0] = '\0';
+	lbuf[1] = 2 + 7;
+	lbuf[2] = CMD_MSGOUT;
+	lbuf[3] = msg_io;
+	if (buf) {
+		memcpy (lbuf +4, &in_header(buf, snd), 2);
+		memcpy (lbuf +6, &in_io(buf, pload), 4);
+	} else { // local
+		lbuf[4] = local_host;
+		memcpy (lbuf +6, &io_pload, 4);
+	}
+	lbuf[10] = acked;
+	lbuf[11] = 0x04;
+	if (fork (oss_out, lbuf) == 0 ) {
+		dbg_2 (0xC40A); // oss_io_out fork failed
+		ufree (lbuf);
+	}
+#endif
+}
+
 void oss_st_out (char * buf, bool acked) {
 #if UART_DRIVER
 	char * lbuf = get_mem (NONE, 4 + 5 + (in_st(buf, count) << 2) +1);
@@ -642,8 +872,10 @@ void oss_snack_in() {
 	cmd_ctrl.oprc = msg_stNack_out (cmd_ctrl.t) ? RC_OK : RC_EMEM;
 }
 
+void oss_ioack_in () {
+	cmd_ctrl.oprc = msg_ioAck_out(NULL) ? RC_OK : RC_EMEM;
+}
 
-// 1st shot: guessing what may be useful...
 #define SENS_FIND 0
 #define SENS_READ 1
 #define SENS_NEXT_ANY 2
@@ -728,6 +960,226 @@ void oss_sens_in() {
 #undef SENS_NEXT_1
 #undef SENS_WRITE
 #undef SENS_ERASE
+
+#define IO_READ		0
+#define IO_WRITE 	1
+#define IO_ADC		2
+#define IO_CNT_START	3
+#define IO_CMP_START    4
+#define IO_NOT_START    5
+#define IO_STOP		6
+#define IO_CNT_GET	7
+#define IO_CMP_GET	8
+#define IO_STATE	9
+#define IO_CREG_GET	10
+#define IO_CREG_SET	11
+#define IO_FLAGS_GET	12
+#define IO_FLAGS_SET	13
+
+void oss_io_in() {
+	lword l;
+	word w, w1;
+
+	if (cmd_ctrl.oplen != 4) {
+		cmd_ctrl.oprc = RC_ELEN;
+		return;
+	}
+	switch (cmd_line[1] & 0x0F) {
+		case IO_READ:
+			if (cmd_line[2] == 0xFF) { // bulk
+				l = 0;
+				for (w1 = 1; w1 < 11; w1++) {
+					if ((w = pin_read (w1)) & 8)
+						w = w & 1 ? 7 : 6;
+					l |= (lword)w << 3 * (w1 -1);
+				}
+				memcpy (cmd_line +1, &l, 4);
+				cmd_ctrl.oprc = RC_OKRET;
+				return;
+			}
+			if (cmd_line[2] < 1 || cmd_line[2] > 10) {
+				cmd_ctrl.oprc = RC_EVAL;
+				return;
+			}
+			if ((w = pin_read (cmd_line[2])) & 8)
+				w = w & 1 ? 7 : 6;
+			cmd_line[3] = w;
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_WRITE:
+			// analog in on pin > 7 is illegal
+			if (cmd_line[2] < 1 || cmd_line[2] > 10 ||
+				cmd_line[2] > 7 && cmd_line[3] & 4 ||
+				cmd_line[3] == 3 || cmd_line[3] > 4) {
+				cmd_ctrl.oprc = RC_EVAL;
+				return;
+			}
+			pin_write (cmd_line[2], cmd_line[3]);
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_ADC:
+			if ((w = cmd_line[2] & 0x0F) < 1 || w > 7 ||
+					(w1 = cmd_line[3]) > 64) {
+				cmd_ctrl.oprc = RC_EVAL;
+				return;
+			}
+			net_opt (PHYSOPT_RXOFF, NULL);
+			w = pin_read_adc (NONE, w,
+					(cmd_line[2] & 0x10) ? 1 : 0,
+					w1);
+			net_opt (PHYSOPT_RXON, NULL);
+			if (w == -1)
+				cmd_ctrl.oprc = RC_ERES;
+			else {
+				cmd_ctrl.oprc = RC_OKRET;
+				memcpy (cmd_line +3, &w, 2);
+			}
+			return;
+#if PULSE_MONITOR
+		case IO_CNT_START:
+			if (pmon_get_state() & PMON_STATE_CNT_ON) {
+				cmd_ctrl.oprc = RC_ERES;
+				return;
+			}
+			if (cmd_line[1] & 0x20)
+				pmon_start_cnt (-1, cmd_line[1] & 0x10 ? 1 : 0);
+			else {
+				l = 0;
+				memcpy (&l, cmd_line +2, 3);
+				pmon_start_cnt (l, cmd_line[1] & 0x10 ? 1 : 0);
+			}
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_CMP_START:
+			if (pmon_get_state() & PMON_STATE_CMP_ON) {
+				cmd_ctrl.oprc = RC_ERES;
+				return;
+			}
+			l = 0;
+			memcpy (&l, cmd_line +2, 3);
+			if (!running (io_rep))
+				fork (io_rep, NULL);
+			pmon_set_cmp (l);
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_NOT_START:
+			if (pmon_get_state() & PMON_STATE_NOT_ON)
+				cmd_ctrl.oprc = RC_ERES;
+			else {
+				if (!running (io_rep))
+					fork (io_rep, NULL);
+				cmd_ctrl.oprc = RC_OKRET;
+				pmon_start_not (cmd_line[2]);
+		       }
+		       return;
+
+		case IO_STOP:
+			cmd_ctrl.oprc = RC_OKRET;
+			w = pmon_get_state();
+			if (cmd_line[2]) { // CNT
+				if (w & PMON_STATE_CNT_ON)
+					pmon_stop_cnt();
+				else {
+					cmd_ctrl.oprc = RC_ERES;
+					cmd_line[2] |= 0xF0;
+				}
+			}
+			if (cmd_line[3]) { // CMP
+				if (w & PMON_STATE_CMP_ON)
+					pmon_set_cmp(-1); // stop
+				else {
+					cmd_ctrl.oprc = RC_ERES;
+					cmd_line[3] |= 0xF0;
+				}
+			}
+			if (cmd_line[4]) { // NOT
+				if (w & PMON_STATE_NOT_ON)
+					pmon_stop_not();
+				else {
+					cmd_ctrl.oprc = RC_ERES;
+					cmd_line[4] |= 0xF0;
+				}
+			}
+			if ((w1 = running (io_rep)) != 0) {
+				w = pmon_get_state();
+				if (!(w & PMON_STATE_CMP_ON ||
+					w & PMON_STATE_NOT_ON))
+					kill (w1);
+			}
+			return;
+
+		case IO_CNT_GET:
+			if (pmon_get_state() & PMON_STATE_CNT_ON)
+				cmd_line[1] |= 0x10;
+			l = pmon_get_cnt();
+			memcpy (cmd_line +2, &l, 3);
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_CMP_GET:
+			if (pmon_get_state() & PMON_STATE_CMP_ON)
+				cmd_line[1] |= 0x10;
+			l = pmon_get_cmp();
+			memcpy (cmd_line +2, &l, 3);
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_STATE:
+			cmd_line[2] = pmon_get_state();
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_CREG_GET:
+			memcpy (cmd_line +2, &io_creg, 3);
+			cmd_ctrl.oprc = RC_OKRET;
+			return; 
+
+		case IO_CREG_SET:
+			memcpy (&io_creg, cmd_line +2, 3);
+			nvm_write (NVM_IO_CREG, (address)&io_creg, 2);
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_FLAGS_GET:
+			cmd_line[2] = io_creg >> 24;
+			cmd_line[3] = cmd_line[2] & 3;
+			cmd_line[2] >>= 2;
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+
+		case IO_FLAGS_SET:
+			if (cmd_line[2] > 63 || cmd_line[3] > 3) {
+				cmd_ctrl.oprc = RC_EVAL;
+				return;
+			}
+			w = cmd_line[2] << 2 | cmd_line[3];
+			*((byte *)(&io_creg) +3) = (byte)w;
+			nvm_write (NVM_IO_CREG +1, (address)&io_creg +1, 1);
+			cmd_ctrl.oprc = RC_OKRET;
+			return;
+#endif
+		default:
+			cmd_ctrl.oprc = RC_EPAR;
+	}
+}
+#undef IO_READ
+#undef IO_WRITE
+#undef IO_ADC
+#undef IO_CNT_START
+#undef IO_CMP_START
+#undef IO_NOT_START
+#undef IO_STOP
+#undef IO_CNT_GET
+#undef IO_CMP_GET
+#undef IO_STATE
+#undef IO_CREG_GET
+#undef IO_CREG_SET
+#undef IO_FLAGS_GET
+#undef IO_FLAGS_SET
 
 void oss_reset_in() {
 	if (cmd_ctrl.oplen != 1) {

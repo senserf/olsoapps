@@ -6,9 +6,12 @@
 #include "net.h"
 #include "tarp.h"
 #include "nvm.h"
-#include "msg_gene.h"
+#include "msg_vmesh.h"
 #include "lib_app_if.h"
 #include "codes.h"
+#if DM2200 && PULSE_MONITOR
+#include "phys_dm2200.h"
+#endif
 // #include "trc.h"
 
 #define TINY_MEM 1
@@ -129,6 +132,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 
 	case msg_stNack:
 		msg_stNack_in (buf);
+		return;
+
+	case msg_io:
+		msg_io_in (buf);
+		return;
+
+	case msg_ioAck:
+		msg_ioAck_in (buf);
 		return;
 
 	default:
@@ -339,6 +350,13 @@ static void cmd_exec (word state) {
 			oss_sens_in();
 			return;
 
+		case CMD_IO:
+			oss_io_in();
+			return;
+
+		case CMD_IOACK:
+			oss_ioack_in();
+
 		case CMD_RESET:
 			oss_reset_in();
 			return;
@@ -363,28 +381,107 @@ static void cmd_out (word state) {
 }
 
 extern tarpCtrlType tarp_ctrl;
-static void read_eprom_and_init() {
-	word w[4];
 
-	nvm_read (NVM_NID, w, 4);
-	if (w[0] == 0xFFFF)
+// see app.h for defaults
+static void read_eprom_and_init() {
+	word w[NVM_BOOT_LEN];
+
+	nvm_read (NVM_NID, w, NVM_BOOT_LEN);
+	if (w[NVM_NID] == 0xFFFF)
 		net_id = 0;
 	else
-		net_id = w[0];
-	if (w[1] == 0 || w[1] == 0xFFFF)
+		net_id = w[NVM_NID];
+	if (w[NVM_LH] == 0 || w[NVM_LH] == 0xFFFF)
 		local_host = ESN;
 	else
-		local_host = w[1];
-	if (w[2] == 0xFFFF)
+		local_host = w[NVM_LH];
+	if (w[NVM_MID] == 0xFFFF)
 		master_host = 0;
 	else
-		master_host = w[2];
+		master_host = w[NVM_MID];
 
-	// see app.h: retries 3, tout 10, 3b spare, encr data 0, 00, 
-	// master chg 0, autoack 1
-	app_flags = 0x3A01;
-	if (w[3] != 0xFFFF)
-		app_flags |= (w[3] & 7) << 2;
+	app_flags = DEFAULT_APP_FLAGS;
+	if (w[NVM_APP] != 0xFFFF)
+		app_flags |= (w[NVM_APP] & 7) << 2; // encryption key #
+
+	if (w[NVM_CYC_CTRL] != 0xFFFF) {
+		memcpy (&cyc_ctrl, w[NVM_CYC_CTRL], 2);
+		if (local_host == master_host) {
+			if (cyc_ctrl.st == CYC_ST_PREP) // break is bad
+				cyc_ctrl.st = CYC_ST_ENA;
+		} else {
+			if (cyc_ctrl.st != CYC_ST_DIS)
+				cyc_ctrl.st = CYC_ST_ENA;
+		}
+	} else {
+		cyc_ctrl.mod = CYC_MOD_NET;
+		cyc_ctrl.prep = DEFAULT_CYC_M_SYNC;
+		if (local_host == master_host)
+			cyc_ctrl.st = CYC_ST_DIS;
+		else
+			cyc_ctrl.st = CYC_ST_ENA;
+	}
+
+	if (w[NVM_CYC_SP] != 0xFFFF || w[NVM_CYC_SP +1] != 0xFFFF)
+		memcpy (&cyc_sp, w + NVM_CYC_SP, 4);
+	else {
+		cyc_sp = DEFAULT_CYC_SP;
+		if (local_host == master_host)
+			cyc_sp += DEFAULT_CYC_M_REST;
+	}
+
+	// using io_pload as scratch:
+	if (w[NVM_IO_CMP] != 0xFFFF || w[NVM_IO_CMP] != 0xFFFF) {
+		memcpy (&io_pload, w + NVM_IO_CMP, 4);
+		pmon_set_cmp (io_pload);
+		pmon_set_cmp (-1); // a bit inconsistent pmon i/f
+		pmon_pending_cmp(); // jic, clear it
+	}
+
+	if (w[NVM_IO_CREG] != 0xFFFF || w[NVM_IO_CREG + 1] != 0xFFFF)
+		memcpy (&io_creg, w +6, 4);
+	else
+		io_creg = 0;
+
+	if (w[NVM_IO_STATE] != 0xFFFF) {
+#if !EEPROM_DRIVER
+		// find last io state (with the counter):
+		w[0] = NVM_IO_STATE +2;
+		while (w[0] < NVM_PAGE_SIZE -1 && IFLASH[w[0]] != 0xFFFF)
+			w[0] += 2;
+		if ((w[0] -= 2) != NVM_IO_STATE) { // more than 1 write
+			w[NVM_IO_STATE] = w[w[0]];
+			w[NVM_IO_STATE +1] = w[w[0] +1];
+		}
+#endif
+		// use io_pload as scratch
+		memcpy (&io_pload, w +NVM_IO_STATE, 4);
+		if (w[NVM_IO_STATE] & PMON_STATE_CNT_ON)
+			pmon_start_cnt (io_pload >> 8,
+				w[NVM_IO_STATE] & PMON_STATE_CNT_RISING);
+		if (w[NVM_IO_STATE] & PMON_STATE_NOT_ON)
+			pmon_start_not (
+				w[NVM_IO_STATE] & PMON_STATE_NOT_RISING);
+		if (w[NVM_IO_STATE] & PMON_STATE_CMP_ON) {
+#if EEPROM_DRIVER
+			pmon_set_cmp (pmon_get_cnt());
+#else
+			io_pload = pmon_get_cmp();
+			if ((io_creg & 3) == 1) { // try to recover cmp
+				while (io_pload < pmon_get_cnt())
+					io_pload += io_creg >> 8;
+				if (io_pload & 0xFF000000)
+					io_pload >>= 24;
+				pmon_set_cmp (io_pload);
+			}
+#endif
+		}
+
+		if ((w[0] = pmon_get_state()) & PMON_STATE_NOT_ON ||
+				w[0] & PMON_STATE_CMP_ON)
+			fork (io_rep, NULL);
+		io_pload = 0xFFFFFFFF; // restore
+	}
 
 	// 3 - warn, +4 - bad, (missed 0x00)
 	connect = 0x3400;
@@ -419,7 +516,7 @@ static void read_eprom_and_init() {
 static bool valid_input () {
 
 	if (cmd_ctrl.opcode == 0 || 
-		cmd_ctrl.opcode > CMD_LOCALE && cmd_ctrl.opcode != CMD_SENSIN) {
+		cmd_ctrl.opcode > CMD_IOACK && cmd_ctrl.opcode != CMD_SENSIN) {
 		dbg_9 (0x5000 | cmd_ctrl.opcode);
 		return NO;
 	}
@@ -507,7 +604,8 @@ process (root, void)
 		if (cmd_ctrl.opcode == CMD_TRACE ||
 			cmd_ctrl.opcode == CMD_MASTER ||
 			cmd_ctrl.opcode == CMD_SACK ||
-			cmd_ctrl.opcode == CMD_SNACK) {
+			cmd_ctrl.opcode == CMD_SNACK ||
+			cmd_ctrl.opcode == CMD_IOACK) {
 			cmd_exec (RS_DOCMD);
 			// requested: master should confirm
 			if (cmd_ctrl.oprc != RC_OK
