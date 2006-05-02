@@ -14,6 +14,8 @@
 
 #endif
 
+#define	GLACIER			1
+
 #define	LEDS_DRIVER		1
 #define	LEDS_BLINKING		1
 #define	RADIO_USE_LEDS		7

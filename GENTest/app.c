@@ -431,6 +431,7 @@ endprocess (1)
 #define	RS_SCM		180
 #define	RS_NOT		190
 #define	RS_CNS		200
+#define	RS_FRE		210
 
 process (root, int)
 
@@ -502,6 +503,9 @@ diag (
 	"M v      -> set comparator to v (-1 turns off)\r\n"
 	"N 1/0 e  -> switch notifier on/off edge\r\n"
 	"O        -> show status\r\n"
+#endif
+#if GLACIER
+	"F i x v  -> freeze\r\n"
 #endif
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
@@ -575,6 +579,10 @@ diag (
 		proceed (RS_NOT);
 	if (ibuf [0] == 'O')
 		proceed (RS_CNS);
+#endif
+#if	GLACIER
+	if (ibuf [0] == 'F')
+		proceed (RS_FRE);
 #endif
 
   entry (RS_RCMD+1)
@@ -859,5 +867,17 @@ diag (
 	proceed (RS_RCMD);
 	
 #endif	/* PULSE_MONITOR */
+
+#if 	GLACIER
+
+  entry (RS_FRE)
+
+	lw = 0;
+	a = b = 0;
+	scan (ibuf + 1, "%lu %x %x", &lw, &a, &b);
+	a = freeze ((lword) lw, a, b);
+	diag ("OVER: %x", a);
+	proceed (RS_RCMD);
+#endif
 
 endprocess (1)
