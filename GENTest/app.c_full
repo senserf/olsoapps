@@ -509,8 +509,8 @@ diag (
 #endif
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
-		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Channel,
-		Mode
+		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Mode,
+		Channel
 	);
 
   entry (RS_RCMD)
