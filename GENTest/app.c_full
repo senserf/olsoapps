@@ -37,12 +37,12 @@ static	lword	CntSent = 0, CntRcvd = 0;
 
 static int sfd;
 
-static word 	ME = 7,
+static word 	ME = 1,
 		YOU = 1,
 		ReceiverDelay = 0,
 		BounceDelay = 0,
 		CloneCount = 0,
-		SendInterval = 4096,
+		SendInterval = 1024,
 		SendRndPat = 0,
 		BounceBackoff = 0,
 		SendRnd = 0,
@@ -505,7 +505,7 @@ diag (
 	"O        -> show status\r\n"
 #endif
 #if GLACIER
-	"F i x v  -> freeze\r\n"
+	"F i      -> freeze\r\n"
 #endif
 	,
 		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
@@ -724,7 +724,7 @@ diag (
 2
 #endif
 #if DM2200
-3
+7
 #endif
 	)
 		proceed (RS_RCMD+1);
@@ -872,11 +872,10 @@ diag (
 
   entry (RS_FRE)
 
-	lw = 0;
-	a = b = 0;
-	scan (ibuf + 1, "%lu %x %x", &lw, &a, &b);
-	a = freeze ((lword) lw, a, b);
-	diag ("OVER: %x", a);
+	a = 0;
+	scan (ibuf + 1, "%u", &a);
+	freeze (a);
+	diag ("OVER");
 	proceed (RS_RCMD);
 #endif
 
