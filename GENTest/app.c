@@ -33,7 +33,7 @@ void	tcv_dumpqueues (void);
 #define	SER(a)	((a) [2])
 #define	BOA(a)	((a) [3])
 
-static	word	CntSent = 0, CntRcvd = 0;
+static	lword	CntSent = 0, CntRcvd = 0;
 
 static int sfd;
 
@@ -205,10 +205,21 @@ process (receiver, void)
 
   entry (RC_DISP)
 
-	leds (2, 1);
 	len = tcv_left (packet) - 2;
 	pow = packet [len >> 1];
-	diag ("R: len = %u, sn = %u", len, SER (packet));
+	if (SER (packet) != SerNum) 
+		ser_outf (RC_DISP,
+		    "RCV(E): <%x> B%d %d len = %u, sn = %u [%u]\r\n",
+			pow,
+			BOA (packet),
+			RCV (packet), len, SER (packet), SerNum);
+	else
+		ser_outf (RC_DISP,
+		    "RCV(K): <%x> B%d %d len = %u, sn = %u\r\n",
+			pow,
+			BOA (packet),
+			RCV (packet), len, SER (packet));
+
 	SerNum = SER (packet) + 1;
 
 #if 0
@@ -220,8 +231,6 @@ process (receiver, void)
 
 	tcv_endp (packet);
 	CntRcvd++;
-	diag ("S: %d, R %d", CntSent, CntRcvd);
-	leds (2, 0);
 
 	delay (ReceiverDelay, 0);
 
@@ -240,8 +249,6 @@ process (sender, void)
 	nodata;
 
   entry (SN_SEND)
-
-	leds (1, 1);
 
 	PLen = gen_packet_length ();
 	if (PLen < MIN_PACKET_LENGTH)
@@ -266,7 +273,6 @@ process (sender, void)
 	diag ("SNT: %u [%u]", Sernum, PLen);
 	CntSent++;
 	Sernum ++;
-	leds (1, 0);
 
 	delay (send_delay (), SN_SEND);
 
@@ -283,8 +289,6 @@ process (bouncer, void)
 
   entry (BN_WAIT)
 
-	leds (2, 0);
-
 	packet = tcv_rnp (BN_WAIT, sfd);
 	if (RCV (packet) != ME) {
 		tcv_endp (packet);
@@ -293,7 +297,6 @@ process (bouncer, void)
 
   entry (BN_SEND)
 
-	leds (2, 1);
 	outpacket = tcv_wnp (BN_SEND, sfd, tcv_left (packet));
 	memcpy ((char*) outpacket, (char*) packet, tcv_left (packet));
 	tcv_endp (packet);
@@ -397,6 +400,38 @@ endprocess (1)
 #endif	/* PULSE_MONITOR */
 
 #define	RS_INIT		00
+#define	RS_RCMD		10
+#define	RS_SOI		20
+#define	RS_DON		30
+#define	RS_SYI		40
+#define	RS_SCC		50
+#define	RS_SCI		60
+#define	RS_SRC		62
+#define	RS_SRD		65
+#define RS_RPC		67
+#define RS_SPC		68
+#define RS_BID		69
+#define	RS_STA		70
+#define	RS_BKF		71
+#define	RS_BND		73
+#define	RS_DUM		75
+#define	RS_ECO		78
+#define	RS_SEC		80
+#define	RS_SMO		86
+#define	RS_SRE		87
+#define	RS_PDO		95
+#define	RS_FLW		100
+#define	RS_FLR		110
+#define	RS_FLE		120
+#define	RS_SPI		130
+#define	RS_GPI		140
+#define	RS_ADC		150
+#define	RS_CNT		160
+#define	RS_SCN		170
+#define	RS_SCM		180
+#define	RS_NOT		190
+#define	RS_CNS		200
+#define	RS_FRE		210
 
 process (root, int)
 
@@ -427,19 +462,421 @@ process (root, int)
 	fork (pulse_monitor, NULL);
 #endif
 
-	pin_write (8, 2);
+	if (Action)
+		do_start (Action);
 
-	if (pin_read (8) & 1) {
-		// The bouncer
-		diag ("BNC");
-		leds (0, 1);
-		do_start (4);
-	} else {
-		diag ("XCV");
-		leds (0, 2);
-		do_start (3);
+  entry (RS_RCMD-2)
+
+//	ser_outf (RS_RCMD-2,
+diag (
+	"\r\nTCV Clone Test\r\n"
+	"Commands:\r\n"
+	"m n      -> set own ID [%u]\r\n"
+	"y n      -> set other ID [%u]\r\n"
+	"c n      -> set clone count [%u]\r\n"
+	"i n      -> set send interval (msec) [%u]\r\n"
+	"j n      -> randomized component of send int (LS bits) [%u]\r\n"
+	"d n      -> set receiver delay (msec) [%u]\r\n"
+	"s n      -> start (0-stop, 1-xm, 2-rcv, 3-both, 4-bnc) [%u]\r\n"
+	"b n      -> bounce delay (fixed) msec [%u]\r\n"
+	"e        -> reset packet counters\r\n"
+	"p        -> show packet counters [%lu, %lu]\r\n"
+	"q n      -> set board ID [%u]\r\n"
+	"t n      -> set bounce backoff (LS bits) [%u]\r\n"
+	"f        -> ram dump\r\n"
+	"g xx..xx -> echo UART input to the terminal\r\n"
+	"o n      -> set mode [%u]\r\n"
+#if CC1100
+	"k n      -> select channel n [%u]\r\n"
+	"r n v    -> set CC1100 reg n to v\r\n"
+#endif
+	"u d      -> enter power-down mode for d seconds\r\n"
+	"w adr 2  -> write word to info flash\r\n"
+	"v adr    -> read word from info flash\r\n"
+        "x        -> erase info flash\r\n"
+	"a n v    -> set pin n to v (see phys_dm2200.c)\r\n"
+	"z n      -> read pin n\r\n"
+	"l p d    -> read analog pin p with delay d\r\n"
+#if PULSE_MONITOR
+	"C v e    -> counter on, v = value, e = edge: rising = 1\r\n"
+	"S        -> stop counter\r\n"
+	"M v      -> set comparator to v (-1 turns off)\r\n"
+	"N 1/0 e  -> switch notifier on/off edge\r\n"
+	"O        -> show status\r\n"
+#endif
+#if GLACIER
+	"F i      -> freeze\r\n"
+#endif
+	,
+		ME, YOU, CloneCount, SendInterval, SendRnd, ReceiverDelay,
+		Action, BounceDelay, CntSent, CntRcvd, BID, BkfRnd, Mode,
+		Channel
+	);
+
+  entry (RS_RCMD)
+  
+	ibuf [0] = ' ';
+	ser_in (RS_RCMD, ibuf, IBUFLEN-1);
+
+	if (ibuf [0] == 'm')
+		proceed (RS_SOI);
+	if (ibuf [0] == 'y')
+		proceed (RS_SYI);
+	if (ibuf [0] == 'c')
+		proceed (RS_SCC);
+	if (ibuf [0] == 'i')
+		proceed (RS_SCI);
+	if (ibuf [0] == 'j')
+		proceed (RS_SRC);
+	if (ibuf [0] == 'd')
+		proceed (RS_SRD);
+	if (ibuf [0] == 's')
+		proceed (RS_STA);
+	if (ibuf [0] == 'b')
+		proceed (RS_BND);
+	if (ibuf [0] == 'f')
+		proceed (RS_DUM);
+	if (ibuf [0] == 'e')
+		proceed (RS_RPC);
+	if (ibuf [0] == 'p')
+		proceed (RS_SPC);
+	if (ibuf [0] == 'q')
+		proceed (RS_BID);
+	if (ibuf [0] == 't')
+		proceed (RS_BKF);
+	if (ibuf [0] == 'g')
+		proceed (RS_ECO);
+	if (ibuf [0] == 'o')
+		proceed (RS_SMO);
+#if CC1100
+	if (ibuf [0] == 'k')
+		proceed (RS_SEC);
+	if (ibuf [0] == 'r')
+		proceed (RS_SRE);
+#endif
+	if (ibuf [0] == 'u')
+		proceed (RS_PDO);
+	if (ibuf [0] == 'w')
+		proceed (RS_FLW);
+	if (ibuf [0] == 'v')
+		proceed (RS_FLR);
+	if (ibuf [0] == 'x')
+		proceed (RS_FLE);
+	if (ibuf [0] == 'a')
+		proceed (RS_SPI);	// Set pin
+	if (ibuf [0] == 'z')
+		proceed (RS_GPI);	// Get pin
+	if (ibuf [0] == 'l')
+		proceed (RS_ADC);	// Get analog pin
+#if 	PULSE_MONITOR
+	if (ibuf [0] == 'C')
+		proceed (RS_CNT);
+	if (ibuf [0] == 'S')
+		proceed (RS_SCN);
+	if (ibuf [0] == 'M')
+		proceed (RS_SCM);
+	if (ibuf [0] == 'N')
+		proceed (RS_NOT);
+	if (ibuf [0] == 'O')
+		proceed (RS_CNS);
+#endif
+#if	GLACIER
+	if (ibuf [0] == 'F')
+		proceed (RS_FRE);
+#endif
+
+  entry (RS_RCMD+1)
+
+	ser_out (RS_RCMD+1, "Illegal command or parameter\r\n");
+	proceed (RS_RCMD-2);
+
+  entry (RS_SOI)
+
+	n = 7;
+	scan (ibuf + 1, "%d", &n);
+	ME = n;
+	
+  entry (RS_DON)
+
+	ser_out (RS_DON, "Done\r\n");
+	proceed (RS_RCMD);
+
+  entry (RS_SYI)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0)
+		proceed (RS_RCMD+1);
+	YOU = n;
+	proceed (RS_DON);
+
+  entry (RS_SCC)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0)
+		proceed (RS_RCMD+1);
+	CloneCount = n;
+	proceed (RS_DON);
+
+  entry (RS_SCI)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n <= 0)
+		proceed (RS_RCMD+1);
+	SendInterval = n;
+	proceed (RS_DON);
+
+  entry (RS_SRC)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 15)
+		proceed (RS_RCMD+1);
+	SendRnd = (word) n;
+	SendRndPat = 0;
+	while (n--)
+		SendRndPat |= (1 << n);
+	proceed (RS_DON);
+
+  entry (RS_BKF)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 15)
+		proceed (RS_RCMD+1);
+	BkfRnd = (word) n;
+	BounceBackoff = 0;
+	while (n--)
+		BounceBackoff |= (1 << n);
+	proceed (RS_DON);
+
+  entry (RS_SRD)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0)
+		proceed (RS_RCMD+1);
+	ReceiverDelay = n;
+	proceed (RS_DON);
+
+  entry (RS_STA)
+
+	n = 0;
+	scan (ibuf + 1, "%d", &n);
+	if (n < 0 || n > 4)
+		proceed (RS_RCMD+1);
+	Action = (word) n;
+	do_quit ();
+	if (n != 0)
+		do_start (n);
+	proceed (RS_DON);
+
+  entry (RS_BND)
+
+	n = 0;
+	scan (ibuf + 1, "%d", &n);
+	BounceDelay = (word) n;
+	proceed (RS_DON);
+
+  entry (RS_DUM)
+
+	dmp_mem ();
+	tcv_dumpqueues ();
+	proceed (RS_DON);
+
+  entry (RS_RPC)
+
+	CntSent = CntRcvd = 0;
+	proceed (RS_DON);
+
+  entry (RS_SPC)
+
+	ser_outf (RS_SPC, "Sent = %lu, Received = %lu\r\n", CntSent, CntRcvd);
+	proceed (RS_RCMD);
+
+  entry (RS_ECO)
+
+	ser_out (RS_ECO, ibuf + 1);
+
+  entry (RS_ECO+1)
+
+	ser_out (RS_ECO+1, "\r\n");
+	proceed (RS_DON);
+
+  entry (RS_BID)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+	if (n == -1)
+		proceed (RS_RCMD+1);
+	BID = n;
+	proceed (RS_DON);
+
+  entry (RS_SMO)
+
+	n = -1;
+	scan (ibuf + 1, "%d", &n);
+
+	if (n < 0 || n >
+#if CC1100
+2
+#endif
+#if DM2200
+7
+#endif
+	)
+		proceed (RS_RCMD+1);
+	Mode = (byte) n;
+	tcv_control (sfd, PHYSOPT_SETMODE, (address)(&n));
+	proceed (RS_DON);
+
+#if CC1100
+
+  entry (RS_SEC)
+
+	scan (ibuf + 1, "%d", &n);
+	Channel = (byte) (n &= 0xff);
+	tcv_control (sfd, PHYSOPT_SETCHANNEL, (address)(&n));
+	proceed (RS_DON);
+
+  entry (RS_SRE)
+
+	v = -1;
+	scan (ibuf + 1, "%x %x", &n, &v);
+	if (v < 0)
+		proceed (RS_RCMD+1);
+	ba [0] = (byte) n;
+	ba [1] = (byte) v;
+	ba [2] = 255;
+
+	tcv_control (sfd, PHYSOPT_SETPARAM, (address)ba);
+	proceed (RS_DON);
+#endif
+
+  entry (RS_PDO)
+
+	v = -1;
+	scan (ibuf + 1, "%d", &v);
+	if (v < 0)
+		proceed (RS_RCMD+1);
+
+	powerdown ();
+	CntSent = seconds () + v;
+	CntRcvd = 0;
+
+  entry (RS_PDO+1)
+
+	if (seconds () >= CntSent) {
+		powerup ();
+		proceed (RS_PDO+2);
 	}
+	CntRcvd++;
+	delay (20, RS_PDO+1);
+	release;
 
-	finish;
+  entry (RS_PDO+2)
 
-endprocess (1);
+	ser_outf (RS_PDO+2, "Done, %lu wakeups\r\n", CntRcvd);
+	proceed (RS_RCMD);
+
+  entry (RS_FLW)
+
+	scan (ibuf + 1, "%u %u", &a, &b);
+	if (a >= IFLASH_SIZE)
+		proceed (RS_RCMD+1);
+	if_write (a, b);
+	proceed (RS_RCMD);
+
+  entry (RS_FLR)
+
+	scan (ibuf + 1, "%u", &a);
+	if (a >= IFLASH_SIZE)
+		proceed (RS_RCMD+1);
+	diag ("IF [%u] = %x", a, IFLASH [a]);
+	proceed (RS_RCMD);
+
+  entry (RS_FLE)
+
+	if_erase (-1);
+	proceed (RS_RCMD);
+
+  entry (RS_SPI)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+	pin_write (a, b);
+	proceed (RS_DON);
+
+  entry (RS_GPI)
+
+	a = 0;
+	scan (ibuf + 1, "%d", &a);
+	diag ("PIN [%u] = %x", a, pin_read (a));
+	proceed (RS_RCMD);
+
+  entry (RS_ADC)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+
+  entry (RS_ADC+1)
+
+	n = pin_read_adc (RS_ADC+1, a, 1, b);
+
+	diag ("PIN [%u] = %d [%x]", a, n, n);
+	proceed (RS_RCMD);
+
+#if	PULSE_MONITOR
+
+  entry (RS_CNT)
+
+	lw = -1;
+	b = 0;
+	scan (ibuf + 1, "%ld %d", &lw, &b);
+	pmon_start_cnt (lw, b != 0);
+	proceed (RS_DON);
+
+  entry (RS_SCN)
+
+	pmon_stop_cnt ();
+	proceed (RS_DON);
+
+  entry (RS_SCM)
+
+	lw = -1;
+	scan (ibuf + 1, "%ld", &lw);
+	pmon_set_cmp (lw);
+	proceed (RS_DON);
+
+  entry (RS_NOT)
+
+	a = b = 0;
+	scan (ibuf + 1, "%d %d", &a, &b);
+	if (a) {
+		pmon_start_not (b != 0);
+	} else {
+		pmon_stop_not ();
+	}
+	proceed (RS_DON);
+
+  entry (RS_CNS)
+
+	out_pmon_state ();
+	proceed (RS_RCMD);
+	
+#endif	/* PULSE_MONITOR */
+
+#if 	GLACIER
+
+  entry (RS_FRE)
+
+	a = 0;
+	scan (ibuf + 1, "%u", &a);
+	freeze (a);
+	diag ("OVER");
+	proceed (RS_RCMD);
+#endif
+
+endprocess (1)
