@@ -24,6 +24,12 @@ void	tcv_dumpqueues (void);
 #include "phys_dm2200.h"
 #endif
 
+#if	DM2100
+#include "phys_dm2100.h"
+#endif
+
+#include "pinopts.h"
+
 #define	IBUFLEN			64
 #define	MIN_PACKET_LENGTH	20
 #define	MAX_PACKET_LENGTH	32
@@ -450,6 +456,9 @@ process (root, int)
 #if DM2200
 	phys_dm2200 (0, MAXPLEN);
 #endif
+#if DM2100
+	phys_dm2100 (0, MAXPLEN);
+#endif
 	tcv_plug (0, &plug_test);
 	sfd = tcv_open (NONE, 0, 0);
 	if (sfd < 0) {
@@ -494,7 +503,7 @@ diag (
 	"w adr 2  -> write word to info flash\r\n"
 	"v adr    -> read word from info flash\r\n"
         "x        -> erase info flash\r\n"
-	"a n v    -> set pin n to v (see phys_dm2200.c)\r\n"
+	"a n v    -> set pin n to v (see pin_read.c)\r\n"
 	"z n      -> read pin n\r\n"
 	"l p d    -> read analog pin p with delay d\r\n"
 #if PULSE_MONITOR
@@ -725,6 +734,9 @@ diag (
 #endif
 #if DM2200
 7
+#endif
+#if DM2100
+0
 #endif
 	)
 		proceed (RS_RCMD+1);
