@@ -144,7 +144,7 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 	if (desc == NULL || (*ses = desc [phy]) == NONE)
 		return TCV_DSP_PASS;
 
-	if (RCV (p) != ME) {
+	if (ME && RCV (p) != ME) {
 #if 0
 		diag ("ME BAD: %x", (word)p);
 		dmp_mem ();
