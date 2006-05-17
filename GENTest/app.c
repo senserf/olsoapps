@@ -403,6 +403,23 @@ process (pulse_monitor, void)
 		proceed (PM_START);
 endprocess (1)
 
+process (uart_writer, void)
+
+	entry (0)
+
+		ser_out (0, "This is a longish message that I would like to "
+			    "send to the uart to check how it works\r\n");
+
+		delay (3077, 0);
+endprocess (1)
+
+process (delayer, void)
+
+	entry (0)
+
+		delay (1023, 0);
+endprocess (0)
+
 #endif	/* PULSE_MONITOR */
 
 #define	RS_INIT		00
@@ -848,6 +865,9 @@ diag (
 	b = 0;
 	scan (ibuf + 1, "%ld %d", &lw, &b);
 	pmon_start_cnt (lw, b != 0);
+	fork (uart_writer, NULL);
+	fork (delayer, NULL);
+	fork (delayer, NULL);
 	proceed (RS_DON);
 
   entry (RS_SCN)
