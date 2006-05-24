@@ -444,7 +444,7 @@ process (root, int)
 	static char *ibuf;
 	int n, v;
 	byte ba [4];
-	static word a, b;
+	static word a, b, c;
 	long lw;
 
   entry (RS_INIT)
@@ -505,7 +505,7 @@ diag (
         "x        -> erase info flash\r\n"
 	"a n v    -> set pin n to v (see pin_read.c)\r\n"
 	"z n      -> read pin n\r\n"
-	"l p d    -> read analog pin p with delay d\r\n"
+	"l p d r  -> read analog pin p with delay d, reference r\r\n"
 #if PULSE_MONITOR
 	"C v e    -> counter on, v = value, e = edge: rising = 1\r\n"
 	"S        -> stop counter\r\n"
@@ -830,12 +830,12 @@ diag (
 
   entry (RS_ADC)
 
-	a = b = 0;
-	scan (ibuf + 1, "%d %d", &a, &b);
+	a = b = c = 0;
+	scan (ibuf + 1, "%d %d %d", &a, &b, &c);
 
   entry (RS_ADC+1)
 
-	n = pin_read_adc (RS_ADC+1, a, 1, b);
+	n = pin_read_adc (RS_ADC+1, a, c, b);
 
 	diag ("PIN [%u] = %d [%x]", a, n, n);
 	proceed (RS_RCMD);
