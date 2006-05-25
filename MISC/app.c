@@ -5,11 +5,10 @@
 #include "sysio.h"
 #include "lhold.h"
 
-process (root, void)
+static lword lw;
+static int pcs;
 
-	static lword lw = 120; 
-
-	word w;
+process (sleeper, void)
 
 	entry (0)
 		lw = (lword) (rnd () & 0x1ff);
@@ -22,5 +21,16 @@ process (root, void)
 
 endprocess (0)
 
+process (root, void)
 
+	entry (0)
 
+		pcs = fork (sleeper, NULL);
+
+	entry (1)
+
+		diag ("%d: left %d", (word) seconds (),
+			(word) lhleft (pcs, &lw));
+		delay (((rnd () & 0xf) + 1) << 10, 1);
+
+endprocess (0)
