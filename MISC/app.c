@@ -5,32 +5,39 @@
 #include "sysio.h"
 #include "lhold.h"
 
-static lword lw;
-static int pcs;
+word when [10];
 
-process (sleeper, void)
+process (sleeper, word)
+
+#define	PNUM	((int)data)
+
+	word	dd, ns;
 
 	entry (0)
-		lw = (lword) (rnd () & 0x1ff);
-		diag ("%d: lhold for %d", (word)seconds(), (word)lw);
+		// Generate a number of seconds to sleep
+		dd = rnd () & 0x3f;
+		ns = (word) seconds ();
+		diag ("%u: [%d] for %d sec", ns, PNUM, dd);
+		when [PNUM] = ns + dd;
+		delay (dd << 10, 1);
+		release;
 
 	entry (1)
-		lhold (1, &lw);
-		diag ("%d: let go", (word)seconds ());
+		ns = (word) seconds ();
+		diag ("%u: [%d] wake up %u", ns, PNUM, when [PNUM]);
 		proceed (0);
 
 endprocess (0)
 
 process (root, void)
 
+	int i;
+
 	entry (0)
 
-		pcs = fork (sleeper, NULL);
+		for (i = 0; i < 8; i++)
+			fork (sleeper, i);
 
-	entry (1)
-
-		diag ("%d: left %d", (word) seconds (),
-			(word) lhleft (pcs, &lw));
-		delay (((rnd () & 0xf) + 1) << 10, 1);
+		finish;
 
 endprocess (0)
