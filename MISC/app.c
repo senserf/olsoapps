@@ -38,6 +38,16 @@ process (root, void)
 		for (i = 0; i < 8; i++)
 			fork (sleeper, i);
 
-		finish;
+	entry (1)
+
+		delay (10 << 10, 2);
+		release;
+
+	entry (2)
+
+		diag ("Freezing");
+		freeze (4);
+		diag ("Unfreezing");
+		proceed (1);
 
 endprocess (0)
