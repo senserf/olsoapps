@@ -65,7 +65,7 @@
 // #define	TCV_LIMIT_XMT		4
 // #define	TCV_LIMIT_RCV		3
 
-#define	DUMP_MEM		0
+#define	DUMP_MEMORY		0
 
 //#define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nPecunia non olet"
 #define	BANNER	"RFM VersaMESH2(tm) v0.1\r\nDual Crystal"
