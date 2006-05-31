@@ -9,9 +9,7 @@
 #include "msg_vmesh.h"
 #include "lib_app_if.h"
 #include "codes.h"
-#if DM2200 && PULSE_MONITOR
-#include "phys_dm2200.h"
-#endif
+#include "pinopts.h"
 // #include "trc.h"
 
 #define TINY_MEM 1
@@ -508,8 +506,10 @@ static void read_eprom_and_init() {
 			tarp_ctrl.param &= 0xFE; // routing off
 		}
 	}
+#if 0
 	w[0] = 3; // default power level
 	net_opt (PHYSOPT_SETPOWER, w);
+#endif
 }
 
 // uart proved to be malicious, check what there is to check:

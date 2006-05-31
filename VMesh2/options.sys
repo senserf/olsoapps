@@ -53,4 +53,6 @@
 #define UART_INPUT_BUFFER_LENGTH 32
 #define MSK_BACKOFF		0xFF
 #define PULSE_MONITOR		1
+#define GLACIER			1
+
 

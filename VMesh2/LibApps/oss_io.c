@@ -12,9 +12,8 @@
 #if DM2100
 #include "phys_dm2100.h"
 #endif
-#if DM2200 && PULSE_MONITOR
-#include "phys_dm2200.h"
-#endif
+#include "pinopts.h"
+#include "lhold.h"
 
 extern tarpCtrlType tarp_ctrl;
 
@@ -195,7 +194,7 @@ void oss_set_in () {
 			net_opt (PHYSOPT_TXOFF, NULL);
 		cmd_ctrl.oprc = RC_OK;
 		break;
-
+#if TARGET_BOARD == BOARD_GENESIS
 	case PAR_RFPWR:
 		if (cmd_ctrl.oplen != 2) {
 			cmd_ctrl.oprc = RC_ELEN;
@@ -208,7 +207,7 @@ void oss_set_in () {
 		net_opt (PHYSOPT_SETPOWER, &val);
 		cmd_ctrl.oprc = RC_OK;
 		break;
-
+#endif
 	case PAR_ALRM_DONT:
 		if (cmd_ctrl.oplen != 1 + sizeof(lword) + 1) {
 			cmd_ctrl.oprc = RC_ELEN;
@@ -264,37 +263,38 @@ void oss_set_in () {
 			cmd_ctrl.oprc = RC_ELEN;
 			break;
 		}
+		memcpy (&val, cmd_line +2, 2);
 		if (val != 12 && val != 24 && val != 48 && val != 96 &&
 				val != 192 && val != 384) {
 			cmd_ctrl.oprc = RC_EVAL;
 			break;
 		}
-		memcpy (&val, cmd_line +2, 2);
 		ion (UART, CONTROL, (char*)&val, UART_CNTRL_SETRATE);
 		cmd_ctrl.oprc = RC_OK;
 		break;
 		
 	 case PAR_CYC_CTRL:
-		if (cmd_ctrl.oplen != 2) {
+		if (cmd_ctrl.oplen != 3) {
 			cmd_ctrl.oprc = RC_ELEN;
 			break;
 		}
-		if ((val = cmd_line[2] >> 4) > 3 ||
-			(word)(cmd_line[2] & 0x0F) > 3) {
+		if (cmd_line[2] > 3 || cmd_line[3] > 3) {
 			cmd_ctrl.oprc = RC_EVAL;
 			break;
 		}
 		if (local_host == master_host) {
-			if (val == cyc_ctrl.st || val == CYC_ST_SLEEP || 
-				(cmd_line[2] & 3) != CYC_MOD_NET) {
+			if (cmd_line[2] == cyc_ctrl.st ||
+				cmd_line[2] == CYC_ST_SLEEP || 
+				cmd_line[3] != CYC_MOD_NET) {
 				cmd_ctrl.oprc = RC_EMAS;
 				break;
 			}
-			if (val != CYC_ST_DIS && cyc_ctrl.st != CYC_ST_DIS) {
+			if (cmd_line[2] != CYC_ST_DIS &&
+					cyc_ctrl.st != CYC_ST_DIS) {
 				cmd_ctrl.oprc = RC_ERES;
 				break;
 			}
-			cyc_ctrl.st = val;
+			cyc_ctrl.st = cmd_line[2];
 			// don't, it is overloaded:
 		       //	cyc_ctrl.mod = cmd_line[2] & 3;
 			nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
@@ -315,16 +315,17 @@ void oss_set_in () {
 
 		}
 		// not master
-		if (cyc_ctrl.mod != (cmd_line[2] & 3) &&
+		if (cyc_ctrl.mod != cmd_line[3] &&
 				cyc_ctrl.st != CYC_ST_DIS) {
 			cmd_ctrl.oprc = RC_ERES;
 			break;
 		}
-		if (val != cyc_ctrl.st &&
-			(val != CYC_ST_DIS && val != CYC_ST_ENA ||
-				val == CYC_ST_ENA &&
-				(cmd_line[2] & 3) != CYC_MOD_NET &&
-				(cmd_line[2] & 3) != CYC_MOD_PNET)) {
+		if (cmd_line[2] != cyc_ctrl.st &&
+			(cmd_line[2] != CYC_ST_DIS &&
+			 cmd_line[2] != CYC_ST_ENA ||
+				cmd_line[2] == CYC_ST_ENA &&
+				cmd_line[3] != CYC_MOD_NET &&
+				cmd_line[3] != CYC_MOD_PNET)) {
 			cmd_ctrl.oprc = RC_EVAL;
 			break;
 		}
@@ -338,10 +339,19 @@ void oss_set_in () {
 			dbg_2 (0xC2F3);
 			kill (running (cyc_man));
 		}
-		cyc_ctrl.st = val;
-		cyc_ctrl.mod = cmd_line[2] & 3;
+		cyc_ctrl.st = cmd_line[2];
+		cyc_ctrl.mod = cmd_line[3];
 		nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
 		cmd_ctrl.oprc = RC_OK;
+		// who knows how we get any consistency here...
+		if (cyc_ctrl.mod == CYC_MOD_POFF) {
+			net_opt (PHYSOPT_RXOFF, NULL);
+			net_opt (PHYSOPT_TXOFF, NULL);
+		} else if (cyc_ctrl.mod == CYC_MOD_PON) {
+			net_opt (PHYSOPT_RXON, NULL);
+			net_opt (PHYSOPT_TXON, NULL);
+		}
+		// ... and don't touch  NET, PNET (?)
 		break;
 
 	 case PAR_CYC_SLEEP:
@@ -372,17 +382,27 @@ void oss_set_in () {
 			break;
 		}
 		memcpy (&val, cmd_line +2, 2);
-		if (cyc_ctrl.st == CYC_ST_PREP &&
-			val != 0 &&  val != 0xEFFF && val != 0xDFFF) {
+		if (cyc_ctrl.st == CYC_ST_PREP && val != 0 &&
+			val != CYC_MSG_FORCE_DIS && val != CYC_MSG_FORCE_ENA) {
 			cmd_ctrl.oprc = RC_ERES;
 			break;
 		}
-		if (val > 0x0FFF && val != 0xEFFF && val != 0xDFFF) {
+		if (val > 0x0FFF && val != CYC_MSG_FORCE_ENA &&
+				val != CYC_MSG_FORCE_DIS) {
 			cmd_ctrl.oprc = RC_EVAL;
 			break;
 		}
 		cyc_ctrl.prep = val;
-		cyc_ctrl.mod = val >> 12; // E-> 10; D-> 01; x-> 00.
+		switch (val) {
+			case CYC_MSG_FORCE_ENA:
+				cyc_ctrl.mod = CYC_MOD_PON;
+				break;
+			case CYC_MSG_FORCE_DIS:
+				cyc_ctrl.mod = CYC_MOD_POFF;
+				break;
+			default:
+				cyc_ctrl.mod = CYC_MOD_NET;
+		}
 		nvm_write (NVM_CYC_CTRL, (address)&cyc_ctrl, 1);
 		cmd_ctrl.oprc = RC_OK;
 		break;
@@ -533,13 +553,13 @@ void oss_get_in (word state) {
 		memcpy (cmd_line +4, &tarp_ctrl.snd, 2);
 		memcpy (cmd_line +6, &tarp_ctrl.fwd, 2);
 		return;
-
+#if TARGET_BOARD == BOARD_GENESIS
 	  case PAR_RFPWR:
 		cmd_ctrl.oplen++;
 		net_opt (PHYSOPT_GETPOWER, &p);
 		cmd_line[2] = p;
 		return;
-
+#endif
 	  case ATTR_SYSVER:
 		cmd_ctrl.oplen += 2;
 		cmd_line[2] = SYSVER_B >> 8;
@@ -602,26 +622,28 @@ void oss_get_in (word state) {
 			return;
 		}
 		cmd_ctrl.oplen += 2;
-		memcpy (cmd_line +2, &cyc_ctrl, 2);
+		switch (cyc_ctrl.mod) {
+			case CYC_MOD_PON:
+				p = CYC_MSG_FORCE_ENA;
+				break;
+			case CYC_MOD_POFF:
+				p = CYC_MSG_FORCE_DIS;
+				break;
+			default:
+				p = cyc_ctrl.prep;
+		}
+		memcpy (cmd_line +2, &p, 2);
+		return;
 
 	  case ATTR_CYC_LEFT:
-		cmd_ctrl.oplen += 4;
+		cmd_ctrl.oplen += 6;
 		if ((p = running (cyc_man)) == 0)
 			l = 0;
-		else {
-			if ((l = ldleft (p, &p1)) == MAX_UINT) {
-				if ((l = dleft (p)) == MAX_UINT) {
-					l = 0;
-				} else {
-					l >>= 10;
-				}
-			} else {
-				l = (l << 6) + p1;
-			}
-		}
-		l += cyc_left;
+		else
+			l = lhleft (p, &cyc_left);
 		memcpy (cmd_line +2, &l, 4);
-		cmd_line[2] &= (cyc_ctrl.st << 6) | (cyc_ctrl.mod << 4);
+		cmd_line[6] = cyc_ctrl.st;
+		cmd_line[7] = cyc_ctrl.mod;
 		return;
 
 	  default:
@@ -652,7 +674,6 @@ void oss_ret_out (word state) {
 }
 
 void oss_master_in (word state) {
-
 	char * out_buf = NULL;
 
 	cmd_ctrl.oprc = RC_OK; // ok by default
@@ -666,6 +687,14 @@ void oss_master_in (word state) {
 			nvm_write (NVM_MID, &master_host, 1);
 			tarp_ctrl.param &= 0xFE; // routing off
 			leds (CON_LED, LED_ON);
+			// operator's inervention is likely, just adjust basics:
+			cyc_ctrl.st = CYC_ST_DIS;
+			cyc_ctrl.mod = CYC_MOD_NET;
+			cyc_sp = DEFAULT_CYC_SP + DEFAULT_CYC_M_REST;
+			if (running (cyc_man))
+				kill (running (cyc_man));
+			// to avoid wasting flash: no writes; if there
+			// was anything customized there, better cold reboot
 		}
 		if (local_host == cmd_ctrl.t)
 			return;
@@ -1021,14 +1050,13 @@ void oss_io_in() {
 
 		case IO_ADC:
 			if ((w = cmd_line[2] & 0x0F) < 1 || w > 7 ||
-					(w1 = cmd_line[3]) > 64) {
+					(w1 = cmd_line[3]) > 64 ||
+					cmd_line[2] >> 4 > 2) {
 				cmd_ctrl.oprc = RC_EVAL;
 				return;
 			}
 			net_opt (PHYSOPT_RXOFF, NULL);
-			w = pin_read_adc (NONE, w,
-					(cmd_line[2] & 0x10) ? 1 : 0,
-					w1);
+			w = pin_read_adc (NONE, w, cmd_line[2] >> 4, w1);
 			net_opt (PHYSOPT_RXON, NULL);
 			if (w == -1)
 				cmd_ctrl.oprc = RC_ERES;

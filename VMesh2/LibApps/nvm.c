@@ -7,9 +7,7 @@
 #include "codes.h"
 #include "msg_vmesh.h"
 #include "lib_app_if.h"
-#if DM2200 && PULSE_MONITOR
-#include "phys_dm2200.h"
-#endif
+#include "pinopts.h"
 
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
@@ -336,6 +334,7 @@ int add_esn (lword * e, int * pos) {
 }
 
 int era_esn (lword * e) {
+#if EEPROM_DRIVER
 	lword buf [ESN_BSIZE]; 
 	word bp, i, rr; 
 
@@ -353,6 +352,7 @@ int era_esn (lword * e) {
 		}
 		i++;
 	}
+#endif
 	return -RC_EVAL;
 }
 

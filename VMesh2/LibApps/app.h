@@ -86,6 +86,8 @@ typedef struct cycCtrlStruct {
 #define CYC_MOD_PNET 1
 #define CYC_MOD_PON 2
 #define CYC_MOD_POFF 3
+#define CYC_MSG_FORCE_ENA 0xEFFF
+#define CYC_MSG_FORCE_DIS 0xDFFF
 
 // 90 s default sleep time, master sync & rest, mode, and state 
 #define DEFAULT_CYC_SP  	90 

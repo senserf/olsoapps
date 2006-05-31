@@ -87,7 +87,7 @@ void msg_master_in (char * buf) {
 	} else if (audit_freq != 0)
 		fork (con_man, NULL);
 
-	if (in_master(buf, cyc) == 0xDFFF) { // specialties
+	if (in_master(buf, cyc) == CYC_MSG_FORCE_DIS) { // specialties
 		if (running (cyc_man))
 			kill (running (cyc_man));
 		if (cyc_ctrl.st != CYC_ST_DIS) {
@@ -96,7 +96,7 @@ void msg_master_in (char * buf) {
 		}
 		return;
 	}
-	if (in_master(buf, cyc) == 0xEFFF) {
+	if (in_master(buf, cyc) == CYC_MSG_FORCE_ENA) {
 		if (running (cyc_man))
 			kill (running (cyc_man));
 		if (cyc_ctrl.st != CYC_ST_ENA && cyc_ctrl.st != CYC_ST_DIS)
@@ -110,6 +110,7 @@ void msg_master_in (char * buf) {
 			kill (running (cyc_man));
 		}
 		cyc_ctrl.prep = in_master(buf, cyc);
+		cyc_ctrl.st = CYC_ST_PREP;
 		fork (cyc_man, NULL);
 	}
 }

@@ -7,9 +7,9 @@
 #include "msg_vmesh.h"
 #include "net.h"
 #include "nvm.h"
-#if DM2200 && PULSE_MONITOR
-#include "phys_dm2200.h"
-#endif
+#include "pinopts.h"
+#include "tcvplug.h"
+#include "lhold.h"
 
 const	lword	ESN = 0xBACA0001;
 lword	cyc_sp;
@@ -26,6 +26,7 @@ brCtrlType br_ctrl;
 cycCtrlType cyc_ctrl;
 
 int cyc_man (word, address);
+int con_man (word, address);
 int beacon (word, address);
 
 char * get_mem (word state, int len);
@@ -189,20 +190,41 @@ endprocess (1)
 
 #define CS_INIT         00
 #define CS_ACT          10
+#define CS_HOLD		20
 process (cyc_man, void)
 	word a;
 	nodata;
 
 	entry (CS_INIT)
 		if (cyc_ctrl.st == CYC_ST_DIS || cyc_ctrl.mod == CYC_MOD_PON ||
-			cyc_ctrl.mod == CYC_MOD_POFF || cyc_sp == 0) {
+			cyc_ctrl.mod == CYC_MOD_POFF || cyc_ctrl.prep == 0 ||
+			cyc_sp == 0) {
 			cyc_left = 0;
 			kill (0);
 		}
 
-		if (cyc_ctrl.st == CYC_ST_SLEEP || cyc_ctrl.st == CYC_ST_ENA)
+		if (cyc_ctrl.st == CYC_ST_SLEEP || cyc_ctrl.st == CYC_ST_ENA) {
 			cyc_left = cyc_sp;
-		else
+			if (local_host != master_host) {
+				// double check
+				if (cyc_ctrl.st == CYC_ST_ENA) {
+					dbg_2 (0xC2F6);
+					cyc_left = 0;
+					cyc_ctrl.st = CYC_ST_ENA;
+					kill (0);
+				}
+				net_opt (PHYSOPT_RXOFF, NULL);
+				leds (CON_LED, LED_OFF);
+				if (cyc_ctrl.mod == CYC_MOD_NET)
+					net_opt (PHYSOPT_TXOFF, NULL);
+				else // CYC_MOD_PNET
+					net_opt (PHYSOPT_TXHOLD, NULL);
+				net_qera (TCV_DSP_XMTU);
+				net_qera (TCV_DSP_RCVU);
+				if ((a = running (con_man)))
+					kill (a);
+			}
+		} else
 			cyc_left = cyc_ctrl.prep;
 
 	entry (CS_ACT)
@@ -224,24 +246,40 @@ process (cyc_man, void)
 						cyc_ctrl.st = CYC_ST_SLEEP;
 					break;
 				default:  // also CYC_ST_SLEEP
-					cyc_left = 0;
+					if (local_host == master_host)
+						dbg_2 (0xC2F5);
+					cyc_ctrl.st = CYC_ST_ENA;
+					net_opt (PHYSOPT_RXON, NULL);
+					net_opt (PHYSOPT_TXON, NULL);
+					leds (CON_LED, LED_BLINK);
 					kill (0);
 			}
 			proceed (CS_INIT);
 		}
-		if (cyc_left < 64) {
-			a = (word)cyc_left;
-			cyc_left = 0;
-			delay (a << 10, CS_ACT);
-		} else {
-			a = (word)(cyc_left >> 6);
-			cyc_left -= (lword)a;
-			ldelay (a, CS_ACT);
+		if (cyc_ctrl.st == CYC_ST_SLEEP &&
+				cyc_ctrl.mod == CYC_MOD_NET) {
+			while (cyc_left != 0) {
+				if (cyc_left > MAX_UINT) {
+					cyc_left -= MAX_UINT;
+					freeze (MAX_UINT);
+				} else {
+					freeze ((word)cyc_left);
+					cyc_left = 0;
+				}
+			}
+			proceed (CS_ACT);
 		}
-		release;
+	entry (CS_HOLD)
+		lhold (CS_HOLD, &cyc_left);
+		if (cyc_left) {
+			dbg_2 (0xC2F7);
+			cyc_left = 0;
+		}
+		proceed (CS_ACT);
 endprocess (1)
 #undef CS_INIT
 #undef CS_ACT
+#undef CS_HOLD
 
 #define BS_ITER 00
 #define BS_ACT  10
@@ -338,27 +376,20 @@ char * get_mem (word state, int len) {
 }
 
 static word get_prep () {
-	word v1, v2, v3;
-	if (cyc_ctrl.mod)
-		return (cyc_ctrl.mod & 1 ? 0xDFFF : 0xEFFF);
+	word w;
+	if (cyc_ctrl.mod != CYC_MOD_NET)
+		return (cyc_ctrl.mod  == CYC_MOD_PON ?
+			CYC_MSG_FORCE_ENA : CYC_MSG_FORCE_DIS);
 
-	if (cyc_ctrl.st == CYC_ST_DIS || cyc_ctrl.prep == 0 ||
-			(v1 = running (cyc_man)) == 0)
+	if (cyc_ctrl.st != CYC_ST_PREP || cyc_ctrl.prep == 0 ||
+			(w = running (cyc_man)) == 0)
 		return 0;
-
-	if ((v2 = ldleft (v1, &v3)) != MAX_UINT)
-		v3 += v2 << 6;
-	else {
-		if ((v3 = dleft (v1)) == MAX_UINT)
-			v3 = 0;
-		else
-			v3 >>= 10;
-	}
-	if ((v3 += cyc_left) >= cyc_sp) {
+	w = (word)lhleft (w, &cyc_left);
+	if (w > cyc_ctrl.prep) {
 		dbg_2 (0xC2F4);
 		return 0;
 	}
-	return v3;
+	return w;
 }
 
 void send_msg (char * buf, int size) {
@@ -374,9 +405,16 @@ void send_msg (char * buf, int size) {
 		in_master(buf, con) = freqs & 0xFF00 | (connect >> 8);
 		in_master(buf, cyc) = get_prep();
 	}
-
-	if (net_tx (NONE, buf, size, encr_data) != 0) {
-		dbg_a (0x0500 | in_header(buf, msg_type)); // Tx failed
+	if (cyc_ctrl.mod == CYC_MOD_POFF) {
+		net_opt (PHYSOPT_TXON, NULL);
+		if (net_tx (NONE, buf, size, encr_data) != 0) {
+			dbg_a (0x0500 | in_header(buf, msg_type)); // Tx failed
+		}
+		net_opt (PHYSOPT_TXOFF, NULL);
+	} else {
+		if (net_tx (NONE, buf, size, encr_data) != 0) {
+			dbg_a (0x0500 | in_header(buf, msg_type));
+		}
 	}
 }
 
