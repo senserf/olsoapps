@@ -50,16 +50,16 @@ typedef struct brCtrlStruct {
 
 #define IO_ACK_TRIG ((word)&io_pload)
 
-#define	BR_SPARE	1
+#define	DAT_ACK		1
 #define IO_ACK		2
 #define BR_STACK	4
 #define BR_STNACK	8
 
 // br_ctrl meant "bridge control" in Genesis, but we use
-// spare bits for identical reliable delivery for VMesh IO
-#define is_brSPARE	(br_ctrl.flags & BR_SPARE)
-#define set_brSPARE	(br_ctrl.flags |= BR_SPARE)
-#define clr_brSPARE	(br_ctrl.flags &= ~BR_SPARE)
+// spare bits for identical reliable delivery for VMesh IO snf DAT
+#define is_datACK	(br_ctrl.flags & DAT_ACK)
+#define set_datACK	(br_ctrl.flags |= DAT_ACK)
+#define clr_datACK	(br_ctrl.flags &= ~DAT_ACK)
 
 #define is_ioACK	(br_ctrl.flags & IO_ACK)
 #define set_ioACK	(br_ctrl.flags |= IO_ACK)
@@ -99,18 +99,29 @@ b0 - autoack
 b1 - master changed (in tarp) flag
 b2-b3 - encryption key #
 b4    - encryption mode
-b5-b7 - spare
+b5    - node can be a binder (1), or not (0)
+b6    - uart modes: cmd (1), dat (0)
+b7    - spare
 b8-b11 - timeout for reliable msgs
 b12-15 0 # of retries  -"-
 ---------------------------------------
-DEF: retries 3, tout 10, 3b spare, encr data 0, 00, master chg 0, autoack 1
+DEF: retries 3, tout 10, 2b spare, uart mode 1, encr data 0, 00, master chg 0,
+autoack 1
 Set in app.c::read_eprom_and_init()
 --------------------------------------*/ 
-#define DEFAULT_APP_FLAGS	0x3A01
+#define DEFAULT_APP_FLAGS	0x3A61
 #define is_autoack	(app_flags & 1)
 #define set_autoack	(app_flags |= 1)
 #define clr_autoack	(app_flags &= ~1)
-// ... later
+
+#define is_cmdmode	(app_flags & 64)
+#define set_cmdmode	(app_flags |= 64)
+#define clr_cmdmode	(app_flags &= ~64)
+
+#define is_binder	(app_flags & 32)
+#define set_binder	(app_flags |= 32)
+#define clr_binder	(app_flags &= ~32)
+
 #define set_retries(r)  (app_flags = (app_flags & 0x0FFF) | ((word)(r) << 12))
 #define ack_retries	(app_flags >> 12)
 #define ack_tout	((app_flags >> 8) & 0x000F)

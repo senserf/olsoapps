@@ -25,13 +25,12 @@
 #define NVM_NID		0
 #define NVM_LH		(NVM_NID + 1)
 #define NVM_MID		(NVM_NID + 2)
-#define NVM_APP		(NVM_NID + 3)
-// NVM_APP: b0-b2: encr; b3-b15 spare
-// if we run out of this page, all we need for duty cycles are 2 bits for mod
-// and dis/ena flag, so we can add them to NVM_APP... all together, we should
-// have 13 + 14 + (8 or even whole NVM_IO_CMP) spares here...
-#define NVM_CYC_CTRL    (NVM_NID + 4)
 
+// NVM_APP: b0-b2, b3: encr; b4: binder; b5: cmdmode; b6-b7 spare
+//          b8-b15: tarp_ctrl.param
+#define NVM_APP		(NVM_NID + 3)
+
+#define NVM_CYC_CTRL    (NVM_NID + 4)
 #define NVM_CYC_SP	(NVM_NID + 5)
 
 #define NVM_IO_CMP	(NVM_NID + 7)

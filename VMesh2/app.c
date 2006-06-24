@@ -87,10 +87,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		return;
 
 	case msg_trace:
+	case msg_traceF:
+	case msg_traceB:
 		msg_trace_in (state, buf);
 		return;
 
 	case msg_traceAck:
+	case msg_traceFAck:
+	case msg_traceBAck:
 		msg_traceAck_in (state, buf);
 		return;
 
@@ -130,6 +134,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 
 	case msg_stNack:
 		msg_stNack_in (buf);
+		return;
+
+	case msg_nh:
+		msg_nh_in (buf);
+		return;
+
+	case msg_nhAck:
+		msg_nhAck_in (buf);
 		return;
 
 	case msg_io:
@@ -384,6 +396,10 @@ extern tarpCtrlType tarp_ctrl;
 static void read_eprom_and_init() {
 	word w[NVM_BOOT_LEN];
 
+	// init uart: _GETRATE doesn't show good result without it
+	w[0] = UART_RATE / 100;
+	ion (UART, CONTROL, (char *)w, UART_CNTRL_SETRATE);
+
 	nvm_read (NVM_NID, w, NVM_BOOT_LEN);
 	if (w[NVM_NID] == 0xFFFF)
 		net_id = 0;
@@ -399,8 +415,14 @@ static void read_eprom_and_init() {
 		master_host = w[NVM_MID];
 
 	app_flags = DEFAULT_APP_FLAGS;
-	if (w[NVM_APP] != 0xFFFF)
-		app_flags |= (w[NVM_APP] & 7) << 2; // encryption key #
+	if ((w[NVM_APP] & 0x0F) != 0x0F)
+		set_encr_data (w[NVM_APP] & 0x0F);
+	if (!(w[NVM_APP] & 0x20))
+		clr_cmdmode;
+	if (!(w[NVM_APP] & 0x10))
+		clr_binder;
+	if ((w[NVM_APP] & 0xFF00) != 0xFF00)
+		tarp_ctrl.param = w[NVM_APP] >> 8;
 
 	if (w[NVM_CYC_CTRL] != 0xFFFF) {
 		memcpy (&cyc_ctrl, w[NVM_CYC_CTRL], 2);
@@ -497,7 +519,7 @@ static void read_eprom_and_init() {
 	} else {
 		if (master_host != local_host) {
 			freqs = 0;
-			fork (st_rep, NULL);
+			fork (st_rep, w); // w <=> !=NULL
 			leds (CON_LED, LED_BLINK);
 			
 		} else {
@@ -516,7 +538,7 @@ static void read_eprom_and_init() {
 static bool valid_input () {
 
 	if (cmd_ctrl.opcode == 0 || 
-		cmd_ctrl.opcode > CMD_IOACK && cmd_ctrl.opcode != CMD_SENSIN) {
+		(cmd_ctrl.opcode > CMD_DAT && cmd_ctrl.opcode != CMD_SENSIN)) {
 		dbg_9 (0x5000 | cmd_ctrl.opcode);
 		return NO;
 	}

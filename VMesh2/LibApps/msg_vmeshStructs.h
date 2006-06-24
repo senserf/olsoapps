@@ -102,6 +102,19 @@ typedef struct msgStNackStruct {
 } msgStNackType;
 #define in_stNack(buf, field)  (((msgStNackType *)(buf))->field)
 
+typedef struct msgNhStruct {
+	headerType      header;
+	nid_t		host;
+} msgNhType;
+#define in_nh(buf, field)  (((msgNhType *)(buf))->field)
+
+typedef struct msgNhAckStruct {
+	headerType      header;
+	word		esn_l;
+	word		esn_h;
+	nid_t		host;
+} msgNhAckType;
+#define in_nhAck(buf, field)  (((msgNhAckType *)(buf))->field)
 typedef struct msgIoStruct {
 	headerType	header;
 	lword		pload;

@@ -8,6 +8,7 @@
 #include "msg_vmesh.h"
 #include "lib_app_if.h"
 #include "pinopts.h"
+#include "tarp.h"
 
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
@@ -49,6 +50,7 @@ void nvm_read (word pos, address d, word wlen) {
 }
 
 #if !EEPROM_DRIVER
+extern tarpCtrlType tarp_ctrl;
 static void fpage_reset (word p) {
 	lword lw;
 	if (p & 0xFFC0) { // ESN page: should not be
@@ -59,7 +61,13 @@ static void fpage_reset (word p) {
 	if_write (NVM_NID, net_id);
 	if_write (NVM_LH, local_host);
 	if_write (NVM_MID, master_host);
-	if_write (NVM_APP, encr_data);
+	lw = encr_data;
+	if (is_cmdmode)
+		lw |= 1 << 5;
+	if (is_binder)
+		lw |= 1 << 4;
+	lw |= tarp_ctrl.param << 8;
+	if_write (NVM_APP, (word)lw);
 	memcpy (&lw, &cyc_ctrl, 2);
 	if_write (NVM_CYC_CTRL, (word)lw);
 	if_write (NVM_CYC_SP, (word)cyc_sp);

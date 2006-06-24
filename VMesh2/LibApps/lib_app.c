@@ -28,6 +28,7 @@ cycCtrlType cyc_ctrl;
 int cyc_man (word, address);
 int con_man (word, address);
 int beacon (word, address);
+int del_man (word, address);
 
 char * get_mem (word state, int len);
 void send_msg (char * buf, int size);
@@ -42,15 +43,35 @@ extern lword esns[];
 extern word  svec[];
 extern void oss_io_out (char * buf, bool acked);
 
-#define SRS_ITER	00
-#define SRS_BR		10
-#define SRS_CONT	20
-#define SRS_ST		30
-#define SRS_NEXT	40
-#define SRS_FIN		50
-process (st_rep, void)
+#define SRS_INIT	00
+#define SRS_DEL		10
+#define SRS_ITER	20
+#define SRS_BR		30
+#define SRS_CONT	40
+#define SRS_ST		50
+#define SRS_NEXT	60
+#define SRS_FIN		70
+#define ST_REP_BOOT_DELAY	100
+process (st_rep, word)
 
 	static int left; 
+
+	entry (SRS_INIT)
+		if (data)
+			left = rnd() % ST_REP_BOOT_DELAY;
+		else
+			left = 0;
+
+	entry (SRS_DEL)
+		if (left > 63) {
+			left -= 63;
+			delay (63 << 10, SRS_DEL);
+			release;
+		}
+		if (left > 0) {
+			delay (left << 10, SRS_ITER);
+			release;
+		}
 
 	entry (SRS_ITER)
 		if (br_ctrl.rep_freq  >> 1 == 0 ||
@@ -108,6 +129,8 @@ process (st_rep, void)
 		ldelay (br_ctrl.rep_freq >> 1, SRS_ITER);
 		release;
 endprocess (1)
+#undef SRS_INIT
+#undef SRS_DEL
 #undef SRS_ITER
 #undef SRS_BR
 #undef SRS_CONT
@@ -402,7 +425,7 @@ void send_msg (char * buf, int size) {
 
 	// master inserts are convenient here, as the beacon is prominent...
 	if (in_header(buf, msg_type) == msg_master) {
-		in_master(buf, con) = freqs & 0xFF00 | (connect >> 8);
+		in_master(buf, con) = (freqs & 0xFF00) | (connect >> 8);
 		in_master(buf, cyc) = get_prep();
 	}
 	if (cyc_ctrl.mod == CYC_MOD_POFF) {

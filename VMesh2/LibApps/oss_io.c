@@ -82,6 +82,10 @@ void oss_set_in () {
 		}
 		tarp_ctrl.param = (tarp_ctrl.param & 0x3F) | (cmd_line[2] << 6);
 		cmd_ctrl.oprc = RC_OK;
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		nvm_write (NVM_APP, &val, 1);
 		break;
 
 	case PAR_TARP_S:
@@ -92,6 +96,10 @@ void oss_set_in () {
 		tarp_ctrl.param = 
 			(tarp_ctrl.param & 0xF1) | ((cmd_line[2] & 7) << 1);
 		cmd_ctrl.oprc = RC_OK;
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		nvm_write (NVM_APP, &val, 1);
 		break;
 		
 	case PAR_TARP_R:
@@ -102,6 +110,10 @@ void oss_set_in () {
 		tarp_ctrl.param = 
 			(tarp_ctrl.param & 0xCF) | ((cmd_line[2] & 3) << 4);
 		cmd_ctrl.oprc = RC_OK;
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		nvm_write (NVM_APP, &val, 1);
 		break;
 
 	case PAR_TARP_F:
@@ -111,6 +123,10 @@ void oss_set_in () {
 		}
 		tarp_ctrl.param = (tarp_ctrl.param & 0xFE) | (cmd_line[2] & 1);
 		cmd_ctrl.oprc = RC_OK;
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		nvm_write (NVM_APP, &val, 1);
 		break;
 
 	case PAR_ENCR_M:
@@ -119,7 +135,9 @@ void oss_set_in () {
 			break;
 		}
 		set_encr_mode(cmd_line[2]);
-		val = encr_data;
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0xFFF0;
+		val |= encr_data;
 		nvm_write (NVM_APP, &val, 1);
 		cmd_ctrl.oprc = RC_OK;
 		break;
@@ -130,7 +148,9 @@ void oss_set_in () {
 			break;
 		}
 		set_encr_key(cmd_line[2]);
-		val = encr_data; 
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0xFFF0;
+		val |= encr_data; 
 		nvm_write (NVM_APP, &val, 1);
 		cmd_ctrl.oprc = RC_OK;
 		break;
@@ -142,6 +162,9 @@ void oss_set_in () {
 		}
 		val = cmd_line[2];
 		set_encr_data(val);
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0xFFF0;
+		val |= encr_data;
 		nvm_write (NVM_APP, &val, 1);
 		cmd_ctrl.oprc = RC_OK;
 		break;
@@ -152,9 +175,9 @@ void oss_set_in () {
 			break;
 		}
 		val = freqs;
-		freqs = freqs & 0xFF00 | cmd_line[2];
+		freqs = (freqs & 0xFF00) | cmd_line[2];
 		if (beac_freq > 63)
-			freqs =  freqs & 0xFF00 | 63;
+			freqs =  (freqs & 0xFF00) | 63;
 		if (val != freqs)
 			trigger (BEAC_TRIG);
 		cmd_ctrl.oprc = RC_OK;
@@ -166,10 +189,10 @@ void oss_set_in () {
 			break;
 		}
 		val = freqs;
-		freqs = freqs & 0x00FF | ((word)cmd_line[2] << 8);
+		freqs = (freqs & 0x00FF) | ((word)cmd_line[2] << 8);
 		if (audit_freq > 63)
-			freqs =  freqs & 0x00FF | 0x3FFF; // 63 s
-		connect = connect & 0x00FF | ((word)cmd_line[3] << 8);
+			freqs =  (freqs & 0x00FF) | 0x3FFF; // 63 s
+		connect = (connect & 0x00FF) | ((word)cmd_line[3] << 8);
 		if (val != freqs)
 			trigger (CON_TRIG);
 		cmd_ctrl.oprc = RC_OK;
@@ -272,7 +295,7 @@ void oss_set_in () {
 		ion (UART, CONTROL, (char*)&val, UART_CNTRL_SETRATE);
 		cmd_ctrl.oprc = RC_OK;
 		break;
-		
+
 	 case PAR_CYC_CTRL:
 		if (cmd_ctrl.oplen != 3) {
 			cmd_ctrl.oprc = RC_ELEN;
@@ -321,17 +344,17 @@ void oss_set_in () {
 			break;
 		}
 		if (cmd_line[2] != cyc_ctrl.st &&
-			(cmd_line[2] != CYC_ST_DIS &&
-			 cmd_line[2] != CYC_ST_ENA ||
-				cmd_line[2] == CYC_ST_ENA &&
+			((cmd_line[2] != CYC_ST_DIS &&
+			 cmd_line[2] != CYC_ST_ENA) ||
+				(cmd_line[2] == CYC_ST_ENA &&
 				cmd_line[3] != CYC_MOD_NET &&
-				cmd_line[3] != CYC_MOD_PNET)) {
+				cmd_line[3] != CYC_MOD_PNET))) {
 			cmd_ctrl.oprc = RC_EVAL;
 			break;
 		}
 		if (cyc_ctrl.st == CYC_ST_PREP ||
-			cyc_ctrl.st == CYC_ST_SLEEP && 
-				cyc_ctrl.mod != CYC_MOD_PNET) {
+			(cyc_ctrl.st == CYC_ST_SLEEP && 
+				cyc_ctrl.mod != CYC_MOD_PNET)) {
 			cmd_ctrl.oprc = RC_ERES;
 			break;
 		}
@@ -420,6 +443,44 @@ void oss_set_in () {
 		if (cyc_sp == 0 && (val = running (cyc_man)) != 0)
 			kill (val);
 		nvm_write (NVM_CYC_SP, (address)&cyc_sp, 2);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	 case PAR_BINDER:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if ((cmd_line[2] == 0 && is_binder) ||
+			(cmd_line[2] != 0 && !is_binder)) {
+			nvm_read (NVM_APP, &val, 1);
+			val &= ~16; //b4 in NVM_APP
+			if (cmd_line[2] != 0) {
+				val |= 16;
+				set_binder;
+			} else
+				clr_binder;
+			nvm_write (NVM_APP, &val, 1);
+		}
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	 case PAR_CMD_MODE:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if ((cmd_line[2] == 0 && is_cmdmode) ||
+			(cmd_line[2] != 0 && !is_cmdmode)) {
+			nvm_read (NVM_APP, &val, 1);
+			val &= ~32; // b5 in NVM_APP
+			if (cmd_line[2] != 0) {
+				val |= 32;
+				set_cmdmode;
+			} else
+				clr_cmdmode;
+			nvm_write (NVM_APP, &val, 1);
+		}
 		cmd_ctrl.oprc = RC_OK;
 		break;
 
@@ -524,7 +585,7 @@ void oss_get_in (word state) {
 
 	  case PAR_UART:
 		cmd_ctrl.oplen += 2;
-		ion (UART, CONTROL, (char*) p, UART_CNTRL_GETRATE);
+		ion (UART, CONTROL, (char*) &p, UART_CNTRL_GETRATE);
 		memcpy (cmd_line +2, &p, 2);
 		return;
 		 
@@ -646,6 +707,27 @@ void oss_get_in (word state) {
 		cmd_line[7] = cyc_ctrl.mod;
 		return;
 
+	  case ATTR_NHOOD:
+		// let's do it as GET... I feel sooner or later
+		// we'll have a request to return some local data...
+
+		// don't return by default
+		if (msg_nh_out())
+			cmd_ctrl.oprc = RC_OK;
+		else
+			cmd_ctrl.oprc = RC_ERES;
+		return;
+
+	  case PAR_BINDER:
+		cmd_ctrl.oplen++;
+		cmd_line[2] = is_binder ? 1 : 0;
+		return;
+
+	  case PAR_CMD_MODE:
+		cmd_ctrl.oplen++;
+		cmd_line[2] = is_cmdmode ? 1 : 0;
+		return;
+
 	  default:
 		cmd_ctrl.oprc = RC_EPAR;
 	}
@@ -717,12 +799,18 @@ void oss_master_in (word state) {
 // 0x00 <1-len> 0xFF msg_traceAck  <1-fcount> <1-bcount> <node> ... 0x04
 void oss_traceAck_out (word state, char * buf) {
 #if UART_DRIVER
-	int num = in_header(buf, hoc) + in_traceAck(buf, fcount) -1;
+	int num = 0;
+	if (in_header(buf, msg_type) != msg_traceBAck)
+		num = in_traceAck(buf, fcount);
+	if (in_header(buf, msg_type) != msg_traceFAck)
+		num += in_header(buf, hoc);
+	if (in_header(buf, msg_type) == msg_traceAck)
+		num--; // dst counted twice
 	char * lbuf = get_mem (state, num * sizeof (nid_t) +7);
 	lbuf[0] = '\0';
 	lbuf[1] = num * sizeof (nid_t) +4;
 	lbuf[2] = CMD_MSGOUT;
-	lbuf[3] = msg_traceAck;
+	lbuf[3] = in_header(buf, msg_type);
 	lbuf[4] = in_traceAck(buf, fcount);
 	lbuf[5] = in_header(buf, hoc);
 	
@@ -758,11 +846,47 @@ void oss_bindReq_out (char * buf) {
 		break;
 	  default:
 		dbg_2 (0xBA00 | in_header(buf, msg_type)); // bad bindReq
+		ufree (lbuf);
 		return;
 	}
 	lbuf[12] = 0x04;
 	if (fork (oss_out, lbuf) == 0 ) {
 		dbg_2 (0xC404); // oss_bindReq_out fork failed
+		ufree (lbuf);
+	}
+#endif
+}
+
+void oss_nhAck_out (char * buf) {
+#if UART_DRIVER
+	char * lbuf = get_mem (NONE, 4 + 9 + 1);
+	if (lbuf == NULL)
+		return;
+	lbuf[0] = '\0';
+	lbuf[1] = 2 + 9;
+	lbuf[2] = CMD_MSGOUT;
+	lbuf[3] = msg_nhAck;
+	switch (in_header(buf, msg_type)) {
+	  case msg_nh:
+		memcpy (lbuf +4, &in_header(buf, snd), 2);
+		memcpy (lbuf +6, &ESN, 4);
+		memcpy (lbuf +10, &local_host, 2);
+		lbuf[12] = 0;
+		break;
+	  case msg_nhAck:
+	  	memcpy (lbuf +4, &in_nhAck(buf, host), 2);
+		memcpy (lbuf +6, &in_nhAck(buf, esn_l), 4);
+		memcpy (lbuf +10, &in_header(buf, snd), 2);
+		lbuf[12] = in_header(buf, hoc);
+		break;
+	  default:
+		dbg_2 (0xBA00 | in_header(buf, msg_type)); // bad nhAck
+		ufree (lbuf);
+		return;
+	}
+	lbuf[13] = 0x04;
+	if (fork (oss_out, lbuf) == 0 ) {
+		dbg_2 (0xC404); // oss_nhAck_out fork failed ????
 		ufree (lbuf);
 	}
 #endif
@@ -866,23 +990,15 @@ void oss_st_out (char * buf, bool acked) {
 }
 
 void oss_trace_in (word state) {
-
 	char * out_buf = NULL;
-
+	if (cmd_ctrl.oplen != 2) {
+		cmd_ctrl.oprc = RC_ELEN;
+		return;
+	}
 	cmd_ctrl.oprc = RC_OK;
 	msg_trace_out (state, &out_buf);
 	send_msg (out_buf, sizeof(msgTraceType));
-	//if (beac_freq == 0 || running(beacon)) {
-		ufree (out_buf);
-#if 0
-	} else {
-		if (fork (beacon, out_buf) == 0) {
-			diag ("Fork b_tr failed");
-			ufree (out_buf);
-			cmd_ctrl.oprc = RC_EFORK;
-		} // beacon frees out_buf at exit
-	}
-#endif
+	ufree (out_buf);
 }
 
 void oss_bind_in (word state) {
@@ -1039,7 +1155,7 @@ void oss_io_in() {
 		case IO_WRITE:
 			// analog in on pin > 7 is illegal
 			if (cmd_line[2] < 1 || cmd_line[2] > 10 ||
-				cmd_line[2] > 7 && cmd_line[3] & 4 ||
+				(cmd_line[2] > 7 && (cmd_line[3] & 4)) ||
 				cmd_line[3] == 3 || cmd_line[3] > 4) {
 				cmd_ctrl.oprc = RC_EVAL;
 				return;

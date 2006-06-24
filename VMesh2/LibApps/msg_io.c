@@ -79,7 +79,7 @@ void msg_master_in (char * buf) {
 	// this is quite regular and frequent, don't trigger con_man
 	if (in_master(buf, con) != 0) { // otherwise keep local settings
 		connect = in_master(buf, con) << 8;
-		freqs = freqs & 0x00FF | in_master(buf, con) & 0xFF00;
+		freqs = (freqs & 0x00FF) | (in_master(buf, con) & 0xFF00);
 	}
 	if (running (con_man)) {
 		if (audit_freq == 0)
@@ -133,25 +133,39 @@ void msg_traceAck_in (word state, char * buf) {
 }
 
 word msg_traceAck_out (word state, char * buf, char** out_buf) {
-	word len = sizeof(msgTraceAckType) +
-		in_header(buf, hoc) * sizeof(nid_t);
+	word len;
+	if (in_header(buf, msg_type) != msg_traceB)
+		len = sizeof(msgTraceAckType) +
+			in_header(buf, hoc) * sizeof(nid_t);
+	else
+		len = sizeof(msgTraceAckType) + sizeof(nid_t);
 	if (*out_buf == NULL)
 		*out_buf = get_mem (state, len);
 	else
 		memset (*out_buf, 0, len);
-
-
-	in_header(*out_buf, msg_type) = msg_traceAck;
+	switch (in_header(buf, msg_type)) {
+		case msg_traceF:
+			in_header(*out_buf, msg_type) = msg_traceFAck;
+			break;
+		case msg_traceB:
+			in_header(*out_buf, msg_type) = msg_traceBAck;
+			break;
+		default:
+			in_header(*out_buf, msg_type) = msg_traceAck;
+	}
 	in_header(*out_buf, rcv) = in_header(buf, snd);
 	in_header(*out_buf, hco) = 0;
 	in_traceAck(*out_buf, fcount) = in_header(buf, hoc);
 
 	// fwd part
-	memcpy (*out_buf + sizeof(msgTraceAckType), buf + sizeof(msgTraceType),
-		sizeof(nid_t) * (in_header(buf, hoc) -1));
+	if (in_header(buf, msg_type) != msg_traceB && in_header(buf, hoc) > 1)
+		memcpy (*out_buf + sizeof(msgTraceAckType),
+			buf + sizeof(msgTraceType),
+			sizeof(nid_t) * (in_header(buf, hoc) -1));
 
 	// note that this node is counted in hoc, but is not appended yet
-	memcpy (*out_buf +len - sizeof(nid_t), (char *)&local_host, sizeof(nid_t));
+	memcpy (*out_buf + len - sizeof(nid_t),
+		(char *)&local_host, sizeof(nid_t));
 	return len;
 }
 
@@ -167,19 +181,28 @@ void msg_trace_in (word state, char * buf) {
 }
 
 void msg_trace_out (word state, char** buf_out) {
-
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, sizeof(msgTraceType));
 	else
 		memset (*buf_out, 0, sizeof(msgTraceType));
 
-	in_header(*buf_out, msg_type) = msg_trace;
+	switch (cmd_line[2]) {
+		case 0:
+			in_header(*buf_out, msg_type) = msg_traceB;
+			break;
+		case 1:
+			in_header(*buf_out, msg_type) = msg_traceF;
+			break;
+		default:
+			in_header(*buf_out, msg_type) = msg_trace;
+	}
 	in_header(*buf_out, rcv) = cmd_ctrl.t;
 	in_header(*buf_out, hco) = cmd_line[1];
 }
 
+extern tarpCtrlType tarp_ctrl;
 void msg_bind_in (char * buf) {
-	word w[5];
+	word w[4];
 	
 	// nid from the chip is either 0 or the same as the message's
 	if (net_id == in_bind(buf, nid))
@@ -197,13 +220,17 @@ void msg_bind_in (char * buf) {
 	// else leave it as is
 
 	// write to nvm
-	w[0] = net_id;
-	w[1] = local_host;
-	w[2] = master_host = in_bind(buf, mid);
-	w[3] = in_bind(buf, encr);
+	w[NVM_NID] = net_id;
+	w[NVM_LH] = local_host;
+	w[NVM_MID] = master_host = in_bind(buf, mid);
 	set_encr_data(in_bind(buf, encr));
-	w[4] = encr_data;
-	nvm_write (NVM_NID, w, 5);
+	w[NVM_APP] = encr_data;
+	if (is_binder)
+		w[NVM_APP] |= 1 << 4;
+	if (is_cmdmode)
+		w[NVM_APP] |= 1 << 5;
+	w[NVM_APP] |= tarp_ctrl.param << 8;
+	nvm_write (NVM_NID, w, 4);
 
 	connect = in_bind(buf, con) << 8;
 	freqs = in_bind(buf, con) & 0xFF00; // also kills unbound beacon:
@@ -227,7 +254,7 @@ void msg_bind_out (word state, char** buf_out) {
 	in_bind(*buf_out, nid) = net_id;
 	in_header(*buf_out, hco) = cmd_line[7]; // range
 	in_bind(*buf_out, mid) = master_host;
-	in_bind(*buf_out, con) = freqs & 0xFF00 | (connect >> 8);
+	in_bind(*buf_out, con) = (freqs & 0xFF00) | (connect >> 8);
 	in_bind(*buf_out, encr) = encr_data;
 }
 
@@ -248,6 +275,26 @@ bool msg_bindReq_out (char * buf, char** buf_out) {
 	in_bindReq(*buf_out, esn_l) = in_new(buf, esn_l);
 	in_bindReq(*buf_out, esn_h) = in_new(buf, esn_h); 
 	in_bindReq(*buf_out, lh) = in_header(buf, snd); 
+	return YES;
+}
+
+void msg_nhAck_in (char * buf) {
+	oss_nhAck_out (buf);
+}
+
+bool msg_nhAck_out (char * buf, char** buf_out) {
+	if (*buf_out == NULL) {
+		*buf_out = get_mem (NONE, sizeof(msgNhAckType));
+		if (*buf_out == NULL)
+			return NO;
+	} else
+		memset (*buf_out, 0, sizeof(msgNhAckType));
+	in_header(*buf_out, msg_type) = msg_nhAck;
+	in_header(*buf_out, rcv) = in_nh(buf, host);
+	in_header(*buf_out, hco) = 0;
+	in_nhAck(*buf_out, host) = in_header(buf, snd);
+	in_nhAck(*buf_out, esn_l) = ESN;
+	in_nhAck(*buf_out, esn_h) = ESN >> 16;
 	return YES;
 }
 
@@ -282,6 +329,31 @@ bool msg_new_out () {
 			return NO;
 		}
 	}
+	return YES;
+}
+
+void msg_nh_in (char * buf) {
+	char * out_buf = NULL;
+	if (in_nh(buf, host) == local_host) {
+		oss_nhAck_out (buf);
+		return;
+	}
+	if (msg_nhAck_out (buf, &out_buf)) {
+		send_msg (out_buf, sizeof(msgNhAckType));
+		ufree (out_buf);
+	}
+}
+
+bool msg_nh_out () {
+	char * buf_out = get_mem (NONE, sizeof(msgNhType));
+	if (buf_out == NULL)
+		return NO;
+	in_header(buf_out, msg_type) = msg_nh;
+	in_header(buf_out, rcv) = 0;
+	in_header(buf_out, hco) = 1;
+	in_nh(buf_out, host) = cmd_ctrl.s;
+	send_msg (buf_out, sizeof(msgNhType));
+	ufree (buf_out);
 	return YES;
 }
 
