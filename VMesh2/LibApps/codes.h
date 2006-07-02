@@ -19,6 +19,7 @@
 #define CMD_IO		0x0B
 #define CMD_IOACK	0x0C
 #define CMD_DAT		0x0D
+#define CMD_DATACK	0x0E
 
 #define CMD_MSGOUT	0xFF
 #define CMD_SENSIN	0xFE

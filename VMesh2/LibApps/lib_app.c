@@ -43,6 +43,8 @@ extern lword esns[];
 extern word  svec[];
 extern void oss_io_out (char * buf, bool acked);
 
+static int shared_left; // shared by mutually exclusive st_rep, dat_rep
+
 #define SRS_INIT	00
 #define SRS_DEL		10
 #define SRS_ITER	20
@@ -54,22 +56,20 @@ extern void oss_io_out (char * buf, bool acked);
 #define ST_REP_BOOT_DELAY	100
 process (st_rep, word)
 
-	static int left; 
-
 	entry (SRS_INIT)
 		if (data)
-			left = rnd() % ST_REP_BOOT_DELAY;
+			shared_left = rnd() % ST_REP_BOOT_DELAY;
 		else
-			left = 0;
+			shared_left = 0;
 
 	entry (SRS_DEL)
-		if (left > 63) {
-			left -= 63;
+		if (shared_left > 63) {
+			shared_left -= 63;
 			delay (63 << 10, SRS_DEL);
 			release;
 		}
-		if (left > 0) {
-			delay (left << 10, SRS_ITER);
+		if (shared_left > 0) {
+			delay (shared_left << 10, SRS_ITER);
 			release;
 		}
 
@@ -78,10 +78,10 @@ process (st_rep, word)
 			local_host == master_host ||
 			master_host == 0) // neg / pos is bit 0
 			kill (0);
-		left = ack_retries + 1; // +1 makes "tries" from "retries"
+		shared_left = ack_retries +1; //+1 makes "tries" from "retries"
 
 	entry (SRS_BR)
-		if (left-- <= 0)
+		if (shared_left-- <= 0)
 			proceed (SRS_CONT);
 		clr_brSTACK;
 		clr_brSTNACK;
@@ -93,10 +93,10 @@ process (st_rep, word)
 	entry (SRS_CONT)
 		if (is_brSTNACK)
 			proceed (SRS_FIN);
-		left = ack_retries + 1;
+		shared_left = ack_retries + 1;
 
 	entry (SRS_ST)
-		if (left-- <= 0)
+		if (shared_left-- <= 0)
 			proceed (SRS_NEXT);
 
 		clr_brSTACK;
@@ -115,7 +115,7 @@ process (st_rep, word)
 	 entry (SRS_NEXT)
 		if (is_brSTNACK || esns[1] == 0xFFFFFFFF)
 			proceed (SRS_FIN);
-		left = ack_retries + 1;
+		shared_left = ack_retries + 1;
 		esns[0] = esns[1];
 		proceed (SRS_ST);
 
@@ -137,6 +137,42 @@ endprocess (1)
 #undef SRS_ST
 #undef SRS_NEXT
 #undef SRS_FIN
+
+#define DRS_INIT	0
+#define DRS_REP		10
+#define DRS_FIN		20
+process (dat_rep, void)
+	nodata;
+
+	entry (DRS_INIT)
+		shared_left = ack_retries +1; //+1 makes "tries" from "retries"
+
+	entry (DRS_REP)
+		if (shared_left-- <= 0 || master_host == 0 ||
+				local_host == master_host)
+			proceed (DRS_FIN);
+		in_header((word)(esns[1]), rcv) = master_host;
+		in_header((word)(esns[1]), hco) = 0;
+		clr_datACK;
+		send_msg ((char *)((word)(esns[1])),
+			sizeof(msgDatType) + in_dat((word)(esns[1]), len));
+		wait (DAT_ACK_TRIG, DRS_FIN);
+		delay (ack_tout << 10, DRS_REP);
+		release;
+
+	entry (DRS_FIN)
+		if (esns[1] != 0) {
+			ufree ((word)(esns[1]));
+			esns[1] = 0;
+		}
+		// if changed in meantime... see oss_io.c
+		if (is_cmdmode)
+			fork (st_rep, NULL);
+		finish;
+endprocess (1)
+#undef DRS_INIT
+#undef DRS_REP
+#undef DRS_FIN
 
 #define IRS_ITER	0
 #define IRS_IRUPT	10
@@ -181,7 +217,7 @@ process (io_rep, void)
 		if (left-- <= 0)
 			proceed (IRS_FIN);
 
-		// this is different from br_rep: report locally as well
+		// this is different from st_rep: report locally as well
 		if (master_host == 0 || master_host == local_host) {
 			oss_io_out(NULL, YES);
 			proceed (IRS_FIN);

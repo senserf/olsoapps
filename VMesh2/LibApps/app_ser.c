@@ -14,8 +14,14 @@ process (app_outserial, char)
 	int quant;
 
   entry (OM_INIT)
-	ptr = data;
-	len = ptr[1] +3; // 3: 0x00, len, 0x04
+	if (*data) { // raw output
+		ptr = data;
+		len = ptr[1] +1; // 1: 0x0D
+		ptr += 2;	// skip BOT, len
+	} else {
+		ptr = data;
+		len = ptr[1] +3; // 3: 0x00, len, 0x04
+	}
 
   entry (OM_WRITE)
 	quant = io (OM_WRITE, UART_A, WRITE, (char*)ptr, len);
@@ -32,7 +38,7 @@ endprocess (1)
 #undef 	OM_INIT
 #undef	OM_WRITE
 
-#define UI_OUTLEN	64
+#define UI_OUTLEN	UART_INPUT_BUFFER_LENGTH
 int app_ser_out (word st, char *m, bool cpy) {
 
 	int prcs;

@@ -254,7 +254,7 @@ void oss_set_in () {
 		if (running (st_rep) && val != (br_ctrl.rep_freq >> 1))
 			trigger (ST_REPTRIG);
 		else if (val == 0 && (br_ctrl.rep_freq >> 1) != 0 &&
-				master_host != 0)
+				master_host != 0 && is_cmdmode)
 			fork (st_rep, NULL);
 		cmd_ctrl.oprc = RC_OK; 
 		break;
@@ -470,6 +470,10 @@ void oss_set_in () {
 			cmd_ctrl.oprc = RC_ELEN;
 			break;
 		}
+		if (cmd_line[2] == 0 && local_host == master_host) {
+			cmd_ctrl.oprc = RC_EMAS;
+			break;
+		}
 		if ((cmd_line[2] == 0 && is_cmdmode) ||
 			(cmd_line[2] != 0 && !is_cmdmode)) {
 			nvm_read (NVM_APP, &val, 1);
@@ -477,8 +481,30 @@ void oss_set_in () {
 			if (cmd_line[2] != 0) {
 				val |= 32;
 				set_cmdmode;
-			} else
+				if (running (dat_in))
+					kill (running (dat_in));
+				if (!running (cmd_in))
+					fork (cmd_in, NULL);
+#if 0
+// equivalent is smoothly done at dat_rep's finish
+				if (running (dat_rep)) {
+					kill (running (dat_rep));
+					if (esns[1] != 0) {
+						free ((char *)(esns[1]));
+						esns[1] = 0;
+					}
+				}
+				fork (st_rep, NULL);
+#endif
+			} else {
 				clr_cmdmode;
+				if (running (cmd_in))
+					kill (running (cmd_in));
+				if (!running (dat_in))
+					fork (dat_in, NULL);
+				if (running (st_rep))
+					kill (running (st_rep));
+			}
 			nvm_write (NVM_APP, &val, 1);
 		}
 		cmd_ctrl.oprc = RC_OK;
@@ -942,6 +968,61 @@ void oss_br_out (char * buf, bool acked) {
 #endif
 }
 
+void oss_datack_out (char * buf) {
+#if UART_DRIVER
+	char * lbuf = get_mem (NONE, 4 + sizeof(nid_t) +1 +1);
+	if (lbuf == NULL)
+		return;
+	lbuf[0] = '\0';
+	lbuf[1] = 2 + sizeof(nid_t) +1;
+	lbuf[2] = CMD_MSGOUT; 
+	lbuf[3] = msg_datAck;
+	memcpy (lbuf +4, &in_header(buf, snd), 2);
+	lbuf[6] = in_dat(buf, ref);
+	lbuf[7] = 0x04;
+	if (fork (oss_out, lbuf) == 0 ) {
+		dbg_2 (0xC40C); // oss_datAck_out fork falied
+		ufree (lbuf);
+	}
+#endif
+}
+
+void oss_dat_out (char * buf, bool acked) {
+#if UART_DRIVER
+	char * lbuf;
+	word w;
+	if (is_cmdmode) {
+		w = 4 + sizeof(nid_t) +1 + in_dat(buf, len) +1 +1;
+		lbuf = get_mem (NONE, w);
+		if (lbuf == NULL) 
+			return; 
+		lbuf[0] = '\0'; 
+		lbuf[1] = w - 2 -1;
+		lbuf[2] = CMD_MSGOUT; 
+		lbuf[3] = msg_dat;
+		memcpy (lbuf +4, &in_header(buf, snd), 2);
+		lbuf[6] = in_dat(buf, ref);
+		memcpy (lbuf +7, buf + sizeof (msgDatType), in_dat(buf, len));
+		w = 7 + in_dat(buf, len);
+		lbuf[w++] = acked;
+		lbuf[w] = 0x04;
+	} else {
+		w = 2 + in_dat(buf, len) +1;
+		lbuf = get_mem (NONE, w);
+		if (lbuf == NULL)  
+			return;  
+		lbuf[0] = 1; // !zero <-> raw output
+		lbuf[1] = in_dat(buf, len);
+		memcpy (lbuf +2, buf + sizeof (msgDatType), in_dat(buf, len));
+		lbuf[w-1] = 0x0D;
+	}
+	if (fork (oss_out, lbuf) == 0 ) {
+		dbg_2 (0xC40B); // oss_dat_out fork failed
+		ufree (lbuf);
+	}
+#endif 
+}
+
 void oss_io_out (char * buf, bool acked) {
 #if UART_DRIVER
 	char * lbuf = get_mem (NONE, 4 + 7 +1);
@@ -1007,6 +1088,28 @@ void oss_bind_in (word state) {
 	msg_bind_out (state, &out_buf);
 	send_msg (out_buf, sizeof(msgBindType));
 	ufree (out_buf);
+}
+
+void oss_dat_in () {
+	if (cmd_ctrl.t == local_host) {
+		cmd_ctrl.oprc = RC_ERES;
+		return;
+	}
+#if 0
+	if (cmd_ctrl.oplen == 0) {
+		cmd_ctrl.oprc = RC_ELEN;
+		return;
+	}
+#endif
+	cmd_ctrl.oprc = msg_dat_out ();
+}
+
+void oss_datack_in () {
+	if (cmd_ctrl.t == local_host) {
+		cmd_ctrl.oprc = RC_ERES;
+		return;
+	}
+	cmd_ctrl.oprc = msg_datAck_out(NULL) ? RC_OK : RC_EMEM;
 }
 
 void oss_sack_in () {

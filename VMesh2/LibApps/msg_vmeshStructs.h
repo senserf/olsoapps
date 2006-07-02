@@ -127,4 +127,18 @@ typedef struct msgIoAckStruct {
 } msgIoAckType;
 #define in_ioAck(buf, field)	(((msgIoAckType *)(buf))->field)
 
+typedef struct msgDatStruct {
+	headerType      header;
+	byte            ref;
+	byte            len;
+} msgDatType;
+#define in_dat(buf, field)    (((msgDatType *)(buf))->field)
+
+typedef struct msgDatAckStruct {
+	headerType      header;
+	byte		ref;
+	byte		spare;
+} msgDatAckType;
+#define in_datAck(buf, field)    (((msgDatAckType *)(buf))->field)
+
 #endif

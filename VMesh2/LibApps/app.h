@@ -48,6 +48,7 @@ typedef struct brCtrlStruct {
 #define ST_ACKS	((word)&br_ctrl)
 #define ST_REPTRIG ((word)&br_ctrl.rep_freq)
 
+#define DAT_ACK_TRIG ((word)esns)
 #define IO_ACK_TRIG ((word)&io_pload)
 
 #define	DAT_ACK		1

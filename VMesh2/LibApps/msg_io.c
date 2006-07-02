@@ -64,7 +64,7 @@ void msg_master_in (char * buf) {
 	if (is_master_chg) {
 		clr_master_chg;
 		nvm_write (NVM_MID, &master_host, 1);
-		if (!running (st_rep) && br_ctrl.rep_freq >> 1)
+		if (is_cmdmode && !running (st_rep) && br_ctrl.rep_freq >> 1)
 			fork (st_rep, NULL);
 		if (running (cyc_man)) {
 			kill (running (cyc_man));
@@ -237,7 +237,7 @@ void msg_bind_in (char * buf) {
 	trigger (BEAC_TRIG);
 
 	// as requested: start st_rep on all binds
-	if (!running(st_rep) && (br_ctrl.rep_freq >> 1) != 0 &&
+	if (is_cmdmode && !running(st_rep) && (br_ctrl.rep_freq >> 1) != 0 &&
 			master_host != 0)
 		fork (st_rep, NULL);
 }
@@ -449,6 +449,31 @@ bool msg_br_out() {
 	return YES;
 }
 
+void msg_dat_in (char * buf) {
+	if ((in_dat(buf, ref) & 0x80) && is_autoack && msg_datAck_out (buf))
+		oss_dat_out (buf, YES);
+	else
+		oss_dat_out (buf, NO);
+}
+
+// this is called only for CMD_DAT. Data mode goes out directly from
+// lib_app.c::dat_rep().
+word msg_dat_out () {
+	char * buf_out;
+	buf_out = get_mem (NONE, sizeof(msgDatType) + cmd_ctrl.oplen);
+	if (buf_out == NULL)
+		return RC_EMEM;
+	in_header(buf_out, msg_type) = msg_dat;
+	in_header(buf_out, rcv) = cmd_ctrl.t;
+	in_header(buf_out, hco) = 0;
+	in_dat(buf_out, ref) = cmd_ctrl.opref;
+	in_dat(buf_out, len) = cmd_ctrl.oplen;
+	memcpy (buf_out + sizeof(msgDatType), cmd_line +1, cmd_ctrl.oplen);
+	send_msg (buf_out, sizeof(msgDatType) + cmd_ctrl.oplen);
+	ufree (buf_out);
+	return RC_OK;
+}
+
 void msg_stAck_in (char * buf) {
 	if (is_brSTACK || (esns[1] >> 16) != in_stAck(buf, esn_h) ||
 		(esns[1] & 0x0000FFFF) != in_stAck(buf, esn_l))
@@ -543,4 +568,33 @@ bool msg_ioAck_out (char * buf) {
 	return YES;
 }
 
+void msg_datAck_in (char * buf) {
+	if (is_cmdmode) {
+		oss_datack_out (buf);
+		return;
+	}
+	// in dat mode; clear retries:
+	if (is_datACK || ((byte)esns[0] | 0x80) != in_datAck(buf, ref))
+		return;
+	set_datACK;
+	trigger (DAT_ACK_TRIG);
+}
+
+bool msg_datAck_out (char * buf) {
+	char * buf_out = get_mem (NONE, sizeof(msgDatAckType));
+	if (buf_out == NULL)
+		return NO;
+	in_header(buf_out, msg_type) = msg_datAck;
+	in_header(buf_out, hco) = 0;
+	if (buf == NULL) { // cmd line
+		in_header(buf_out, rcv) = cmd_ctrl.t;
+		in_datAck(buf_out, ref) = cmd_line[1];
+	} else { //msg_dat in
+		in_header(buf_out, rcv) = in_header(buf, snd);
+		in_datAck(buf_out, ref) = in_dat(buf, ref);
+	}
+	send_msg (buf_out, sizeof(msgDatAckType));
+	ufree (buf_out);
+	return YES;
+}
 

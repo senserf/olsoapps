@@ -22,57 +22,6 @@
 //#define ui_in(a, b, c)  
 #endif
 
-static void sensor_in (word state, char * buf) {
-	lword esn;
-	int	i;
-	byte rc = RC_OK;
-	memcpy (&esn, buf + 5, 4);
-	i = buf[1];
-
-	if (i < 9 || i > UART_INPUT_BUFFER_LENGTH -2 -1) // uart is crap
-		rc = RC_ELEN;
-	else if (net_id == 0)
-		rc = RC_ENET;
-	else if (master_host == 0)
-		rc = RC_EMAS;
-	else if (master_host == local_host)
-		rc = RC_ERES;
-	
-	if (rc != RC_OK) {
-		buf[2] = rc;
-		app_ser_out (state, buf, YES);
-		return;
-	}
-
-	if (esn_count == 0) { // all through
-		app_ser_out (state, buf, YES);
-		(void)msg_alrm_out (buf);
-		return;
-	}
-	
-	// nonempty ESN table, we do status aggregation:
-	if (buf[9] == 0) { // status
-		if ((i = lookup_esn (&esn)) < 0)
-			buf[2] = RC_EADDR;
-		else
-			set_svec (i, YES);
-		app_ser_out (state, buf, YES);
-		return;
-	}
-
-	// only alarms left
-
-	// If alarms replace status heart beats, svector should be updated
-	// at any alarm. However, eeprom is slow and alarms
-	// potentially frequent. So, we update svector only at status and
-	// at registration.
-	app_ser_out (state, buf, YES);
-
-	// nobody cares, but let's have "dont tell" operational:
-	if (buf[9] != br_ctrl.dont_s || esn != br_ctrl.dont_esn)
-		(void)msg_alrm_out (buf);
-
-}
 
 static void process_incoming (word state, char * buf, word size, word rssi) {
 	// let's leave the rssi as a formal param, even if it's
@@ -152,6 +101,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		msg_ioAck_in (buf);
 		return;
 
+	case msg_dat:
+		msg_dat_in (buf);
+		return;
+
+	case msg_datAck:
+		msg_datAck_in (buf);
+		return;
+
 	default:
 		dbg_a (0x0200 | in_header(buf, msg_type)); // Got ?
 
@@ -208,6 +165,87 @@ endprocess (1)
 
 #if UART_DRIVER
 
+#define UI_INLEN        UART_INPUT_BUFFER_LENGTH
+#define UI_TOUT         1024
+static byte uart_ibuf[UI_INLEN];
+static byte uart_oset, uart_len;
+
+// things are different and messy, to avoid allocating and copying possibly
+// long blocks
+static void logger_in () {
+	if (running (dat_rep))
+		kill (running (dat_rep));
+	if (esns[1] != 0) // already allocated
+		ufree ((word)(esns[1]));
+	if (master_host == 0) {
+		dbg_9 (0x4000); // data mode: no master
+		return;
+	}
+	esns[1] = (word)get_mem (NONE, sizeof(msgDatType) + uart_oset);
+	if (esns[1] == 0) {
+		dbg_9 (0x3000 | uart_oset); // data mode: no memory for msg
+		return;
+	}
+	in_header((word)(esns[1]), msg_type) = msg_dat;
+	in_header((word)(esns[1]), hco) = 0; 
+	in_header((word)(esns[1]), rcv) = master_host;
+	in_dat((word)(esns[1]), ref) = ++esns[0] | 0x80; // ack required
+	in_dat((word)(esns[1]), len) = uart_oset;
+	memcpy ((word)(esns[1]) + sizeof(msgDatType), uart_ibuf, uart_oset);
+	fork (dat_rep, NULL);
+}
+
+static void sensor_in (word state) {
+	lword esn;
+	int	i;
+	byte rc = RC_OK;
+	memcpy (&esn, uart_ibuf + 5, 4);
+	i = uart_ibuf[1];
+
+	if (i < 9 || i > UART_INPUT_BUFFER_LENGTH -2 -1) // uart is crap
+		rc = RC_ELEN;
+	else if (net_id == 0)
+		rc = RC_ENET;
+	else if (master_host == 0)
+		rc = RC_EMAS;
+	else if (master_host == local_host)
+		rc = RC_ERES;
+	
+	if (rc != RC_OK) {
+		uart_ibuf[2] = rc;
+		app_ser_out (state, uart_ibuf, YES);
+		return;
+	}
+
+	if (esn_count == 0) { // all through
+		app_ser_out (state, uart_ibuf, YES);
+		(void)msg_alrm_out (uart_ibuf);
+		return;
+	}
+	
+	// nonempty ESN table, we do status aggregation:
+	if (uart_ibuf[9] == 0) { // status
+		if ((i = lookup_esn (&esn)) < 0)
+			uart_ibuf[2] = RC_EADDR;
+		else
+			set_svec (i, YES);
+		app_ser_out (state, uart_ibuf, YES);
+		return;
+	}
+
+	// only alarms left
+
+	// If alarms replace status heart beats, svector should be updated
+	// at any alarm. However, eeprom is slow and alarms
+	// potentially frequent. So, we update svector only at status and
+	// at registration.
+	app_ser_out (state, uart_ibuf, YES);
+
+	// nobody cares, but let's have "dont tell" operational:
+	if (uart_ibuf[9] != br_ctrl.dont_s || esn != br_ctrl.dont_esn)
+		(void)msg_alrm_out (uart_ibuf);
+
+}
 /*
    --------------------
    cmd_in process
@@ -222,14 +260,8 @@ endprocess (1)
 #define CS_READ_BODY	50
 #define CS_DONE_R	60
 #define CS_WAIT 	70
-
-#define UI_INLEN 	64
-#define UI_TOUT		1024
 process (cmd_in, void)
-	static byte ui_ibuf[UI_INLEN];
-	static byte ptr, len;
 	word quant;
-
 	nodata;
 
 	entry (CS_START)
@@ -239,44 +271,46 @@ process (cmd_in, void)
 		dbg_9 (0x2000 | UI_TOUT);
 
 	entry (CS_IN)
-		memset (ui_ibuf, 0, UI_INLEN);
+		memset (uart_ibuf, 0, UI_INLEN);
 
 	entry (CS_READ_START)
-		io (CS_READ_START, UART_A, READ, ui_ibuf, 1);
-		if (ui_ibuf[0] != '\0') {
-			dbg_9 (0x1000 | ui_ibuf[0]); // no START 0x00
-			ui_ibuf[0] = '\0';
+		io (CS_READ_START, UART_A, READ, uart_ibuf, 1);
+		if (uart_ibuf[0] != '\0') {
+			dbg_9 (0x1000 | uart_ibuf[0]); // no START 0x00
+			uart_ibuf[0] = '\0';
 			proceed (CS_READ_START);
 		}
 
 	entry (CS_READ_LEN)
 		delay (UI_TOUT, CS_TOUT);
-		io (CS_READ_LEN, UART_A, READ, ui_ibuf + 1, 1);
-		if (ui_ibuf[1] < CMD_HEAD_LEN || ui_ibuf[1] > UI_INLEN - 3) {
-			dbg_9 (0x3000 | ui_ibuf[1]); // bad length
-			ui_ibuf[1] = '\0';
+		io (CS_READ_LEN, UART_A, READ, uart_ibuf + 1, 1);
+		if (uart_ibuf[1] < CMD_HEAD_LEN ||
+				uart_ibuf[1] > UI_INLEN - 3) {
+			dbg_9 (0x3000 | uart_ibuf[1]); // bad length
+			uart_ibuf[1] = '\0';
 			proceed (CS_READ_START);
 		}
-		len = ui_ibuf[1] +1; // + 0x04
-		ptr = 2;
+		uart_len = uart_ibuf[1] +1; // + 0x04
+		uart_oset = 2;
 
 	entry (CS_READ_BODY)
 		delay (UI_TOUT, CS_TOUT);
-		quant = io (CS_READ_BODY, UART_A, READ, ui_ibuf + ptr, len);
-		len -= quant;
-		ptr += quant;
-		if (len)
+		quant = io (CS_READ_BODY, UART_A, READ, uart_ibuf + uart_oset,
+				uart_len);
+		uart_len -= quant;
+		uart_oset += quant;
+		if (uart_len)
 			proceed (CS_READ_BODY);
-		if (ui_ibuf[ptr -1] != 0x04) {
-			dbg_9 (0x4000 | ui_ibuf[ptr -1]); // no EOT 0x04
+		if (uart_ibuf[uart_oset -1] != 0x04) {
+			dbg_9 (0x4000 | uart_ibuf[uart_oset -1]); // no EOT 0x04
 			proceed (CS_IN);
 		}
 		delay (0, CS_DONE_R); // just in case, cancel tout
 
 	entry (CS_DONE_R)
 		// handle sensor input w/o command overhead
-		if (ui_ibuf [2] == CMD_SENSIN) {
-			sensor_in (CS_DONE_R, ui_ibuf);
+		if (uart_ibuf [2] == CMD_SENSIN) {
+			sensor_in (CS_DONE_R);
 			proceed (CS_IN);
 		}
 
@@ -285,9 +319,9 @@ process (cmd_in, void)
 			wait (CMD_WRITER, CS_WAIT);
 			release;
 		}
-		cmd_ctrl.oplen  = ui_ibuf[1] - CMD_HEAD_LEN;
-		cmd_ctrl.opcode = ui_ibuf[2];
-		cmd_ctrl.opref  = ui_ibuf[3];
+		cmd_ctrl.oplen  = uart_ibuf[1] - CMD_HEAD_LEN;
+		cmd_ctrl.opcode = uart_ibuf[2];
+		cmd_ctrl.opref  = uart_ibuf[3];
 
 		// do this ugly thing for CMD_GET, so we don't have
 		// to resize cmd_line later on. 6 is the longest value,
@@ -300,13 +334,13 @@ process (cmd_in, void)
 
 		cmd_line[0] = '\0';
 		if (cmd_ctrl.oplen)
-			memcpy (cmd_line +1, ui_ibuf +CMD_HEAD_LEN +2,
+			memcpy (cmd_line +1, uart_ibuf +CMD_HEAD_LEN +2,
 				cmd_ctrl.oplen);
 		cmd_ctrl.oprc   = RC_NONE;
 		if (cmd_ctrl.opcode == CMD_LOCALE)
 			cmd_ctrl.t = local_host;
 		else
-			memcpy (&cmd_ctrl.t, ui_ibuf + CMD_HEAD_LEN, 2);
+			memcpy (&cmd_ctrl.t, uart_ibuf + CMD_HEAD_LEN, 2);
 		cmd_ctrl.s = local_host;
 		trigger (CMD_READER);
 		proceed (CS_IN);
@@ -320,8 +354,56 @@ endprocess (1)
 #undef CS_READ_BODY
 #undef CS_DONE_R
 #undef CS_WAIT
-#undef UI_INLEN
-#undef UI_TOUT
+
+#define DS_START	0
+#define DS_TOUT		10
+#define DS_IN		20
+#define DS_READ_START	30
+#define DS_READ		40
+process (dat_in, void)
+	nodata;
+
+	entry (DS_START)
+		proceed (DS_IN);
+
+	entry (DS_TOUT)
+		dbg_9 (0x2000 | uart_oset);
+		logger_in ();
+
+
+	entry (DS_IN)
+		memset (uart_ibuf, 0, UI_INLEN);
+
+	entry (DS_READ_START)
+		io (DS_READ_START, UART_A, READ, uart_ibuf, 1);
+		if (uart_ibuf[0] == 0x0D) { // discard empty CRs
+			uart_ibuf[0] = '\0';
+			proceed (DS_READ_START);
+		}
+		uart_oset = 1;
+
+	entry (DS_READ)
+		delay (UI_TOUT, DS_TOUT);
+		io (DS_READ, UART_A, READ, uart_ibuf + uart_oset, 1);
+		if (uart_ibuf [uart_oset] == 0x0D) {
+			logger_in ();
+			proceed (DS_IN);
+		}
+		if (uart_oset < UI_INLEN -1 -1) { // index, 0x0D
+			uart_oset++;
+			proceed (DS_READ);
+		} else {
+			dbg_9 (0x1000);
+			logger_in ();
+			proceed (DS_IN);
+		}
+
+endprocess (1)
+#undef DS_START
+#undef DS_TOUT
+#undef DS_IN
+#undef DS_READ_START
+#undef DS_READ
 
 #endif
 
@@ -366,6 +448,7 @@ static void cmd_exec (word state) {
 
 		case CMD_IOACK:
 			oss_ioack_in();
+			return;
 
 		case CMD_RESET:
 			oss_reset_in();
@@ -373,6 +456,14 @@ static void cmd_exec (word state) {
 
 		case CMD_LOCALE:
 			oss_locale_in ();
+			return;
+
+		case CMD_DAT:
+			oss_dat_in ();
+			return;
+
+		case CMD_DATACK:
+			oss_datack_in ();
 			return;
 	}
 	cmd_ctrl.oprc = RC_ECMD;
@@ -519,7 +610,8 @@ static void read_eprom_and_init() {
 	} else {
 		if (master_host != local_host) {
 			freqs = 0;
-			fork (st_rep, w); // w <=> !=NULL
+			if (is_cmdmode)
+				fork (st_rep, w); // w <=> !=NULL
 			leds (CON_LED, LED_BLINK);
 			
 		} else {
@@ -538,7 +630,8 @@ static void read_eprom_and_init() {
 static bool valid_input () {
 
 	if (cmd_ctrl.opcode == 0 || 
-		(cmd_ctrl.opcode > CMD_DAT && cmd_ctrl.opcode != CMD_SENSIN)) {
+		(cmd_ctrl.opcode > CMD_DATACK &&
+		 cmd_ctrl.opcode != CMD_SENSIN)) {
 		dbg_9 (0x5000 | cmd_ctrl.opcode);
 		return NO;
 	}
@@ -582,7 +675,10 @@ process (root, void)
 		read_eprom_and_init();
 		(void) fork (rcv, NULL);
 #if UART_DRIVER
-		(void) fork (cmd_in, NULL);
+		if (is_cmdmode)
+			(void) fork (cmd_in, NULL);
+		else
+			(void) fork (dat_in, NULL);
 #endif
 		//leds (CON_LED, LED_BLINK); // TXON sets it on on dm2100
 		proceed (RS_RCMD);
@@ -627,7 +723,9 @@ process (root, void)
 			cmd_ctrl.opcode == CMD_MASTER ||
 			cmd_ctrl.opcode == CMD_SACK ||
 			cmd_ctrl.opcode == CMD_SNACK ||
-			cmd_ctrl.opcode == CMD_IOACK) {
+			cmd_ctrl.opcode == CMD_IOACK ||
+			cmd_ctrl.opcode == CMD_DAT ||
+			cmd_ctrl.opcode == CMD_DATACK) {
 			cmd_exec (RS_DOCMD);
 			// requested: master should confirm
 			if (cmd_ctrl.oprc != RC_OK
