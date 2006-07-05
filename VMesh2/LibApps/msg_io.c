@@ -304,6 +304,8 @@ void msg_new_in (char * buf) {
 		oss_bindReq_out (buf);
 		return;
 	}
+	if (!is_binder)
+		return;
 	if (msg_bindReq_out (buf, &out_buf)) {
 		send_msg (out_buf, sizeof(msgBindReqType));
 		ufree (out_buf);

@@ -106,8 +106,8 @@ b7    - spare
 b8-b11 - timeout for reliable msgs
 b12-15 0 # of retries  -"-
 ---------------------------------------
-DEF: retries 3, tout 10, 2b spare, uart mode 1, encr data 0, 00, master chg 0,
-autoack 1
+DEF: retries 3, tout 10, 1b spare, uart mode 1, binder, encr data 0,
+00, master chg 0, autoack 1
 Set in app.c::read_eprom_and_init()
 --------------------------------------*/ 
 #define DEFAULT_APP_FLAGS	0x3A61

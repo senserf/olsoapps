@@ -485,17 +485,10 @@ void oss_set_in () {
 					kill (running (dat_in));
 				if (!running (cmd_in))
 					fork (cmd_in, NULL);
-#if 0
-// equivalent is smoothly done at dat_rep's finish
-				if (running (dat_rep)) {
-					kill (running (dat_rep));
-					if (esns[1] != 0) {
-						free ((char *)(esns[1]));
-						esns[1] = 0;
-					}
-				}
-				fork (st_rep, NULL);
-#endif
+				// if dat_rep's running, it'll fork
+				// st_rep at finish
+				if (!running (dat_rep))
+					fork (st_rep, NULL);
 			} else {
 				clr_cmdmode;
 				if (running (cmd_in))
