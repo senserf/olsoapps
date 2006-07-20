@@ -138,9 +138,10 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 	int i;
 	address dup;
 
+#if 0
 	// Simulate processing time
 	mdelay (len);
-
+#endif
 	if (desc == NULL || (*ses = desc [phy]) == NONE)
 		return TCV_DSP_PASS;
 
@@ -166,6 +167,7 @@ static int tcv_rcv (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 	        	diag ("Clone failed");
         	} else {
             		memcpy ((char*) dup, (char*) p, len);
+			RCV (dup) = 77;
 	        } 
 	}
 
@@ -331,8 +333,12 @@ void do_start (int mode) {
 	}
 
 	if (mode & 1) {
-		if (!running (sender))
-			fork (sender, NULL);
+		if (SendInterval) {
+			if (!running (sender))
+				fork (sender, NULL);
+		} else
+			killall (sender);
+
 		tcv_control (sfd, PHYSOPT_TXON, NULL);
 	}
 
@@ -632,7 +638,7 @@ diag (
 
 	n = -1;
 	scan (ibuf + 1, "%d", &n);
-	if (n <= 0)
+	if (n < 0)
 		proceed (RS_RCMD+1);
 	SendInterval = n;
 	proceed (RS_DON);
