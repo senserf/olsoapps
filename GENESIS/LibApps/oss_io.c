@@ -79,6 +79,10 @@ void oss_set_in () {
 		}
 		tarp_ctrl.param = (tarp_ctrl.param & 0x3F) | (cmd_line[2] << 6);
 		cmd_ctrl.oprc = RC_OK;
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		ee_write (EE_APP, (byte *)&val, 2);
 		break;
 
 	case PAR_TARP_S:
@@ -89,6 +93,10 @@ void oss_set_in () {
 		tarp_ctrl.param = 
 			(tarp_ctrl.param & 0xF1) | ((cmd_line[2] & 7) << 1);
 		cmd_ctrl.oprc = RC_OK;
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		ee_write (EE_APP, (byte *)&val, 2);
 		break;
 		
 	case PAR_TARP_R:
@@ -99,6 +107,10 @@ void oss_set_in () {
 		tarp_ctrl.param = 
 			(tarp_ctrl.param & 0xCF) | ((cmd_line[2] & 3) << 4);
 		cmd_ctrl.oprc = RC_OK;
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		ee_write (EE_APP, (byte *)&val, 2);
 		break;
 
 	case PAR_TARP_F:
@@ -107,6 +119,50 @@ void oss_set_in () {
 			break;
 		}
 		tarp_ctrl.param = (tarp_ctrl.param & 0xFE) | (cmd_line[2] & 1);
+		cmd_ctrl.oprc = RC_OK;
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		ee_write (EE_APP, (byte *)&val, 2);
+		break;
+
+	case PAR_ENCR_M:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		set_encr_mode(cmd_line[2]);
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0xFFF0;
+		val |= encr_data;
+		ee_write (EE_APP, (byte *)&val, 2);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	case PAR_ENCR_K:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		set_encr_key(cmd_line[2]);
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0xFFF0;
+		val |= encr_data; 
+		ee_write (EE_APP, (byte *)&val, 2);
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	case PAR_ENCR_D:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		val = cmd_line[2];
+		set_encr_data(val);
+		ee_read (EE_APP, (byte *)&val, 2);
+		val &= 0xFFF0;
+		val |= encr_data;
+		ee_write (EE_APP, (byte *)&val, 2);
 		cmd_ctrl.oprc = RC_OK;
 		break;
 
@@ -192,8 +248,10 @@ void oss_set_in () {
 		br_ctrl.rep_freq <<= 1;
 		if (cmd_line[4] & 1)
 			br_ctrl.rep_freq++;
-		if (running (st_rep) && val != (br_ctrl.rep_freq >> 1))
+		if (running (st_rep) && val != (br_ctrl.rep_freq >> 1)) {
+			clr_powup;
 			trigger (ST_REPTRIG);
+		}
 		else if (val == 0 && (br_ctrl.rep_freq >> 1) != 0 &&
 				master_host != 0)
 			fork (st_rep, NULL);
@@ -220,6 +278,25 @@ void oss_set_in () {
 		else
 			clr_autoack;
 		cmd_ctrl.oprc = RC_OK; 
+		break;
+
+	 case PAR_BINDER:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if (cmd_line[2] == 0 && is_binder ||
+				cmd_line[2] != 0 && !is_binder) {
+			ee_read (EE_APP, (byte *)&val, 2);
+			val &= ~16; //b4 in NVM_APP
+			if (cmd_line[2] != 0) {
+				val |= 16;
+				set_binder;
+			} else
+				clr_binder;
+			ee_write (EE_APP, (byte *)&val, 2);
+		}
+		cmd_ctrl.oprc = RC_OK;
 		break;
 
 	default:
@@ -264,6 +341,13 @@ void oss_get_in (word state) {
 	  case PAR_TARP_F:
 		cmd_ctrl.oplen++;
 		cmd_line[2] = tarp_ctrl.param;
+		return;
+
+	  case PAR_ENCR_M:
+	  case PAR_ENCR_K:
+	  case PAR_ENCR_D:
+		cmd_ctrl.oplen++;
+		cmd_line[2] = encr_data;
 		return;
 
 	  case PAR_BEAC:
@@ -346,6 +430,12 @@ void oss_get_in (word state) {
 		cmd_line[2] = p;
 		return;
 
+	  case ATTR_SYSVER:
+		cmd_ctrl.oplen += 2;
+		cmd_line[2] = SYSVER_B >> 8;
+		cmd_line[3] = (byte)SYSVER_B;
+		return;
+
 	  case ATTR_MEM1:
 		cmd_ctrl.oplen += 6;
 #if MALLOC_STATS
@@ -370,6 +460,19 @@ void oss_get_in (word state) {
 #else
 		memset (cmd_line +2, 0, 6);
 #endif
+		return;
+
+	  case ATTR_NHOOD:
+		// don't return by default
+		if (msg_nh_out())
+			cmd_ctrl.oprc = RC_OK;
+		else
+			cmd_ctrl.oprc = RC_ERES;
+		return;
+
+	  case PAR_BINDER:
+		cmd_ctrl.oplen++;
+		cmd_line[2] = is_binder ? 1 : 0;
 		return;
 
 	  default:
@@ -436,12 +539,19 @@ void oss_master_in (word state) {
 // 0x00 <1-len> 0xFF msg_traceAck  <1-fcount> <1-bcount> <node> ... 0x04
 void oss_traceAck_out (word state, char * buf) {
 #if UART_DRIVER
-	int num = in_header(buf, hoc) + in_traceAck(buf, fcount) -1;
+	int num = 0;
+	if (in_header(buf, msg_type) != msg_traceBAck)
+		num = in_traceAck(buf, fcount);
+	if (in_header(buf, msg_type) != msg_traceFAck)
+		num += in_header(buf, hoc);
+	if (in_header(buf, msg_type) == msg_traceAck)
+		num--; // dst counted twice
+
 	char * lbuf = get_mem (state, num * sizeof (nid_t) +7);
 	lbuf[0] = '\0';
 	lbuf[1] = num * sizeof (nid_t) +4;
 	lbuf[2] = CMD_MSGOUT;
-	lbuf[3] = msg_traceAck;
+	lbuf[3] = in_header(buf, msg_type);
 	lbuf[4] = in_traceAck(buf, fcount);
 	lbuf[5] = in_header(buf, hoc);
 	
@@ -477,6 +587,7 @@ void oss_bindReq_out (char * buf) {
 		break;
 	  default:
 		dbg_2 (0xBA00 | in_header(buf, msg_type)); // bad bindReq
+		ufree (lbuf);
 		return;
 	}
 	lbuf[12] = 0x04;
@@ -487,13 +598,51 @@ void oss_bindReq_out (char * buf) {
 #endif
 }
 
-void oss_alrm_out (char * buf) {
+void oss_nhAck_out (char * buf) {
 #if UART_DRIVER
-	char * lbuf = get_mem (NONE, 4 + 10 + 1);
+	char * lbuf = get_mem (NONE, 4 + 9 + 1);
 	if (lbuf == NULL)
 		return;
 	lbuf[0] = '\0';
-	lbuf[1] = 2 + 10;
+	lbuf[1] = 2 + 9;
+	lbuf[2] = CMD_MSGOUT;
+	lbuf[3] = msg_nhAck;
+	switch (in_header(buf, msg_type)) {
+		case msg_nh:
+			memcpy (lbuf +4, &in_header(buf, snd), 2);
+			memcpy (lbuf +6, &ESN, 4);
+			memcpy (lbuf +10, &local_host, 2);
+			lbuf[12] = 0;
+			break;
+		case msg_nhAck:
+			memcpy (lbuf +4, &in_nhAck(buf, host), 2);
+			memcpy (lbuf +6, &in_nhAck(buf, esn_l), 4);
+			memcpy (lbuf +10, &in_header(buf, snd), 2);
+			lbuf[12] = in_header(buf, hoc);
+			break;
+		default:
+			dbg_2 (0xBA00 | in_header(buf, msg_type)); // bad nhAck
+			ufree (lbuf);
+			return;
+	}
+	lbuf[13] = 0x04;
+	if (fork (oss_out, lbuf) == 0 ) {
+		dbg_2 (0xC404); // oss_nhAck_out fork failed ????
+		ufree (lbuf);
+	}
+#endif
+}
+
+void oss_alrm_out (char * buf) {
+#if UART_DRIVER
+	char * lbuf;
+	word len = buf[sizeof(msgAlrmType)];
+	if (len > UART_INPUT_BUFFER_LENGTH - 12)
+		return;
+	if ((lbuf = get_mem (NONE, 4 + 10 + 1 +len)) == NULL)
+		return;
+	lbuf[0] = '\0';
+	lbuf[1] = 2 + 10 + len;
 	lbuf[2] = CMD_MSGOUT;
 	lbuf[3] = msg_alrm;
 	memcpy (lbuf +4, &in_header(buf, snd), 2);
@@ -501,8 +650,10 @@ void oss_alrm_out (char * buf) {
 	lbuf[7] = in_alrm(buf, rev);
 	memcpy (lbuf +8, &in_alrm(buf, esn_l), 4); //cheating
 	lbuf[12] = in_alrm(buf, s);
-	lbuf[13] = in_alrm(buf, rssi);
-	lbuf[14] = 0x04;
+	if (len)
+		memcpy (lbuf +13, buf + sizeof(msgAlrmType) +1, len);
+	lbuf[13 + len] = in_alrm(buf, rssi);
+	lbuf[14 + len] = 0x04;
 	if (fork (oss_out, lbuf) == 0 ) {
 		dbg_2 (0xC407); // oss_alrm_out fork failed
 		ufree (lbuf);
@@ -555,23 +706,15 @@ void oss_st_out (char * buf, bool acked) {
 }
 
 void oss_trace_in (word state) {
-
 	char * out_buf = NULL;
-
+	if (cmd_ctrl.oplen != 2) {
+		cmd_ctrl.oprc = RC_ELEN;
+		return;
+	}
 	cmd_ctrl.oprc = RC_OK;
 	msg_trace_out (state, &out_buf);
 	send_msg (out_buf, sizeof(msgTraceType));
-	//if (beac_freq == 0 || running(beacon)) {
-		ufree (out_buf);
-#if 0
-	} else {
-		if (fork (beacon, out_buf) == 0) {
-			diag ("Fork b_tr failed");
-			ufree (out_buf);
-			cmd_ctrl.oprc = RC_EFORK;
-		} // beacon frees out_buf at exit
-	}
-#endif
+	ufree (out_buf);
 }
 
 void oss_bind_in (word state) {

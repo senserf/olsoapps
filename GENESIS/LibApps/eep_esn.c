@@ -271,10 +271,10 @@ word s_count () {
 }
 
 void app_reset (word lev) {
-	byte a[6];
+	byte a[NVM_BOOT_LEN];
 	if (lev & 8) {
-		memset (a, 0xFF, 6);
-		ee_write (EE_NID, a, 6);
+		memset (a, 0xFF, NVM_BOOT_LEN);
+		ee_write (EE_NID, a, NVM_BOOT_LEN);
 		clr_esn();
 		reset();
 	}

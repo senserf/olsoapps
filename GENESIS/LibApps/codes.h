@@ -58,5 +58,11 @@
 #define PAR_RFPWR	20
 #define ATTR_MEM1	21
 #define ATTR_MEM2	22
+#define PAR_ENCR_M	23
+#define PAR_ENCR_K	24
+#define PAR_ENCR_D	25
+#define ATTR_SYSVER	26
+#define ATTR_NHOOD	27
+#define PAR_BINDER	28
 
 #endif

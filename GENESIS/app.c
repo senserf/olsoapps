@@ -22,11 +22,12 @@
 
 static void sensor_in (word state, char * buf) {
 	lword esn;
-	int	i = -1;
+	int	i;
 	byte rc = RC_OK;
 	memcpy (&esn, buf + 5, 4);
+	i = buf[1];
 
-	if (buf[1] != 9) // uart was crap
+	if (i < 9 || i > UART_INPUT_BUFFER_LENGTH -2 -1) // uart is crap
 		rc = RC_ELEN;
 	else if (net_id == 0)
 		rc = RC_ENET;
@@ -48,27 +49,26 @@ static void sensor_in (word state, char * buf) {
 	}
 	
 	// nonempty ESN table, we do status aggregation:
-	if (buf[9] == 0) { // status
-		if ((i = lookup_esn (&esn)) < 0)
-			buf[2] = RC_EADDR;
-		else
-			set_svec (i, YES);
+
+	// immediate forward
+	if (buf[9] & 0x25) { // b0, b2, b5
 		app_ser_out (state, buf, YES);
+		if (buf[9] != br_ctrl.dont_s || esn != br_ctrl.dont_esn)
+			(void)msg_alrm_out (buf);
 		return;
 	}
 
-	// only alarms left
-
-	// If alarms replace status heart beats, svector should be updated
-	// at any alarm. However, eeprom is slow and alarms
-	// potentially frequent. So, we update svector only at status and
-	// at registration.
+	if ((i = lookup_esn (&esn)) < 0)
+		buf[2] = RC_EADDR;
+	else
+		set_svec (i, YES);
 	app_ser_out (state, buf, YES);
 
-	// nobody cares, but let's have "dont tell" operational:
-	if (buf[9] != br_ctrl.dont_s || esn != br_ctrl.dont_esn)
+	// not a heart beat, is in the ESN table, and
+	// not blocked by "don't tell"
+	if (buf[9] != 0 && buf[2] != RC_EADDR &&
+			(buf[9] != br_ctrl.dont_s || esn != br_ctrl.dont_esn))
 		(void)msg_alrm_out (buf);
-
 }
 
 static void process_incoming (word state, char * buf, word size, word rssi) {
@@ -84,10 +84,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		return;
 
 	case msg_trace:
+	case msg_traceF:
+	case msg_traceB:
 		msg_trace_in (state, buf);
 		return;
 
 	case msg_traceAck:
+	case msg_traceFAck:
+	case msg_traceBAck:
 		msg_traceAck_in (state, buf);
 		return;
 
@@ -129,6 +133,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		msg_stNack_in (buf);
 		return;
 
+	case msg_nh:
+		msg_nh_in (buf);
+		return;
+
+	case msg_nhAck:
+		msg_nhAck_in (buf);
+		return;
+
 	default:
 		dbg_a (0x0200 | in_header(buf, msg_type)); // Got ?
 
@@ -158,7 +170,7 @@ process (rcv, void)
 			buf_ptr = NULL;
 			packet_size = 0;
 		}
-		packet_size = net_rx (RS_TRY, &buf_ptr, &rssi);
+		packet_size = net_rx (RS_TRY, &buf_ptr, &rssi, encr_data);
 		if (packet_size <= 0) {
 			dbg_a (0x01FF); // net_rx failed (%d)...
 			dbg_a (0x8000 | packet_size); // ...packet_size
@@ -360,25 +372,31 @@ static void cmd_out (word state) {
 	return;
 }
 
+extern tarpCtrlType tarp_ctrl;
 static void read_eprom_and_init() {
-	word w[3];
+	word w[NVM_BOOT_LEN >> 1];
 
-	ee_read (EE_NID, (byte *)w, 6);
-	if (w[0] == 0xFFFF)
+	ee_read (EE_NID, (byte *)w, NVM_BOOT_LEN);
+	if (w[EE_NID >> 1] == 0xFFFF)
 		net_id = 0;
 	else
-		net_id = w[0];
-	if (w[1] == 0 || w[1] == 0xFFFF)
+		net_id = w[EE_NID >> 1];
+	if (w[EE_LH >> 1] == 0 || w[EE_LH >> 1] == 0xFFFF)
 		local_host = ESN;
 	else
-		local_host = w[1];
-	if (w[2] == 0xFFFF)
+		local_host = w[EE_LH >> 1];
+	if (w[EE_MID >> 1] == 0xFFFF)
 		master_host = 0;
 	else
-		master_host = w[2];
+		master_host = w[EE_MID >> 1];
 
-	// see app.h: retries 3, tout 10, 6b spare, master chg 0, autoack 1
-	app_flags = 0x3A01;
+	app_flags = DEFAULT_APP_FLAGS;
+	if ((w[EE_APP >> 1] & 0x0F) != 0x0F)
+		set_encr_data (w[EE_APP >> 1] & 0x0F);
+	if (!(w[EE_APP >> 1] & 0x10))
+		clr_binder;
+	if ((w[EE_APP >> 1] & 0xFF00) != 0xFF00)
+		tarp_ctrl.param = w[EE_APP >> 1] >> 8;
 
 	// 3 - warn, +4 - bad, (missed 0x00)
 	connect = 0x3400;
@@ -396,12 +414,14 @@ static void read_eprom_and_init() {
 	} else {
 		if (master_host != local_host) {
 			freqs = 0;
+			set_powup;
 			fork (st_rep, NULL);
 			leds (CON_LED, LED_BLINK);
 			
 		} else {
 			freqs = 0x1D1D; // 29s freq, 29s beacon
 			leds (CON_LED, LED_ON);
+			tarp_ctrl.param &= 0xFE; // routing off
 		}
 	}
 }
@@ -481,11 +501,14 @@ process (root, void)
 	entry (RS_DOCMD)
 		if (cmd_ctrl.t == local_host) {
 			cmd_exec (RS_DOCMD);
-			if (cmd_ctrl.oprc == RC_ECMD ||
-				cmd_ctrl.s == local_host)
+			if (cmd_ctrl.oprc == RC_ECMD || 
+				cmd_ctrl.opcode == CMD_LOCALE)
 				proceed (RS_RETOUT);
 			if (cmd_ctrl.oprc != RC_OK || cmd_ctrl.opref & 0x80)
-				proceed (RS_CMDOUT); // send ret
+				if (cmd_ctrl.s == local_host)
+					proceed (RS_RETOUT);
+				else
+					proceed (RS_CMDOUT); // send ret
 			proceed (RS_FREE);
 		} else if (net_id == 0) { // no point
 			cmd_ctrl.oprc = RC_ENET;

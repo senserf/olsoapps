@@ -74,23 +74,42 @@ typedef struct brCtrlStruct {
 /* app_flags ---------------------------
 b0 - autoack
 b1 - master changed (in tarp) flag
-b2-b7 - spare
+b2-b3 - encryption key #
+b4    - encryption mode
+b5    - node can be a binder (1), or not (0)
+b6    - spare
+b7    - powup
 b8-b11 - timeout for reliable msgs
 b12-15 0 # of retries  -"-
-
-All set in app.c::read_eprom_and_init()
+---------------------------------------
+DEF: retries 3, tout 10, powup 0, 1b spare, binder 1, encr data 0, 00,
+master chg 0, autoack 1
+Set in app.c::read_eprom_and_init()
 ---------------------------------------*/
-
+#define DEFAULT_APP_FLAGS	0x3A21
 #define is_autoack	(app_flags & 1)
 #define set_autoack	(app_flags |= 1)
 #define clr_autoack	(app_flags &= ~1)
-// ... later
+
+#define is_binder       (app_flags & 32)
+#define set_binder      (app_flags |= 32)
+#define clr_binder      (app_flags &= ~32)
+
+#define is_powup	(app_flags & 128)
+#define set_powup	(app_flags |= 128)
+#define clr_powup	(app_flags &=~128)
+
 #define set_retries(r)  (app_flags = (app_flags & 0x0FFF) | ((word)(r) << 12))
 #define ack_retries	(app_flags >> 12)
 #define ack_tout	((app_flags >> 8) & 0x000F)
 #define set_tout(t)	(app_flags = (app_flags & 0xF0FF) | ((word)((t) & 0x000F) << 8))
 
-// set in app_tarp_if.h
+// set_ in app_tarp_if.h
 #define clr_master_chg  (app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)
+
+#define encr_data	((app_flags >> 2) & 7)
+#define set_encr_mode(m) (app_flags = (m) == 0 ? app_flags & ~16 : app_flags | 16)
+#define set_encr_key(k) (app_flags = (app_flags & ~12) | ((k & 3) << 2))
+#define set_encr_data(d) (app_flags = (app_flags & ~28) | ((d & 7) << 2))
 #endif

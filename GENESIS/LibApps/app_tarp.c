@@ -24,9 +24,12 @@ bool msg_isBind (msg_t m) {
 
 // header (called from raw buf tarp_rx sees) + msg + # of appended ids
 int tr_offset (headerType * mb) {
-	if (mb->msg_type == msg_trace)	// fwd dir
+	int i;
+	if (mb->msg_type == msg_trace || mb->msg_type == msg_traceF) // fwd dir
 		return 2 + sizeof(msgTraceType) + sizeof(nid_t) * (mb->hoc -1);
-	return 2 + sizeof(msgTraceAckType) + sizeof(nid_t) *
-		(mb->hoc + ((msgTraceAckType *)mb)->fcount -1);
+	i = 2 + sizeof(msgTraceAckType) + sizeof(nid_t) * mb->hoc;
+	if (mb->msg_type == msg_traceAck) // bidirectional
+		i += sizeof(nid_t) * (((msgTraceAckType *)mb)->fcount -1);
+	return i;
 }
 

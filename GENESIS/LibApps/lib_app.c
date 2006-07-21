@@ -30,21 +30,48 @@ extern int msg_st_out();
 extern lword esns[];
 extern word  svec[];
 
-#define SRS_ITER	00
-#define SRS_BR		10
-#define SRS_CONT	20
-#define SRS_ST		30
-#define SRS_NEXT	40
-#define SRS_FIN		50
+#define SRS_INIT        00
+#define SRS_DEL         10
+#define SRS_ITER	20
+#define SRS_BR		30
+#define SRS_CONT	40
+#define SRS_ST		50
+#define SRS_NEXT	60
+#define SRS_FIN		70
+#define ST_REP_BOOT_DELAY 100
 process (st_rep, void)
 
 	static int left; 
 
+	entry (SRS_INIT)
+		if (is_powup)
+			delay (2000, SRS_INIT +1);
+		else
+			proceed (SRS_ITER);
+
+	entry (SRS_INIT +1)
+		if ((left = (word)entropy) == 0)
+			left = local_host & 127;
+		left %= ST_REP_BOOT_DELAY;
+
+	entry (SRS_DEL)
+		if (left > 63) {
+			left -= 63;
+			delay (63 << 10, SRS_DEL);
+			release;
+		}
+		if (left > 0) {
+			delay (left << 10, SRS_ITER);
+			release;
+		}
+
 	entry (SRS_ITER)
 		if (br_ctrl.rep_freq  >> 1 == 0 ||
 			local_host == master_host ||
-			master_host == 0) // neg / pos is bit 0
+			master_host == 0) { // neg / pos is bit 0
+			clr_powup;
 			kill (0);
+		}
 		left = ack_retries + 1; // +1 makes "tries" from "retries"
 
 	entry (SRS_BR)
@@ -58,7 +85,7 @@ process (st_rep, void)
 		release;
 
 	entry (SRS_CONT)
-		if (is_brSTNACK)
+		if (is_brSTNACK || is_powup)
 			proceed (SRS_FIN);
 		left = ack_retries + 1;
 
@@ -88,7 +115,10 @@ process (st_rep, void)
 
 	entry (SRS_FIN)
 		esns[0] = esns[1] = 0;
-		memset (svec, 0, SVEC_SIZE << 1);
+		if (is_powup)
+			clr_powup;
+		else
+			memset (svec, 0, SVEC_SIZE << 1);
 		// ldelay on 0 takes PicOS down,  double check:
 		if (br_ctrl.rep_freq  >> 1 == 0)
 			kill (0);
@@ -205,7 +235,7 @@ void send_msg (char * buf, int size) {
 		return;
 	}
 
-	if (net_tx (NONE, buf, size) != 0) {
+	if (net_tx (NONE, buf, size, encr_data) != 0) {
 #if 0
 		// dupa: remove with the new driver
 		net_opt (PHYSOPT_RXOFF, NULL);

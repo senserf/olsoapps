@@ -101,25 +101,39 @@ void msg_traceAck_in (word state, char * buf) {
 }
 
 word msg_traceAck_out (word state, char * buf, char** out_buf) {
-	word len = sizeof(msgTraceAckType) +
-		in_header(buf, hoc) * sizeof(nid_t);
+	word len;
+	if (in_header(buf, msg_type) != msg_traceB)
+		len = sizeof(msgTraceAckType) +
+			in_header(buf, hoc) * sizeof(nid_t);
+	else
+		len = sizeof(msgTraceAckType) + sizeof(nid_t);
 	if (*out_buf == NULL)
 		*out_buf = get_mem (state, len);
 	else
 		memset (*out_buf, 0, len);
-
-
-	in_header(*out_buf, msg_type) = msg_traceAck;
+	switch (in_header(buf, msg_type)) {
+		case msg_traceF:
+			in_header(*out_buf, msg_type) = msg_traceFAck;
+			break;
+		case msg_traceB:
+			in_header(*out_buf, msg_type) = msg_traceBAck;
+			break;
+		default:
+			in_header(*out_buf, msg_type) = msg_traceAck;
+	}
 	in_header(*out_buf, rcv) = in_header(buf, snd);
 	in_header(*out_buf, hco) = 0;
 	in_traceAck(*out_buf, fcount) = in_header(buf, hoc);
 
 	// fwd part
-	memcpy (*out_buf + sizeof(msgTraceAckType), buf + sizeof(msgTraceType),
-		sizeof(nid_t) * (in_header(buf, hoc) -1));
+	if (in_header(buf, msg_type) != msg_traceB && in_header(buf, hoc) > 1)
+		memcpy (*out_buf + sizeof(msgTraceAckType),
+			 buf + sizeof(msgTraceType),
+			 sizeof(nid_t) * (in_header(buf, hoc) -1));
 
 	// note that this node is counted in hoc, but is not appended yet
-	memcpy (*out_buf +len - sizeof(nid_t), (char *)&local_host, sizeof(nid_t));
+	memcpy (*out_buf + len - sizeof(nid_t),
+		(char *)&local_host, sizeof(nid_t));
 	return len;
 }
 
@@ -141,13 +155,23 @@ void msg_trace_out (word state, char** buf_out) {
 	else
 		memset (*buf_out, 0, sizeof(msgTraceType));
 
-	in_header(*buf_out, msg_type) = msg_trace;
+	switch (cmd_line[2]) {
+		case 0:
+			in_header(*buf_out, msg_type) = msg_traceB;
+			break;
+		case 1:
+			in_header(*buf_out, msg_type) = msg_traceF;
+			break;
+		default:
+			in_header(*buf_out, msg_type) = msg_trace;
+	}
 	in_header(*buf_out, rcv) = cmd_ctrl.t;
 	in_header(*buf_out, hco) = cmd_line[1];
 }
 
+extern tarpCtrlType tarp_ctrl;
 void msg_bind_in (char * buf) {
-	word w[3];
+	word w[4];
 	
 	// nid from the chip is either 0 or the same as the message's
 	if (net_id == in_bind(buf, nid))
@@ -168,7 +192,13 @@ void msg_bind_in (char * buf) {
 	w[0] = net_id;
 	w[1] = local_host;
 	w[2] = master_host = in_bind(buf, mid);
-	ee_write (EE_NID, (byte *)w, 6);
+	w[3] = in_bind(buf, encr);
+	set_encr_data(in_bind(buf, encr));
+	w[3] = encr_data;
+	if (is_binder)
+		w[3] |= 1 << 4;
+	w[3] |= tarp_ctrl.param << 8;
+	ee_write (EE_NID, (byte *)w, 8);
 
 	connect = in_bind(buf, con) << 8;
 	freqs = in_bind(buf, con) & 0xFF00; // also kills unbound beacon:
@@ -193,6 +223,7 @@ void msg_bind_out (word state, char** buf_out) {
 	in_header(*buf_out, hco) = cmd_line[7]; // range
 	in_bind(*buf_out, mid) = master_host;
 	in_bind(*buf_out, con) = freqs & 0xFF00 | (connect >> 8);
+	in_bind(*buf_out, encr) = encr_data;
 }
 
 void msg_bindReq_in (char * buf) { 
@@ -215,13 +246,33 @@ bool msg_bindReq_out (char * buf, char** buf_out) {
 	return YES;
 }
 
+void msg_nhAck_in (char * buf) {
+	oss_nhAck_out (buf);
+}
+
+bool msg_nhAck_out (char * buf, char** buf_out) {
+	if (*buf_out == NULL) {
+		*buf_out = get_mem (NONE, sizeof(msgNhAckType));
+		if (*buf_out == NULL)
+			return NO;
+	} else
+		memset (*buf_out, 0, sizeof(msgNhAckType));
+	in_header(*buf_out, msg_type) = msg_nhAck;
+	in_header(*buf_out, rcv) = in_nh(buf, host);
+	in_header(*buf_out, hco) = 0;
+	in_nhAck(*buf_out, host) = in_header(buf, snd);
+	in_nhAck(*buf_out, esn_l) = ESN;
+	in_nhAck(*buf_out, esn_h) = ESN >> 16;
+	return YES;
+}
+
 void msg_new_in (char * buf) {
 	char * out_buf = NULL;
 	if (master_host == local_host) {
 		oss_bindReq_out (buf);
 		return;
 	}
-	if (msg_bindReq_out (buf, &out_buf)) {
+	if (is_binder && msg_bindReq_out (buf, &out_buf)) {
 		send_msg (out_buf, sizeof(msgBindReqType));
 		ufree (out_buf);
 	}
@@ -249,12 +300,37 @@ bool msg_new_out () {
 	return YES;
 }
 
+void msg_nh_in (char * buf) {
+	char * out_buf = NULL;
+	if (in_nh(buf, host) == local_host) {
+		oss_nhAck_out (buf);
+		return;
+	}
+	if (msg_nhAck_out (buf, &out_buf)) {
+		send_msg (out_buf, sizeof(msgNhAckType));
+		ufree (out_buf);
+	}
+}
+
+bool msg_nh_out () {
+	char * buf_out = get_mem (NONE, sizeof(msgNhType));
+	if (buf_out == NULL)
+		return NO;
+	in_header(buf_out, msg_type) = msg_nh;
+	in_header(buf_out, rcv) = 0;
+	in_header(buf_out, hco) = 1;
+	in_nh(buf_out, host) = cmd_ctrl.s;
+	send_msg (buf_out, sizeof(msgNhType));
+	ufree (buf_out);
+	return YES;
+}
+
 void msg_alrm_in (char * buf) {
 	oss_alrm_out (buf);
 }
 
 bool msg_alrm_out (char * buf) {
-	char * buf_out = get_mem (NONE, sizeof(msgAlrmType));
+	char * buf_out = get_mem (NONE, sizeof(msgAlrmType) + buf[1] - 9 + 1);
 	if (buf_out == NULL)
 		return NO;
 	in_header(buf_out, msg_type) = msg_alrm;
@@ -265,8 +341,12 @@ bool msg_alrm_out (char * buf) {
 	memcpy (&in_alrm(buf_out, esn_l), buf +5, 2);
 	memcpy (&in_alrm(buf_out, esn_h), buf +7, 2);
 	in_alrm(buf_out, s) = buf[9];
-	in_alrm(buf_out, rssi) = buf[10];
-	send_msg (buf_out, sizeof(msgAlrmType));
+	in_alrm(buf_out, rssi) = buf[10 + buf[1] - 9];
+	// the length is not in the msgAlrm struct, to avoid 1 byte loss
+	buf_out[sizeof(msgAlrmType)] = buf[1] - 9;
+	memcpy (buf_out + sizeof(msgAlrmType) + 1, buf + 10, buf[1] - 9);
+	net_opt (PHYSOPT_CAV, NULL);
+	send_msg (buf_out, sizeof(msgAlrmType) + buf[1] - 9 + 1);
 	ufree (buf_out);
 	return YES;
 }

@@ -53,6 +53,8 @@ extern void msg_st_in (char * buf);
 extern void msg_br_in (char * buf);
 extern void msg_stAck_in (char * buf);
 extern void msg_stNack_in ();
+extern void msg_nh_in (char * buf);
+extern void msg_nhAck_in (char * buf);
 
 extern void msg_cmd_out (word state, char** buf_out);
 extern void msg_master_out (word state, char** buf_out);
@@ -66,7 +68,9 @@ extern int msg_st_out ();
 extern bool msg_br_out();
 extern bool msg_stAck_out ();
 extern bool msg_stAck_aout (char * buf);
-extern bool  msg_stNack_out (nid_t dest);
+extern bool msg_stNack_out (nid_t dest);
+extern bool msg_nh_out ();
+extern bool msg_nhAck_out (char * buf, char** buf_out);
 
 extern void send_msg (char * buf, int size);
 
@@ -78,6 +82,8 @@ extern void oss_bindReq_out (char * buf);
 extern void oss_alrm_out (char * buf);
 extern void oss_br_out (char * buf, bool acked);
 extern void oss_st_out (char * buf, bool acked);
+extern void oss_nhAck_out (char * buf);
+
 //extern void oss_new_out (word state, char * buf);
 //extern void oss_rpc_in (word state, char * in_buf);
 extern void oss_master_in (word state);
