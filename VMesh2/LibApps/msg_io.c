@@ -15,7 +15,6 @@ void msg_cmd_in (word state, char * buf) {
 		wait (CMD_WRITER, state);
 		release;
 	}
-	// dupa: butt ugly, clean this crap!
 	if (in_cmd(buf, opcode) == CMD_GET && in_cmd(buf, oplen) == 1)
 		cmd_line = get_mem (state, 8);
 	else
@@ -385,35 +384,11 @@ bool msg_alrm_out (char * buf) {
 	return YES;
 }
 
-void msg_st_in (char * buf) {
-	if (is_autoack && msg_stAck_aout (buf))
-		oss_st_out (buf, YES);
-	else
-		oss_st_out (buf, NO);
-}
-
 void msg_io_in (char * buf) {
 	if (is_autoack && msg_ioAck_out (buf))
 		oss_io_out (buf, YES);
 	else
 		oss_io_out (buf, NO);
-}
-
-int msg_st_out () {
-	char * buf_out = get_mem (NONE, sizeof(msgStType) + (ESN_PACK << 2));
-	if (buf_out == NULL)
-		return NO;
-	if (!load_esns (buf_out)) {
-		ufree (buf_out);
-		return -1;
-	}
-	in_header(buf_out, msg_type) = msg_st;
-	in_header(buf_out, rcv) = master_host;
-	in_header(buf_out, hco) = 0;
-	in_st(buf_out, con) = connect;
-	send_msg (buf_out, sizeof(msgStType) +(in_st(buf_out, count) << 2));
-	ufree (buf_out);
-	return YES;
 }
 
 bool msg_io_out () {
@@ -430,7 +405,7 @@ bool msg_io_out () {
 }
 
 void msg_br_in (char * buf) {
-	if (is_autoack && msg_stAck_aout (buf))
+	if (is_autoack && msg_stAck_out (buf))
 		oss_br_out (buf, YES);
 	else
 		oss_br_out (buf, NO);
@@ -444,8 +419,6 @@ bool msg_br_out() {
 	in_header(buf_out, rcv) = master_host;
 	in_header(buf_out, hco) = 0;
 	in_br(buf_out, con) = connect;
-	in_br(buf_out, esn_no) = esn_count;
-	in_br(buf_out, s_no) = s_count();
 	send_msg (buf_out, sizeof(msgBrType));
 	ufree (buf_out);
 	return YES;
@@ -477,74 +450,27 @@ word msg_dat_out () {
 }
 
 void msg_stAck_in (char * buf) {
-	if (is_brSTACK || (esns[1] >> 16) != in_stAck(buf, esn_h) ||
-		(esns[1] & 0x0000FFFF) != in_stAck(buf, esn_l))
-		return; // not waited for or not the one
+	if (is_brSTACK)
+		return; // not waited for
 	set_brSTACK;
 	trigger (ST_ACKS);
 }
 
-bool msg_stAck_out () {
+bool msg_stAck_out (char * buf) {
 	char * buf_out = get_mem (NONE, sizeof(msgStAckType));
 	if (buf_out == NULL)
 		return NO;
 	in_header(buf_out, msg_type) = msg_stAck;
-	in_header(buf_out, rcv) = cmd_ctrl.t;
+	if (buf)
+		in_header(buf_out, rcv) = in_header(buf, snd);
+	else
+		in_header(buf_out, rcv) = cmd_ctrl.t;
 	in_header(buf_out, hco) = 0;
-	memcpy (&in_stAck(buf_out, esn_l), &cmd_line[1], 2);
-	memcpy (&in_stAck(buf_out, esn_h), &cmd_line[3], 2);
 	send_msg (buf_out, sizeof(msgStAckType));
 	ufree (buf_out);
 	return YES;
 }
 
-bool msg_stAck_aout (char * buf) {
-	char * buf_out = get_mem (NONE, sizeof(msgStAckType));
-	if (buf_out == NULL)
-		return NO;
-	in_header(buf_out, msg_type) = msg_stAck;
-	in_header(buf_out, rcv) = in_header(buf, snd);
-	in_header(buf_out, hco) = 0;
-	if (in_header(buf, msg_type) == msg_br) {
-		in_stAck(buf_out, esn_h) =
-		  in_stAck(buf_out, esn_l) = 0;
-	} else { // msg_st
-		if (in_st(buf, count) == 0) {
-			in_stAck(buf_out, esn_h) =
-			  in_stAck(buf_out, esn_l) = 0xFFFF;
-		} else {
-			memcpy (&in_stAck(buf_out, esn_l),
-			  buf + sizeof(msgStType) +
-			  ((in_st(buf, count) -1) <<2), 2);	
-			memcpy (&in_stAck(buf_out, esn_h),
-			  buf + sizeof(msgStType) +
-			  ((in_st(buf, count) -1) <<2) +2, 2);
-		}
-	}
-	send_msg (buf_out, sizeof(msgStAckType));
-	ufree (buf_out);
-	return YES;
-}
-
-void msg_stNack_in () {
-	if (is_brSTNACK)
-		return;
-	set_brSTNACK;
-	trigger (ST_ACKS);
-}
-
-bool msg_stNack_out (nid_t dest) {
-	char * buf_out = get_mem (NONE, sizeof(msgStNackType));
-	if (buf_out == NULL)
-		return NO;
-	in_header(buf_out, msg_type) = msg_stNack;
-	in_header(buf_out, rcv) = dest;
-	in_header(buf_out, hco) = 0;
-	send_msg (buf_out, sizeof(msgStNackType));
-	ufree (buf_out);
-	return YES;
-}
-	
 void msg_ioAck_in (char * buf) {
 	if (is_ioACK || io_pload != in_ioAck(buf, pload))
 		return;
@@ -576,7 +502,7 @@ void msg_datAck_in (char * buf) {
 		return;
 	}
 	// in dat mode; clear retries:
-	if (is_datACK || ((byte)esns[0] | 0x80) != in_datAck(buf, ref))
+	if (is_datACK || (dat_seq | 0x80) != in_datAck(buf, ref))
 		return;
 	set_datACK;
 	trigger (DAT_ACK_TRIG);

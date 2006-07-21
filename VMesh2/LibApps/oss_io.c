@@ -9,9 +9,6 @@
 #include "tarp.h"
 #include "codes.h"
 #include "nvm.h"
-#if DM2100
-#include "phys_dm2100.h"
-#endif
 #include "pinopts.h"
 #include "lhold.h"
 
@@ -217,20 +214,7 @@ void oss_set_in () {
 			net_opt (PHYSOPT_TXOFF, NULL);
 		cmd_ctrl.oprc = RC_OK;
 		break;
-#if TARGET_BOARD == BOARD_GENESIS
-	case PAR_RFPWR:
-		if (cmd_ctrl.oplen != 2) {
-			cmd_ctrl.oprc = RC_ELEN;
-			break;
-		}
-		if ((val = cmd_line[2]) < 0 || val > 7) {
-			cmd_ctrl.oprc = RC_EVAL;
-			break;
-		}
-		net_opt (PHYSOPT_SETPOWER, &val);
-		cmd_ctrl.oprc = RC_OK;
-		break;
-#endif
+
 	case PAR_ALRM_DONT:
 		if (cmd_ctrl.oplen != 1 + sizeof(lword) + 1) {
 			cmd_ctrl.oprc = RC_ELEN;
@@ -614,14 +598,6 @@ void oss_get_in (word state) {
 		 memcpy (cmd_line +2, &l, 4);
 		 return;
 
-	  case ATTR_BRIDGE:
-		 cmd_ctrl.oplen += 4;
-		 p = esn_count;
-		 memcpy (cmd_line +2, &p, 2);
-		 p = s_count();
-		 memcpy (cmd_line +4, &p, 2);
-		 return;
- 
 	  case ATTR_RSSI:
 		cmd_ctrl.oplen += 2;
 		memcpy (cmd_line +2, &l_rssi, 2);
@@ -633,13 +609,7 @@ void oss_get_in (word state) {
 		memcpy (cmd_line +4, &tarp_ctrl.snd, 2);
 		memcpy (cmd_line +6, &tarp_ctrl.fwd, 2);
 		return;
-#if TARGET_BOARD == BOARD_GENESIS
-	  case PAR_RFPWR:
-		cmd_ctrl.oplen++;
-		net_opt (PHYSOPT_GETPOWER, &p);
-		cmd_line[2] = p;
-		return;
-#endif
+
 	  case ATTR_SYSVER:
 		cmd_ctrl.oplen += 2;
 		cmd_line[2] = SYSVER_B >> 8;
@@ -941,19 +911,17 @@ void oss_alrm_out (char * buf) {
 
 void oss_br_out (char * buf, bool acked) {
 #if UART_DRIVER
-	char * lbuf = get_mem (NONE, 4 + 9 + 1);
+	char * lbuf = get_mem (NONE, 4 + 5 + 1);
 	if (lbuf == NULL)
 		return;
 	lbuf[0] = '\0';
-	lbuf[1] = 2 + 9;
+	lbuf[1] = 2 + 5;
 	lbuf[2] = CMD_MSGOUT;
 	lbuf[3] = msg_br;
 	memcpy (lbuf +4, &in_header(buf, snd), 2);
 	memcpy (lbuf +6, &in_br(buf, con), 2);
-	memcpy (lbuf +8, &in_br(buf, esn_no), 2);
-	memcpy (lbuf +10, &in_br(buf, s_no), 2);
-	lbuf[12] = acked;
-	lbuf[13] = 0x04;
+	lbuf[8] = acked;
+	lbuf[9] = 0x04;
 	if (fork (oss_out, lbuf) == 0 ) {
 		dbg_2 (0xC408); // oss_br_out fork failed
 		ufree (lbuf);
@@ -1041,28 +1009,6 @@ void oss_io_out (char * buf, bool acked) {
 #endif
 }
 
-void oss_st_out (char * buf, bool acked) {
-#if UART_DRIVER
-	char * lbuf = get_mem (NONE, 4 + 5 + (in_st(buf, count) << 2) +1);
-	if (lbuf == NULL)
-		return;
-	lbuf[0] = '\0';
-	lbuf[1] = 2 + 5 + (in_st(buf, count) << 2);
-	lbuf[2] = CMD_MSGOUT;
-	lbuf[3] = msg_st;
-	memcpy (lbuf +4, &in_header(buf, snd), 2);
-	lbuf[6] = in_st(buf, con); // only missed beats (msg_br has it all)
-	lbuf[7] = in_st(buf, count);
-	lbuf[8] = acked;
-	memcpy (lbuf +9, buf + sizeof(msgStType), in_st(buf, count) << 2);
-	lbuf[9 + (in_st(buf, count) << 2)] =  0x04; 
-	if (fork (oss_out, lbuf) == 0 ) {
-		dbg_2 (0xC409); // oss_st_out fork failed
-		ufree (lbuf); 
-	}
-#endif
-}
-
 void oss_trace_in (word state) {
 	char * out_buf = NULL;
 	if (cmd_ctrl.oplen != 2) {
@@ -1106,101 +1052,42 @@ void oss_datack_in () {
 }
 
 void oss_sack_in () {
-	cmd_ctrl.oprc = msg_stAck_out() ? RC_OK : RC_EMEM;
-}
-
-void oss_snack_in() {
-	cmd_ctrl.oprc = msg_stNack_out (cmd_ctrl.t) ? RC_OK : RC_EMEM;
+	cmd_ctrl.oprc = msg_stAck_out(NULL) ? RC_OK : RC_EMEM;
 }
 
 void oss_ioack_in () {
 	cmd_ctrl.oprc = msg_ioAck_out(NULL) ? RC_OK : RC_EMEM;
 }
 
-#define SENS_FIND 0
-#define SENS_READ 1
-#define SENS_NEXT_ANY 2
-#define SENS_NEXT_0 3
-#define SENS_NEXT_1 4
-#define SENS_WRITE 5
-#define SENS_ERASE 6
-void oss_sens_in() {
-	lword e;
-	int st;
-
-	if (cmd_ctrl.oplen != 5) {
-		cmd_ctrl.oprc = RC_ELEN;
-		return;
+static void pin_backup (word pin, word val) {
+	lword l;
+	word def, nvm_val;
+	
+	switch (pin) {
+		case 1:
+		case 2:
+		case 3:
+		case 8:
+		case 9:
+		case 10:
+			def = 2;
+		case 4:
+		case 5:
+			def = 1;
+		case 6:
+		case 7:
+			def = 4;
+		default:
+			def = 0xEE;
 	}
-	memcpy (&e, cmd_line +1, 4);
-	switch (cmd_line[5]) {
-	  case SENS_FIND:
-		if ((st = lookup_esn_st (&e)) < 0)
-			cmd_ctrl.oprc = RC_OK;
-		else {
-			cmd_ctrl.oprc = RC_OKRET;
-			cmd_line[5] |= (st << 4);
-		}
-		return;
-
-	  case SENS_READ:
-		if ((st = lookup_esn_st (&e)) < 0)
-			 cmd_ctrl.oprc = RC_EVAL;
-		else {
-			cmd_ctrl.oprc = RC_OKRET;
-			cmd_line[5] |= (st << 4);
-		}
-		return;
-
-	  case SENS_NEXT_ANY:
-		if ((st = get_next (&e, 2)) < 0)
-			cmd_ctrl.oprc = RC_EVAL;
-		else {
-			cmd_ctrl.oprc = RC_OKRET;
-			cmd_line[5] |= (st << 4);
-			memcpy (cmd_line +1, &e, 4);
-		}
-		return;
-
-	  case SENS_NEXT_0:
-		if ((st = get_next (&e, 0)) < 0)
-			cmd_ctrl.oprc = RC_EVAL; 
-		else {
-			cmd_ctrl.oprc = RC_OKRET;
-			cmd_line[5] |= (st << 4);
-			memcpy (cmd_line +1, &e, 4);
-		}
-		return;
-
-	  case SENS_NEXT_1:
-		if ((st = get_next (&e, 1)) < 0)
-			cmd_ctrl.oprc = RC_EVAL;
-		else {
-			cmd_ctrl.oprc = RC_OKRET;
-			cmd_line[5] |= (st << 4);
-			memcpy (cmd_line +1, &e, 4);
-		}
-		return;
-
-	  case SENS_WRITE:
-		cmd_ctrl.oprc = add_esn (&e, &st);
-		return;
-
-	  case SENS_ERASE:
-		cmd_ctrl.oprc = era_esn (&e) < 0 ? RC_EVAL : RC_OK;
-		 return;
-
-	  default:
-		cmd_ctrl.oprc = RC_EPAR;
+	nvm_read (NVM_IO_PINS, (address)&l, 2);
+	nvm_val = (l >> ((pin -1) * 3)) & 7;
+	if (val != nvm_val && (val != def || nvm_val != 7)) {
+		l &= ~(7L << ((pin -1) * 3));
+		l |= (lword)val << ((pin -1) * 3);
+		nvm_write (NVM_IO_PINS, (address)&l, 2);
 	}
 }
-#undef SENS_FIND
-#undef SENS_READ
-#undef SENS_NEXT_ANY
-#undef SENS_NEXT_0
-#undef SENS_NEXT_1
-#undef SENS_WRITE
-#undef SENS_ERASE
 
 #define IO_READ		0
 #define IO_WRITE 	1
@@ -1256,8 +1143,12 @@ void oss_io_in() {
 				cmd_ctrl.oprc = RC_EVAL;
 				return;
 			}
-			pin_write (cmd_line[2], cmd_line[3]);
-			cmd_ctrl.oprc = RC_OKRET;
+			if (pin_write (cmd_line[2], cmd_line[3]) < 0) {
+				cmd_ctrl.oprc = RC_ERES;
+			} else {
+				cmd_ctrl.oprc = RC_OKRET;
+				pin_backup (cmd_line[2], cmd_line[3]);
+			}
 			return;
 
 		case IO_ADC:
@@ -1399,6 +1290,11 @@ void oss_io_in() {
 			w = cmd_line[2] << 2 | cmd_line[3];
 			*((byte *)(&io_creg) +3) = (byte)w;
 			nvm_write (NVM_IO_CREG +1, (address)&io_creg +1, 1);
+			if (cmd_line[2] != 0 && !running (io_back))
+				fork (io_back, NULL);
+			else if (cmd_line[2] == 0 &&
+					(w = running (io_back)) != 0)
+				kill (w);
 			cmd_ctrl.oprc = RC_OKRET;
 			return;
 #endif

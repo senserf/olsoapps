@@ -19,6 +19,9 @@ extern nid_t net_id;
 extern word app_flags;
 extern word l_rssi;
 extern word freqs;
+extern byte * dat_ptr;
+extern byte dat_seq;
+
 // in app.h:
 //#define beac_freq	(freqs & 0x00FF)
 //#define audit_freq	(freqs >> 8)
@@ -39,6 +42,7 @@ extern int cyc_man (word, address);
 extern int con_man (word, address);
 extern int st_rep (word, address);
 extern int io_rep (word, address);
+extern int io_back (word, address);
 extern int dat_rep (word, address);
 
 // they're in app.c
@@ -57,10 +61,8 @@ extern void msg_bind_in (char * buf);
 extern void msg_bindReq_in (char * buf);
 extern void msg_new_in (char * buf);
 extern void msg_alrm_in (char * buf);
-extern void msg_st_in (char * buf);
 extern void msg_br_in (char * buf);
 extern void msg_stAck_in (char * buf);
-extern void msg_stNack_in ();
 extern void msg_io_in (char * buf);
 extern void msg_ioAck_in (char * buf);
 extern void msg_dat_in (char * buf); 
@@ -76,11 +78,8 @@ extern void msg_bind_out (word state, char** buf_out);
 extern bool msg_bindReq_out (char * buf, char** buf_out);
 extern bool msg_new_out ();
 extern bool msg_alrm_out (char * buf);
-extern int msg_st_out ();
 extern bool msg_br_out();
-extern bool msg_stAck_out ();
-extern bool msg_stAck_aout (char * buf);
-extern bool  msg_stNack_out (nid_t dest);
+extern bool msg_stAck_out (char * buf);
 extern bool msg_io_out ();
 extern bool msg_ioAck_out (char * buf);
 extern word msg_dat_out ();
@@ -97,7 +96,6 @@ extern void oss_traceAck_out (word state, char * buf);
 extern void oss_bindReq_out (char * buf);
 extern void oss_alrm_out (char * buf);
 extern void oss_br_out (char * buf, bool acked);
-extern void oss_st_out (char * buf, bool acked);
 extern void oss_io_out (char * buf, bool acked);
 extern void oss_dat_out (char * buf, bool acked);
 extern void oss_datack_out (char * buf);
@@ -108,8 +106,6 @@ extern void oss_set_in ();
 extern void oss_get_in (word state);
 extern void oss_bind_in (word state);
 extern void oss_sack_in ();
-extern void oss_snack_in ();
-extern void oss_sens_in ();
 extern void oss_io_in ();
 extern void oss_ioack_in ();
 extern void oss_dat_in ();

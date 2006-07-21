@@ -67,8 +67,6 @@ typedef struct msgBindReqStruct {
 typedef struct msgBrStruct {
 	headerType	header;
 	word		con;
-	word		esn_no;
-	word		s_no;
 } msgBrType;
 #define in_br(buf, field)  (((msgBrType *)(buf))->field)
 
@@ -83,24 +81,26 @@ typedef struct msgAlrmStruct {
 } msgAlrmType;
 #define in_alrm(buf, field)  (((msgAlrmType *)(buf))->field)
 
+#if 0
 typedef struct msgStStruct {
 	headerType	header;
 	byte		con;
 	byte		count; // plenty of free bits here
 } msgStType;
 #define in_st(buf, field)  (((msgStType *)(buf))->field)
+#endif
 
 typedef struct msgStAckStruct {
 	headerType	header;
-	word		esn_l;
-	word		esn_h;
 } msgStAckType;
 #define in_stAck(buf, field)  (((msgStAckType *)(buf))->field)
 
+#if 0
 typedef struct msgStNackStruct {
 	headerType	header;
 } msgStNackType;
 #define in_stNack(buf, field)  (((msgStNackType *)(buf))->field)
+#endif
 
 typedef struct msgNhStruct {
 	headerType      header;

@@ -12,8 +12,8 @@
 #define CMD_TRACE	0x04
 #define CMD_BIND	0x05
 #define CMD_SACK	0x06
-#define CMD_SNACK	0x07
-#define CMD_SENS	0x08
+#define CMD_SNACK_OBSOLETE	0x07
+#define CMD_SENS_OBSOLETE	0x08
 #define CMD_RESET	0x09
 #define CMD_LOCALE	0x0A
 #define CMD_IO		0x0B
@@ -56,10 +56,10 @@
 #define PAR_RETRY	14
 #define PAR_AUTOACK	15
 #define ATTR_UPTIME	16
-#define ATTR_BRIDGE	17
+#define ATTR_BRIDGE_OBSOLETE	17
 #define ATTR_RSSI	18
 #define ATTR_MSG_COUNT_T 19
-#define PAR_RFPWR	20
+#define PAR_RFPWR_OBSOLETE	20
 #define ATTR_MEM1	21
 #define ATTR_MEM2	22
 #define PAR_ENCR_M	23

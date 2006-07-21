@@ -73,16 +73,8 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		msg_alrm_in (buf);
 		return;
 
-	case msg_st:
-		msg_st_in (buf);
-		return;
-
 	case msg_stAck:
 		msg_stAck_in (buf);
-		return;
-
-	case msg_stNack:
-		msg_stNack_in (buf);
 		return;
 
 	case msg_nh:
@@ -175,32 +167,30 @@ static byte uart_oset, uart_len;
 static void logger_in () {
 	if (running (dat_rep))
 		kill (running (dat_rep));
-	if (esns[1] != 0) // already allocated
-		ufree ((word)(esns[1]));
+	if (dat_ptr) // already allocated
+		ufree (dat_ptr);
 	if (master_host == 0) {
 		dbg_9 (0x4000); // data mode: no master
 		return;
 	}
-	esns[1] = (word)get_mem (NONE, sizeof(msgDatType) + uart_oset);
-	if (esns[1] == 0) {
+	dat_ptr = get_mem (NONE, sizeof(msgDatType) + uart_oset);
+	if (dat_ptr == NULL) {
 		dbg_9 (0x3000 | uart_oset); // data mode: no memory for msg
 		return;
 	}
-	in_header((word)(esns[1]), msg_type) = msg_dat;
-	in_header((word)(esns[1]), hco) = 0; 
-	in_header((word)(esns[1]), rcv) = master_host;
-	in_dat((word)(esns[1]), ref) = ++esns[0] | 0x80; // ack required
-	in_dat((word)(esns[1]), len) = uart_oset;
-	memcpy ((word)(esns[1]) + sizeof(msgDatType), uart_ibuf, uart_oset);
+	in_header(dat_ptr, msg_type) = msg_dat;
+	in_header(dat_ptr, hco) = 0; 
+	in_header(dat_ptr, rcv) = master_host;
+	in_dat(dat_ptr, ref) = ++dat_seq | 0x80; // ack required
+	in_dat(dat_ptr, len) = uart_oset;
+	memcpy (dat_ptr + sizeof(msgDatType), uart_ibuf, uart_oset);
 	fork (dat_rep, NULL);
 }
 
 static void sensor_in (word state) {
 	lword esn;
-	int	i;
+	int i = uart_ibuf[1];
 	byte rc = RC_OK;
-	memcpy (&esn, uart_ibuf + 5, 4);
-	i = uart_ibuf[1];
 
 	if (i < 9 || i > UART_INPUT_BUFFER_LENGTH -2 -1) // uart is crap
 		rc = RC_ELEN;
@@ -217,35 +207,14 @@ static void sensor_in (word state) {
 		return;
 	}
 
-	if (esn_count == 0) { // all through
-		app_ser_out (state, uart_ibuf, YES);
-		(void)msg_alrm_out (uart_ibuf);
+	memcpy (&esn, uart_ibuf + 5, 4);
+	if (uart_ibuf[9] == br_ctrl.dont_s && esn == br_ctrl.dont_esn)
 		return;
-	}
-	
-	// nonempty ESN table, we do status aggregation:
-	if (uart_ibuf[9] == 0) { // status
-		if ((i = lookup_esn (&esn)) < 0)
-			uart_ibuf[2] = RC_EADDR;
-		else
-			set_svec (i, YES);
-		app_ser_out (state, uart_ibuf, YES);
-		return;
-	}
-
-	// only alarms left
-
-	// If alarms replace status heart beats, svector should be updated
-	// at any alarm. However, eeprom is slow and alarms
-	// potentially frequent. So, we update svector only at status and
-	// at registration.
+	// all through (no aggregation)
 	app_ser_out (state, uart_ibuf, YES);
-
-	// nobody cares, but let's have "dont tell" operational:
-	if (uart_ibuf[9] != br_ctrl.dont_s || esn != br_ctrl.dont_esn)
-		(void)msg_alrm_out (uart_ibuf);
-
+	(void)msg_alrm_out (uart_ibuf);
 }
+
 /*
    --------------------
    cmd_in process
@@ -385,7 +354,7 @@ process (dat_in, void)
 	entry (DS_READ)
 		delay (UI_TOUT, DS_TOUT);
 		io (DS_READ, UART_A, READ, uart_ibuf + uart_oset, 1);
-		if (uart_ibuf [uart_oset] == 0x0D) {
+		if (uart_oset >= 64 || uart_ibuf [uart_oset] == 0x0D) {
 			logger_in ();
 			proceed (DS_IN);
 		}
@@ -434,14 +403,6 @@ static void cmd_exec (word state) {
 			oss_sack_in ();
 			return;
 
-		case CMD_SNACK:
-			oss_snack_in();
-			return;
-
-		case CMD_SENS:
-			oss_sens_in();
-			return;
-
 		case CMD_IO:
 			oss_io_in();
 			return;
@@ -481,10 +442,34 @@ static void cmd_out (word state) {
 	return;
 }
 
+
+static void def_pin (word pin) {
+	switch (pin) {
+		case 1:
+		case 2:
+		case 3:
+		case 8:
+		case 9:
+		case 10:
+			pin_write (pin, 2);
+			return;
+		case 4:
+		case 5:
+			pin_write (pin, 1);
+			return;
+		case 6:
+		case 7:
+			pin_write (pin, 4);
+		default:
+			return;
+	}
+}
+
 extern tarpCtrlType tarp_ctrl;
 
 // see app.h for defaults
 static void read_eprom_and_init() {
+	lword lw;
 	word w[NVM_BOOT_LEN];
 
 	// init uart: _GETRATE doesn't show good result without it
@@ -541,6 +526,15 @@ static void read_eprom_and_init() {
 			cyc_sp += DEFAULT_CYC_M_REST;
 	}
 
+	// deal with IO pins before pmon
+	memcpy (&lw, w + NVM_IO_PINS, 4);
+	for (w[0] = 1; w[0] <= 10; w[0]++) {
+		if ((w[1] = (lw >> ((w[0] -1) * 3)) & 7) == 7)
+			def_pin (w[0]);
+		else
+			pin_write (w[0], w[1]);
+	}
+
 	// using io_pload as scratch:
 	if (w[NVM_IO_CMP] != 0xFFFF || w[NVM_IO_CMP] != 0xFFFF) {
 		memcpy (&io_pload, w + NVM_IO_CMP, 4);
@@ -550,33 +544,26 @@ static void read_eprom_and_init() {
 	}
 
 	if (w[NVM_IO_CREG] != 0xFFFF || w[NVM_IO_CREG + 1] != 0xFFFF)
-		memcpy (&io_creg, w +6, 4);
+		memcpy (&io_creg, w + NVM_IO_CREG, 4);
 	else
 		io_creg = 0;
 
-	if (w[NVM_IO_STATE] != 0xFFFF) {
-#if !EEPROM_DRIVER
+	if (IFLASH[NVM_IO_STATE] != 0xFFFF) {
 		// find last io state (with the counter):
 		w[0] = NVM_IO_STATE +2;
-		while (w[0] < NVM_PAGE_SIZE -1 && IFLASH[w[0]] != 0xFFFF)
+		while (w[0] < (NVM_PAGE_SIZE <<1) -1 && IFLASH[w[0]] != 0xFFFF)
 			w[0] += 2;
-		if ((w[0] -= 2) != NVM_IO_STATE) { // more than 1 write
-			w[NVM_IO_STATE] = w[w[0]];
-			w[NVM_IO_STATE +1] = w[w[0] +1];
-		}
-#endif
+		w[1] = IFLASH[w[0] -2];
+		w[2] = IFLASH[w[0] -1];
+
 		// use io_pload as scratch
-		memcpy (&io_pload, w +NVM_IO_STATE, 4);
-		if (w[NVM_IO_STATE] & PMON_STATE_CNT_ON)
+		memcpy (&io_pload, w +1, 4);
+		if (w[1] & PMON_STATE_CNT_ON)
 			pmon_start_cnt (io_pload >> 8,
-				w[NVM_IO_STATE] & PMON_STATE_CNT_RISING);
-		if (w[NVM_IO_STATE] & PMON_STATE_NOT_ON)
-			pmon_start_not (
-				w[NVM_IO_STATE] & PMON_STATE_NOT_RISING);
-		if (w[NVM_IO_STATE] & PMON_STATE_CMP_ON) {
-#if EEPROM_DRIVER
-			pmon_set_cmp (pmon_get_cnt());
-#else
+				w[1] & PMON_STATE_CNT_RISING);
+		if (w[1] & PMON_STATE_NOT_ON)
+			pmon_start_not (w[1] & PMON_STATE_NOT_RISING);
+		if (w[1] & PMON_STATE_CMP_ON) {
 			io_pload = pmon_get_cmp();
 			if ((io_creg & 3) == 1) { // try to recover cmp
 				while (io_pload < pmon_get_cnt())
@@ -585,7 +572,6 @@ static void read_eprom_and_init() {
 					io_pload >>= 24;
 				pmon_set_cmp (io_pload);
 			}
-#endif
 		}
 
 		if ((w[0] = pmon_get_state()) & PMON_STATE_NOT_ON ||
@@ -593,11 +579,12 @@ static void read_eprom_and_init() {
 			fork (io_rep, NULL);
 		io_pload = 0xFFFFFFFF; // restore
 	}
+	if (io_creg >> 26 != 0)
+		fork (io_back, NULL);
 
 	// 3 - warn, +4 - bad, (missed 0x00)
 	connect = 0x3400;
 	l_rssi = 0;
-	esn_count = count_esn();
 
 	net_opt (PHYSOPT_SETSID, &net_id);
 	memset (&br_ctrl, 0, sizeof(brCtrlType));
@@ -620,16 +607,13 @@ static void read_eprom_and_init() {
 			tarp_ctrl.param &= 0xFE; // routing off
 		}
 	}
-#if 0
-	w[0] = 3; // default power level
-	net_opt (PHYSOPT_SETPOWER, w);
-#endif
 }
 
 // uart proved to be malicious, check what there is to check:
 static bool valid_input () {
 
-	if (cmd_ctrl.opcode == 0 || 
+	if (cmd_ctrl.opcode == 0 || cmd_ctrl.opcode == 7 ||
+			cmd_ctrl.opcode == 8 ||
 		(cmd_ctrl.opcode > CMD_DATACK &&
 		 cmd_ctrl.opcode != CMD_SENSIN)) {
 		dbg_9 (0x5000 | cmd_ctrl.opcode);
@@ -722,7 +706,6 @@ process (root, void)
 		if (cmd_ctrl.opcode == CMD_TRACE ||
 			cmd_ctrl.opcode == CMD_MASTER ||
 			cmd_ctrl.opcode == CMD_SACK ||
-			cmd_ctrl.opcode == CMD_SNACK ||
 			cmd_ctrl.opcode == CMD_IOACK ||
 			cmd_ctrl.opcode == CMD_DAT ||
 			cmd_ctrl.opcode == CMD_DATACK) {

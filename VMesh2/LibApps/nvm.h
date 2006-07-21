@@ -7,20 +7,9 @@
 //+++ "nvm.c"
 #include "sysio.h"
 
-#if EEPROM_DRIVER
-#define ESN_SIZE	1008
-#define NVM_PAGE_SIZE	(EE_PAGE_SIZE >> 1)
-#else
-#define ESN_SIZE	32
 #define NVM_PAGE_SIZE	64
-#endif
 
-#define SVEC_SIZE	(ESN_SIZE >> 4)
-#define ESN_BSIZE	8
-#define ESN_OSET	1
-#define ESN_PACK	5
-
-// IMPORTANT: always keep them TOGETHER and away from the ESN's space
+// IMPORTANT: always keep them TOGETHER
 #define NVM_BOOT_LEN	13
 #define NVM_NID		0
 #define NVM_LH		(NVM_NID + 1)
@@ -35,24 +24,15 @@
 
 #define NVM_IO_CMP	(NVM_NID + 7)
 #define NVM_IO_CREG	(NVM_NID + 9)
-#define NVM_IO_STATE	(NVM_NID + 11)
+#define NVM_IO_PINS	(NVM_NID + 11)
+
+// now, it is on dedicated page 1
+#define NVM_IO_STATE	(NVM_PAGE_SIZE)
 
 extern void nvm_read (word pos, address d, word wlen);
 extern void nvm_write (word pos, const word * s, word wlen);
 extern void nvm_erase();
 extern void nvm_io_backup();
-extern word esn_count;
-extern lword esns[];
-extern int lookup_esn (lword * esn);
-extern int lookup_esn_st (lword * esn);
-extern int get_next (lword * esn, word st);
-extern bool load_esns (char * buf);
-extern void set_svec (int i, bool what);
-extern int add_esn (lword * esn, int * pos);
-extern int era_esn (lword * esn);
 extern void app_reset (word lev);
-extern word count_esn();
-extern word s_count();
-
 #endif
 

@@ -20,6 +20,9 @@ lword	io_pload = 0xFFFFFFFF;
 nid_t	net_id;
 word	app_flags, freqs, connect, l_rssi;
 byte * cmd_line  = NULL;
+byte * dat_ptr = NULL;
+byte	dat_seq = 0;
+// spare byte here
 
 cmdCtrlType cmd_ctrl = {0, 0x00, 0x00, 0x00, 0x00};
 brCtrlType br_ctrl;
@@ -37,10 +40,8 @@ void send_msg (char * buf, int size);
 extern nid_t local_host;
 extern nid_t master_host;
 extern bool msg_br_out();
-extern int msg_st_out();
 extern bool msg_io_out();
-extern lword esns[];
-extern word  svec[];
+extern byte * dat_ptr;
 extern void oss_io_out (char * buf, bool acked);
 
 static int shared_left; // shared by mutually exclusive st_rep, dat_rep
@@ -49,9 +50,6 @@ static int shared_left; // shared by mutually exclusive st_rep, dat_rep
 #define SRS_DEL		10
 #define SRS_ITER	20
 #define SRS_BR		30
-#define SRS_CONT	40
-#define SRS_ST		50
-#define SRS_NEXT	60
 #define SRS_FIN		70
 #define ST_REP_BOOT_DELAY	100
 process (st_rep, word)
@@ -82,46 +80,14 @@ process (st_rep, word)
 
 	entry (SRS_BR)
 		if (shared_left-- <= 0)
-			proceed (SRS_CONT);
+			proceed (SRS_FIN);
 		clr_brSTACK;
-		clr_brSTNACK;
 		if (msg_br_out()) // sent out
-			wait (ST_ACKS, SRS_CONT);
+			wait (ST_ACKS, SRS_FIN);
 		delay (ack_tout << 10, SRS_BR);
 		release;
 
-	entry (SRS_CONT)
-		if (is_brSTNACK)
-			proceed (SRS_FIN);
-		shared_left = ack_retries + 1;
-
-	entry (SRS_ST)
-		if (shared_left-- <= 0)
-			proceed (SRS_NEXT);
-
-		clr_brSTACK;
-		clr_brSTNACK;
-		switch (msg_st_out()) {
-			case -1: // nothing to report
-				proceed (SRS_FIN);
-			case YES:
-				wait (ST_ACKS, SRS_NEXT);
-				// fall through
-			default: // NO, bad things: retry
-				delay (ack_tout << 10, SRS_ST);
-		}
-		release;
-
-	 entry (SRS_NEXT)
-		if (is_brSTNACK || esns[1] == 0xFFFFFFFF)
-			proceed (SRS_FIN);
-		shared_left = ack_retries + 1;
-		esns[0] = esns[1];
-		proceed (SRS_ST);
-
 	entry (SRS_FIN)
-		esns[0] = esns[1] = 0;
-		memset (svec, 0, SVEC_SIZE << 1);
 		// ldelay on 0 takes PicOS down,  double check:
 		if (br_ctrl.rep_freq  >> 1 == 0)
 			kill (0);
@@ -133,9 +99,6 @@ endprocess (1)
 #undef SRS_DEL
 #undef SRS_ITER
 #undef SRS_BR
-#undef SRS_CONT
-#undef SRS_ST
-#undef SRS_NEXT
 #undef SRS_FIN
 
 #define DRS_INIT	0
@@ -151,19 +114,18 @@ process (dat_rep, void)
 		if (shared_left-- <= 0 || master_host == 0 ||
 				local_host == master_host)
 			proceed (DRS_FIN);
-		in_header((word)(esns[1]), rcv) = master_host;
-		in_header((word)(esns[1]), hco) = 0;
+		in_header(dat_ptr, rcv) = master_host;
+		in_header(dat_ptr, hco) = 0;
 		clr_datACK;
-		send_msg ((char *)((word)(esns[1])),
-			sizeof(msgDatType) + in_dat((word)(esns[1]), len));
+		send_msg (dat_ptr, sizeof(msgDatType) + in_dat(dat_ptr, len));
 		wait (DAT_ACK_TRIG, DRS_FIN);
 		delay (ack_tout << 10, DRS_REP);
 		release;
 
 	entry (DRS_FIN)
-		if (esns[1] != 0) {
-			ufree ((word)(esns[1]));
-			esns[1] = 0;
+		if (dat_ptr) {
+			ufree (dat_ptr);
+			dat_ptr = NULL;
 		}
 		// if changed in meantime... see oss_io.c
 		if (is_cmdmode)
@@ -174,10 +136,26 @@ endprocess (1)
 #undef DRS_REP
 #undef DRS_FIN
 
+#define IBS_ITER        0
+#define IBS_HOLD	10
+process (io_back, void)
+	static lword htime;
+
+	entry (IBS_ITER)
+		if ((htime = (io_creg >> 26) * 900) == 0)
+			kill (0);
+
+	entry (IBS_HOLD)
+		lhold (IBS_HOLD, &htime);
+		nvm_io_backup();
+		proceed (IBS_ITER);
+endprocess (1)
+#undef IBS_ITER
+#undef IBS_HOLD
+
 #define IRS_ITER	0
 #define IRS_IRUPT	10
 #define IRS_REP		20
-#define IRS_NVM		30
 #define IRS_FIN		40
 process (io_rep, void)
 	static int left;
@@ -187,8 +165,6 @@ process (io_rep, void)
 	entry (IRS_ITER)
 		wait (PMON_CMPEVENT, IRS_IRUPT);
 		wait (PMON_NOTEVENT, IRS_IRUPT);
-		if (io_creg >> 26) // nvm writes
-			delay ((word)(io_creg >> 26) << 10, IRS_NVM);
 		if ((lw = pmon_get_state()) & PMON_STATE_CMP_PENDING ||
 				lw & PMON_STATE_NOT_PENDING)
 			proceed (IRS_IRUPT);
@@ -231,10 +207,6 @@ process (io_rep, void)
 		wait (PMON_NOTEVENT, IRS_IRUPT);
 		release;
 
-	entry (IRS_NVM)
-		nvm_io_backup();
-		proceed (IRS_ITER);
-
 	entry (IRS_FIN)
 		io_pload = 0xFFFFFFFF;
 		proceed (IRS_ITER);
@@ -243,7 +215,6 @@ endprocess (1)
 #undef IRS_ITER
 #undef IRS_IRUPT
 #undef IRS_REP
-#undef IRS_NVM
 #undef IRS_FIN
 
 

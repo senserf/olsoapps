@@ -51,7 +51,7 @@
 #define dbg_binary		1
 #define RESET_ON_SYSERR		1
 #define RESET_ON_MALLOC		1
-#define UART_INPUT_BUFFER_LENGTH 68
+#define UART_INPUT_BUFFER_LENGTH 72
 #define MSK_BACKOFF		0xFF
 #define PULSE_MONITOR		1
 #define GLACIER			1

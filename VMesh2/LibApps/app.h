@@ -48,13 +48,13 @@ typedef struct brCtrlStruct {
 #define ST_ACKS	((word)&br_ctrl)
 #define ST_REPTRIG ((word)&br_ctrl.rep_freq)
 
-#define DAT_ACK_TRIG ((word)esns)
+#define DAT_ACK_TRIG ((word)&dat_ptr)
 #define IO_ACK_TRIG ((word)&io_pload)
 
 #define	DAT_ACK		1
 #define IO_ACK		2
 #define BR_STACK	4
-#define BR_STNACK	8
+#define BR_STNACK_OBSOLETE	8
 
 // br_ctrl meant "bridge control" in Genesis, but we use
 // spare bits for identical reliable delivery for VMesh IO snf DAT
@@ -69,10 +69,12 @@ typedef struct brCtrlStruct {
 #define is_brSTACK      (br_ctrl.flags & BR_STACK)
 #define set_brSTACK     (br_ctrl.flags |= BR_STACK)
 #define clr_brSTACK     (br_ctrl.flags &= ~BR_STACK)
-	 
+
+#if 0
 #define is_brSTNACK     (br_ctrl.flags & BR_STNACK)
 #define set_brSTNACK    (br_ctrl.flags |= BR_STNACK)
 #define clr_brSTNACK    (br_ctrl.flags &= ~BR_STNACK)
+#endif
 
 typedef struct cycCtrlStruct {
 	word	mod	:2;
