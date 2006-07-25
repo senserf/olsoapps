@@ -968,14 +968,12 @@ void oss_dat_out (char * buf, bool acked) {
 		lbuf[w++] = acked;
 		lbuf[w] = 0x04;
 	} else {
-		w = 2 + in_dat(buf, len) +1;
-		lbuf = get_mem (NONE, w);
+		lbuf = get_mem (NONE, 2 + in_dat(buf, len));
 		if (lbuf == NULL)  
 			return;  
 		lbuf[0] = 1; // !zero <-> raw output
 		lbuf[1] = in_dat(buf, len);
 		memcpy (lbuf +2, buf + sizeof (msgDatType), in_dat(buf, len));
-		lbuf[w-1] = 0x0D;
 	}
 	if (fork (oss_out, lbuf) == 0 ) {
 		dbg_2 (0xC40B); // oss_dat_out fork failed
@@ -1040,6 +1038,10 @@ void oss_dat_in () {
 		return;
 	}
 #endif
+	if (cmd_ctrl.oplen > 64) {
+		cmd_ctrl.oprc = RC_ELEN;
+		return;
+	}
 	cmd_ctrl.oprc = msg_dat_out ();
 }
 
@@ -1182,6 +1184,7 @@ void oss_io_in() {
 				pmon_start_cnt (l, cmd_line[1] & 0x10 ? 1 : 0);
 			}
 			cmd_ctrl.oprc = RC_OKRET;
+			nvm_io_backup();
 			return;
 
 		case IO_CMP_START:
@@ -1195,6 +1198,8 @@ void oss_io_in() {
 				fork (io_rep, NULL);
 			pmon_set_cmp (l);
 			cmd_ctrl.oprc = RC_OKRET;
+			nvm_write (NVM_IO_CMP, (address)&l, 2);
+			nvm_io_backup();
 			return;
 
 		case IO_NOT_START:
@@ -1205,12 +1210,14 @@ void oss_io_in() {
 					fork (io_rep, NULL);
 				cmd_ctrl.oprc = RC_OKRET;
 				pmon_start_not (cmd_line[2]);
-		       }
-		       return;
+			}
+			nvm_io_backup();
+			return;
 
 		case IO_STOP:
 			cmd_ctrl.oprc = RC_OKRET;
 			w = pmon_get_state();
+			cmd_line[2] &= 0x0F; // jic; clear high bits
 			if (cmd_line[2]) { // CNT
 				if (w & PMON_STATE_CNT_ON)
 					pmon_stop_cnt();
@@ -1241,6 +1248,10 @@ void oss_io_in() {
 					w & PMON_STATE_NOT_ON))
 					kill (w1);
 			}
+			if ((cmd_line[2] & 0xF0) == 0 ||
+					(cmd_line[3] & 0xF0) == 0 ||
+					(cmd_line[4] & 0xF0) == 0)
+				nvm_io_backup();
 			return;
 
 		case IO_CNT_GET:

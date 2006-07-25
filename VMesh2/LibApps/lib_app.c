@@ -14,7 +14,7 @@
 const	lword	ESN = 0xBACA0001;
 lword	cyc_sp;
 lword	cyc_left = 0;
-lword	io_creg; // LSB: nvm_freq :6, cmp oper :2; creg :24
+lword	io_creg; // MSB: nvm_freq :6, cmp oper :2; creg :24
 lword	io_pload = 0xFFFFFFFF;
 
 nid_t	net_id;
@@ -144,23 +144,31 @@ process (io_back, void)
 	entry (IBS_ITER)
 		if ((htime = (io_creg >> 26) * 900) == 0)
 			kill (0);
+		nvm_io_backup();
 
 	entry (IBS_HOLD)
 		lhold (IBS_HOLD, &htime);
-		nvm_io_backup();
 		proceed (IBS_ITER);
 endprocess (1)
 #undef IBS_ITER
 #undef IBS_HOLD
 
-#define IRS_ITER	0
-#define IRS_IRUPT	10
-#define IRS_REP		20
+#define IRS_INIT	0
+#define IRS_ITER	10
+#define IRS_IRUPT	20
+#define IRS_REP		30
 #define IRS_FIN		40
 process (io_rep, void)
 	static int left;
 	lword lw;
 	nodata;
+
+	entry (IRS_INIT)
+		// Debatable, but seems a good idea at powerup if
+		// we try to recover comparator. So, to be consistent,
+		// clear the flags at any start:
+		pmon_pending_cmp();
+		pmon_pending_not();
 
 	entry (IRS_ITER)
 		wait (PMON_CMPEVENT, IRS_IRUPT);
@@ -173,12 +181,12 @@ process (io_rep, void)
 	entry (IRS_IRUPT)
 		io_pload = pmon_get_cnt() << 8 | pmon_get_state();
 		if (io_pload & PMON_STATE_CMP_PENDING) {
-			switch (io_creg & 3) {
+			switch ((io_creg >> 24) & 3) {
 				case 1:
-					pmon_add_cmp (io_creg >> 8);
+					pmon_add_cmp (io_creg & 0x00FFFFFFL);
 					break;
 				case 2:
-					pmon_sub_cnt (io_creg >> 8);
+					pmon_sub_cnt (io_creg & 0x00FFFFFFL);
 					break;
 				case 3:
 					pmon_dec_cnt ();
@@ -212,6 +220,7 @@ process (io_rep, void)
 		proceed (IRS_ITER);
 
 endprocess (1)
+#undef IRS_INIT
 #undef IRS_ITER
 #undef IRS_IRUPT
 #undef IRS_REP

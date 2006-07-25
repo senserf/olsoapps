@@ -355,18 +355,14 @@ process (dat_in, void)
 		delay (UI_TOUT, DS_TOUT);
 		io (DS_READ, UART_A, READ, uart_ibuf + uart_oset, 1);
 		if (uart_oset >= 64 || uart_ibuf [uart_oset] == 0x0D) {
+			// CR is wanted as part of the string...
+			if (uart_oset < 64)
+				uart_oset++;
 			logger_in ();
 			proceed (DS_IN);
 		}
-		if (uart_oset < UI_INLEN -1 -1) { // index, 0x0D
-			uart_oset++;
-			proceed (DS_READ);
-		} else {
-			dbg_9 (0x1000);
-			logger_in ();
-			proceed (DS_IN);
-		}
-
+		uart_oset++;
+		proceed (DS_READ);
 endprocess (1)
 #undef DS_START
 #undef DS_TOUT
@@ -565,13 +561,13 @@ static void read_eprom_and_init() {
 			pmon_start_not (w[1] & PMON_STATE_NOT_RISING);
 		if (w[1] & PMON_STATE_CMP_ON) {
 			io_pload = pmon_get_cmp();
-			if ((io_creg & 3) == 1) { // try to recover cmp
-				while (io_pload < pmon_get_cnt())
-					io_pload += io_creg >> 8;
+			if (((io_creg >> 24) & 3) == 1) { // try to recover cmp
+				while (io_pload <= pmon_get_cnt())
+					io_pload += io_creg & 0x00FFFFFFL;
 				if (io_pload & 0xFF000000)
 					io_pload >>= 24;
-				pmon_set_cmp (io_pload);
 			}
+			pmon_set_cmp (io_pload);
 		}
 
 		if ((w[0] = pmon_get_state()) & PMON_STATE_NOT_ON ||
