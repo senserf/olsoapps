@@ -41,15 +41,17 @@ static void fpage_reset (word p) {
 		if_write (NVM_NID, net_id);
 		if_write (NVM_LH, local_host);
 		if_write (NVM_MID, master_host);
-		lw = encr_data;
+		w = encr_data;
 		if (is_cmdmode)
-			lw |= 1 << 5;
+			w |= 1 << 5;
 		if (is_binder)
-			lw |= 1 << 4;
-		lw |= tarp_ctrl.param << 8;
-		if_write (NVM_APP, (word)lw);
-		memcpy (&lw, &cyc_ctrl, 2);
-		if_write (NVM_CYC_CTRL, (word)lw);
+			w |= 1 << 4;
+		w |= tarp_ctrl.param << 8;
+		if_write (NVM_APP, w);
+		ion (UART, CONTROL, (char*) &w, UART_CNTRL_GETRATE);
+		if_write (NVM_UART, w);
+		memcpy (&w, &cyc_ctrl, 2);
+		if_write (NVM_CYC_CTRL, w);
 		if_write (NVM_CYC_SP, (word)cyc_sp);
 		if_write (NVM_CYC_SP +1, (word)(cyc_sp >> 16));
 		lw = pmon_get_cmp();

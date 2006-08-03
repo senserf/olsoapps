@@ -10,7 +10,7 @@
 #define NVM_PAGE_SIZE	64
 
 // IMPORTANT: always keep them TOGETHER
-#define NVM_BOOT_LEN	13
+#define NVM_BOOT_LEN	14
 #define NVM_NID		0
 #define NVM_LH		(NVM_NID + 1)
 #define NVM_MID		(NVM_NID + 2)
@@ -19,12 +19,13 @@
 //          b8-b15: tarp_ctrl.param
 #define NVM_APP		(NVM_NID + 3)
 
-#define NVM_CYC_CTRL    (NVM_NID + 4)
-#define NVM_CYC_SP	(NVM_NID + 5)
+#define NVM_UART	(NVM_NID + 4)
+#define NVM_CYC_CTRL    (NVM_NID + 5)
+#define NVM_CYC_SP	(NVM_NID + 6)
 
-#define NVM_IO_CMP	(NVM_NID + 7)
-#define NVM_IO_CREG	(NVM_NID + 9)
-#define NVM_IO_PINS	(NVM_NID + 11)
+#define NVM_IO_CMP	(NVM_NID + 8)
+#define NVM_IO_CREG	(NVM_NID + 10)
+#define NVM_IO_PINS	(NVM_NID + 12)
 
 // now, it is on dedicated page 1
 #define NVM_IO_STATE	(NVM_PAGE_SIZE)

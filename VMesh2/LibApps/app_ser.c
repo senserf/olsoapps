@@ -16,7 +16,7 @@ process (app_outserial, char)
   entry (OM_INIT)
 	if (*data) { // raw output
 		ptr = data;
-		len = ptr[1] +1; // 1: 0x0D
+		len = ptr[1];
 		ptr += 2;	// skip BOT, len
 	} else {
 		ptr = data;

@@ -277,6 +277,7 @@ void oss_set_in () {
 			break;
 		}
 		ion (UART, CONTROL, (char*)&val, UART_CNTRL_SETRATE);
+		nvm_write (NVM_UART, &val, 1);
 		cmd_ctrl.oprc = RC_OK;
 		break;
 
