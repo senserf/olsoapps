@@ -468,13 +468,13 @@ static void read_eprom_and_init() {
 	lword lw;
 	word w[NVM_BOOT_LEN];
 
+	nvm_read (NVM_NID, w, NVM_BOOT_LEN);
 	if (w[NVM_UART] == 0xFFFF || (w[NVM_UART] != 12 && w[NVM_UART] != 24 &&
 				w[NVM_UART] != 48 && w[NVM_UART] != 96 &&
 				w[NVM_UART] != 192 && w[NVM_UART] != 384))
 	       w[NVM_UART] = UART_RATE / 100;
 	ion (UART, CONTROL, (char *)&w[NVM_UART], UART_CNTRL_SETRATE);
 
-	nvm_read (NVM_NID, w, NVM_BOOT_LEN);
 	if (w[NVM_NID] == 0xFFFF)
 		net_id = 0;
 	else
