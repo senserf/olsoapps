@@ -239,6 +239,10 @@ process (cyc_man, void)
 			cyc_ctrl.mod == CYC_MOD_POFF || cyc_ctrl.prep == 0 ||
 			cyc_sp == 0) {
 			cyc_left = 0;
+			if (local_host == master_host) 
+				cyc_ctrl.st = CYC_ST_DIS;
+			else if (cyc_ctrl.st != CYC_ST_DIS)
+				cyc_ctrl.st = CYC_ST_ENA;
 			kill (0);
 		}
 
@@ -271,6 +275,10 @@ process (cyc_man, void)
                         cyc_ctrl.mod == CYC_MOD_POFF || cyc_ctrl.prep == 0 ||
 			cyc_sp == 0) {
 			cyc_left = 0;
+			if (local_host == master_host)
+				cyc_ctrl.st = CYC_ST_DIS; 
+			else if (cyc_ctrl.st != CYC_ST_DIS)
+				cyc_ctrl.st = CYC_ST_ENA;
                         kill (0);
 		}
 		if (cyc_left == 0) {
@@ -444,7 +452,7 @@ void send_msg (char * buf, int size) {
 		in_master(buf, con) = (freqs & 0xFF00) | (connect >> 8);
 		in_master(buf, cyc) = get_prep();
 	}
-	if (cyc_ctrl.mod == CYC_MOD_POFF) {
+	if (local_host != master_host && cyc_ctrl.mod == CYC_MOD_POFF) {
 		net_opt (PHYSOPT_TXON, NULL);
 		if (net_tx (NONE, buf, size, encr_data) != 0) {
 			dbg_a (0x0500 | in_header(buf, msg_type)); // Tx failed

@@ -338,8 +338,7 @@ void oss_set_in () {
 			break;
 		}
 		if (cyc_ctrl.st == CYC_ST_PREP ||
-			(cyc_ctrl.st == CYC_ST_SLEEP && 
-				cyc_ctrl.mod != CYC_MOD_PNET)) {
+				cyc_ctrl.st == CYC_ST_SLEEP) { 
 			cmd_ctrl.oprc = RC_ERES;
 			break;
 		}
@@ -420,7 +419,7 @@ void oss_set_in () {
 			cmd_ctrl.oprc = RC_ELEN;
 			break;
 		}
-		if (local_host == master_host) {
+		if (local_host != master_host) {
 			cmd_ctrl.oprc = RC_EMAS;
 			break;
 		}

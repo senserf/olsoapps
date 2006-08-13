@@ -499,10 +499,12 @@ static void read_eprom_and_init() {
 		tarp_ctrl.param = w[NVM_APP] >> 8;
 
 	if (w[NVM_CYC_CTRL] != 0xFFFF) {
-		memcpy (&cyc_ctrl, w[NVM_CYC_CTRL], 2);
+		memcpy (&cyc_ctrl, w + NVM_CYC_CTRL, 2);
 		if (local_host == master_host) {
 			if (cyc_ctrl.st == CYC_ST_PREP) // break is bad
 				cyc_ctrl.st = CYC_ST_ENA;
+			if (cyc_ctrl.st == CYC_ST_ENA)
+				fork (cyc_man, NULL);
 		} else {
 			if (cyc_ctrl.st != CYC_ST_DIS)
 				cyc_ctrl.st = CYC_ST_ENA;

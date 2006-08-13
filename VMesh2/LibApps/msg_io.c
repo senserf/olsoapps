@@ -98,7 +98,7 @@ void msg_master_in (char * buf) {
 	if (in_master(buf, cyc) == CYC_MSG_FORCE_ENA) {
 		if (running (cyc_man))
 			kill (running (cyc_man));
-		if (cyc_ctrl.st != CYC_ST_ENA && cyc_ctrl.st != CYC_ST_DIS)
+		if (cyc_ctrl.st != CYC_ST_ENA /*&& cyc_ctrl.st != CYC_ST_DIS*/)
 			cyc_ctrl.st = CYC_ST_ENA;
 		return;
 	}	
