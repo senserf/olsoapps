@@ -32,14 +32,13 @@
 
 #define	UART_TCV		0
 
-#define	TARGET_BOARD		BOARD_VERSA2
-
-//#define	TARGET_BOARD		BOARD_GENESIS
+//#define	TARGET_BOARD		BOARD_VERSA2
+#define	TARGET_BOARD		BOARD_GENESIS
 
 #define CC1000 			0	
-#define	CC1100			0
+#define	CC1100			1
 #define DM2100 			0
-#define	DM2200			1
+#define	DM2200			0
 #define RF24G 			0
 #define	ENTROPY_COLLECTION	1
 #define CC1000_FREQ 		868
@@ -49,8 +48,8 @@
 #define	STACK_GUARD		1
 
 #define	UART_RATE		19200
-#define	CRYSTAL_RATE		32768
-#define	CRYSTAL2_RATE		6000000
+#define	CRYSTAL_RATE		8000000
+// #define	CRYSTAL2_RATE		6000000
 #define	UART_BITS		8
 #define	UART_PARITY		0
 
@@ -67,7 +66,9 @@
 
 #define	DUMP_MEMORY		1
 
-//#define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nNaturalia non sunt turpia"
+//#define	BANNER	"RFM VersaMESH(tm) Genesis v0.6\r\nPecunia non olet"
 #define	BANNER	"RFM VersaMESH2(tm) v0.1\r\nDual Crystal"
 
 #define	UART_INPUT_BUFFER_LENGTH	32
+
+// #define	MSK_BACKOFF		3
