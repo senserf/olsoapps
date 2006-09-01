@@ -1,5 +1,5 @@
 #ifndef __lib_apps_h
-#define __lib_apps.h
+#define __lib_apps_h
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
 /* All rights reserved.                                                 */
@@ -15,8 +15,9 @@ extern void set_tag (char * buf);
 
 extern void msg_getTag_in (word state, char * buf);
 extern void msg_setTag_in (word state, char * buf);
-extern void msg_getTagAck_out (word state, char** buf_out, lword rcv, word seq);
-extern void msg_setTagAck_out (word state, char** buf_out, lword rcv, word seq,
+extern void msg_getTagAck_out (word state, char** buf_out, nid_t rcv, seq_t seq,
+                   word pass);
+extern void msg_setTagAck_out (word state, char** buf_out, nid_t rcv, seq_t seq,
 			       word pass);
 
 extern void send_msg (char * buf, int size);

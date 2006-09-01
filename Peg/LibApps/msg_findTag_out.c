@@ -6,7 +6,7 @@
 #include "msg_pegs.h"
 #include "lib_apps.h"
 
-void msg_findTag_out (word state, char** buf_out, lword tag, lword peg) {
+void msg_findTag_out (word state, char** buf_out, lword tag, nid_t peg) {
 
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, sizeof(msgFindTagType));

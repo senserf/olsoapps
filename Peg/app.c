@@ -30,7 +30,7 @@ heapmem {80, 20}; // how to find or guess the right ratio?
 
 // arbitrary
 #define UI_BUFLEN		256
-#define DEF_LOCAL_HOST		99
+#define DEF_LOCAL_HOST		1
 
 static char * ui_ibuf = NULL;
 static char * ui_obuf = NULL;
@@ -40,21 +40,26 @@ static char * cmd_line	= NULL;
 #define CMD_READER	((word)&cmd_line)
 #define CMD_WRITER	((word)((&cmd_line)+1))
 
+//#define app_trace(b) app_diag(D_DEBUG, b" loc_host %u",local_host)
 // in LibConf
-extern lword host_id;
-extern lword local_host;
-extern lword host_passwd;
+extern lword	host_id;
+extern nid_t	local_host;
+extern lword	host_passwd;
+extern word 	host_pl;
+extern nid_t	net_id;
 
 // in LibComms
 extern int net_init (word, word);
+extern tarpCtrlType tarp_ctrl;
 
 // format strings
-static const char welcome_str[] = "\r\nWelcome to Peg Testbed\r\n"
-	"Commands:\r\n"
-	"\tSet:\ts [ lh [ hid [ mid ] ] ]\r\n"
-	"\tSnd Master:\tm [ peg ]\r\n"
-	"\tSnd Find:\tf [ tag [ peg [ rss [ pLev ] ] ] ]\r\n"
-	"\tOpt RF:\to[{r|t| }{+|-}]"
+static const char welcome_str[] = "Commands:\r\n"
+	"\tSet:\ts [ lh [ hid [ mid [ pl ] ] ] ]\r\n"
+	"\tMaster:\tm [ peg ]\r\n"
+	"\tFind:\tf [ tag [ peg [ rss [ pLev ] ] ] ]\r\n"
+	"\tFwd get:g [ tag [ peg ] ]\r\n"
+	"\tFwd set:t [ tag [ peg ] ]\r\n"
+	"\tOpt RF:\to[{r|t| }{+|-}]\r\n"
 	"\tHelp:\th\r\n"
 	"\tq(uit)\r\n";
 
@@ -62,10 +67,10 @@ static const char o_str[] =	"phys: %x, plug: %x, txrx: %x\r\n";
 
 static const char ill_str[] =	"Illegal command (%s)\r\n";
 
-static const char stats_str[] = "Stats for hostId - localHost (%lx - %lu):\r\n"
+static const char stats_str[] = "Stats for hostId - localHost (%lx - %u):\r\n"
 	" In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n"
 	" Freq audit (%u) events (%u),\r\n"
-	" Time (%lu), Delta (%ld) to Master (%lu),\r\n"
+	" PLev (%u), Time (%lu), Delta (%ld) to Master (%u),\r\n"
 	" phys: %x, plug: %x, txrx: %x\r\n"
 	" Mem free (%u, %u) faults (%u, %u)\r\n";
 
@@ -74,14 +79,14 @@ static void stats () {
 	word faults0, faults1;
 	word mem0 = memfree(0, &faults0);
 	word mem1 = memfree(1, &faults1);
-	
+
 	net_diag (D_UI, stats_str,
-			host_id, local_host, 
-			app_count.rcv, tarp_count.rcv,
-			app_count.snd, tarp_count.snd, 
-			app_count.fwd, tarp_count.fwd,
+			host_id, local_host,
+			app_count.rcv, tarp_ctrl.rcv,
+			app_count.snd, tarp_ctrl.snd,
+			app_count.fwd, tarp_ctrl.fwd,
 			tag_auditFreq, tag_eventGran,
-			seconds(), master_delta, master_host,
+			host_pl, seconds(), master_delta, master_host,
 			net_opt (PHYSOPT_PHYSINFO, NULL),
 			net_opt (PHYSOPT_PLUGINFO, NULL),
 			net_opt (PHYSOPT_STATUS, NULL),
@@ -93,11 +98,12 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
-  
+
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
-		if (in_pong_rxon(buf))
+//	    diag ("about to check msg %d", in_pong(buf, flags));
+		if (in_pong_rxon(buf)) 
 			check_msg4tag (in_header(buf, snd));
 
 		msg_pong_in (state, buf, rssi);
@@ -106,7 +112,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 	case msg_report:
 		msg_report_in (state, buf);
 		return;
-		
+
 	case msg_reportAck:
 		msg_reportAck_in (buf);
 		return;
@@ -117,6 +123,18 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 
 	case msg_findTag:
 		msg_findTag_in (state, buf);
+		return;
+
+	case msg_fwd:
+		msg_fwd_in (state, buf, size);
+		return;
+
+	case msg_getTagAck:
+		msg_getTagAck_in (state, buf, size);
+		return;
+
+    case msg_setTagAck:
+		msg_setTagAck_in (state, buf, size);
 		return;
 
 	case msg_rpc:
@@ -164,19 +182,20 @@ process (rcv, void)
 			buf_ptr = NULL;
 			packet_size = 0;
 		}
-		packet_size = net_rx (RS_TRY, &buf_ptr, &rssi);
+    	packet_size = net_rx (RS_TRY, &buf_ptr, &rssi, 0);
 		if (packet_size <= 0) {
 			app_diag (D_SERIOUS, "net_rx failed (%d)", packet_size);
 			proceed (RS_TRY);
 		}
 
-		app_diag (D_DEBUG, "RCV (%d): %x-%u-%lu-%lu-%u-%u\r\n",
-			  packet_size, in_header(buf_ptr, msg_type),
-			  in_header(buf_ptr, seq_no),
+//		app_diag (D_WARNING, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",
+		app_diag (D_DEBUG, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",			  
+		packet_size, in_header(buf_ptr, msg_type),
+			  in_header(buf_ptr, seq_no) & 0xffff,
 			  in_header(buf_ptr, snd),
 			  in_header(buf_ptr, rcv),
-			  in_header(buf_ptr, hoc),
-			  in_header(buf_ptr, hco));
+			  in_header(buf_ptr, hoc) & 0xffff,
+			  in_header(buf_ptr, hco) & 0xffff);
 
 		// that's how we could check which plugin is on
 		// if (net_opt (PHYSOPT_PLUGINFO, NULL) != INFO_PLUG_TARP)
@@ -237,7 +256,7 @@ process  (audit, void)
 			buf_ptr = NULL;
 		}
 		proceed (AS_TAGLOOP);
-		
+
 endprocess (1)
 #undef AS_START
 #undef AS_TAGLOOP
@@ -296,20 +315,23 @@ endprocess (1)
 
 
 process (root, void)
-	static lword	in_tag, in_peg;
-	static word	in_rssi, in_pl;
-	lword 		in_lh, in_hid, in_mh;
+	static lword	in_tag, in_pass, in_npass;
+	static nid_t	in_peg;
+	static word	in_rssi, in_pl, in_maj, in_min, in_span;
+	lword 		in_hid;
+	nid_t 		in_lh, in_mh;
+	word		in_hpl; // peg power level
 	int		opt_sel;
 
 	nodata;
 
 	entry (RS_INIT)
 		local_host = DEF_LOCAL_HOST;
-		host_id = -local_host;
+//		app_trace("init");
 
 		// these survive for repeated commands;
-		in_tag = in_peg = 0;
-		in_rssi = in_pl = 0;
+		in_tag = in_pass = in_npass = 0;
+		in_peg = in_rssi = in_pl = 0;
 
 		init_tags();
 		ui_out (RS_INIT, welcome_str);
@@ -319,7 +341,8 @@ process (root, void)
 			app_diag (D_FATAL, "net_init failed");
 			reset();
 		}
-
+		net_opt (PHYSOPT_SETSID, &net_id);
+		net_opt (PHYSOPT_SETPOWER, &host_pl);
 		(void) fork (rcv, NULL);
 		(void) fork (cmd_in, NULL);
 		(void) fork (audit, NULL);
@@ -337,45 +360,79 @@ process (root, void)
 		}
 
 	entry (RS_DOCMD)
+//	     app_trace("rs_docmd");
 		if (cmd_line[0] == ' ') // ignore if starts with blank
 			proceed (RS_FREE);
 
                 if (cmd_line[0] == 'h') {
+//                	app_trace("help");
 			strcpy (ui_obuf, welcome_str);
+//			app_trace("help_end");
 			proceed (RS_UIOUT);
 		}
 
 		if (cmd_line[0] == 'q')
 			reset();
-			
+
 		if (cmd_line[0] == 'm') {
-			 scan (cmd_line+1, "%lu", &in_peg);
+			 scan (cmd_line+1, "%u", &in_peg);
 			 oss_master_in (RS_DOCMD, in_peg);
 			 proceed (RS_FREE);
 		}
 
 		if (cmd_line[0] == 'f') {
-			scan (cmd_line+1, "%lu, %lu, %u, %u",
+//			app_trace("fwd");
+			scan (cmd_line+1, "%lu, %u, %u, %u",
 				&in_tag, &in_peg, &in_rssi, &in_pl);
 			*(word*)&in_tag = (in_rssi << 8 ) | in_pl;
 			oss_findTag_in (RS_DOCMD, in_tag, in_peg);
+//			app_trace("fwd-end");
+			proceed (RS_FREE);
+		}
+
+		if (cmd_line[0] == 'g') {
+//			app_trace("get");
+			scan (cmd_line+1, "%lu, %u, %lu",
+				&in_tag, &in_peg, &in_pass);
+			oss_getTag_in (RS_DOCMD, in_tag, in_peg, in_pass);
+//			app_trace("get_end");
+			proceed (RS_FREE);
+		}
+
+        if (cmd_line[0] == 't') {
+			in_lh = in_pl = in_maj = in_min = in_span = 0;
+			in_hid = 0;
+			scan (cmd_line+1, "%lu %u %lu %u %u %u %x %u %lu",
+				&in_tag, &in_peg, &in_pass, &in_lh, &in_maj,
+				&in_min,  &in_pl, &in_span, &in_npass);
+			oss_setTag_in (RS_DOCMD, in_tag, in_peg, in_pass, in_lh,
+			               in_maj, in_min,  in_pl, in_span, in_npass);
 			proceed (RS_FREE);
 		}
 
 		if (cmd_line[0] == 's') {
-			in_lh = in_hid = in_mh = 0;
-			scan (cmd_line+1, "%lu, %lu, %lu",
-				&in_lh, &in_hid, &in_mh);
+//			app_trace("stat");
+			in_lh = in_hpl = in_mh = 0;
+			in_hid = 0;
+//			app_trace("stat_beg");
+			scan (cmd_line+1, "%u, %lu, %u, %u",
+				&in_lh, &in_hid, &in_mh, &in_hpl);
 			if (in_lh)
 				local_host = in_lh;
+//			app_trace("stat_lh");
 			if (in_hid)
 				host_id = in_hid;
 			if (in_mh)
 				master_host = in_mh;
+			if (in_hpl) {
+				net_opt (PHYSOPT_SETPOWER, &in_hpl);
+				host_pl = in_hpl;
+			}
+
 			stats();
 			proceed (RS_FREE);
 		}
-			
+
 		if (cmd_line[0] == 'o') {
 
 			if (strlen (cmd_line) > 2) {

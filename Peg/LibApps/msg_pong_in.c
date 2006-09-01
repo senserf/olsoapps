@@ -8,7 +8,7 @@
 #include "msg_pegs.h"
 #include "lib_apps.h"
 
-extern lword local_host;
+extern nid_t local_host;
 
 void msg_pong_in (word state, char * buf, word rssi) {
 	char * out_buf = NULL; // is static needed / better here? (state)
@@ -50,7 +50,7 @@ void msg_pong_in (word state, char * buf, word rssi) {
 			app_diag (D_DEBUG, "Ignoring Tag %lx",
 				       	tagArray[tagIndex].id);
 			break;
-			
+
 		case fadingReportedTag:
 			set_tagState(tagIndex, reportedTag, NO);
 			break;

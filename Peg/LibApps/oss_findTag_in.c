@@ -6,14 +6,14 @@
 #include "msg_pegStructs.h"
 #include "lib_apps.h"
 
-extern lword local_host;
+extern nid_t local_host;
 
-void oss_findTag_in (word state, lword tag, lword peg) {
+void oss_findTag_in (word state, lword tag, nid_t peg) {
 
 	char * out_buf = NULL;
 	int tagIndex;
 
-	if (peg == local_host) {
+	if (peg == local_host || peg == 0) {
 		if (tag == 0) { // summary
 			msg_report_out (state, -1, &out_buf);
 		} else {
@@ -29,8 +29,9 @@ void oss_findTag_in (word state, lword tag, lword peg) {
 		in_header(out_buf, snd) = local_host;
 		oss_report_out (out_buf, oss_fmt);
 
-	} else {
+	}
 
+	if (peg != local_host) {
 		msg_findTag_out (state, &out_buf, tag, peg);
 		send_msg (out_buf, sizeof(msgFindTagType));
 	}

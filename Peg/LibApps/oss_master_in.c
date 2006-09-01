@@ -6,9 +6,9 @@
 #include "msg_pegStructs.h"
 #include "lib_apps.h"
 
-extern lword local_host;
+extern nid_t local_host;
 
-void oss_master_in (word state, lword peg) {
+void oss_master_in (word state, nid_t peg) {
 
 	char * out_buf = NULL;
 

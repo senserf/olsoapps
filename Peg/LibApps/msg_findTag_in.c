@@ -6,13 +6,13 @@
 #include "msg_pegStructs.h"
 #include "lib_apps.h"
 
-extern lword local_host;
+extern nid_t local_host;
 
 void msg_findTag_in (word state, char * buf) {
 
 	char * out_buf = NULL;
 	int tagIndex;
-	
+
 	if ( in_findTag(buf, target) == 0) { // summary
 		msg_report_out (state, -1, &out_buf);
 	} else {

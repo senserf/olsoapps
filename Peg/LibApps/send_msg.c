@@ -9,7 +9,7 @@
 #include "net.h"
 
 // in LibConf
-extern lword local_host;
+extern nid_t local_host;
 
 void send_msg (char * buf, int size) {
 	// it doesn't seem like a good place to filter out
@@ -22,9 +22,10 @@ void send_msg (char * buf, int size) {
 		return;
 	}
 
-	if (net_tx (NONE, buf, size, 0, NO) == 0) {
+	if (net_tx (NONE, buf, size, 0) == 0) {
 		app_count.snd++;
-		app_diag (D_DEBUG, "Sent %u to %lu",
+//		app_diag (D_WARNING, "Sent %u to %u",
+		app_diag (D_DEBUG, "Sent %u to %u",
 			in_header(buf, msg_type),
 			in_header(buf, rcv));
 	} else

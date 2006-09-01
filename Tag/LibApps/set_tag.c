@@ -7,12 +7,11 @@
 #include "lib_apps.h"
 
 extern lword host_id;
-extern lword local_host;
+extern nid_t local_host;
+extern lword host_passwd;
 
 void set_tag (char * buf) {
 	// we may need more scrutiny...
-	if (in_setTag(buf, host_id) != 0)
-		host_id = in_setTag(buf, host_id);
 	if (in_setTag(buf, node_addr) != 0)
 		local_host = in_setTag(buf, node_addr);
 	if (in_setTag(buf, pow_levels) != 0)

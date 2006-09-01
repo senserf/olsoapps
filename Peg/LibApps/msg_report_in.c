@@ -6,11 +6,11 @@
 #include "lib_apps.h"
 #include "msg_pegStructs.h"
 
-extern lword local_host;
+extern nid_t local_host;
 
 void msg_report_in (word state, char * buf) {
 	char * out_buf = NULL;
-	
+
 	msg_reportAck_out (state, buf, &out_buf);
 	if (out_buf) {
 		send_msg (out_buf, sizeof(msgReportAckType));

@@ -12,8 +12,10 @@
    check for a msg pending for this tag
 */
 
-void check_msg4tag (lword tag) {
+void check_msg4tag (nid_t tag) {
+//	diag ("check msg");
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) == tag) {
+//		diag ("check msg %d tag %d", in_header(msg4tag.buf, msg_type), tag);
 		if (seconds() - msg4tag.tstamp <= 77) // do it
 			send_msg (msg4tag.buf,
 				in_header(msg4tag.buf, msg_type) == msg_getTag ?

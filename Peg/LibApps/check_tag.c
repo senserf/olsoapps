@@ -7,17 +7,17 @@
 #include "diag.h"
 #include "lib_apps.h"
 
-extern lword local_host;
+extern nid_t local_host;
 
 void check_tag (word state, word i, char** buf_out) {
-	if (tagArray[i].id == 0 ||
-		seconds() - tagArray[i].lastTime < tag_eventGran)
-		return;
-
 	if (i >= tag_lim) {
 		app_diag (D_FATAL, "tagAr bound %u", i);
 		return;
 	}
+	
+	if (tagArray[i].id == 0 ||
+		seconds() - tagArray[i].lastTime < tag_eventGran)
+		return;	
 
 	switch (tagArray[i].state) {
 		case newTag:

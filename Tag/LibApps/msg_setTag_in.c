@@ -13,7 +13,9 @@ void msg_setTag_in (word state, char * buf) {
 	
 	msg_setTagAck_out (state, &out_buf, in_header(buf, snd),
 			in_header(buf, seq_no), pass);
+    net_opt (PHYSOPT_TXON, NULL);
 	send_msg (out_buf, sizeof(msgSetTagAckType));
+	net_opt (PHYSOPT_TXOFF, NULL);
 	ufree (out_buf);
 
 	if (pass)

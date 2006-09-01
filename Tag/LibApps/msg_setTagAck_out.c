@@ -6,7 +6,7 @@
 #include "msg_tags.h"
 #include "lib_apps.h"
 
-void msg_setTagAck_out (word state, char** out_buf, lword rcv, word seq,
+void msg_setTagAck_out (word state, char** out_buf, nid_t rcv, seq_t seq,
 			word pass) {
 
 	if (*out_buf == NULL)
@@ -17,5 +17,5 @@ void msg_setTagAck_out (word state, char** out_buf, lword rcv, word seq,
 	in_header(*out_buf, msg_type) = msg_setTagAck;
 	in_header(*out_buf, rcv) = rcv;
 	in_setTagAck(out_buf, ackSeq) = seq;
-	in_setTagAck(out_buf, ack) = pass;
+	in_setTagAck(out_buf, ack) = (byte)pass;
 }

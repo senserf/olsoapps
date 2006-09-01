@@ -10,7 +10,6 @@
 #include "ser.h"
 #include "diag.h"
 #include "lib_apps.h"
-
 // #include "trc.h"
 
 heapmem {80, 20}; // how to find out a good ratio?
@@ -30,8 +29,6 @@ heapmem {80, 20}; // how to find out a good ratio?
 
 // arbitrary
 #define UI_BUFLEN		256
-#define DEF_LOCAL_HOST		0 // if !=0, tx pong starts right on
-#define DEF_HOST_ID		0xBACA
 
 static char * ui_ibuf = NULL;
 static char * ui_obuf = NULL;
@@ -45,9 +42,12 @@ static char * cmd_line	= NULL;
 #define RX_SW_ON	((word)&pong_params.rx_span)
 
 // in LibConf
-extern lword host_id;
-extern lword local_host;
-extern lword host_passwd;
+extern lword	host_id;
+extern nid_t	local_host;
+extern lword	host_passwd;
+extern nid_t	net_id;
+
+extern tarpCtrlType tarp_ctrl;
 
 // format strings
 static const char welcome_str[] = "\r\nWelcome to Tag Testbed\r\n"
@@ -58,7 +58,7 @@ static const char welcome_str[] = "\r\nWelcome to Tag Testbed\r\n"
 
 static const char ill_str[] =	"Illegal command (%s)\r\n";
 
-static const char stats_str[] = "Stats for hostId: localHost (%lx: %lu):\r\n"
+static const char stats_str[] = "Stats for hostId: localHost (%lx: %u):\r\n"
 	" In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n"
 	" Time (%lu), Freqs (%u, %u), PLev: %x\r\n"
 	"phys: %x, plug: %x, txrx: %x\r\n"
@@ -72,9 +72,9 @@ static void stats () {
 	
 	app_diag (D_UI, stats_str,
 			host_id, local_host, 
-			app_count.rcv, tarp_count.rcv,
-			app_count.snd, tarp_count.snd, 
-			app_count.fwd, tarp_count.fwd,
+			app_count.rcv, tarp_ctrl.rcv,
+			app_count.snd, tarp_ctrl.snd, 
+			app_count.fwd, tarp_ctrl.fwd,
 			seconds(), pong_params.freq_maj, pong_params.freq_min, 
 			pong_params.pow_levels,
 			net_opt (PHYSOPT_PHYSINFO, NULL),
@@ -93,7 +93,7 @@ static void process_incoming (word state, char * buf, word size) {
 		return;
 
 	case msg_setTag:
-		msg_getTag_in (state, buf);
+		msg_setTag_in (state, buf);
 		stats();
 		return;
 
@@ -142,19 +142,20 @@ process (rcv, void)
 			buf_ptr = NULL;
 			packet_size = 0;
 		}
-		packet_size = net_rx (RS_TRY, &buf_ptr, NULL);
+		packet_size = net_rx (RS_TRY, &buf_ptr, NULL, 0);
 		if (packet_size <= 0) {
 			app_diag (D_SERIOUS, "net_rx failed (%d)", packet_size);
 			proceed (RS_TRY);
 		}
 
-		app_diag (D_DEBUG, "RCV (%d): %x-%u-%lu-%lu-%u-%u\r\n",
+//		app_diag (D_WARNING, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",
+		app_diag (D_DEBUG, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",
 			  packet_size, in_header(buf_ptr, msg_type),
-			  in_header(buf_ptr, seq_no),
+			  in_header(buf_ptr, seq_no) & 0xffff,
 			  in_header(buf_ptr, snd),
 			  in_header(buf_ptr, rcv),
-			  in_header(buf_ptr, hoc),
-			  in_header(buf_ptr, hco));
+			  in_header(buf_ptr, hoc) & 0xffff,
+			  in_header(buf_ptr, hco) & 0xffff);
 
 	entry (RS_MSG)
 		process_incoming (RS_MSG, buf_ptr, packet_size);
@@ -196,7 +197,38 @@ endprocess (1)
 
 // [0, F] -> [0, FF] (high power levels may not make sense anyway)
 static word map_level (word l) {
-	return l;
+	switch (l) {
+		case 2:
+			return 2;
+		case 3:
+			return 3;
+		case 4:
+			return 4;
+		case 5:
+			return 5;
+		case 6:
+			return 6;
+		case 7:
+			return 0x0A; // -4 dBm
+		case 8:
+			return 0x0F; // 0 dBm
+		case 9:
+			return 0x60; // 4 dBm
+		case 10:
+			return 0x70;
+		case 11:
+			return 0x80;
+		case 12:
+			return 0x90;
+		case 13:
+			return 0xC0;
+		case 14:
+			return 0xE0;
+		case 15:
+			return 0xFF;
+		default:
+			return 1; // -20 dBm
+		}
 }
 
 /*
@@ -240,7 +272,7 @@ process (pong, void)
 			in_pong (frame, level) = level;
 
 			if (level == pong_params.rx_lev) {
-				in_pong (frame, flags) &= PONG_RXON;
+				in_pong (frame, flags) |= PONG_RXON;
 				trigger (RX_SW_ON);
 			} else
 				in_pong (frame, flags) = 0;
@@ -331,21 +363,20 @@ endprocess (1)
 process (root, void)
 
 	// input (s command)
-	word in_pl, in_maj, in_min, in_span;
-	lword in_lh, in_hid;
+	word in_lh, in_pl, in_maj, in_min, in_span;
+	lword in_hid;
 	
 	nodata;
 
 	entry (RS_INIT)
-		local_host = DEF_LOCAL_HOST;
-		host_id = DEF_HOST_ID; // should be a generated const?
+		local_host = (nid_t)host_id;
 		ui_out (RS_INIT, welcome_str);
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
-
 		if (net_init (INFO_PHYS_DEV, INFO_PLUG_TARP) < 0) {
 			app_diag (D_FATAL, "net_init failed");
 			reset();
 		}
+		net_opt (PHYSOPT_SETSID, &net_id);
 		net_opt (PHYSOPT_RXOFF, NULL);
 		net_opt (PHYSOPT_TXOFF, NULL);
 
@@ -380,9 +411,9 @@ process (root, void)
 			reset();
 			
 		if (cmd_line[0] == 's') {
-			in_pl = in_maj = in_min = in_span = 0;
-			in_lh = in_hid = 0;
-			scan (cmd_line+1, "%lu %u %u %x %u %lx",
+			in_lh = in_pl = in_maj = in_min = in_span = 0;
+			in_hid = 0;
+			scan (cmd_line+1, "%u %u %u %x %u %lx",
 				&in_lh, &in_maj, &in_min,  &in_pl, &in_span,
 				&in_hid);
 			if (in_lh) {

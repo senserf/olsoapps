@@ -11,6 +11,6 @@ void msg_master_in (char * buf) {
 
 	master_delta = in_master(buf, mtime) - seconds();
 	master_host  = in_header(buf, snd); // blindly, for now
-	app_diag (D_INFO, "Set master to %lu at %ld", master_host,
+	app_diag (D_INFO, "Set master to %u at %ld", master_host,
 			master_delta);
 }
