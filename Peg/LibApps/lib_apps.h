@@ -1,5 +1,5 @@
 #ifndef __lib_apps_h
-#define __lib_apps.h
+#define __lib_apps_h
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
 /* All rights reserved.                                                 */

@@ -17,8 +17,14 @@ heapmem {80, 20}; // how to find out a good ratio?
 // elsewhere may be a better place for this:
 #if CC1000
 #define INFO_PHYS_DEV INFO_PHYS_CC1000
-#else
-#define INFO_PHYS_DEV INFO_PHYS_RADIO
+#endif
+
+#if CC1100
+#define	INFO_PHYS_DEV INFO_PHYS_CC1100
+#endif
+
+#ifndef INFO_PHYS_DEV
+#error "UNDEFINED RADIO"
 #endif
 
 // UI is uart_a, including simulated uart_a

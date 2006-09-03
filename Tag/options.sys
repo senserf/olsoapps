@@ -12,21 +12,22 @@
 
 #define	MALLOC_SINGLEPOOL	1
 #define	MALLOC_ALIGN4		1
+#define	TARGET_BOARD		BOARD_GENESIS
 
-#define	UART_RATE		9600
+#define	LEDS_DRIVER		1
+#define	LEDS_BLINKING		1
+#define	RADIO_USE_LEDS		7
+
+#define	UART_RATE		19200
 #define	CRYSTAL_RATE		8000000
 #define	UART_BITS		8
 #define	UART_PARITY		0
 
 #define	EEPROM_DRIVER		1
 #define	INFO_FLASH		1
-#define	TARGET_BOARD		BOARD_GENESIS
 
 #endif
 
-#define	LEDS_DRIVER		1
-#define	LEDS_BLINKING		0
-#define	USE_LEDS		1
 #define	DIAG_MESSAGES		2
 #define	UART_DRIVER		1	/* UART A + B */
 
@@ -41,16 +42,10 @@
 #define MALLOC_STATS		1
 #define	STACK_GUARD		1
 
-#define	UART_TCV		0
-
-#define CC1100			1
-
-#define DM2100 			0
-#define RF24G 			0
+#define	CC1100			1
 #define	ENTROPY_COLLECTION	1
 
 #define	LBT_DELAY		8
-// This is 0-16
 #define	LBT_THRESHOLD		2
 
 #define	RESET_ON_SYSERR		1

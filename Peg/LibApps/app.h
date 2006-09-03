@@ -70,7 +70,7 @@ typedef struct wroomStruct {
 	lword  tstamp;
 } wroomType;
 
-#define tag_lim	66
+#define tag_lim	4
 
 #define OSS_HT 	0
 #define OSS_TCL	1
