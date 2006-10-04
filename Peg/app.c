@@ -4,11 +4,12 @@
 /* ==================================================================== */
 #include "sysio.h"
 #include "form.h"
+#include "ser.h"
 #include "net.h"
 #include "tarp.h"
-#include "msg_pegs.h"
-#include "ser.h"
 #include "diag.h"
+#include "msg_pegStructs.h"
+#include "msg_pegs.h"
 #include "app.h"
 #include "lib_apps.h"
 // #include "trc.h"
@@ -18,8 +19,18 @@ heapmem {80, 20}; // how to find or guess the right ratio?
 // elsewhere may be a better place for this:
 #if CC1000
 #define INFO_PHYS_DEV INFO_PHYS_CC1000
-#else
-#define INFO_PHYS_DEV INFO_PHYS_RADIO
+#endif
+
+#if CC1100
+#define INFO_PHYS_DEV INFO_PHYS_CC1100
+#endif
+
+#if DM2200
+#define INFO_PHYS_DEV INFO_PHYS_DM2200
+#endif
+
+#ifndef INFO_PHYS_DEV
+#error "UNDEFINED RADIO"
 #endif
 
 // UI is uart_a, including simulated uart_a
@@ -28,8 +39,9 @@ heapmem {80, 20}; // how to find or guess the right ratio?
 #define ui_in	ser_in
 #define ui_inf	ser_inf
 
-// arbitrary
-#define UI_BUFLEN		256
+#define TINY_MEM 1
+
+#define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 #define DEF_LOCAL_HOST		1
 
 static char * ui_ibuf = NULL;
@@ -53,33 +65,59 @@ extern int net_init (word, word);
 extern tarpCtrlType tarp_ctrl;
 
 // format strings
+#if TINY_MEM
+static const char welcome_str[] = "\r\nPeg: s (lh hid mid pl) m f g t r h q\r\n";
+#else
 static const char welcome_str[] = "Commands:\r\n"
-	"\tSet:\ts [ lh [ hid [ mid [ pl ] ] ] ]\r\n"
+	"\tSet:\ts [ lh [ hid [ mid [ pl ]]]]\r\n"
 	"\tMaster:\tm [ peg ]\r\n"
-	"\tFind:\tf [ tag [ peg [ rss [ pLev ] ] ] ]\r\n"
-	"\tFwd get:g [ tag [ peg ] ]\r\n"
-	"\tFwd set:t [ tag [ peg ] ]\r\n"
-	"\tOpt RF:\to[{r|t| }{+|-}]\r\n"
+	"\tFind:\tf [ tag [ peg [ rss [ pLev ]]]]\r\n"
+	"\tFwd get:g [ tag [ peg ]]\r\n"
+	"\tFwd set:t [ tag [ peg ]]\r\n"
+	"\tFwd peg:r [ peg [ npeg [ pwr [ str ]]]]\r\n"
 	"\tHelp:\th\r\n"
-	"\tq(uit)\r\n";
+	"\tq\r\n";
+#endif
 
 static const char o_str[] =	"phys: %x, plug: %x, txrx: %x\r\n";
 
 static const char ill_str[] =	"Illegal command (%s)\r\n";
 
+#if TINY_MEM
+static const char stats_str1[] = "Stats for hostId - localHost (%lx - %u):\r\n";
+static const char stats_str2[] = " In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n";
+static const char stats_str3[] = " Freq audit (%u) events (%u),\r\n";
+static const char stats_str4[] = 
+	" PLev (%u), Time (%lu), Delta (%ld) to Master (%u),\r\n";
+static const char stats_str5[] = " phys: %x, plug: %x, txrx: %x\r\n";
+static const char stats_str6[] = " Mem free (%u, %u) faults (%u, %u)\r\n";
+#else
 static const char stats_str[] = "Stats for hostId - localHost (%lx - %u):\r\n"
 	" In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n"
 	" Freq audit (%u) events (%u),\r\n"
 	" PLev (%u), Time (%lu), Delta (%ld) to Master (%u),\r\n"
 	" phys: %x, plug: %x, txrx: %x\r\n"
 	" Mem free (%u, %u) faults (%u, %u)\r\n";
+#endif
 
 // Display node stats on UI
 static void stats () {
 	word faults0, faults1;
 	word mem0 = memfree(0, &faults0);
 	word mem1 = memfree(1, &faults1);
-
+#if TINY_MEM
+	net_diag (D_UI, stats_str1, host_id, local_host);
+	net_diag (D_UI, stats_str2, app_count.rcv, tarp_ctrl.rcv,
+			app_count.snd, tarp_ctrl.snd,
+			app_count.fwd, tarp_ctrl.fwd);
+	net_diag (D_UI, stats_str3, tag_auditFreq, tag_eventGran);
+	net_diag (D_UI, stats_str4, host_pl, seconds(), 
+			master_delta, master_host);
+	net_diag (D_UI, stats_str5, net_opt (PHYSOPT_PHYSINFO, NULL),
+			net_opt (PHYSOPT_PLUGINFO, NULL),
+			net_opt (PHYSOPT_STATUS, NULL));
+	net_diag (D_UI, stats_str6, mem0, mem1, faults0, faults1);
+#else
 	net_diag (D_UI, stats_str,
 			host_id, local_host,
 			app_count.rcv, tarp_ctrl.rcv,
@@ -91,6 +129,7 @@ static void stats () {
 			net_opt (PHYSOPT_PLUGINFO, NULL),
 			net_opt (PHYSOPT_STATUS, NULL),
 			mem0, mem1, faults0, faults1);
+#endif
 }
 
 static void process_incoming (word state, char * buf, word size, word rssi) {
@@ -136,6 +175,10 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
     case msg_setTagAck:
 		msg_setTagAck_in (state, buf, size);
 		return;
+
+//    case msg_setPeg:
+//		msg_setPeg_in (state, buf, size);
+//		return;
 
 	case msg_rpc:
 		if (cmd_line != NULL) { // busy with another input
@@ -322,11 +365,12 @@ process (root, void)
 	nid_t 		in_lh, in_mh;
 	word		in_hpl; // peg power level
 	int		opt_sel;
+	char str[PEG_STR_LEN];
 
 	nodata;
 
 	entry (RS_INIT)
-		local_host = DEF_LOCAL_HOST;
+//		local_host = DEF_LOCAL_HOST;
 //		app_trace("init");
 
 		// these survive for repeated commands;
@@ -382,6 +426,8 @@ process (root, void)
 
 		if (cmd_line[0] == 'f') {
 //			app_trace("fwd");
+			in_tag = 0;
+		    in_peg = in_rssi = in_pl = 0;
 			scan (cmd_line+1, "%lu, %u, %u, %u",
 				&in_tag, &in_peg, &in_rssi, &in_pl);
 			*(word*)&in_tag = (in_rssi << 8 ) | in_pl;
@@ -407,6 +453,15 @@ process (root, void)
 				&in_min,  &in_pl, &in_span, &in_npass);
 			oss_setTag_in (RS_DOCMD, in_tag, in_peg, in_pass, in_lh,
 			               in_maj, in_min,  in_pl, in_span, in_npass);
+			proceed (RS_FREE);
+		}
+		
+		 if (cmd_line[0] == 'r') {
+			in_lh = in_peg = in_hpl = 0;
+			scan (cmd_line+1, "%u %u %u %s",
+				&in_peg, &in_lh, &in_hpl, str);
+//			app_diag(D_WARNING, "remote set %u new %u pwr %u %s", in_peg, in_lh, in_hpl, str);
+			oss_setPeg_in (RS_DOCMD, in_peg, in_lh, in_hpl, str);
 			proceed (RS_FREE);
 		}
 

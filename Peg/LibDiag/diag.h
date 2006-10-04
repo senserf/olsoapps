@@ -16,10 +16,10 @@
 #define D_ALL		42
 
 // current levels
-#define net_dl		D_DEBUG
-#define app_dl		D_DEBUG
-//#define net_dl          D_WARNING
-//#define app_dl          D_WARNING
+//#define net_dl		D_DEBUG
+//#define app_dl		D_DEBUG
+#define net_dl          D_WARNING
+#define app_dl          D_WARNING
 
 //+++ "net_diag.c" "app_diag.c"
 

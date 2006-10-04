@@ -4,11 +4,11 @@
 /* ==================================================================== */
 #include "sysio.h"
 #include "form.h"
+#include "ser.h"
 #include "net.h"
 #include "tarp.h"
-#include "msg_tags.h"
-#include "ser.h"
 #include "diag.h"
+#include "msg_tags.h"
 #include "lib_apps.h"
 // #include "trc.h"
 
@@ -23,6 +23,10 @@ heapmem {80, 20}; // how to find out a good ratio?
 #define	INFO_PHYS_DEV INFO_PHYS_CC1100
 #endif
 
+#if DM2200
+#define INFO_PHYS_DEV INFO_PHYS_DM2200
+#endif
+
 #ifndef INFO_PHYS_DEV
 #error "UNDEFINED RADIO"
 #endif
@@ -34,7 +38,7 @@ heapmem {80, 20}; // how to find out a good ratio?
 #define ui_inf	ser_inf
 
 // arbitrary
-#define UI_BUFLEN		256
+#define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 
 static char * ui_ibuf = NULL;
 static char * ui_obuf = NULL;
@@ -55,27 +59,51 @@ extern nid_t	net_id;
 
 extern tarpCtrlType tarp_ctrl;
 
+#define TINY_MEM 1
 // format strings
+#if TINY_MEM
+static const char welcome_str[] = "\r\nTag: s (lh M m pl span hid) h q\r\n";
+#else
 static const char welcome_str[] = "\r\nWelcome to Tag Testbed\r\n"
 	"Commands:\r\n"
 	"\tSet:\ts[lh[ maj[ min[ pl[ span[ hid]]]]]]\r\n"
 	"\tHelp:\th\r\n"
 	"\tq(uit)\r\n";
+#endif
 
 static const char ill_str[] =	"Illegal command (%s)\r\n";
 
+#if TINY_MEM
+static const char stats_str1[] = "Stats for hostId: localHost (%lx: %u):\r\n";
+static const char stats_str2[] = " In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n";
+static const char stats_str3[] = " Time (%lu), Freqs (%u, %u), PLev: %x\r\n";
+static const char stats_str4[] = "phys: %x, plug: %x, txrx: %x\r\n";
+static const char stats_str5[] = " Mem free (%u, %u) faults (%u, %u)\r\n";
+#else
 static const char stats_str[] = "Stats for hostId: localHost (%lx: %u):\r\n"
 	" In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n"
 	" Time (%lu), Freqs (%u, %u), PLev: %x\r\n"
 	"phys: %x, plug: %x, txrx: %x\r\n"
 	" Mem free (%u, %u) faults (%u, %u)\r\n";
+#endif
 
 // Display node stats on UI
 static void stats () {
 	word faults0, faults1;
 	word mem0 = memfree(0, &faults0);
 	word mem1 = memfree(1, &faults1);
-	
+#if TINY_MEM
+	app_diag (D_UI, stats_str1, host_id, local_host);
+	app_diag (D_UI, stats_str2, app_count.rcv, tarp_ctrl.rcv,
+			app_count.snd, tarp_ctrl.snd,
+			app_count.fwd, tarp_ctrl.fwd);
+	app_diag (D_UI, stats_str3, seconds(), pong_params.freq_maj,
+			pong_params.freq_min, pong_params.pow_levels);
+	app_diag (D_UI, stats_str4, net_opt (PHYSOPT_PHYSINFO, NULL),
+			net_opt (PHYSOPT_PLUGINFO, NULL),
+			net_opt (PHYSOPT_STATUS, NULL));
+	app_diag (D_UI, stats_str5, mem0, mem1, faults0, faults1);
+#else
 	app_diag (D_UI, stats_str,
 			host_id, local_host, 
 			app_count.rcv, tarp_ctrl.rcv,
@@ -87,6 +115,7 @@ static void stats () {
 			net_opt (PHYSOPT_PLUGINFO, NULL),
 			net_opt (PHYSOPT_STATUS, NULL),
 			mem0, mem1, faults0, faults1);
+#endif
 }
 
 static void process_incoming (word state, char * buf, word size) {
@@ -258,6 +287,7 @@ process (pong, void)
 	entry (PS_INIT)
 		in_header(frame, msg_type) = msg_pong;
 		in_header(frame, rcv) = 0;
+		in_header(frame, hco) = 1; // we do not want pong msg be forwarded by 
 
 	entry (PS_NEXT)
 		// let's say 1ms is bad -- helps with input, and
@@ -376,6 +406,7 @@ process (root, void)
 
 	entry (RS_INIT)
 		local_host = (nid_t)host_id;
+		tarp_ctrl.param &= 0xFE; // routing off
 		ui_out (RS_INIT, welcome_str);
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 		if (net_init (INFO_PHYS_DEV, INFO_PLUG_TARP) < 0) {
@@ -430,8 +461,10 @@ process (root, void)
 					local_host = in_lh;
 				}
 			}
-			if (in_pl)
+			if (in_pl) {
+				pong_params.rx_lev = max_pwr(in_pl);				
 				pong_params.pow_levels = in_pl;
+			}
 			if (in_maj) {
 				if (pong_params.freq_maj < 2) {
 					pong_params.freq_maj = in_maj;

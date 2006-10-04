@@ -5,6 +5,8 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "app.h"
+extern lword host_id;
+extern nid_t local_host;
 
 extern appCountType app_count;
 extern pongParamsType pong_params;
@@ -19,7 +21,7 @@ extern void msg_getTagAck_out (word state, char** buf_out, nid_t rcv, seq_t seq,
                    word pass);
 extern void msg_setTagAck_out (word state, char** buf_out, nid_t rcv, seq_t seq,
 			       word pass);
-
+extern word max_pwr (word p_levs);
 extern void send_msg (char * buf, int size);
 
 /*

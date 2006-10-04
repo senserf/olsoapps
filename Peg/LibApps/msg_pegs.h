@@ -11,7 +11,7 @@
 typedef enum {
 	msg_null, msg_getTag, msg_getTagAck, msg_setTag, msg_setTagAck, msg_rpc, msg_pong,
 	msg_new, msg_newAck, msg_master, msg_report, msg_reportAck,
-	msg_fwd, msg_alrm, msg_findTag
+	msg_fwd, msg_alrm, msg_findTag, msg_setPeg
 } msgType;
 
 

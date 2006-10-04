@@ -8,7 +8,8 @@
 
 extern appCountType app_count;
 extern long master_delta;
-extern word master_host;
+extern nid_t master_host;
+extern nid_t local_host;
 extern wroomType msg4tag;
 extern wroomType msg4ward;
 extern tagDataType tagArray [tag_lim];
@@ -24,7 +25,6 @@ extern void init_tag (word i);
 extern void init_tags (void);
 extern int insert_tag (lword tag);
 extern void set_tagState (word i, tagStateType state, bool updEvTime);
-
 
 extern void msg_findTag_in (word state, char * buf);
 extern void msg_findTag_out (word state, char** buf_out, lword tag, nid_t peg);
@@ -45,7 +45,7 @@ extern void oss_findTag_in (word state, lword tag, nid_t peg);
 extern void oss_getTag_in (word state, lword tag, nid_t peg, lword pass);
 extern void oss_setTag_in (word state, lword tag, nid_t peg, lword pass, nid_t nid,
 			               word	in_maj, word in_min, word in_pl, word in_span, lword npass);
-
+extern void oss_setPeg_in (word state, nid_t peg, nid_t nid, word pl, char * str);
 extern void oss_master_in (word state, nid_t peg);
 extern void oss_report_out (char * buf, word fmt);
 extern void oss_setTag_out (char * buf, word fmt);
