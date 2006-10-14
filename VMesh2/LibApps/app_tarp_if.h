@@ -26,6 +26,6 @@ extern int tr_offset (headerType * mb);
 			 ((m) & 0x3F) == msg_traceFAck)
 
 // clr_ in app.h
-#define set_master_chg	(app_flags |= 2)
+#define set_master_chg()	(app_flags |= 2)
 #endif
 

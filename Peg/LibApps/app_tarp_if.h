@@ -20,6 +20,6 @@ extern int tr_offset (headerType * mb);
 #define msg_isNew(m)	(NO)
 #define	msg_isClear(a)	(YES)
 // clr in app.h
-#define set_master_chg	(app_flags |= 2)
+#define set_master_chg()	(app_flags |= 2)
 #endif
 

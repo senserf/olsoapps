@@ -57,7 +57,7 @@ void msg_cmd_out (word state, char** buf_out) {
 void msg_master_in (char * buf) {
 	if (master_host != in_header(buf, snd)) {
 		dbg_2 (0xBB00 | is_master_chg);
-		set_master_chg;
+		set_master_chg ();
 		master_host  = in_header(buf, snd);
 	}
 	if (is_master_chg) {
