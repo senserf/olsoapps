@@ -36,10 +36,14 @@ typedef struct wroomStruct {
 	lword  tstamp;
 } wroomType;
 
+extern word       app_flags;
+#define clr_master_chg	(app_flags &= ~2)
+#define is_master_chg	(app_flags & 2)
+
 #define tag_lim	16
 
 #define OSS_HT 	0
 #define OSS_TCL	1
-#define oss_fmt	OSS_TCL
+#define oss_fmt	OSS_HT
 
 #endif

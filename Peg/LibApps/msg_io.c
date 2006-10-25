@@ -8,6 +8,7 @@
 #include "msg_pegStructs.h"
 #include "msg_pegs.h"
 #include "lib_apps.h"
+#include "app_tarp_if.h"
 
 extern word 	host_pl;
 
@@ -151,11 +152,18 @@ void msg_getTagAck_in (word state, char * buf, word size) {
 }
 
 void msg_master_in (char * buf) {
-
-	master_delta = in_master(buf, mtime) - seconds();
-	master_host  = in_header(buf, snd); // blindly, for now
-	app_diag (D_INFO, "Set master to %u at %ld", master_host,
+	if (master_host != in_header(buf, snd)) {
+		app_diag (D_SERIOUS, "master? %d %d", master_host,
+			in_header(buf, snd));
+		master_host  = in_header(buf, snd);
+		set_master_chg();
+	}
+	if (is_master_chg) {
+		clr_master_chg;
+		app_diag (D_INFO, "Set master to %u at %ld", master_host,
 			master_delta);
+	}
+	master_delta = in_master(buf, mtime) - seconds();
 }
 
 void msg_master_out (word state, char** buf_out, nid_t peg) {
