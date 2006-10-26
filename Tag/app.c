@@ -78,13 +78,13 @@ static const char stats_str1[] = "Stats for hostId: localHost (%lx: %u):\r\n";
 static const char stats_str2[] = " In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n";
 static const char stats_str3[] = " Time (%lu), Freqs (%u, %u), PLev: %x\r\n";
 static const char stats_str4[] = "phys: %x, plug: %x, txrx: %x\r\n";
-static const char stats_str5[] = " Mem free (%u, %u) faults (%u, %u)\r\n";
+static const char stats_str5[] = " Mem free (%u, %u) min (%u, %u)\r\n";
 #else
 static const char stats_str[] = "Stats for hostId: localHost (%lx: %u):\r\n"
 	" In (%u:%u), Out (%u:%u), Fwd (%u:%u),\r\n"
 	" Time (%lu), Freqs (%u, %u), PLev: %x\r\n"
 	"phys: %x, plug: %x, txrx: %x\r\n"
-	" Mem free (%u, %u) faults (%u, %u)\r\n";
+	" Mem free (%u, %u) min (%u, %u)\r\n";
 #endif
 
 // Display node stats on UI

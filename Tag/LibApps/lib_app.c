@@ -68,9 +68,10 @@ void send_msg (char * buf, int size) {
 	// we may need more scrutiny...
 	if (in_setTag(buf, node_addr) != 0)
 		local_host = in_setTag(buf, node_addr);
-	if (in_setTag(buf, pow_levels) != 0)
-	    pong_params.rx_lev = max_pwr(in_setTag(buf, pow_levels));
+	if (in_setTag(buf, pow_levels) != 0) {
+		pong_params.rx_lev = max_pwr(in_setTag(buf, pow_levels));
 		pong_params.pow_levels = in_setTag(buf, pow_levels);
+	}
 	if (in_setTag(buf, freq_maj) != 0)
 		pong_params.freq_maj = in_setTag(buf, freq_maj);
 	if (in_setTag(buf, freq_min) != 0)
