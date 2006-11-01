@@ -1170,7 +1170,7 @@ void oss_io_in() {
 				memcpy (cmd_line +3, &w, 2);
 			}
 			return;
-#if PULSE_MONITOR
+#ifdef PULSE_MONITOR
 		case IO_CNT_START:
 			if (pmon_get_state() & PMON_STATE_CNT_ON) {
 				cmd_ctrl.oprc = RC_ERES;
