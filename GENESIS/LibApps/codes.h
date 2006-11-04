@@ -20,6 +20,7 @@
 #define CMD_MSGOUT	0xFF
 #define CMD_SENSIN	0xFE
 #define CMD_DIAG	0xFD
+#define CMD_SENSRX	0xFC
 
 #define RC_NONE		0xFF
 #define RC_OK		0

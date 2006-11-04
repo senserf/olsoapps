@@ -230,6 +230,8 @@ endprocess (1)
 #define CS_INIT         00
 #define CS_ACT          10
 #define CS_HOLD		20
+
+extern void hstat (word);
 process (cyc_man, void)
 	word a;
 	nodata;
@@ -308,8 +310,10 @@ process (cyc_man, void)
 			while (cyc_left != 0) {
 				if (cyc_left > MAX_UINT) {
 					cyc_left -= MAX_UINT;
+					hstat (0);
 					freeze (MAX_UINT);
 				} else {
+					hstat (0);
 					freeze ((word)cyc_left);
 					cyc_left = 0;
 				}

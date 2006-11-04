@@ -20,6 +20,17 @@
 //#define ui_in(a, b, c)  
 #endif
 
+static void sensrx_in (char * buf) {
+	word v;
+	if (buf[1] != 3) // bad length
+		return;
+	memcpy (&v, buf + 3, 2);
+	if (v != sensrx_ver) {
+		sensrx_ver = v;
+		ee_write (EE_SENSRX_VER, (byte *)&sensrx_ver, 2);
+	}
+}
+
 static void sensor_in (word state, char * buf) {
 	lword esn;
 	int	i;
@@ -134,7 +145,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		return;
 
 	case msg_nh:
-		msg_nh_in (buf);
+		msg_nh_in (buf, rssi);
 		return;
 
 	case msg_nhAck:
@@ -241,7 +252,8 @@ process (cmd_in, void)
 	entry (CS_READ_LEN)
 		delay (UI_TOUT, CS_TOUT);
 		io (CS_READ_LEN, UART_A, READ, ui_ibuf + 1, 1);
-		if (ui_ibuf[1] < CMD_HEAD_LEN || ui_ibuf[1] > UI_INLEN - 3) {
+		// 3 is for CMD_SENSRX, 1 less than CMD_HEAD_LEN
+		if (ui_ibuf[1] < 3 || ui_ibuf[1] > UI_INLEN - 3) {
 			dbg_9 (0x3000 | ui_ibuf[1]); // bad length
 			ui_ibuf[1] = '\0';
 			proceed (CS_READ_START);
@@ -266,6 +278,10 @@ process (cmd_in, void)
 		// handle sensor input w/o command overhead
 		if (ui_ibuf [2] == CMD_SENSIN) {
 			sensor_in (CS_DONE_R, ui_ibuf);
+			proceed (CS_IN);
+		}
+		if (ui_ibuf [2] == CMD_SENSRX) {
+			sensrx_in (ui_ibuf);
 			proceed (CS_IN);
 		}
 
@@ -398,6 +414,8 @@ static void read_eprom_and_init() {
 	if ((w[EE_APP >> 1] & 0xFF00) != 0xFF00)
 		tarp_ctrl.param = w[EE_APP >> 1] >> 8;
 
+	sensrx_ver = w[EE_SENSRX_VER >> 1];
+
 	// 3 - warn, +4 - bad, (missed 0x00)
 	connect = 0x3400;
 	l_rssi = 0;
@@ -416,7 +434,7 @@ static void read_eprom_and_init() {
 			freqs = 0;
 			set_powup;
 			fork (st_rep, NULL);
-			leds (CON_LED, LED_BLINK);
+			leds (CON_LED, LED_OFF);
 			
 		} else {
 			freqs = 0x1D1D; // 29s freq, 29s beacon
@@ -430,7 +448,8 @@ static void read_eprom_and_init() {
 static bool valid_input () {
 
 	if (cmd_ctrl.opcode == 0 || 
-		cmd_ctrl.opcode > CMD_LOCALE && cmd_ctrl.opcode != CMD_SENSIN) {
+		cmd_ctrl.opcode > CMD_LOCALE && cmd_ctrl.opcode != CMD_SENSIN &&
+			cmd_ctrl.opcode != CMD_SENSRX) {
 		dbg_9 (0x5000 | cmd_ctrl.opcode);
 		return NO;
 	}

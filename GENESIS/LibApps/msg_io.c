@@ -247,10 +247,10 @@ bool msg_bindReq_out (char * buf, char** buf_out) {
 }
 
 void msg_nhAck_in (char * buf) {
-	oss_nhAck_out (buf);
+	oss_nhAck_out (buf, 0);
 }
 
-bool msg_nhAck_out (char * buf, char** buf_out) {
+bool msg_nhAck_out (char * buf, char** buf_out, word rssi) {
 	if (*buf_out == NULL) {
 		*buf_out = get_mem (NONE, sizeof(msgNhAckType));
 		if (*buf_out == NULL)
@@ -263,6 +263,7 @@ bool msg_nhAck_out (char * buf, char** buf_out) {
 	in_nhAck(*buf_out, host) = in_header(buf, snd);
 	in_nhAck(*buf_out, esn_l) = ESN;
 	in_nhAck(*buf_out, esn_h) = ESN >> 16;
+	in_nhAck(*buf_out, rssi) = rssi;
 	return YES;
 }
 
@@ -300,13 +301,13 @@ bool msg_new_out () {
 	return YES;
 }
 
-void msg_nh_in (char * buf) {
+void msg_nh_in (char * buf, word rssi) {
 	char * out_buf = NULL;
 	if (in_nh(buf, host) == local_host) {
-		oss_nhAck_out (buf);
+		oss_nhAck_out (buf, rssi);
 		return;
 	}
-	if (msg_nhAck_out (buf, &out_buf)) {
+	if (msg_nhAck_out (buf, &out_buf, rssi)) {
 		send_msg (out_buf, sizeof(msgNhAckType));
 		ufree (out_buf);
 	}

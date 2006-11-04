@@ -200,7 +200,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 
 // [0, FF] -> [0, F], say:
 static word map_rssi (word r) {
-	return (r >> 4);
+	return (r >> 8);
 }
 
 /*
@@ -244,6 +244,10 @@ process (rcv, void)
 		// if (net_opt (PHYSOPT_PLUGINFO, NULL) != INFO_PLUG_TARP)
 
 	entry (RS_MSG)
+		if (in_header(buf_ptr, msg_type) == msg_pong)
+			app_diag (D_UI, "rss (%d.%d): %x",
+					in_header(buf_ptr, snd),
+					in_pong(buf_ptr, level), rssi);
 		process_incoming (RS_MSG, buf_ptr, packet_size, map_rssi(rssi));
 		app_count.rcv++;
 		proceed (RS_TRY);

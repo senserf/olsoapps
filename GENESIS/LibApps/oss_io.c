@@ -431,9 +431,10 @@ void oss_get_in (word state) {
 		return;
 
 	  case ATTR_SYSVER:
-		cmd_ctrl.oplen += 2;
+		cmd_ctrl.oplen += 4;
 		cmd_line[2] = SYSVER_B >> 8;
 		cmd_line[3] = (byte)SYSVER_B;
+		memcpy (cmd_line +4, &sensrx_ver, 2);
 		return;
 
 	  case ATTR_MEM1:
@@ -598,13 +599,13 @@ void oss_bindReq_out (char * buf) {
 #endif
 }
 
-void oss_nhAck_out (char * buf) {
+void oss_nhAck_out (char * buf, word rssi) {
 #if UART_DRIVER
-	char * lbuf = get_mem (NONE, 4 + 9 + 1);
+	char * lbuf = get_mem (NONE, 4 + 11 + 1);
 	if (lbuf == NULL)
 		return;
 	lbuf[0] = '\0';
-	lbuf[1] = 2 + 9;
+	lbuf[1] = 2 + 11;
 	lbuf[2] = CMD_MSGOUT;
 	lbuf[3] = msg_nhAck;
 	switch (in_header(buf, msg_type)) {
@@ -612,20 +613,22 @@ void oss_nhAck_out (char * buf) {
 			memcpy (lbuf +4, &in_header(buf, snd), 2);
 			memcpy (lbuf +6, &ESN, 4);
 			memcpy (lbuf +10, &local_host, 2);
-			lbuf[12] = 0;
+			memcpy (lbuf +12, &rssi, 2);
+			lbuf[14] = 0;
 			break;
 		case msg_nhAck:
 			memcpy (lbuf +4, &in_nhAck(buf, host), 2);
 			memcpy (lbuf +6, &in_nhAck(buf, esn_l), 4);
 			memcpy (lbuf +10, &in_header(buf, snd), 2);
-			lbuf[12] = in_header(buf, hoc);
+			memcpy (lbuf +12, &in_nhAck(buf, rssi), 2);
+			lbuf[14] = in_header(buf, hoc);
 			break;
 		default:
 			dbg_2 (0xBA00 | in_header(buf, msg_type)); // bad nhAck
 			ufree (lbuf);
 			return;
 	}
-	lbuf[13] = 0x04;
+	lbuf[15] = 0x04;
 	if (fork (oss_out, lbuf) == 0 ) {
 		dbg_2 (0xC404); // oss_nhAck_out fork failed ????
 		ufree (lbuf);

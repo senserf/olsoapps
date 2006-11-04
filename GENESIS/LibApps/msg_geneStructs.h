@@ -112,6 +112,7 @@ typedef struct msgNhAckStruct {
 	word            esn_l;
 	word            esn_h;
 	nid_t           host;
+	word		rssi;
 } msgNhAckType;
 #define in_nhAck(buf, field)  (((msgNhAckType *)(buf))->field)
 

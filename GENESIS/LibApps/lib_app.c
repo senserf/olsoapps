@@ -12,7 +12,7 @@ brCtrlType br_ctrl;
 const	lword	ESN = 0xBACA0001;
 
 nid_t	net_id;
-word	app_flags, freqs, connect, l_rssi;
+word	app_flags, freqs, connect, l_rssi, sensrx_ver;
 
 char * cmd_line  = NULL;
 cmdCtrlType cmd_ctrl = {0, 0x00, 0x00, 0x00, 0x00};

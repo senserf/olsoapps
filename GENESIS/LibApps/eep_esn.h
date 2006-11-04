@@ -13,10 +13,11 @@
 #define ESN_PACK	5
 
 // IMPORTANT: always keep them away from the ESN's space
-#define NVM_BOOT_LEN	8
+#define NVM_BOOT_LEN	10
 #define EE_NID		0
 #define EE_LH		(EE_NID + 2)
 #define EE_MID		(EE_NID + 4)
 // EE_APP: b0-b2, b3: encr; b4: binder; b5-b7 spare, b8-b15: tarp_ctrl.param
 #define EE_APP		(EE_NID + 6)
+#define EE_SENSRX_VER	(EE_NID + 8)
 #endif
