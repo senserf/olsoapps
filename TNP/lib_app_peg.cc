@@ -2,37 +2,26 @@
 /* Copyright (C) Olsonet Communications, 2002 - 2006.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
-#include "sysio.h"
-#include "net.h"
+
 #include "diag.h"
-#include "app.h"
-#include "lib_apps.h"
-#include "msg_pegs.h"
-#include "msg_tagStructs.h"
-#include "msg_pegStructs.h"
+#include "app_peg.h"
+#include "msg_peg.h"
 
+#ifdef	__SMURPH__
 
-word	app_flags = 0;
-lword	host_passwd = 0;
-const lword	host_id = 0xBACA0001;
-extern nid_t	net_id;
-extern nid_t	local_host;
-extern nid_t   master_host;
-long   master_delta = 0;
-word	host_pl = 9;
-word	tag_auditFreq = 10240; // in bin msec
-word	tag_eventGran = 10; // in seconds
+#include "node_peg.h"
+#include "stdattr.h"
 
-// if we can get away with it, it's better to have it in IRAM (?)
-tagDataType tagArray [tag_lim];
+#else	/* PICOS */
 
+#include "net.h"
+#include "tarp.h"
 
-wroomType msg4tag = {NULL, 0};
-wroomType msg4ward = {NULL, 0};
+#endif	/* SMURPH or PICOS */
 
-appCountType app_count = {0, 0, 0};
+#include "attnames_peg.h"
 
-int find_tag (lword tag) {
+__PUBLF (NodePeg, int, find_tag) (lword tag) {
 	int i = 0;
 	lword mask = 0xffffffff;
 	
@@ -50,7 +39,7 @@ int find_tag (lword tag) {
 	return -1;
 }
 
-char * get_mem (word state, int len) {
+__PUBLF (NodePeg, char*, get_mem) (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
 		app_diag (D_WARNING, "Waiting for memory");
@@ -59,7 +48,7 @@ char * get_mem (word state, int len) {
 	return buf;
 }
 
-void init_tag (word i) {
+__PUBLF (NodePeg, void, init_tag) (word i) {
 	tagArray[i].id = 0;
 	tagArray[i].state = noTag;
 	tagArray[i].count = 0;
@@ -67,13 +56,14 @@ void init_tag (word i) {
 	tagArray[i].lastTime = 0;
 }
 
-void init_tags () {
+__PUBLF (NodePeg, void, init_tags) () {
 	word i = tag_lim;
 	while (i-- > 0)
 		init_tag (i);
 }
 
-void set_tagState (word i, tagStateType state, bool updEvTime) {
+__PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
+							bool updEvTime) {
 	tagArray[i].state = state;
 	tagArray[i].count = 0; // always (?) reset the counter
 	tagArray[i].lastTime = seconds();
@@ -81,7 +71,8 @@ void set_tagState (word i, tagStateType state, bool updEvTime) {
 		tagArray[i].evTime = tagArray[i].lastTime;
 }
 
-int insert_tag (lword tag) {
+__PUBLF (NodePeg, int, insert_tag) (lword tag) {
+
 	int i = 0;
 
 	while (i < tag_lim) {
@@ -97,7 +88,7 @@ int insert_tag (lword tag) {
 	return -1;
 }
 
-void check_tag (word state, word i, char** buf_out) {
+__PUBLF (NodePeg, void, check_tag) (word state, word i, char** buf_out) {
 	if (i >= tag_lim) {
 		app_diag (D_FATAL, "tagAr bound %u", i);
 		return;
@@ -146,7 +137,8 @@ void check_tag (word state, word i, char** buf_out) {
 	}
 }
 
-void copy_fwd_msg (word state, char** buf_out, char * buf, word size) {
+__PUBLF (NodePeg, void, copy_fwd_msg) (word state, char** buf_out, char * buf,
+								word size) {
 
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, size);
@@ -156,7 +148,7 @@ void copy_fwd_msg (word state, char** buf_out, char * buf, word size) {
 	memcpy (*buf_out, buf, size);
 }
 
-void send_msg (char * buf, int size) {
+__PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
 	// it doesn't seem like a good place to filter out
 	// local host, but it's convenient, for now...
 
@@ -167,7 +159,7 @@ void send_msg (char * buf, int size) {
 		return;
 	}
 
-	if (net_tx (NONE, buf, size, 0) == 0) {
+	if (net_tx (WNONE, buf, size, 0) == 0) {
 		app_count.snd++;
 //		app_diag (D_WARNING, "Sent %u to %u",
 		app_diag (D_DEBUG, "Sent %u to %u",
@@ -178,7 +170,7 @@ void send_msg (char * buf, int size) {
 			in_header(buf, msg_type));
  }
 
-int check_msg_size (char * buf, word size, word repLevel) {
+__PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial
@@ -245,10 +237,9 @@ int check_msg_size (char * buf, word size, word repLevel) {
    check for a msg pending for this tag
 */
 
-void check_msg4tag (nid_t tag) {
+__PUBLF (NodePeg, void, check_msg4tag) (nid_t tag) {
 //	diag ("check msg");
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) == tag) {
-//		diag ("check msg %d tag %d", in_header(msg4tag.buf, msg_type), tag);
 		if (seconds() - msg4tag.tstamp <= 77) // do it
 			send_msg (msg4tag.buf,
 				in_header(msg4tag.buf, msg_type) == msg_getTag ?

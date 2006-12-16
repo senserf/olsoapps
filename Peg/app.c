@@ -12,6 +12,8 @@
 #include "msg_pegs.h"
 #include "app.h"
 #include "lib_apps.h"
+#include "app_tarp_if.h"
+
 // #include "trc.h"
 
 heapmem {80, 20}; // how to find or guess the right ratio?
@@ -376,6 +378,10 @@ process (root, void)
 	entry (RS_INIT)
 //		local_host = DEF_LOCAL_HOST;
 //		app_trace("init");
+
+		local_host = 1;
+		net_id = 85;
+		master_host = 1;
 
 		// these survive for repeated commands;
 		in_tag = in_pass = in_npass = 0;

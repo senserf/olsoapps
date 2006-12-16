@@ -2,31 +2,25 @@
 /* Copyright (C) Olsonet Communications, 2002 - 2006.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
-#include "sysio.h"
-#include "net.h"
+
 #include "diag.h"
-#include "app.h"
-#include "msg_tagStructs.h"
+#include "app_tag.h"
+#include "msg_tag.h"
 
-pongParamsType pong_params = {	5120, 	// freq_maj
-				1024, 	// freq_min
-				0x0987, // 7-8-9 (3 levels)
-				1024,	// rx_span
-				7	// rx_lev
-};
+#ifdef	__SMURPH__
 
-word	app_flags = 0;
-lword	host_passwd = 0;
-const 	lword	host_id = 0xBACA0061;
+#include "node_tag.h"
+#include "stdattr.h"
 
-// These are now defined in tarp_node_data.h and must be set by the praxis root
-extern	nid_t	net_id;
-extern	nid_t	local_host;
-extern	nid_t   master_host;
+#else	/* PICOS */
 
-appCountType app_count = {0, 0, 0};
+#include "net.h"
 
-char * get_mem (word state, int len) {
+#endif	/* SMURPH or PICOS */
+
+#include "attnames_tag.h"
+
+__PUBLF (NodeTag, char*, get_mem) (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
 		app_diag (D_WARNING, "Waiting for memory");
@@ -34,7 +28,8 @@ char * get_mem (word state, int len) {
 	}
 	return buf;
 }
-void send_msg (char * buf, int size) {
+
+__PUBLF (NodeTag, void, send_msg) (char * buf, int size) {
 	// it doesn't seem like a good place to filter out
 	// local host, but it's convenient, for now...
 
@@ -45,18 +40,17 @@ void send_msg (char * buf, int size) {
 		return;
 	}
 
-	if (net_tx (NONE, buf, size, 0) == 0) {
+	if (net_tx (WNONE, buf, size, 0) == 0) {
 		app_count.snd++;
-//		app_diag (D_WARNING, "Sent msg %u to %u",
-        app_diag (D_DEBUG, "Sent %u to %u",
+        	app_diag (D_DEBUG, "Sent %u to %u",
 			in_header(buf, msg_type),
 			in_header(buf, rcv));
 	} else
 		app_diag (D_SERIOUS, "Tx %u failed",
 			in_header(buf, msg_type));
- }
+}
  
- word max_pwr (word p_levs) {
+__PUBLF (NodeTag, word, max_pwr) (word p_levs) {
  	word shift = 0;
  	word level = p_levs & 0x000f;
  	while ((shift += 4) < 16) {
@@ -64,9 +58,9 @@ void send_msg (char * buf, int size) {
 			level = (p_levs >> shift) & 0x000f;
  	}
  	return level;
- }
+}
  
- void set_tag (char * buf) {
+__PUBLF (NodeTag, void, set_tag) (char * buf) {
 	// we may need more scrutiny...
 	if (in_setTag(buf, node_addr) != 0)
 		local_host = in_setTag(buf, node_addr);
@@ -84,7 +78,7 @@ void send_msg (char * buf, int size) {
 		host_passwd = in_setTag(buf, npasswd);
 }
 
-word check_passwd (lword p1, lword p2) {
+__PUBLF (NodeTag, word, check_passwd) (lword p1, lword p2) {
 	if (host_passwd == p1)
 		return 1;
 	if (host_passwd == p2)

@@ -562,3 +562,5 @@ endprocess (0)
 #undef RS_DOCMD
 #undef RS_CMDOUT
 #undef RS_RETOUT
+
+praxis_starter;
