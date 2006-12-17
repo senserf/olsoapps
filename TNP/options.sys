@@ -26,8 +26,3 @@
 #define	dbg_e(c)	do { } while (0)
 #define	dbg_f(c)	do { } while (0)
 #endif
-
-#undef	TCV_TIMERS
-#undef	TCV_HOOKS
-#define	TCV_TIMERS	1
-#define	TCV_HOOKS	1
