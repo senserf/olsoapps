@@ -49,16 +49,16 @@
 	<node number="0" type="peg">
 	    <location>1.0 4.0</location>
 	    <uart rate="9600" bsize="12">
-		<input source="socket" type="untimed">localhost:2211</input>
-		<output target="socket"></output>
+		<input source="socket" type="untimed"></input>
+		<output target="socket" type="held"></output>
 	    </uart>
 	</node>
 
 	<node number="1" type="tag">
 	    <location>1.0 10.0</location>
 	    <uart rate="9600" bsize="12">
-		<input source="socket" type="untimed">localhost:2211</input>
-		<output target="socket"></output>
+		<input source="socket" type="untimed"></input>
+		<output target="socket" type="held"></output>
 	    </uart>
 	</node>
 
