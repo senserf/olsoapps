@@ -563,4 +563,4 @@ endprocess (0)
 #undef RS_CMDOUT
 #undef RS_RETOUT
 
-praxis_starter;
+praxis_starter (Node);
