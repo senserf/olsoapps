@@ -36,7 +36,7 @@ char * 	_da (get_mem) (word state, int len);
 void 	_da (init_tag) (word i);
 void 	_da (init_tags) (void);
 int 	_da (insert_tag) (lword tag);
-void 	_da (set_tagState) (word i, tagStateType state, bool updEvTime);
+void 	_da (set_tagState) (word i, tagStateType state, Boolean updEvTime);
 
 void 	_da (msg_findTag_in) (word state, char * buf);
 void 	_da (msg_findTag_out) (word state, char** buf_out, lword tag,
@@ -74,11 +74,11 @@ void 	_da (send_msg) (char * buf, int size);
 // For PICOS, this stuff is included from app_tarp_if_tag.h (as macros). For
 // SMURPH, we need a bunch of virtual functions.
 
-virtual bool _da (msg_isBind) (msg_t m) { return NO; };
-virtual bool _da (msg_isTrace) (msg_t m) { return NO; };
-virtual bool _da (msg_isMaster) (msg_t m) { m == msg_master; };
-virtual bool _da (msg_isNew) (msg_t m) { return NO; }
-virtual bool _da (msg_isClear) (byte o) { return YES; };
+virtual Boolean _da (msg_isBind) (msg_t m) { return NO; };
+virtual Boolean _da (msg_isTrace) (msg_t m) { return NO; };
+virtual Boolean _da (msg_isMaster) (msg_t m) { m == msg_master; };
+virtual Boolean _da (msg_isNew) (msg_t m) { return NO; }
+virtual Boolean _da (msg_isClear) (byte o) { return YES; };
 virtual void _da (set_master_chg) () { _da (app_flags) |= 2; };
 
 #endif	/* SMURPH */

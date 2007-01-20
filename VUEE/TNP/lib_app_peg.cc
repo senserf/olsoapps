@@ -63,7 +63,7 @@ __PUBLF (NodePeg, void, init_tags) () {
 }
 
 __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
-							bool updEvTime) {
+							Boolean updEvTime) {
 	tagArray[i].state = state;
 	tagArray[i].count = 0; // always (?) reset the counter
 	tagArray[i].lastTime = seconds();

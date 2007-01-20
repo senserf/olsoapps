@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2007.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -124,8 +124,6 @@ __PUBLF (NodeTag, void, process_incoming) (word state, char * buf, word size) {
 // Toggling rx happens in the rxsw process, driven from the pong process.
 thread (rcv)
 
-	nodata;
-
 	entry (RC_INIT)
 
 		rcv_packet_size = 0;
@@ -161,8 +159,6 @@ thread (rcv)
 endthread
 
 thread (rxsw)
-
-	nodata;
 
 	entry (RX_OFF)
 
@@ -226,8 +222,6 @@ static word map_level (word l) {
 thread (pong)
 
 	word	level;
-
-	nodata;
 
 	entry (PS_INIT)
 
@@ -297,8 +291,6 @@ endthread
 
 thread (cmd_in)
 
-	nodata;
-
 	entry (CS_INIT)
 
 		if (ui_ibuf == NULL)
@@ -336,8 +328,6 @@ thread (root)
 	// input (s command)
 	word in_lh, in_pl, in_maj, in_min, in_span;
 	lword in_hid;
-	
-	nodata;
 
 	entry (RS_INIT)
 

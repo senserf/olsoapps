@@ -1,0 +1,15 @@
+#ifndef	__tnp_common_h__
+#define	__tnp_common_h__
+
+#include "sysio.h"
+#include "board.h"
+
+void buildTagNode (data_no_t*);
+	
+void startTagNode ();
+
+void buildPegNode (data_no_t*);
+	
+void startPegNode ();
+
+#endif
