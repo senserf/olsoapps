@@ -20,13 +20,15 @@ static void read_esnt (word pos, lword * d, word n) {
 		memset (d, 0xff, n << 2);
 		n = ESN_SIZE - pos;
 	}
-	ee_read (EE_PAGE_SIZE * ESN_OSET + (pos << 2), (byte *)d, n << 2);
+	ee_read (EE_PAGE_SIZE * ESN_OSET + (pos << 2),
+		(byte *)d, n << 2);
 }
 
 static void write_esnt (word pos, lword * s, word n) {
 	if (pos + n > ESN_SIZE)
 		 n = ESN_SIZE - pos;
-	ee_write (EE_PAGE_SIZE * ESN_OSET + (pos << 2), (byte *)s, n << 2);
+	ee_write (WNONE, EE_PAGE_SIZE * ESN_OSET + (pos << 2),
+		(byte *)s, n << 2);
 }
 
 void clr_esn () {
@@ -274,7 +276,7 @@ void app_reset (word lev) {
 	byte a[NVM_BOOT_LEN];
 	if (lev & 8) {
 		memset (a, 0xFF, NVM_BOOT_LEN);
-		ee_write (EE_NID, a, NVM_BOOT_LEN);
+		ee_write (WNONE, EE_NID, a, NVM_BOOT_LEN);
 		clr_esn();
 		reset();
 	}

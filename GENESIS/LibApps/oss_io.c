@@ -48,7 +48,7 @@ void oss_set_in () {
 			cmd_ctrl.s = val;
 
 		local_host = val;
-		ee_write (EE_LH, (byte *)&local_host, 2);
+		ee_write (WNONE, EE_LH, (byte *)&local_host, 2);
 		break;
 
 	case PAR_NID:
@@ -66,7 +66,7 @@ void oss_set_in () {
 			trigger (BEAC_TRIG);
 		}
 		net_id = val;
-		ee_write (EE_NID, (byte *)&net_id, 2);
+		ee_write (WNONE, EE_NID, (byte *)&net_id, 2);
 		if (net_id == 0)
 			reset();
 		net_opt (PHYSOPT_SETSID, &net_id);
@@ -82,7 +82,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0x00FF;
 		val |= (word)tarp_ctrl.param << 8;
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		break;
 
 	case PAR_TARP_S:
@@ -96,7 +96,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0x00FF;
 		val |= (word)tarp_ctrl.param << 8;
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		break;
 		
 	case PAR_TARP_R:
@@ -110,7 +110,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0x00FF;
 		val |= (word)tarp_ctrl.param << 8;
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		break;
 
 	case PAR_TARP_F:
@@ -123,7 +123,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0x00FF;
 		val |= (word)tarp_ctrl.param << 8;
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		break;
 
 	case PAR_ENCR_M:
@@ -135,7 +135,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0xFFF0;
 		val |= encr_data;
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		cmd_ctrl.oprc = RC_OK;
 		break;
 
@@ -148,7 +148,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0xFFF0;
 		val |= encr_data; 
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		cmd_ctrl.oprc = RC_OK;
 		break;
 
@@ -162,7 +162,7 @@ void oss_set_in () {
 		ee_read (EE_APP, (byte *)&val, 2);
 		val &= 0xFFF0;
 		val |= encr_data;
-		ee_write (EE_APP, (byte *)&val, 2);
+		ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		cmd_ctrl.oprc = RC_OK;
 		break;
 
@@ -294,7 +294,7 @@ void oss_set_in () {
 				set_binder;
 			} else
 				clr_binder;
-			ee_write (EE_APP, (byte *)&val, 2);
+			ee_write (WNONE, EE_APP, (byte *)&val, 2);
 		}
 		cmd_ctrl.oprc = RC_OK;
 		break;
@@ -515,7 +515,7 @@ void oss_master_in (word state) {
 	if (cmd_ctrl.t == 0 || local_host == cmd_ctrl.t) {
 		if (master_host != local_host) {
 			master_host = local_host;
-			ee_write (EE_MID, (byte *)&master_host, 2);
+			ee_write (WNONE, EE_MID, (byte *)&master_host, 2);
 			tarp_ctrl.param &= 0xFE; // routing off
 			leds (CON_LED, LED_ON);
 		}

@@ -27,7 +27,7 @@ static void sensrx_in (char * buf) {
 	memcpy (&v, buf + 3, 2);
 	if (v != sensrx_ver) {
 		sensrx_ver = v;
-		ee_write (EE_SENSRX_VER, (byte *)&sensrx_ver, 2);
+		ee_write (WNONE, EE_SENSRX_VER, (byte *)&sensrx_ver, 2);
 	}
 }
 
