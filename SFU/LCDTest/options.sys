@@ -1,0 +1,3 @@
+#undef	CC1100
+#define	CC1100			0
+
