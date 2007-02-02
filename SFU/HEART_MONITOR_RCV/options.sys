@@ -1,0 +1,16 @@
+// Insert here applications-specific options
+#define	INFO_FLASH	1
+
+#ifdef	DIAG_MESSAGES
+#undef	DIAG_MESSAGES
+#endif
+#define	DIAG_MESSAGES	2
+
+#ifdef	CODE_LONG_INTS
+#undef	CODE_LONG_INTS
+#endif
+
+#define	CODE_LONG_INTS	1
+
+//#define	MONITOR_PIN_CLOCK	P1_1
+//#define	MONITOR_PIN_SCHED	P1_2

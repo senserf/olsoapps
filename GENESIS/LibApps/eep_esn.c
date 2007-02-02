@@ -1,4 +1,4 @@
-#include "eeprom.h"
+#include "storage.h"
 #include "app.h"
 #include "codes.h"
 #include "msg_gene.h"
