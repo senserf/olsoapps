@@ -13,8 +13,10 @@ heapmem {10, 90};
 #include "serf.h"
 #include "form.h"
 
+#if CC1100
 #include "phys_cc1100.h"
 #include "plug_null.h"
+#endif
 
 #define	RF_MAXPLEN	48
 #define	RF_MSTYPE_HR	1
@@ -31,14 +33,18 @@ word	sbuf [ADCS_SAMPLE_LENGTH], dbuf [ADCS_SAMPLE_LENGTH];
 int	sfd;
 word	err;
 
-lword	samples = 0, samples_prev = 0;
-lword	overflows = 0;
+lword	samples;
+lword	overflows;
 lword	flash_addr,
 	flash_samples;
 
 lword	a, b;
 
+lword	Time;
+
 word	HRate;
+
+char	SRate [12];
 
 Boolean	FBusy = NO, Load = NO;
 
@@ -183,7 +189,6 @@ Again:
 Sync:
 	ee_sync (RE_SYN);
 	Load = NO;
-	samples_prev = 0;
 	FBusy = NO;
 	goto Again;
 
@@ -208,6 +213,9 @@ endprocess (1);
 
 process (monitor, void) 
 
+  word Rate1, Rate2;
+  lword TotalTime;
+
   entry (MO_RUN)
 
 	overflows += adcs_overflow ();
@@ -224,24 +232,30 @@ process (monitor, void)
 	delay (10 * 1024, MO_RUN);
 	release;
 Idle:
-
-	if (samples_prev != 0)
-		samples_prev = (samples - samples_prev + 5) / 10;
+	if ((TotalTime = seconds () - Time) != 0) {
+		Rate1 = (word) (samples / TotalTime);
+		Rate2 = (word)(((samples % TotalTime) * 1000) / TotalTime);
+		form (SRate, "%d.%c%c%c", Rate1,
+			((Rate2 / 100)    ) + '0',
+			((Rate2 / 10) % 10) + '0',
+			((Rate2     ) % 10) + '0');
+	} else {
+		SRate [0] = '\0';
+	}
 
   entry (MO_IDLE)
 
 	delay (10 * 1024, MO_RUN);
 	
-	ser_outf (MO_IDLE, "IDLE: %lu (%u/s) v = %lu\r\n",
-		samples, (word) samples_prev, overflows);
+	ser_outf (MO_IDLE, "IDLE: %lu (%s/s) v = %lu\r\n",
+		samples, (word) SRate, overflows);
 
 	lcd_clear (0, 15);
-	form (ibuf, "%lu %u", samples, (word) samples_prev);
+	form (ibuf, "%lu", samples);
 	lcd_write (0, ibuf);
 	lcd_clear (16, 31);
-	form (ibuf, "%lu", overflows);
+	form (ibuf, "%s %lu", SRate, overflows);
 	lcd_write (16, ibuf);
-	samples_prev = samples;
 
 endprocess (1);
 
@@ -302,6 +316,7 @@ process (root, int)
 	fork (monitor, NULL);
 	lcd_on (0);
 
+#if CC1100
 	phys_cc1100 (0, RF_MAXPLEN);
 	tcv_plug (0, &plug_null);
 	sfd = tcv_open (NONE, 0, 0);
@@ -314,6 +329,7 @@ process (root, int)
 	tcv_control (sfd, PHYSOPT_TXON, NULL);
 	err = RF_NETID;
 	tcv_control (sfd, PHYSOPT_SETSID, &err);
+#endif
 
   entry (RS_RCMF)
 
@@ -357,7 +373,10 @@ process (root, int)
 	scan (ibuf + 1, "%u", &bs);
 	if (bs == 0)
 		proceed (RS_RCME);
+	samples = 0;
+	overflows = 0;
 	err = adcs_start (bs);
+	Time = seconds ();
 
   entry (RS_DON)
 

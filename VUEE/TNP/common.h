@@ -5,11 +5,6 @@
 #include "board.h"
 
 void buildTagNode (data_no_t*);
-	
-void startTagNode ();
-
 void buildPegNode (data_no_t*);
-	
-void startPegNode ();
 
 #endif

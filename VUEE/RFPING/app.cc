@@ -38,7 +38,7 @@ thread (receiver)
 		finish;
 	}
 
-	when ((int)(&rkillflag), RC_TRY);
+	when (&rkillflag, RC_TRY);
 	r_packet = tcv_rnp (RC_TRY, sfd);
 
 	if (r_packet [1] == PKT_ACK) {
@@ -81,7 +81,7 @@ thread (receiver)
 		tcv_left (r_packet));
 
 	tcv_endp (r_packet);
-	trigger ((int)(&last_ack));
+	trigger (&last_ack);
 	proceed (RC_TRY);
 
 endthread
@@ -103,7 +103,7 @@ __PUBLF (Node, int, rcv_stop) () {
 	if (RCVon) {
 		tcv_control (sfd, PHYSOPT_RXOFF, NULL);
 		rkillflag = YES;
-		trigger ((int)(&rkillflag));
+		trigger (&rkillflag);
 		return 1;
 	}
 
@@ -123,11 +123,11 @@ Finish:
 		XMTon = NO;
 		finish;
 	}
-	when ((int)(&tkillflag), SN_SEND);
+	when (&tkillflag, SN_SEND);
 
 	if (last_ack != last_snt) {
 		delay (tdelay, SN_NEXT);
-		when ((int)(&last_ack), SN_SEND);
+		when (&last_ack, SN_SEND);
 		release;
 	}
 
@@ -147,7 +147,7 @@ Finish:
 	if (tkillflag)
 		goto Finish;
 
-	when ((int)(&tkillflag), SN_SEND);
+	when (&tkillflag, SN_SEND);
 
 	x_packet = tcv_wnp (SN_NEXT, sfd, packet_length + 2);
 
@@ -192,7 +192,7 @@ __PUBLF (Node, int, snd_stop) () {
 	tcv_control (sfd, PHYSOPT_TXOFF, NULL);
 	if (XMTon) {
 		tkillflag = YES;
-		trigger ((int)(&tkillflag));
+		trigger (&tkillflag);
 		return 1;
 	}
 	return 0;

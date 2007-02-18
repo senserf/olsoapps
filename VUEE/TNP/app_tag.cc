@@ -35,11 +35,11 @@
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 
 // Semaphore for command line
-#define CMD_READER	((word)(int)&cmd_line)
-#define CMD_WRITER	((word)(int)((&cmd_line)+1))
+#define CMD_READER	(&cmd_line)
+#define CMD_WRITER	((&cmd_line)+1)
 
 // rx switch control
-#define RX_SW_ON	((word)(int)&pong_params.rx_span)
+#define RX_SW_ON	(&pong_params.rx_span)
 
 // Display node stats on UI
 __PUBLF (NodeTag, void, stats) () {

@@ -12,5 +12,7 @@
 
 #define	CODE_LONG_INTS	1
 
-//#define	MONITOR_PIN_CLOCK	P1_1
-//#define	MONITOR_PIN_SCHED	P1_2
+#define	NO_LONG_DELAYS	1
+
+#undef	SPIN_WHEN_HALTED
+#define	SPIN_WHEN_HALTED	1

@@ -35,8 +35,8 @@
 #define DEF_LOCAL_HOST		1
 
 // Semaphores
-#define CMD_READER	((word)(int)&cmd_line)
-#define CMD_WRITER	((word)(int)((&cmd_line)+1))
+#define CMD_READER	(&cmd_line)
+#define CMD_WRITER	((&cmd_line)+1)
 
 // Display node stats on UI
 __PUBLF (NodePeg, void, stats) () {
@@ -152,8 +152,6 @@ static word map_rssi (word r) {
 
 // In this model, a single rcv is forked once, and runs / sleeps all the time
 thread (rcv)
-
-	nodata;
 
 	entry (RC_INIT)
 
