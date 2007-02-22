@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005                    */
+/* Copyright (C) Olsonet Communications, 2002 - 2007                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -46,7 +46,7 @@ word	HRate;
 
 char	SRate [12];
 
-Boolean	FBusy = NO, Load = NO;
+Boolean	FBusy = NO, Load = NO, Talk = YES;
 
 byte	PCount;
 
@@ -128,7 +128,8 @@ process (sender, void)
   entry (SE_DON)
 
 SDone:
-	ser_out (SE_DON, "TRANSMISSION FINISHED\r\n");
+	if (Talk)
+		ser_out (SE_DON, "TRANSMISSION FINISHED\r\n");
 	FBusy = NO;
 	tcv_control (sfd, PHYSOPT_RXOFF, NULL);
 	finish;
@@ -195,14 +196,15 @@ Sync:
   entry (RE_DUMP)
 
 Dump:
-	ser_outf (RE_DUMP, "S: %x %x %x %x %x %x %x\r\n",
-		sbuf [0],
-		sbuf [1],
-		sbuf [2],
-		sbuf [3],
-		sbuf [4],
-		sbuf [5],
-		sbuf [6]);
+	if (Talk)
+		ser_outf (RE_DUMP, "S: %x %x %x %x %x %x %x\r\n",
+			sbuf [0],
+			sbuf [1],
+			sbuf [2],
+			sbuf [3],
+			sbuf [4],
+			sbuf [5],
+			sbuf [6]);
 	goto Again;
 
 endprocess (1);
@@ -226,8 +228,9 @@ process (monitor, void)
 	// Loading
   entry (MO_LOA)
 
-	ser_outf (MO_LOA, "LOADING: %lx [%lu] v = %lu\r\n",
-		flash_addr, flash_samples, overflows);
+	if (Talk)
+		ser_outf (MO_LOA, "LOADING: %lx [%lu] v = %lu\r\n",
+			flash_addr, flash_samples, overflows);
 
 	delay (10 * 1024, MO_RUN);
 	release;
@@ -247,8 +250,9 @@ Idle:
 
 	delay (10 * 1024, MO_RUN);
 	
-	ser_outf (MO_IDLE, "IDLE: %lu (%s/s) v = %lu\r\n",
-		samples, (word) SRate, overflows);
+	if (Talk)
+		ser_outf (MO_IDLE, "IDLE: %lu (%s/s) v = %lu\r\n",
+			samples, (word) SRate, overflows);
 
 	lcd_clear (0, 15);
 	form (ibuf, "%lu", samples);
@@ -305,6 +309,7 @@ endprocess (1);
 #define	RS_XMT		11
 #define	RS_HEA		12
 #define	RS_HEK		13
+#define	RS_TAK		14
 
 process (root, int)
 
@@ -344,6 +349,7 @@ process (root, int)
 		"x addr n     -> transmit n samples from flash\r\n"
 		"h            -> start heart rate monitor\r\n"
 		"k            -> stop heart rate monitor\r\n"
+		"t            -> toggle talk/quiet\r\n"
 	);
 
   entry (RS_RCMD)
@@ -360,6 +366,7 @@ process (root, int)
 	  	case 'x': proceed (RS_XMT);
 	  	case 'h': proceed (RS_HEA);
 	  	case 'k': proceed (RS_HEK);
+	  	case 't': proceed (RS_TAK);
 	}
 	
   entry (RS_RCME)
@@ -460,6 +467,11 @@ process (root, int)
 		proceed (RS_RCME);
 
 	killall (hrate);
+	proceed (RS_DON);
+
+  entry (RS_TAK)
+
+	Talk = Talk ? NO : YES;
 	proceed (RS_DON);
 
 endprocess (1);
