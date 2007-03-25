@@ -1,0 +1,13 @@
+// Insert here applications-specific options
+// #define	INFO_FLASH	1
+
+#undef	DIAG_MESSAGES
+#undef	RADIO_USE_LEDS
+
+#define	DIAG_MESSAGES	2
+#define	NO_LONG_DELAYS	1
+
+// #undef	SPIN_WHEN_HALTED
+// #define	SPIN_WHEN_HALTED	1
+
+#define	RADIO_USE_LEDS	7

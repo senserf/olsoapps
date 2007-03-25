@@ -57,7 +57,9 @@ process THREADNAME (root) (Node) {
 		RS_SPIN,
 		RS_RANA,
 		RS_RANA1,
-		RS_RANA2
+		RS_RANA2,
+		RS_SETP,
+		RS_GETP
 	};
 
 	perform;
@@ -108,6 +110,8 @@ static word	tdelay, packet_length;
 #define		RS_RANA		190
 #define		RS_RANA1	193
 #define		RS_RANA2	196
+#define		RS_SETP		200
+#define		RS_GETP		210
 	
 static	char *ibuf;
 static	int k, n1;

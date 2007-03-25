@@ -7,7 +7,7 @@
 #include "adc_sampler.h"
 #include "tcvphys.h"
 
-heapmem {10, 90};
+heapmem {100};
 
 #include "ser.h"
 #include "serf.h"
@@ -17,6 +17,8 @@ heapmem {10, 90};
 #include "phys_cc1100.h"
 #include "plug_null.h"
 #endif
+
+void hrc_start (), hrc_stop ();
 
 #define	RF_MAXPLEN	48
 #define	RF_MSTYPE_HR	1
@@ -41,8 +43,6 @@ lword	flash_addr,
 lword	a, b;
 
 lword	Time;
-
-word	HRate;
 
 char	SRate [12];
 
@@ -147,7 +147,7 @@ process (hrate, void)
 	packet = tcv_wnp (HR_NEX, sfd, RF_FRAME + 2);
 	packet [0] = RF_NETID;
 	packet [1] = RF_MSTYPE_HR << 8;
-	packet [2] = HRate;
+	packet [2] = HeartRateCounter;
 	tcv_endp (packet);
 
 	delay (RF_HRATE_INT, HR_NEX);
@@ -166,7 +166,6 @@ process (reader, void)
 Again:
 	adcs_get_sample (RE_WAIT, sbuf);
 	samples++;
-	HRate = sbuf [0];
 
 	if (Load == NO) {
 		if ((samples & 0x3ff) == 0)
@@ -197,14 +196,13 @@ Sync:
 
 Dump:
 	if (Talk)
-		ser_outf (RE_DUMP, "S: %x %x %x %x %x %x %x\r\n",
+		ser_outf (RE_DUMP, "S: %x %x %x %x %x %x\r\n",
 			sbuf [0],
 			sbuf [1],
 			sbuf [2],
 			sbuf [3],
 			sbuf [4],
-			sbuf [5],
-			sbuf [6]);
+			sbuf [5]);
 	goto Again;
 
 endprocess (1);
@@ -251,8 +249,8 @@ Idle:
 	delay (10 * 1024, MO_RUN);
 	
 	if (Talk)
-		ser_outf (MO_IDLE, "IDLE: %lu (%s/s) v = %lu\r\n",
-			samples, (word) SRate, overflows);
+		ser_outf (MO_IDLE, "IDLE: %lu (%s/s) v = %lu hr = %u\r\n",
+			samples, (word) SRate, overflows, HeartRateCounter);
 
 	lcd_clear (0, 15);
 	form (ibuf, "%lu", samples);
@@ -274,15 +272,14 @@ process (dumper, void)
 
   entry (DU_DIS)
 
-	ser_outf (DU_DIS, "%lx: %x %x %x %x %x %x %x\r\n",
+	ser_outf (DU_DIS, "%lx: %x %x %x %x %x %x\r\n",
 		flash_addr,
 		dbuf [0],
 		dbuf [1],
 		dbuf [2],
 		dbuf [3],
 		dbuf [4],
-		dbuf [5],
-		dbuf [6]);
+		dbuf [5]);
 
 	if (--flash_samples == 0) {
 		FBusy = NO;
@@ -458,6 +455,7 @@ process (root, int)
 	if (running (hrate))
 		proceed (RS_RCME);
 
+	hrc_start ();
 	fork (hrate, NULL);
 	proceed (RS_DON);
 
@@ -466,6 +464,7 @@ process (root, int)
 	if (!running (hrate))
 		proceed (RS_RCME);
 
+	hrc_stop ();
 	killall (hrate);
 	proceed (RS_DON);
 

@@ -1,8 +1,22 @@
 #!/bin/sh
 rm -rf */KTMP */Image* */*.cyp */cstartup.* */irq.* */internal.map */out */temp */Makefile */.gdbinit */gdb.ini */*.o */side.* */side
-cd TESTS
-cleanall
-cd ../SFU
-cleanall
-cd ../VUEE
-cleanall
+if [ -d TESTS ]
+then
+	cd TESTS
+	cleanall
+	cd ..
+fi
+
+if [ -d SFU ]
+then
+	cd SFU
+	cleanall
+	cd ..
+fi
+
+if [ -d VUEE ]
+then
+	cd VUEE
+	cleanall
+	cd ..
+fi

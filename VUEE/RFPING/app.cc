@@ -205,7 +205,7 @@ thread (root)
 	ibuf = (char*) umalloc (IBUFLEN);
 	ibuf [0] = 0;
 
-	phys_dm2200 (0, MAXPLEN);
+	phys_cc1100 (0, MAXPLEN);
 	// WARNING: the SMURPH model assumes that the plugin is static, i.e.,
 	// all nodes use the same plugin. This is easy to change later, but
 	// ... for now ...
@@ -228,6 +228,8 @@ thread (root)
 		"s intvl  -> start/reset sending interval (2 secs default)\r\n"
 		"r        -> start receiver\r\n"
 		"d i v    -> change phys parameter i to v\r\n"
+		"x p      -> set transmit power\r\n"
+		"y        -> get current transmit power\r\n"
 		"g        -> get received power\r\n"
 		"o        -> stop receiver\r\n"
 		"t        -> stop transmitter\r\n"
@@ -274,6 +276,10 @@ thread (root)
 		proceed (RS_SPIN);
 	if (ibuf [0] == 'a')
 		proceed (RS_RANA);
+	if (ibuf [0] == 'x')
+		proceed (RS_SETP);
+	if (ibuf [0] == 'y')
+		proceed (RS_GETP);
 
     entry (RS_RCMD1)
 
@@ -394,6 +400,20 @@ thread (root)
     entry (RS_RANA2)
 
 	ser_outf (RS_RANA2, "A[%u] = %d\r\n", p [0], n1);
+	proceed (RS_RCMD);
+
+    entry (RS_SETP)
+
+	if (scan (ibuf + 1, "%u", p+0) < 1)
+		proceed (RS_RCMD1);
+
+	tcv_control (sfd, PHYSOPT_SETPOWER, p);
+	proceed (RS_RCMD);
+
+    entry (RS_GETP)
+
+	ser_outf (RS_GETP, "P = %d\r\n",
+		tcv_control (sfd, PHYSOPT_GETPOWER, NULL));
 	proceed (RS_RCMD);
 
 endthread

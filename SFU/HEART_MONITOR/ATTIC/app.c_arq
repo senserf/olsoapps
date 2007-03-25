@@ -1,0 +1,1026 @@
+/* ============================================================= */
+/* Copyright (C) Olsonet Communications, 2007                    */
+/* All rights reserved.                                          */
+/* ============================================================= */
+
+#include "sysio.h"
+#include "adc_sampler.h"
+#include "tcvphys.h"
+
+heapmem {100};
+
+#include "form.h"
+
+#include "phys_cc1100.h"
+#include "phys_uart.h"
+#include "plug_null.h"
+
+const static lword ESN = 0x80000001;
+
+#define	MAXPLEN	60
+
+#define	PT_HELLO		0x80
+#define	PT_STATUS		0x90
+#define	PT_SDATA		0xC0
+#define	PT_HRATE		0xD0
+
+#define	PT_BIND			0x00
+#define	PT_UNBIND		0x40
+#define	PT_STOP			0x20
+#define	PT_REPORT		0x30
+#define	PT_RESET		0x10
+#define	PT_SAMPLE		0x50
+#define	PT_SAMPLEH		0x51
+#define	PT_SEND			0x60
+#define	PT_HRMON		0x70
+#define	PT_HRMOFF		0x71
+
+#define	ST_READY	0x00	// These must work as offsets to PT_STATUS
+#define	ST_SAMPLING	0x02	// ...
+#define	ST_SENDING	0x04	// ...
+
+#define	HRM_ACTIVE	(HeartRateMonitor != 0) // ... like this
+
+#define	INTV_HELLO	(4096 - 0x1f + (rnd () & 0xff))
+#define	INTV_PERSTAT	7168
+#define	INTV_RESEND	(1024 - 0x1f + (rnd () & 0xff))
+#define	INTV_IPS_S	100	// Inter packet space (serial)
+#define	INTV_IPS_W	100	// Inter packet space (wireless)
+#define	INTV_IPS	(BSFD == USFD ? INTV_IPS_S : INTV_IPS_W)
+
+#define	INTV_DISPLAY	512
+
+#define	WINDOW_SIZE_S	(16*3)	// Window size (serial)
+#define	WINDOW_SIZE_W	(4*3)	// Window size (wireless)
+#define	WINDOW_SIZE	(BSFD == USFD ? WINDOW_SIZE_S : WINDOW_SIZE_W)
+
+#define	MAX_SAMPLES	8	// The max number of stored samples
+
+#define	SAMPLE_SIZE		(ADCS_SAMPLE_LENGTH*2)	// This is 12 bytes
+#define	SAMPLES_PER_PACKET	4			// == 48 bytes
+
+#define	MULT_SAMPLE_SIZE(a)	(((a) << 3) + ((a) << 2))
+#define	MULT_SAMPLES_PACKET(a)	((a) << 2)
+
+#define	SAMPLE_BUFFER_SIZE	240
+
+#define	put1(p,b)	do { *((p)++) = (b); } while (0)
+
+#define	get1(p,b)	do { (b) = (*((p)++)); } while (0)
+
+#define put2(p,w)	do { \
+				*((p)++) = (byte)(w >>  8); \
+				*((p)++) = (byte)(w      ); \
+			} while (0)
+
+#define	get2(p,w)	do { \
+				w  = ((word)(*((p)++))) <<  8; \
+				w |= (      (*((p)++)))      ; \
+			} while (0)
+
+#define put3(p,w)	do { \
+				*((p)++) = (byte)(w >> 16); \
+				*((p)++) = (byte)(w >>  8); \
+				*((p)++) = (byte)(w      ); \
+			} while (0)
+
+#define	get3(p,w)	do { \
+				w  = ((lword)(*((p)++))) << 16; \
+				w |= ((lword)(*((p)++))) <<  8; \
+				w |= (       (*((p)++)))      ; \
+			} while (0)
+
+#define put4(p,w)	do { \
+				*((p)++) = (byte)(w >> 24); \
+				*((p)++) = (byte)(w >> 16); \
+				*((p)++) = (byte)(w >>  8); \
+				*((p)++) = (byte)(w      ); \
+			} while (0)
+
+#define	get4(p,w)	do { \
+				w  = ((lword)(*((p)++))) << 24; \
+				w |= ((lword)(*((p)++))) << 16; \
+				w |= ((lword)(*((p)++))) <<  8; \
+				w |= (       (*((p)++)))      ; \
+			} while (0)
+
+#ifdef	DONT_DISPLAY
+#define	DISPIT		do { } while (0)
+#else
+#define	DISPIT		ptrigger (Display, 0) 		// Display event
+#endif
+
+#define	SENDIT		ptrigger (TheThread, 0)		// Sender event
+#define	BINDIT		trigger (&BSFD)			// Bind event
+
+lword	BufferIn, BufferOut, BufferLimit, NextToGo, Left, NextToAck;
+
+lword	SampStart [MAX_SAMPLES];
+lword	SampCount [MAX_SAMPLES];
+
+char	*Tracer = NULL;
+
+byte	SampIdent [MAX_SAMPLES];
+
+byte	Status = ST_READY;
+byte	ThisSampleId;
+byte	ThisSampleSlot;
+byte	NextSampleSlot;
+byte	Ack;
+byte	DispToggle = 0;
+Boolean	HREndOnEOS;
+
+//
+// Heart rate calculator ====================================================
+//
+#define	HRC_N_SLOTS	4	// Number of 3-second slots
+
+byte	SCnt;
+
+const word hr_weights [] = { 10, 6, 3, 1 };
+word HeartRate = 0;
+byte hr_val [HRC_N_SLOTS];
+
+// ===========================================================================
+
+word	SBuf [ADCS_SAMPLE_LENGTH];
+
+int	Display = 0, TheThread = 0;
+
+int	USFD, RSFD,	// Session IDs UART / RF
+	BSFD = NONE;	// Which one is bound
+
+void send_status (int msfd) {
+/*
+ * Send a status packet:
+ *
+ * 	Status byte, [smp, count] * 6
+ *      Sampling, sample Id, collected, left
+ *      Sending, sample Id, last sent, left, last acked
+ *
+ */
+	address packet;
+	byte *pp;
+	int i, n;
+
+	if (msfd != BSFD)
+		// Lost a race
+		return;
+
+	switch (Status) {
+
+	    case ST_READY:
+
+		// Calculate packet size based on the sample pool
+		for (i = 0, n = 6; i < MAX_SAMPLES; i++)
+			if (SampCount [i])
+				n += 4;
+
+		if ((packet = tcv_wnp (WNONE, msfd, n)) == NULL)
+			return;
+
+		pp = (byte*) (packet + 1);
+
+		put1 (pp, PT_STATUS | ST_READY | HRM_ACTIVE);
+
+		for (i = 0; i < MAX_SAMPLES; i++) {
+			if (SampCount [i]) {
+				put1 (pp, SampIdent [i]);
+				put3 (pp, SampCount [i]);
+			}
+		}
+
+		tcv_endp ((address) packet);
+		return;
+
+	    case ST_SAMPLING:
+
+		if ((packet = tcv_wnp (WNONE, msfd, 4 + 6)) == NULL)
+			return;
+
+		pp = (byte*) (packet + 1);
+
+		put1 (pp, PT_STATUS | ST_SAMPLING | HRM_ACTIVE);
+
+		put1 (pp, ThisSampleId);
+		put3 (pp, Left);
+
+		// ===
+		// 8
+
+		tcv_endp (packet);
+		return;
+
+	    case ST_SENDING:
+
+		if ((packet = tcv_wnp (WNONE, msfd, 4 + 8)) == NULL)
+			return;
+
+		pp = (byte*) (packet + 1);
+
+		put1 (pp, PT_STATUS | ST_SENDING | HRM_ACTIVE);
+
+		put1 (pp, ThisSampleId);
+		put3 (pp, Left);
+		put3 (pp, NextToAck);
+
+		// ===
+		// 11
+
+		tcv_endp (packet);
+		return;
+
+	}
+}
+
+word find_free_sample_slot () {
+
+	word w;
+
+	for (w = 0; w < MAX_SAMPLES; w++)
+		if (SampCount [w] == 0)
+			return w;
+
+	return WNONE;
+}
+
+void kill_samples (lword n) {
+/*
+ * Removes the samples that will be overwritten by the new sample
+ */
+	lword lpo, lpp;
+	word w;
+
+	lpo = BufferIn + n;
+
+	for (w = 0; w < MAX_SAMPLES; w++) {
+		if (SampCount [w] == 0)
+			continue;
+		if (lpo > SampStart [w] && BufferIn < SampStart [w] +
+		    SampCount [w])
+			SampCount [w] = 0;
+	}
+}
+
+void erase_all_samples () {
+
+	int i;
+
+	for (i = 0; i < MAX_SAMPLES; i++)
+		SampCount [i] = 0;
+
+	NextSampleSlot = 0;
+}
+
+void init_storage () {
+
+	lword sz;
+
+	BufferIn = BufferOut = 0;
+
+	BufferLimit = ee_size (NULL, NULL);
+
+	// Turn this into samples
+	BufferLimit /= SAMPLE_SIZE;
+}
+
+void abort_all () {
+/*
+ * Equivalent to a soft reset
+ */
+	if (HRM_ACTIVE) {
+		hrc_stop ();
+		kill (HeartRateMonitor);
+		HeartRate = 0;
+	}
+
+	if (Status == ST_SAMPLING)
+		// Have to stop the ADC sampler as well
+		adcs_stop ();
+
+	if (TheThread != 0) {
+		kill (TheThread);
+		TheThread = 0;
+	}
+
+	Status = ST_READY;
+}
+
+int send_next () {
+/*
+ * Sends a bunch of samples starting from NextToGo
+ */
+	lword sa;
+	address packet;
+	byte *pp;
+	word ns;
+
+	if (Left > SAMPLES_PER_PACKET) {
+		ns = SAMPLES_PER_PACKET;
+		packet = tcv_wnp (WNONE, BSFD, 4 + 8 +
+			SAMPLE_SIZE * SAMPLES_PER_PACKET);
+	} else {
+		ns = (word) Left;
+		packet = tcv_wnp (WNONE, BSFD, 4 + 8 + MULT_SAMPLE_SIZE (ns));
+	}
+
+	if (packet == NULL)
+		// Memory problems
+		return ERROR;
+
+	pp = (byte*) (packet + 1);
+
+	put1 (pp, PT_SDATA);
+	put1 (pp, ThisSampleId);
+	put3 (pp, NextToGo);
+	put3 (pp, Left);
+
+	sa = SampStart [ThisSampleSlot] + NextToGo;
+	if (sa >= BufferLimit)
+		sa -= BufferLimit;
+	while (ns--) {
+		ee_read (MULT_SAMPLE_SIZE (sa), (byte*) SBuf, SAMPLE_SIZE);
+		memcpy (pp, SBuf, SAMPLE_SIZE);
+		pp += SAMPLE_SIZE;
+		if (++sa == BufferLimit)
+			sa = 0;
+	}
+
+	tcv_endp (packet);
+	return 0;
+}
+
+// ============================================================================
+
+#define	DS_SIGNAL	0
+#define	DS_LOOP		1
+
+thread (display)
+
+    char cb [12];
+    word w;
+    int i;
+
+    entry (DS_SIGNAL)
+
+	// Force "on" state of all flashing items
+	DispToggle = 1;
+
+    entry (DS_LOOP)
+
+
+	if (BSFD == NONE) {
+		// Unbound
+		lcd_clear (0, 0);
+		if (DispToggle)
+			lcd_write (0, "UNBOUND");
+		if (Tracer != NULL)
+			// Two characters
+			lcd_write (21, Tracer);
+	} else {
+
+		if (Tracer != NULL)
+			lcd_write (21, Tracer);
+
+		// We are bound: fixed items first
+		lcd_write (15, BSFD == USFD ? "S" : "W");
+		for (w = 0, i = 0; i < MAX_SAMPLES; i++) 
+			if (SampCount [i])
+				w++;
+		cb [0] = (char) (w + '0');
+		cb [1] = '\0';
+		lcd_write (13, cb);
+
+		if (HeartRate) {
+			// Display the heart rate
+			if (DispToggle) {
+				form (cb, "%d", HeartRate);
+				i = 4 - strlen (cb);
+				if (i > 0) {
+					lcd_clear (16, i);
+					lcd_write (16 + i, cb);
+				}
+			} else {
+				lcd_clear (16, 4);
+			}
+		}
+
+		if (Status == ST_READY) {
+
+			// No flashing in this state unless HeartRate != 0
+			lcd_write (0, "READY   ");
+			lcd_clear (9, 3);
+			lcd_clear (32-8, 8);
+			if (HeartRate) {
+				DispToggle = 1 - DispToggle;
+				delay (INTV_DISPLAY, DS_LOOP);
+			}
+			when (0, DS_SIGNAL);
+			release;
+
+		} else {
+
+			if (DispToggle)
+				lcd_write (0, Status == ST_SAMPLING ?
+					"SAMPLING" : "SENDING ");
+			else
+				lcd_clear (0, 8);
+
+			// Sample number
+			form (cb, "%d", ThisSampleId);
+			i = 3 - strlen (cb);
+			if (i > 0)
+				lcd_clear (9, i);
+			lcd_write (9 + i, cb);
+
+			// Left
+			form (cb, "%lu", Left);
+			i = 8 - strlen (cb);
+			if (i <= 0) {
+				i = 0;
+			} else {
+				lcd_clear (32-8, i);
+			}
+			lcd_write (32-8 + i, cb);
+		}
+	}
+
+	DispToggle = 1 - DispToggle;
+	delay (INTV_DISPLAY, DS_LOOP);
+	when (0, DS_SIGNAL);
+
+endthread
+
+// ============================================================================
+
+#define	SN_LOOP		0
+
+thread (sender)
+
+    int ns;
+
+    entry (SN_LOOP)
+
+	if (BSFD == NONE) {
+		// Drop everything
+		Status = ST_READY;
+		TheThread = 0;
+		finish;
+	}
+
+	if (Ack == 1) {
+
+		// This means NAK: retransmit from NextToAck
+		Ack = 0;
+		Left += (NextToGo - NextToAck);
+		NextToGo = NextToAck;
+
+	} else if (NextToGo - NextToAck >= WINDOW_SIZE || Left == 0) {
+
+		if (NextToGo == NextToAck) {
+			// Final ACK
+			TheThread = 0;
+			finish;
+		}
+
+		// Keep sending the last packet at intervals
+		send_next ();
+		delay (INTV_RESEND, SN_LOOP);
+		when (0, SN_LOOP);
+		release;
+	}
+
+	// Keep sending
+
+	if ((ns = send_next ()) != ERROR) {
+		NextToGo += ns;
+		Left -= ns;
+	}
+
+	delay (INTV_IPS, SN_LOOP);
+	when (0, SN_LOOP);
+
+endthread
+
+// ============================================================================
+
+#define	SM_INIT		0
+#define	SM_ACQUIRE	1
+#define	SM_OUT		2
+
+thread (sampler)
+
+    entry (SM_INIT)
+
+	if (adcs_start (SAMPLE_BUFFER_SIZE) == ERROR) {
+		// No memory, not likely to happen but be prepared
+		TheThread = 0;
+		Status = ST_READY;
+		SampCount [ThisSampleSlot] = 0;
+		if (BSFD != NONE)
+			send_status (BSFD);
+		finish;
+	}
+
+	// We have succeeded
+
+    entry (SM_ACQUIRE)
+
+NextSample:
+
+	adcs_get_sample (SM_ACQUIRE, SBuf);
+
+    entry (SM_OUT)
+
+	ee_write (SM_OUT, MULT_SAMPLE_SIZE (BufferIn), (byte*) SBuf,
+		SAMPLE_SIZE);
+
+	// Update the IN pointer
+	if (++BufferIn == BufferLimit)
+		BufferIn = 0;
+
+	SampCount [ThisSampleSlot]++;
+
+	if (--Left)
+		goto NextSample;
+
+	// Done
+	adcs_stop ();
+
+	Status = ST_READY;
+
+	if (HRM_ACTIVE && HREndOnEOS) {
+		// Terminate the heart rate monitor as well
+		hrc_stop ();
+		kill (HeartRateMonitor);
+		HeartRate = 0;
+	}
+
+	TheThread = 0;
+
+	if (BSFD != NONE)
+		send_status (BSFD);
+
+	finish;
+
+endthread
+
+// ============================================================================
+
+#define	HR_INIT		0
+#define	HR_START	1
+#define	HR_FIRST	2
+#define	HR_SECOND	3
+
+thread (hrate)
+
+    byte nb;
+    address packet;
+    byte *pp;
+    word hr;
+    int i;
+
+    entry (HR_INIT)
+
+	for (i = 0; i < HRC_N_SLOTS; i++)
+		hr_val [i] = 0;
+
+	// Align at second boundary
+	when (0, HR_START);
+	release;
+
+    entry (HR_START)
+
+	hrc_start ();
+	SCnt = 0;
+	when (0, HR_FIRST);
+	release;
+
+    entry (HR_FIRST)
+
+	if (SCnt != 2) {
+		// Keep ticking for 3 sec
+		SCnt++;
+		when (0, HR_FIRST);
+		release;
+	}
+
+	nb = hrc_get ();
+
+	// The startup
+	for (i = 0; i < HRC_N_SLOTS; i++)
+		hr_val [i] = nb;
+
+	goto HR_Calc;
+
+    entry (HR_SECOND)
+
+	if (SCnt != 2) {
+		SCnt++;
+		when (0, HR_SECOND);
+		release;
+	}
+
+	nb = hrc_get ();
+
+	// Shift the samples
+	for (i = HRC_N_SLOTS-1; i != 0; i--)
+		hr_val [i] = hr_val [i-1];
+HR_Calc:
+	SCnt = 0;
+	for (hr = 0, i = 0; i < HRC_N_SLOTS; i++)
+		hr += (word) (hr_val [i]) * hr_weights [i];
+
+	if (HeartRate != 0)
+		HeartRate = (hr * 3 + HeartRate) >> 2;
+	else
+		HeartRate = hr;
+
+	// Create a packet
+	if (BSFD != NONE) {
+		packet = tcv_wnp (WNONE, BSFD, 4 + 2);
+		if (packet != NULL) {
+			// Fill it out and send
+			pp = (byte*) (packet + 1);
+			put1 (pp, PT_HRATE);
+			nb = HeartRate < 255 ? (byte) HeartRate : 255;
+			put1 (pp, nb);
+			tcv_endp (packet);
+		}
+	}
+	when (0, HR_SECOND);
+	release;
+
+endthread
+	
+// ============================================================================
+
+#define	LI_INIT		0
+#define	LI_WBIND	1
+#define	LI_GETCMD	2
+#define	LI_PERSTAT	3
+
+#define	MYFD	((int)data)
+
+strand (listener, int)
+
+    lword lwsc;
+    address packet;
+    byte *pp;
+    word wsc;
+    byte cmd, bsc;
+
+    entry (LI_INIT)
+
+	// This is where we start listening. The first thing we should do
+	// is to bind ourselves somehwere.
+
+	if (BSFD == MYFD)
+		// We are bound already on this interface
+		proceed (LI_GETCMD);
+
+	if (BSFD == NONE) {
+
+		// We are not bound at all. Send a HELLO packet. We don't do
+		// that if we are bound on the other interface, but we listen
+		// on this one in case somebody wants to re-bind us here.
+
+		packet = tcv_wnp (LI_INIT, MYFD, 4 + 6);
+		pp = (byte*) (packet + 1);
+
+		put1 (pp, PT_HELLO);
+		put4 (pp, ESN);
+		// ===
+		// 5
+
+		tcv_endp (packet);
+	}
+
+    entry (LI_WBIND)
+
+	// Keep waiting
+	delay (INTV_HELLO, LI_INIT);
+	packet = tcv_rnp (LI_WBIND, MYFD);
+	if (Status) {
+		// Ignore if we are busy (well we cannot be, can we?)
+BIgn:
+		tcv_endp (packet);
+		proceed (LI_WBIND);
+	}
+
+	if (tcv_left (packet) < 6)
+		goto BIgn;
+
+	// NetId
+	wsc = packet [0];
+
+	pp = (byte*) (packet + 1);
+
+	get1 (pp, cmd);
+	if (cmd != PT_BIND)
+		// Only BIND command expected
+		goto BIgn;
+
+	get4 (pp, lwsc);
+	if (lwsc != ESN)
+		// Not my ESN
+		goto BIgn;
+
+	// Bind
+	BSFD = MYFD;
+
+	// Set the NetId
+	tcv_control (MYFD, PHYSOPT_SETSID, &wsc);
+
+	tcv_endp (packet);
+	BINDIT;
+	send_status (MYFD);
+	DISPIT;
+
+	// Note: BIND commands are not acked. An unbound node will keep
+	// sending HELLO on the interface, so once it stops, the binding
+	// AP will know that the command has succeeded
+
+    entry (LI_GETCMD)
+
+	// This is the main request acquisition loop
+	if (BSFD != MYFD)
+		// Check before every read if the binding is still ON
+		proceed (LI_INIT);
+
+	// re-check when bound on the oher interface
+	when (&BSFD, LI_GETCMD);
+	// do periodic status reports even if nobody asks
+	delay (INTV_PERSTAT, LI_PERSTAT);
+
+	packet = tcv_rnp (LI_GETCMD, MYFD);
+
+	if (tcv_left (packet) < 6) {
+LRet:
+		tcv_endp (packet);
+		proceed (LI_GETCMD);
+	}
+
+	pp = (byte*) (packet + 1);
+
+	get1 (pp, cmd);
+
+	if ((cmd & 0x80)) 		// To AP
+		goto LRet;
+
+	switch (cmd) {
+
+	    case PT_UNBIND:
+
+		// Unbind forces abort. This is not acknowledged.
+		abort_all ();
+		BSFD = NONE;
+		// Become promiscuous to listen to bind commands
+		wsc = 0;
+		tcv_control (MYFD, PHYSOPT_SETSID, &wsc);
+		tcv_endp (packet);
+		DISPIT;
+		proceed (LI_INIT);
+
+	    case PT_RESET:
+
+		// Erase all samples
+		erase_all_samples ();
+
+	    case PT_STOP:
+
+		// Stop whatever you are doing
+		abort_all ();
+		DISPIT;
+
+	    case PT_BIND:
+	    case PT_REPORT:
+Report:
+		// Do this first to reduce memory contention on tcv_rnp
+		tcv_endp (packet);
+		// Send status
+		send_status (MYFD);
+		proceed (LI_GETCMD);
+
+	    case PT_SAMPLE:
+	    case PT_SAMPLEH:
+
+		// Note: if we are not idle, we simply ignore the request.
+		// At the end, we send a status report, which will tell the
+		// AP what has happend. If the status says that we are
+		// doing the requested sample, the AP will know that we
+		// have accepted the command. If we are done before the
+		// report makes it to the AP, we will be idle, and the sample
+		// will show up on the list.
+
+		if (Status != ST_READY)
+			goto Report;
+
+		// The sample Id
+		get1 (pp, bsc);
+
+		// Check if have this sample already
+		for (wsc = 0; wsc < MAX_SAMPLES; wsc++)
+			if (SampCount [wsc] && SampIdent [wsc] == bsc)
+				// Just report the status
+				goto Report;
+
+		if (cmd == PT_SAMPLEH) {
+			if (!HRM_ACTIVE)
+				HeartRateMonitor = runthread (hrate);
+			HREndOnEOS = YES;
+		}
+
+		// No such sample; start a new one
+		get3 (pp, Left);
+
+		if (Left >= BufferLimit)
+			// Sanity check: do not exceed buffer capacity
+			Left = BufferLimit - 1;
+
+		// Delete the samples that will overlap with us
+		kill_samples (Left);
+
+		// Get a free slot
+		if ((wsc = find_free_sample_slot ()) == WNONE) {
+			ThisSampleSlot = NextSampleSlot;
+			SampCount [ThisSampleSlot] = 0;
+			if (++NextSampleSlot == MAX_SAMPLES)
+				NextSampleSlot = 0;
+		} else {
+			ThisSampleSlot = (byte) wsc;
+		}
+
+		SampIdent [ThisSampleSlot] = ThisSampleId = bsc;
+		SampStart [ThisSampleSlot] = BufferIn;
+
+		Status = ST_SAMPLING;
+		TheThread = runthread (sampler);
+		DISPIT;
+		goto Report;
+
+	    case PT_SEND:
+
+		// Sample Id
+		get1 (pp, bsc);
+
+		if (Status != ST_READY) {
+			// Doing something
+			if (Status != ST_SENDING)
+				goto Report;
+
+			// We are sending, check if the sample number matches
+			if (ThisSampleId != bsc)
+				goto Report;
+
+			// This is the number of next expected sample
+			get3 (pp, lwsc);
+
+			if (lwsc == NextToAck) {
+				if (Left)
+				// Duplicate, treat as a NAK
+					Ack = 1;
+SDone:
+				SENDIT;
+				tcv_endp (packet);
+				proceed (LI_GETCMD);
+			}
+
+			if (lwsc < NextToAck)
+				// Incorrect, shouldn't happen
+				goto Report;
+
+			NextToAck = lwsc;
+
+			if (NextToGo < NextToAck) {
+				if (NextToAck - NextToGo <= Left) {
+					Left -= (NextToAck - NextToGo);
+					NextToGo = NextToAck;
+				} else {
+					// This cannot happen
+					NextToGo += Left;
+					NextToAck = NextToGo;
+					Left = 0;
+				}
+			}
+
+			// Advancement
+			goto SDone;
+		}
+
+		// We are idle, so this is a start
+		for (ThisSampleSlot = 0; ThisSampleSlot < MAX_SAMPLES;
+		    ThisSampleSlot++)
+			if (SampCount [ThisSampleSlot] &&
+			    SampIdent [ThisSampleSlot] == bsc)
+				break;
+
+		if (ThisSampleSlot == MAX_SAMPLES)
+			// Not found
+			goto Report;
+
+		// Starting sample
+		get3 (pp, NextToGo);
+
+		if (SampCount [ThisSampleSlot] <= NextToGo)
+			// Nothing to send
+			goto Report;
+
+		// Number of samples
+		get3 (pp, Left);
+
+		if (Left > SampCount [ThisSampleSlot] - NextToGo)
+			// Trim it down
+			Left = SampCount [ThisSampleSlot] - NextToGo;
+
+		ThisSampleId = bsc;
+
+		// Ready to start
+		NextToAck = NextToGo;
+		Status = ST_SENDING;
+		Ack = 0;
+		TheThread = runthread (sender);
+		tcv_endp (packet);
+		DISPIT;
+		proceed (LI_GETCMD);
+
+	    case PT_HRMON:
+
+		// Switch on the heart rate monitor
+		if (!HRM_ACTIVE) {
+			HeartRateMonitor = runthread (hrate);
+			DISPIT;
+		}
+		HREndOnEOS = NO;
+		goto Report;
+
+	    case PT_HRMOFF:
+
+		// Switch off the heart rate monitor
+		if (HRM_ACTIVE) {
+			hrc_stop ();
+			kill (HeartRateMonitor);
+			HeartRate = 0;
+			DISPIT;
+		}
+		goto Report;
+	}
+
+	// Just in case - ignore unrecognizable command
+	proceed (LI_GETCMD);
+
+    entry (LI_PERSTAT)
+
+	if (Status == ST_READY && !HRM_ACTIVE && BSFD == MYFD)
+		// Periodic status report
+		send_status (MYFD);
+
+	proceed (LI_GETCMD);
+
+endstrand
+
+// ============================================================================
+
+thread (root)
+
+#define	RS_INIT		0
+
+    word scr;
+
+    entry (RS_INIT)
+
+	erase_all_samples ();
+	init_storage ();
+
+	lcd_on (0);
+	lcd_clear (0, 0);
+
+	phys_cc1100 (0, MAXPLEN);
+	phys_uart (1, MAXPLEN, 0);
+	tcv_plug (0, &plug_null);
+
+	RSFD = tcv_open (NONE, 0, 0);
+	USFD = tcv_open (NONE, 1, 0);
+
+	if (RSFD < 0 || USFD < 0) {
+		lcd_write (0, "FAILED TO START INTERFACES!");
+		finish;
+	}
+
+	diag ("STARTED");
+
+	scr = 0;
+	tcv_control (RSFD, PHYSOPT_SETSID, &scr);
+	tcv_control (USFD, PHYSOPT_SETSID, &scr);
+
+	runstrand (listener, USFD);
+	runstrand (listener, RSFD);
+#ifndef	DONT_DISPLAY
+	Display = runthread (display);
+#endif
+
+	// We are not needed any more. This will provide a high-priority slot
+	// for the sampler.
+	finish;
+
+endthread

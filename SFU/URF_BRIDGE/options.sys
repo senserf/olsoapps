@@ -1,0 +1,22 @@
+// Intentionally empty
+#undef	CODE_LONG_INTS
+#undef	TCV_LIMIT_XMT
+#undef	TCV_LIMIT_RCV
+#undef	SPIN_WHEN_HALTED
+#undef	DIAG_MESSAGES
+#undef	RADIO_USE_LEDS
+#undef	UART_RATE
+#undef	UART_DRIVER
+#undef	UART_TCV
+
+#define	DIAG_MESSAGES		0
+#define	UART_DRIVER		0
+#define	UART_TCV		1
+#define	CODE_LONG_INTS		0
+#define	TCV_LIMIT_XMT		8
+#define	TCV_LIMIT_RCV		8
+#define	SPIN_WHEN_HALTED	0
+#define	RADIO_USE_LEDS		7
+
+#define	RADIO_BITRATE		200000
+#define	UART_RATE		115200

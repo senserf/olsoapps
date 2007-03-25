@@ -27,6 +27,17 @@
 		-5.0dB		9.9E-1
 	</ber>
 	<frame>9600 12 0</frame>
+	<rssi mode="log,transform">-202.0 0 53.0 255</rssi>
+	<power mode="log,interp">
+		-30.0dBm  	0
+		-15.0dBm	1
+		-10.0dBm	2
+		 -5.0dBm	3
+		  0.0dBm	4
+		  5.0dBm	5
+		  7.0dBm	6
+		 10.0dBm	7
+	</power>
     </channel>
     <nodes>
 	<defaults>
@@ -50,6 +61,9 @@
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
+	    <preinit tag="TEST1" type="word">13</preinit>
+	    <preinit tag="TEST2" type="lword">130000</preinit>
+	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
 	</defaults>
 	<node number="0">
 	    <leds number="4">
@@ -68,6 +82,8 @@
 		<output target="socket"></output>
 	    </pins>
 	    <location>1.0 11.0</location>
+	    <preinit tag="TEST1" type="word">0x13</preinit>
+	    <preinit tag="TEST3" type="string"></preinit>
 	</node>
 	<node number="2">
 		<location>11.0 11.0</location>
@@ -79,7 +95,20 @@
 		<location>6.0 6.0</location>
 	</node>
 	<node number="5">
+	    <uart rate="9600" bsize="12">
+		<input source="string">s 4096\r\n</input>
+	    </uart>
+	    <preinit tag="TEST1" type="word">13</preinit>
 		<location>7.0 7.0</location>
 	</node>
     </nodes>
+
+    <roamer>
+	<input source="string">
+		R 5 [1.0 1.0 64.0 64.0] [0.5 2.0] [2.0 4.0] -1.0
+		R 0 [1.0 1.0 64.0 64.0] [4.0 4.0] [2.0 4.0] -1.0
+		R 3 [1.0 1.0 64.0 64.0] [4.0 4.0] [2.0 4.0] -1.0
+	</input>
+    </roamer>
+
 </network>
