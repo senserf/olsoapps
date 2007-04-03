@@ -1,6 +1,8 @@
 #ifndef	__praxis_globals_h__
 #define	__praxis_globals_h__
 
+#include "params.h"
+
 #ifdef	__SMURPH__
 
 #define	THREADNAME(a)	a ## _test
@@ -13,16 +15,12 @@
 #define	sfd		_dac (Node, sfd)
 #define	last_snt	_dac (Node, last_snt)
 #define	last_rcv	_dac (Node, last_rcv)
-#define	last_ack	_dac (Node, last_ack)
-#define	XMTon		_dac (Node, XMTon)
-#define	RCVon		_dac (Node, RCVon)
-#define	rkillflag	_dac (Node, rkillflag)
-#define	tkillflag	_dac (Node, tkillflag)
-
-#define	rcv_start	_dac (Node, rcv_start)
-#define	rcv_stop	_dac (Node, rcv_stop)
-#define	snd_start	_dac (Node, snd_start)
-#define	snd_stop	_dac (Node, snd_stop)
+#define	received	_dac (Node, received)
+#define	lost		_dac (Node, lost)
+#define	packet_length	_dac (Node, packet_length)
+#define	send_interval	_dac (Node, send_interval)
+#define	NODE_ID		_dac (Node, NODE_ID)
+#define	receiving	_dac (Node, receiving)
 
 // ====================
 
@@ -37,13 +35,16 @@
 #include "plug_null.h"
 
 int	sfd;
-long	last_snt;
-long	last_rcv;
-long	last_ack;
-bool	XMTon;
-bool 	RCVon;
-bool	rkillflag;
-bool	tkillflag;
+lword	last_snt;
+lword	last_rcv [MAX_PEER_COUNT];
+lword	received [MAX_PEER_COUNT];
+lword	lost [MAX_PEER_COUNT];
+word	packet_length;
+word	send_interval;
+int	sfd;
+Boolean	receiving;
+
+const word	NODE_ID = 0xBACA;;
 
 heapmem {10, 90};
 

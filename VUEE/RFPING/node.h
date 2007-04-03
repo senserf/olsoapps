@@ -2,7 +2,6 @@
 #define	__node_h__
 
 #include "board.h"
-#include "chan_shadow.h"
 #include "plug_null.h"
 
 station	Node : NNode {

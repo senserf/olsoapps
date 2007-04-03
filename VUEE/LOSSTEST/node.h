@@ -3,6 +3,7 @@
 
 #include "board.h"
 #include "plug_null.h"
+#include "params.h"
 
 station	Node : NNode {
 

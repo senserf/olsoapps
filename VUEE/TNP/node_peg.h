@@ -6,7 +6,6 @@
 #endif
 
 #include "board.h"
-#include "chan_shadow.h"
 #include "plug_tarp.h"
 
 station	NodePeg : TNode {

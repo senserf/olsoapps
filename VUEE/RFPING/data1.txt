@@ -10,7 +10,7 @@
 		RP(d)/XP [dB] = -10 x 3.0 x log(d/1.0m) + X(1.0) - 38.0
  		=======================================================
 	</shadowing>
-	<cutoff>400m</cutoff>
+	<cutoff>-120dBm</cutoff>
 	<ber>
 		Interpolated ber table:
 		======================

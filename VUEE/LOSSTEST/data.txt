@@ -2,7 +2,7 @@
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
     <channel>
-        <shadowing bn="-98.0dBm" syncbits="8">
+        <shadowing bn="-95.0dBm" syncbits="8">
 		RP(d) = received power at distance d
 		XP    = transmitted power
 		X     = lognormal random Gaussian component
@@ -61,54 +61,40 @@
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
-	    <preinit tag="TEST1" type="word">13</preinit>
-	    <preinit tag="TEST2" type="lword">0xaaaaaaaa</preinit>
-	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
-	</defaults>
-	<node number="0">
-	    <leds number="4">
-		<output target="socket"></output>
-	    </leds>
 	    <pins number="10" adc="8">
-		<output target="device">pins_output0.txt</output>
+		<output target="socket"></output>
+		<input source="socket"></input>
 		<status>1111111111</status>
 		<values>0000000000</values>
 		<voltage>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</voltage>
 	    </pins>
-	    <location>1.0 1.0</location>
+	    <leds number="4">
+		<output target="socket"></output>
+	    </leds>
+	</defaults>
+	<node number="0">
+	    	<location>100.0 100.0</location>
+		<preinit tag="NODE_ID">0</preinit>
 	</node>
 	<node number="1">
-	    <pins number="10" adc="8">
-		<output target="socket"></output>
-	    </pins>
-	    <location>1.0 11.0</location>
-	    <preinit tag="TEST1" type="word">0x13</preinit>
-	    <preinit tag="TEST3" type="string"></preinit>
+	    	<location>180.0 100.0</location>
+		<preinit tag="NODE_ID">1</preinit>
 	</node>
 	<node number="2">
-		<location>11.0 11.0</location>
+		<location>260.0 100.0</location>
+		<preinit tag="NODE_ID">2</preinit>
 	</node>
 	<node number="3">
-		<location>11.0 1.0</location>
+		<location>340.0 100.0</location>
+		<preinit tag="NODE_ID">3</preinit>
 	</node>
 	<node number="4">
-		<location>6.0 6.0</location>
+		<location>420.0 100.0</location>
+		<preinit tag="NODE_ID">4</preinit>
 	</node>
 	<node number="5">
-	    <uart rate="9600" bsize="12">
-		<input source="string">s 4096\r\n</input>
-	    </uart>
-	    <preinit tag="TEST1" type="word">13</preinit>
-		<location>7.0 7.0</location>
+		<location>500.0 100.0</location>
+		<preinit tag="NODE_ID">5</preinit>
 	</node>
     </nodes>
-
-    <roamer>
-	<input source="string">
-		R 5 [1.0 1.0 64.0 64.0] [0.5 2.0] [2.0 4.0] -1.0
-		R 0 [1.0 1.0 64.0 64.0] [4.0 4.0] [2.0 4.0] -1.0
-		R 3 [1.0 1.0 64.0 64.0] [4.0 4.0] [2.0 4.0] -1.0
-	</input>
-    </roamer>
-
 </network>
