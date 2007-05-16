@@ -1,6 +1,6 @@
 /* ============================================================= */
 /* ============================================================= */
-/* ==              P. Gburzynski, May 2007                    == */
+/* ==              P. Gburzynski, March 2007                  == */
 /* ============================================================= */
 /* ============================================================= */
 
@@ -66,7 +66,8 @@ const	byte
 #define	HR_ON		0x00	// Offsets to PT_HRMCTRL
 #define	HR_OFF		0x01
 
-#define	SM_XMIT		0x01	// Offset to PT_SAMPLE
+#define	SM_XMIT		0x02	// Offsets to PT_SAMPLE
+#define	SM_HRMON	0x01	// ...
 
 #define	ST_READY	0x00	// These must work as offsets to PT_STATUS
 #define	ST_SAMPLING	0x02	// ...
@@ -82,9 +83,8 @@ const	byte
 
 #define	MAX_SAMPLES	8	// The max number of stored samples
 
-#define	SAMPLE_SIZE		(ADCS_SAMPLE_LENGTH * 2)// This is 12 bytes
+#define	SAMPLE_SIZE		(ADCS_SAMPLE_LENGTH*2)	// This is 12 bytes
 #define	SAMPLES_PER_PACKET	4			// == 48 bytes
-#define	SAMPLES_PER_SECOND	(ADCS_TA_FREQUENCY / SAMPLES_PER_PACKET)
 
 #define	BUFFER_STORAGE_UNIT	(SAMPLE_SIZE * SAMPLES_PER_PACKET)
 #define	MULT_STORAGE_UNIT(a)	(((a) << 5) + ((a) << 4))
@@ -139,7 +139,7 @@ byte	NextSampleSlot;
 byte	SRL, SRP;		// Roster length/ptr
 byte	DispToggle = 0;
 byte	LostSamples = 0;
-	SamplesToStat,
+Boolean	HREndOnEOS,		// Terminate HR monitor when end of sampling
 	XWS;			// Transmitting sample packets
 
 word	HeartRate = 0;
@@ -610,27 +610,17 @@ NextSample:
 			LostSamples = (byte) ovf;
 	}
 
-	if (XWS) {
-		// Sending while sampling
-		if (QPackets <= PACKET_QUEUE_LIMIT) {
-			// Send this sample
-			packet = tcv_wnp (WNONE, BSFD, 6 + BUFFER_STORAGE_UNIT);
-			if (packet != NULL) {
-				put1 (packet, PT_SDATA);
-				put1 (packet, ThisSampleId);
-				put1 (packet, HeartRate);
-				put3 (packet, SampCount [ThisSampleSlot]);
-				memcpy (((byte*) packet) + 8, (byte*) SBuf,
-					BUFFER_STORAGE_UNIT);
-				tcv_endp (packet);
-			}
-		}
-
-	} else {
-		// Just sampling
-		if (SamplesToStat-- == 0) {
-			SamplesToStat = SAMPLES_PER_SECOND;
-			send_status (BSFD);
+	if (XWS && QPackets <= PACKET_QUEUE_LIMIT) {
+		// Send this sample
+		packet = tcv_wnp (WNONE, BSFD, 6 + BUFFER_STORAGE_UNIT);
+		if (packet != NULL) {
+			put1 (packet, PT_SDATA);
+			put1 (packet, ThisSampleId);
+			put1 (packet, HeartRate);
+			put3 (packet, SampCount [ThisSampleSlot]);
+			memcpy (((byte*) packet) + 8, (byte*) SBuf,
+				BUFFER_STORAGE_UNIT);
+			tcv_endp (packet);
 		}
 	}
 
@@ -641,6 +631,13 @@ NextSample:
 
 	// Done
 	adcs_stop ();
+
+	if (HRM_ACTIVE && HREndOnEOS) {
+		// Terminate the heart rate monitor as well
+		hrc_stop ();
+		kill (TheHRMonitor);
+		HeartRate = 0;
+	}
 
 	if (XWS) {
 		XWS = 2;
@@ -866,6 +863,14 @@ Report:
 				// Just report the status
 				goto Report;
 
+		if ((cmd & SM_HRMON)) {
+			if (!HRM_ACTIVE) {
+				hrc_start ();
+				TheHRMonitor = runthread (hrate);
+			}
+			HREndOnEOS = YES;
+		}
+
 		XWS = (cmd & SM_XMIT) ? 1 : 0;
 		QPackets = 0;
 
@@ -893,7 +898,6 @@ Report:
 		SampStart [ThisSampleSlot] = BufferIn;
 
 		LostSamples = 0;
-		SamplesToStat = SAMPLES_PER_SECOND;
 
 		Status = ST_SAMPLING;
 		TheSampler = runthread (sampler);
@@ -989,6 +993,7 @@ StartX:
 				TheHRMonitor = runthread (hrate);
 				DISPIT;
 			}
+			HREndOnEOS = NO;
 		}
 
 		goto Report;

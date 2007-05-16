@@ -3,7 +3,7 @@
 
 			###############################
 			##                           ##
-			## P. Gburzynski, May 2007   ##
+			## P. Gburzynski, March 2007 ##
 			##                           ##
 			###############################
 
@@ -20,7 +20,7 @@ set SAMP(MAX)		600
 
 
 array set CMD		{ BIND 0 UNBIND 64 RESET 16 STOP 32 ABORT 33 REPORT 48
-				SAMPLE 80 SAMPLEX 81 HRMON 112 HRMOFF 113
+				SAMPLE 80 SAMPLEX 82 HRMON 112 HRMOFF 113
 					SEND 96 HELLO 128 HRATE 208 SDATA 192
 							STATUS 144 }
 
@@ -1166,7 +1166,6 @@ proc handle_status { st mo } {
 				set Wins($lid,LSR) 0
 				idle_buttons $lid
 			}
-			kick_status_updater $lid
 			return
 		}
 	
@@ -1500,7 +1499,7 @@ proc handle_sdata { lid } {
 
 	if { $sid != $Wins($lid,TSI) } {
 		# something fundamentally wrong
-		log "LID $lid, unexpected sample ID, operation aborted"
+		log "LID $lid, unexpected sample ID, operation aborted
 		full_stop $lid
 		return
 	}
@@ -1586,7 +1585,7 @@ proc status_updater { lid } {
 
 	global Wins INTV
 
-	if { $Wins($lid,LSR) || $Wins($lid,LST) == "SMP" } {
+	if $Wins($lid,LSR) {
 		# don't need this at all; as a matter of fact, the updater
 		# is in the way
 		set Wins($lid,SCB) ""

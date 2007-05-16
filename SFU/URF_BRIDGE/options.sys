@@ -14,7 +14,7 @@
 #define	UART_TCV		1
 #define	CODE_LONG_INTS		0
 #define	TCV_LIMIT_XMT		8
-#define	TCV_LIMIT_RCV		8
+#define	TCV_LIMIT_RCV		16
 #define	SPIN_WHEN_HALTED	0
 #define	RADIO_USE_LEDS		7
 

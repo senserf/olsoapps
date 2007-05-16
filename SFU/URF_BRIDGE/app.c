@@ -10,53 +10,113 @@ heapmem {100};
 
 #include "phys_cc1100.h"
 #include "phys_uart.h"
-#include "plug_null.h"
 
 #define	XMIT_POWER	2
 
+// The plugin
+
+int tcv_ope_bridge (int, int, va_list);
+int tcv_clo_bridge (int, int);
+int tcv_rcv_bridge (int, address, int, int*, tcvadp_t*);
+int tcv_frm_bridge (address, int, tcvadp_t*);
+int tcv_out_bridge (address);
+int tcv_xmt_bridge (address);
+
+const tcvplug_t plug_bridge =
+		{ tcv_ope_bridge, tcv_clo_bridge, tcv_rcv_bridge,
+			tcv_frm_bridge, tcv_out_bridge, tcv_xmt_bridge, NULL,
+				0x0091 /* Plugin Id */ };
+
 int	RSFD, USFD;
 
-#define	MAXPLEN		60
+#define	MAXPLEN			60
 
-thread (touart)
+// The Plugin =================================================================
 
-#define	TU_NEXT		0
+int 	*desc = NULL;
 
-    int len;
-    address ipk, opk;
+int tcv_ope_bridge (int phy, int fd, va_list plid) {
+/*
+ * This is very simple - we are allowed to have one descriptor per phy.
+ */
+	int i;
 
-    entry (TU_NEXT)
-
-	ipk = tcv_rnp (TU_NEXT, RSFD);
-	len = tcv_left (ipk);
-	opk = tcv_wnp (WNONE, USFD, len);
-
-	if (opk == NULL) {
-		tcv_endp (ipk);
-		proceed (TU_NEXT);
+	if (desc == NULL) {
+		desc = (int*) umalloc (sizeof (int) * TCV_MAX_PHYS);
+		if (desc == NULL)
+			syserror (EMALLOC, "plug_bridge tcv_ope_bridge");
+		for (i = 0; i < TCV_MAX_PHYS; i++)
+			desc [i] = NONE;
 	}
 
-	memcpy (opk, ipk, len);
-	tcv_endp (ipk);
-	tcv_endp (opk);
-	proceed (TU_NEXT);
+	/* phy has been verified by TCV */
+	if (desc [phy] != NONE)
+		return ERROR;
 
-endthread
+	desc [phy] = fd;
+	return 0;
+}
+
+int tcv_clo_bridge (int phy, int fd) {
+
+	/* phy/fd has been verified */
+
+	if (desc == NULL || desc [phy] != fd)
+		return ERROR;
+
+	desc [phy] = NONE;
+	return 0;
+}
+
+int tcv_rcv_bridge (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
+
+	if (desc == NULL)
+		return TCV_DSP_PASS;
+
+	// Swap the sessions
+	phy = 1 - phy;
+
+	if ((*ses = desc [phy]) == NONE)
+		return TCV_DSP_PASS;
+
+	bounds->head = bounds->tail = 0;
+
+	return TCV_DSP_XMT;
+}
+
+int tcv_frm_bridge (address p, int phy, tcvadp_t *bounds) {
+
+	// Link Id + CRC
+	return bounds->head = bounds->tail = 0;
+}
+
+int tcv_out_bridge (address p) {
+
+	return TCV_DSP_XMT;
+
+}
+
+int tcv_xmt_bridge (address p) {
+
+	return TCV_DSP_DROP;
+}
+
+// ============================================================================
+
+
+// ============================================================================
 
 thread (root)
 
 #define	RS_INIT		0
-#define	RS_READ		1
 
     word scr;
-    int len;
-    address ipk, opk;
 
     entry (RS_INIT)
 
 	phys_cc1100 (0, MAXPLEN);
 	phys_uart (1, MAXPLEN, 0);
-	tcv_plug (0, &plug_null);
+	tcv_plug (0, &plug_bridge);
 
 	RSFD = tcv_open (NONE, 0, 0);
 	USFD = tcv_open (NONE, 1, 0);
@@ -77,20 +137,6 @@ thread (root)
 	tcv_control (USFD, PHYSOPT_TXON, NULL);
 	tcv_control (USFD, PHYSOPT_RXON, NULL);
 
-	runthread (touart);
-
-    entry (RS_READ)
-
-	ipk = tcv_rnp (RS_READ, USFD);
-	len = tcv_left (ipk);
-	opk = tcv_wnp (WNONE, RSFD, len);
-	if (opk == NULL) {
-		tcv_endp (ipk);
-		proceed (RS_READ);
-	}
-	memcpy (opk, ipk, len);
-	tcv_endp (ipk);
-	tcv_endp (opk);
-	proceed (RS_READ);
+	finish;
 
 endthread
