@@ -6,4 +6,4 @@
 #undef	UART_RATE
 
 #define	UART_DRIVER	1
-#define	UART_RATE	9600
+#define	UART_RATE	115200

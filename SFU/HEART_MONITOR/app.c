@@ -15,7 +15,10 @@ heapmem {100};
 
 #include "form.h"
 
+#ifndef BLUETOOTH_PRESENT
 #include "phys_cc1100.h"
+#endif
+
 #include "phys_uart.h"
 
 // The plugin
@@ -138,7 +141,7 @@ byte	ThisSampleSlot;
 byte	NextSampleSlot;
 byte	SRL, SRP;		// Roster length/ptr
 byte	DispToggle = 0;
-byte	LostSamples = 0;
+byte	LostSamples = 0,
 	SamplesToStat,
 	XWS;			// Transmitting sample packets
 
@@ -1024,8 +1027,14 @@ thread (root)
 	lcd_on (0);
 	lcd_clear (0, 0);
 
+#ifdef BLUETOOTH_PRESENT
+	// UART_B as the primary interface via BlueTooth
+	phys_uart (0, MAXPLEN, BLUETOOTH_PRESENT - 1);
+	phys_uart (1, MAXPLEN, BLUETOOTH_PRESENT > 1 ? 0 : 1);
+#else
 	phys_cc1100 (0, MAXPLEN);
 	phys_uart (1, MAXPLEN, 0);
+#endif
 	tcv_plug (0, &plug_heart);
 
 	RSFD = tcv_open (NONE, 0, 0);
@@ -1048,8 +1057,10 @@ thread (root)
 	tcv_control (USFD, PHYSOPT_TXON, NULL);
 	tcv_control (USFD, PHYSOPT_RXON, NULL);
 
+#ifndef BLUETOOTH_PRESENT
 	scr = XMIT_POWER;
 	tcv_control (RSFD, PHYSOPT_SETPOWER, &scr);
+#endif
 
 	runstrand (listener, USFD);
 	runstrand (listener, RSFD);

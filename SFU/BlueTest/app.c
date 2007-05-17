@@ -74,9 +74,10 @@ thread (root)
 #define	RS_ESC	5
 #define	RS_RES	6
 #define	RS_ATT	7
+#define	RS_RAU	8
 
-#define	RS_WRL	8
-#define	RS_ERR	9
+#define	RS_WRL	9
+#define	RS_ERR	10
 
 	static char *ibuf;
 	static int n, k, p;
@@ -97,6 +98,7 @@ thread (root)
 		"Commands:\r\n"
 		"w string    -> write line to module\r\n"
 		"r rate      -> set rate for module\r\n"
+		"t rate      -> set rate for UART\r\n"
 		"e           -> escape\r\n"
 		"s           -> reset module\r\n"
 		"a           -> view attention flag\r\n"
@@ -110,6 +112,7 @@ thread (root)
 
 	    case 'w': proceed (RS_WRI);
 	    case 'r': proceed (RS_RAT);
+	    case 't': proceed (RS_RAU);
 	    case 'e': proceed (RS_ESC);
 	    case 's': proceed (RS_RES);
 	    case 'a': proceed (RS_ATT);
@@ -147,6 +150,13 @@ thread (root)
 	n = 96;
 	scan (ibuf + 1, "%d", &n);
 	ion (UART_B, CONTROL, (char*)(&n), UART_CNTRL_SETRATE);
+	proceed (RS_RCM);
+
+  entry (RS_RAU)
+
+	n = 96;
+	scan (ibuf + 1, "%d", &n);
+	ion (UART_A, CONTROL, (char*)(&n), UART_CNTRL_SETRATE);
 	proceed (RS_RCM);
 
   entry (RS_ESC)
