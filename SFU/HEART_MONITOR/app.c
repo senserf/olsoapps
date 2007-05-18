@@ -9,7 +9,7 @@
 #include "tcvphys.h"
 #include "tcvplug.h"
 
-//#define	DONT_DISPLAY
+// #define	DONT_DISPLAY
 
 heapmem {100};
 
