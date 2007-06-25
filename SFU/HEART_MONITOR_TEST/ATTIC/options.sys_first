@@ -1,0 +1,21 @@
+// Insert here applications-specific options
+#define	INFO_FLASH	1
+
+#ifdef	DIAG_MESSAGES
+#undef	DIAG_MESSAGES
+#endif
+#define	DIAG_MESSAGES	2
+
+#ifdef	CODE_LONG_INTS
+#undef	CODE_LONG_INTS
+#endif
+
+#define	CODE_LONG_INTS	1
+
+#define	NO_LONG_DELAYS	1
+
+#undef	NESTED_INTERRUPTS
+#define	NESTED_INTERRUPTS	1
+
+// #undef	SPIN_WHEN_HALTED
+// #define	SPIN_WHEN_HALTED	1
