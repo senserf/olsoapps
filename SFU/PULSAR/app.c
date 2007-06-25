@@ -11,7 +11,14 @@
 #include "form.h"
 
 char	ibuf [32];
-word 	ipwait;
+word 	ipwait, llimit, hlimit, current;
+
+void set_interval () {
+
+	ipwait = (word)(((lword) 60 * 1024) / current);
+}
+
+
 
 #define	PU_START	0
 #define	PU_OFF		1
@@ -37,37 +44,45 @@ thread (pulsar)
 
 endthread
 
+
 #define	RS_INIT		0
-#define	RS_RCMD		1
+#define	RS_SET		1
+#define	RS_CHANGE	2
 
 thread (root)
 
-  word a;
+  word del;
 
   entry (RS_INIT)
 
-	ser_out (RS_INIT,
-		"\r\nPulsar\r\n"
-		"Commands:\r\n"
-		"n        -> beats per minute\r\n"
-	);
+	current = 65;
 
-	ipwait = 1024;	// 60 per minute
+	runthread (pulsar);
 
-	if (!running (pulsar))
-		runthread (pulsar);
+  entry (RS_SET)
 
-  entry (RS_RCMD)
+	ser_outf (RS_SET, "RATE: %d\r\n", current);
 
-	ser_in (RS_RCMD, ibuf, 31);
+	set_interval ();
 
-	a = 0;
-	scan (ibuf, "%u", &a);
-	if (a < 10 || a > 200)
-		proceed (RS_INIT);
+	del = rnd () & 0x3f;
 
-	ipwait = (word)(((lword) 60 * 1024) / a);
-	proceed (RS_RCMD);
+	if (del < 5)
+		del = 5;
+
+	if (del > 60)
+		del = 60;
+
+ 	delay (del * 1024, RS_CHANGE);
+	release;
+
+  entry (RS_CHANGE)
+
+	do {
+		current = 40 + rnd () % 0x7ff;
+	} while (current > 145);
+
+	proceed (RS_SET);
 
 endthread
 

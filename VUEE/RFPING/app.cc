@@ -220,6 +220,9 @@ thread (root)
 		halt ();
 	}
 
+	pin_read_adc (WNONE, 3, 0, 0);
+	pin_read_adc (WNONE, 4, 0, 0);
+
     entry (RS_RCMDM2)
 
 	ser_out (RS_RCMDM2,

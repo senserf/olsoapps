@@ -6,3 +6,5 @@
 
 #undef	UART_RATE
 #define	UART_RATE		9600
+
+#define	RANDOM_NUMBER_GENERATOR	2

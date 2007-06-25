@@ -1,21 +1,15 @@
-// Insert here applications-specific options
-#define	INFO_FLASH	1
-
-#ifdef	DIAG_MESSAGES
 #undef	DIAG_MESSAGES
-#endif
-#define	DIAG_MESSAGES	2
+#undef	RADIO_USE_LEDS
 
-#ifdef	CODE_LONG_INTS
-#undef	CODE_LONG_INTS
-#endif
+#define	DIAG_MESSAGES		2
+#define	NO_LONG_DELAYS		1
 
-#define	CODE_LONG_INTS	1
+#define	RADIO_USE_LEDS		0
+#define	DIAG_MESSAGES_TO_LCD	1
 
-#define	NO_LONG_DELAYS	1
-
-#undef	NESTED_INTERRUPTS
-#define	NESTED_INTERRUPTS	1
-
-// #undef	SPIN_WHEN_HALTED
-// #define	SPIN_WHEN_HALTED	1
+#undef	UART_TCV
+#undef	UART_TCVP
+#undef  UART_DRIVER
+#define	UART_TCV		0
+#define	UART_TCVP		0
+#define	UART_DRIVER		1

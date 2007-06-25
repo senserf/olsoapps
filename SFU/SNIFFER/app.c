@@ -20,7 +20,7 @@ heapmem {100};
 
 int RSFD;
 
-char obuf [3*24 + 8];
+char obuf [3*MAXPLEN + 8];
 
 thread (root)
 
@@ -29,7 +29,7 @@ thread (root)
 #define	RS_WRITE	2
 
     word scr;
-    word packet;
+    address packet;
     int len, k, i;
 
     entry (RS_INIT)
@@ -53,14 +53,16 @@ Again:
 	packet = tcv_rnp (RS_READ, RSFD);
 	len = tcv_left (packet);
 
+	if (len > MAXPLEN) {
+		tcv_endp (packet);
+		goto Again;
+	}
+
 	k = 0;
 
 	obuf [k++] = '0' + (len / 10);
 	obuf [k++] = '0' + (len % 10);
 	obuf [k++] = ':';
-
-	if (len > 24)
-		len = 24;
 
 	for (i = 0; i < len; i++) {
 		scr = ((byte*)packet) [i];
@@ -74,7 +76,6 @@ Again:
 	obuf [k++] = '\r';
 	obuf [k++] = '\n';
 	obuf [k  ] = '\0';
-
 
     entry (RS_WRITE)
 

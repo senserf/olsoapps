@@ -1,476 +1,337 @@
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007                    */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
+/* ============================================================= */
+/* ============================================================= */
+/* ==              P. Gburzynski, June 2007                   == */
+/* ============================================================= */
+/* ============================================================= */
+
+// This praxis is used to test the prototype boards, specifically,
+// radio, LCD, flash and UART
 
 #include "sysio.h"
-#include "adc_sampler.h"
 #include "tcvphys.h"
+#include "tcvplug.h"
+#include "board_rf.h"
 
 heapmem {100};
 
-#include "ser.h"
-#include "serf.h"
 #include "form.h"
+#include "serf.h"
 
-#if CC1100
 #include "phys_cc1100.h"
-#include "plug_null.h"
+
+// The plugin
+
+int tcv_ope_heart (int, int, va_list);
+int tcv_clo_heart (int, int);
+int tcv_rcv_heart (int, address, int, int*, tcvadp_t*);
+int tcv_frm_heart (address, int, tcvadp_t*);
+int tcv_out_heart (address);
+int tcv_xmt_heart (address);
+
+const tcvplug_t plug_heart =
+		{ tcv_ope_heart, tcv_clo_heart, tcv_rcv_heart, tcv_frm_heart,
+			tcv_out_heart, tcv_xmt_heart, NULL,
+				0x0081 /* Plugin Id */ };
+
+#define	MAXPLEN			56
+#define	MINPLEN			16
+#define	XMIT_POWER		7	// Out of 7
+#define	PACKET_QUEUE_LIMIT	8
+
+int	RSFD = NONE;	// Radio interface SID
+
+word Sent, Rcvd;
+
+char cbuf [18];
+
+// The Plugin =================================================================
+
+int 	*desc = NULL;
+
+int tcv_ope_heart (int phy, int fd, va_list plid) {
+/*
+ * This is very simple - we are allowed to have one descriptor per phy.
+ */
+	int i;
+
+	if (desc == NULL) {
+		desc = (int*) umalloc (sizeof (int) * TCV_MAX_PHYS);
+		if (desc == NULL)
+			syserror (EMALLOC, "plug_heart tcv_ope_heart");
+		for (i = 0; i < TCV_MAX_PHYS; i++)
+			desc [i] = NONE;
+	}
+
+	/* phy has been verified by TCV */
+	if (desc [phy] != NONE)
+		return ERROR;
+
+	desc [phy] = fd;
+	return 0;
+}
+
+int tcv_clo_heart (int phy, int fd) {
+
+	/* phy/fd has been verified */
+
+	if (desc == NULL || desc [phy] != fd)
+		return ERROR;
+
+	desc [phy] = NONE;
+	return 0;
+}
+
+int tcv_rcv_heart (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
+
+	if (desc == NULL || (*ses = desc [phy]) == NONE)
+		return TCV_DSP_PASS;
+
+	bounds->head = bounds->tail = 0;
+
+	return TCV_DSP_RCV;
+}
+
+int tcv_frm_heart (address p, int phy, tcvadp_t *bounds) {
+
+	// Link Id + CRC
+	return bounds->head = bounds->tail = 2;
+}
+
+int tcv_out_heart (address p) {
+
+	return TCV_DSP_XMT;
+
+}
+
+int tcv_xmt_heart (address p) {
+
+	return TCV_DSP_DROP;
+}
+
+// ============================================================================
+
+#ifdef EEPROM_PRESENT
+
+void memory_test () {
+
+#define	N_FLASH_SAMPLES	2000		// We only try this many samples ...
+#define	N_FLASH_SAMPLE_SIZE 48		// ... of this size
+
+	lword nb, ms;
+	byte *sbuf;
+	word si, cn;
+	byte el;
+
+	lcd_clear (0, 0);
+	lcd_write (0, "TESTING FLASH:");
+
+	sbuf = (byte*) umalloc (N_FLASH_SAMPLE_SIZE);
+
+	nb = ee_size (NULL, NULL);
+
+	// Increment
+	si = (word) (nb / N_FLASH_SAMPLES);
+
+	lcd_write (16, "WRITING: ");
+
+	nb = 0;
+	for (cn = 0; cn < N_FLASH_SAMPLES; cn++) {
+		form (cbuf, "%ld", nb);
+		// Determine the number of initial spaces
+		el = 7 - (byte) strlen (cbuf);
+		lcd_write (16 + 9 + el, cbuf);
+		while (el) {
+			el--;
+			lcd_write (16 + 9 + el, " ");
+		}
+
+		// Prepare the buffer to write
+		for (el = 0; el < N_FLASH_SAMPLE_SIZE; el++)
+			sbuf [el] = 0xA5;
+
+		ee_write (WNONE, nb, sbuf, N_FLASH_SAMPLE_SIZE);
+		nb += si;
+	}
+
+	lcd_clear (0, 0);
+	mdelay (500);
+
+	lcd_write (0,  "READING: ");
+	lcd_write (16, "MISREAD:       0");
+
+	nb = 0;
+	ms = 0;
+	for (cn = 0; cn < N_FLASH_SAMPLES; cn++) {
+		form (cbuf, "%ld", nb);
+		el = 7 - (byte) strlen (cbuf);
+		lcd_write (0 + 9 + el, cbuf);
+		while (el) {
+			el--;
+			lcd_write (0 + 9 + el, " ");
+		}
+
+		ee_read (nb, sbuf, N_FLASH_SAMPLE_SIZE);
+
+		// Check
+		for (el = 0; el < N_FLASH_SAMPLE_SIZE; el++) {
+			if (sbuf [el] != 0xA5)
+				ms++;
+		}
+
+		form (cbuf, "%ld", ms);
+		el = 7 - (byte) strlen (cbuf);
+		lcd_write (16 + 9 + el, cbuf);
+		while (el) {
+			el--;
+			lcd_write (16 + 9 + el, " ");
+		}
+		nb += si;
+	}
+
+	ufree (sbuf);
+
+	lcd_clear (0, 0);
+	lcd_write (0, "FLASH DONE!");
+	mdelay (2000);
+}
+
+#endif /* EEPROM_PRESENT */
+
+static word gen_packet_length (void) {
+
+	word pl;
+
+#if MINPLEN >= MAXPLEN
+	return MINPLEN;
+#else
+	pl = ((rnd () % (MAXPLEN - MINPLEN + 1)) + MINPLEN) & 0xFFE;
+	if (pl < MINPLEN)
+		return MINPLEN;
+	else if (pl > MAXPLEN)
+		return MAXPLEN;
+	return pl;
 #endif
 
-void hrc_start (), hrc_stop ();
+}
 
-#define	RF_MAXPLEN	48
-#define	RF_MSTYPE_HR	1
-#define	RF_MSTYPE_SM	2
-#define	RF_MSTYPE_SML	7		// Last sample
-#define	RF_MSTYPE_AK	3
-#define	RF_FRAME	(2 + 4)		// CRC + netid + type + count (mod 256)
-#define	RF_NETID	0xCABA		// To make us distinct
-#define	RF_RTIMEOUT	2048
-#define	RF_HRATE_INT	1024		// Heart rate send interval
+static void enc5 (word n) {
 
-char	ibuf [82];
-word	sbuf [ADCS_SAMPLE_LENGTH], dbuf [ADCS_SAMPLE_LENGTH];
-int	sfd;
-word	err;
+	byte i;
 
-lword	samples;
-lword	overflows;
-lword	flash_addr,
-	flash_samples;
+	cbuf [5] = '\0';
 
-lword	a, b;
-
-lword	Time;
-
-char	SRate [12];
-
-Boolean	FBusy = NO, Load = NO, Talk = YES;
-
-byte	PCount;
-
-#define	SE_NEX		0
-#define	SE_ANP		1
-#define	SE_WAK		2
-#define	SE_LOP		3
-#define	SE_DON		4
-
-process (sender, void)
-/*
- * This is a most naive version that requires every packet to be acked
- */
-  address packet;
-
-  entry (SE_NEX)
-
-	if (flash_samples == 0) {
-		// Fin
-		packet = tcv_wnp (SE_ANP, sfd, RF_FRAME);
-		packet [1] = (RF_MSTYPE_SM  << 8) | PCount;
-		tcv_endp (packet);
-		// Done, finish
-		goto SDone;
+	i = 4;
+	while (1) {
+		if (n == 0) {
+			if (i == 4)
+				cbuf [i] = '0';
+			else
+				cbuf [i] = ' ';
+		} else {
+			cbuf [i] = (char) ((n % 10) + '0');
+			n /= 10;
+		}
+		if (i == 0)
+			break;
+		i--;
 	}
+}
 
-	// Note: perhaps ACKs should be handled in the plugin in the final
-	// version? That way we wouldn't have to rebuild the packet before
-	// every retransmission.
+#define	SN_LOOP		0
+#define	SN_WPA		1
+#define	SN_OUT		2
 
-	flash_samples--;
-	ee_read (flash_addr, (byte*)dbuf, ADCS_SAMPLE_LENGTH * 2);
-	// Be RT-friendly
-	proceed (SE_ANP);
+thread (sender)
 
-  entry (SE_ANP)
+    address packet;
+    static word plen;
 
-	packet = tcv_wnp (SE_ANP, sfd, ADCS_SAMPLE_LENGTH * 2 + RF_FRAME);
+    entry (SN_LOOP) 
 
-	packet [0] = RF_NETID;
+	plen = gen_packet_length ();
 
-	if (flash_samples)
-		packet [1] = (RF_MSTYPE_SM  << 8) | PCount;
-	else
-		packet [1] = (RF_MSTYPE_SML << 8) | PCount;
+    entry (SN_WPA)
 
-	memcpy (packet + 2, dbuf, ADCS_SAMPLE_LENGTH * 2);
-	tcv_endp (packet);
-	proceed (SE_WAK);
+	packet = tcv_wnp (SN_WPA, RSFD, plen);
 
-  entry (SE_WAK)
-
-	delay (RF_RTIMEOUT, SE_ANP);
-	packet = tcv_rnp (SE_WAK, sfd);
-	unwait (WNONE);
-
-	if ((packet [1] & 0xff00) != (RF_MSTYPE_AK << 8)) {
-		tcv_endp (packet);
-		proceed (SE_WAK);
-	}
-
-	if ((packet [1] & 0xff) != PCount) {
-		// Retransmit immediately
-		tcv_endp (packet);
-		proceed (SE_ANP);
-	}
+	packet [0] = 0;
+	packet [1] = Sent;
 
 	tcv_endp (packet);
 
-	// Acknowledged
-	proceed (SE_LOP);
+	enc5 (Sent);
+	Sent++;
 
-  entry (SE_LOP)
+	lcd_write (7, cbuf);
 
-	flash_addr += ADCS_SAMPLE_LENGTH * 2;
-	PCount ++;
-	proceed (SE_NEX);
+    entry (SN_OUT)
 
-  entry (SE_DON)
+	ser_outf (SN_OUT, "SND: %u %u\r\n", Sent, plen);
+	delay (1024, SN_LOOP);
 
-SDone:
-	if (Talk)
-		ser_out (SE_DON, "TRANSMISSION FINISHED\r\n");
-	FBusy = NO;
-	tcv_control (sfd, PHYSOPT_RXOFF, NULL);
-	finish;
+endthread
 
-endprocess (1)
+#define	RC_WAIT		0
+#define	RC_OUT		1
 
-#define	HR_NEX		0
+thread (receiver)
 
-process (hrate, void)
+    address packet;
 
-  address packet;
+    entry (RC_WAIT)
 
-  entry (HR_NEX)
-
-	packet = tcv_wnp (HR_NEX, sfd, RF_FRAME + 2);
-	packet [0] = RF_NETID;
-	packet [1] = RF_MSTYPE_HR << 8;
-	packet [2] = HeartRateCounter;
+	packet = tcv_rnp (RC_WAIT, RSFD);
+	Rcvd = packet [1];
 	tcv_endp (packet);
 
-	delay (RF_HRATE_INT, HR_NEX);
+	enc5 (Rcvd);
+	lcd_write (16 + 7, cbuf);
 
-endprocess (1)
-	
-#define	RE_WAIT		0
-#define	RE_OUT		1
-#define	RE_SYN		2
-#define	RE_DUMP		3
+    entry (RC_OUT)
 
-process (reader, void)
+	ser_outf (RC_OUT, "RCV: %u\r\n", Rcvd);
+	proceed (RC_WAIT);
 
-  entry (RE_WAIT)
+endthread
 
-Again:
-	adcs_get_sample (RE_WAIT, sbuf);
-	samples++;
+// ============================================================================
 
-	if (Load == NO) {
-		if ((samples & 0x3ff) == 0)
-			goto Dump;
-		else
-			goto Again;
-	}
-
-  entry (RE_OUT)
-
-	ee_write (RE_OUT, flash_addr, (byte*) sbuf, ADCS_SAMPLE_LENGTH * 2);
-
-	if (--flash_samples == 0)
-		goto Sync;
-	else
-		flash_addr += ADCS_SAMPLE_LENGTH * 2;
-	goto Again;
-
-  entry (RE_SYN)
-
-Sync:
-	ee_sync (RE_SYN);
-	Load = NO;
-	FBusy = NO;
-	goto Again;
-
-  entry (RE_DUMP)
-
-Dump:
-	if (Talk)
-		ser_outf (RE_DUMP, "S: %x %x %x %x %x %x\r\n",
-			sbuf [0],
-			sbuf [1],
-			sbuf [2],
-			sbuf [3],
-			sbuf [4],
-			sbuf [5]);
-	goto Again;
-
-endprocess (1);
-
-#define	MO_RUN		0
-#define	MO_LOA		1
-#define	MO_IDLE		2
-
-process (monitor, void) 
-
-  word Rate1, Rate2;
-  lword TotalTime;
-
-  entry (MO_RUN)
-
-	overflows += adcs_overflow ();
-
-	if (!Load)
-		goto Idle;
-
-	// Loading
-  entry (MO_LOA)
-
-	if (Talk)
-		ser_outf (MO_LOA, "LOADING: %lx [%lu] v = %lu\r\n",
-			flash_addr, flash_samples, overflows);
-
-	delay (10 * 1024, MO_RUN);
-	release;
-Idle:
-	if ((TotalTime = seconds () - Time) != 0) {
-		Rate1 = (word) (samples / TotalTime);
-		Rate2 = (word)(((samples % TotalTime) * 1000) / TotalTime);
-		form (SRate, "%d.%c%c%c", Rate1,
-			((Rate2 / 100)    ) + '0',
-			((Rate2 / 10) % 10) + '0',
-			((Rate2     ) % 10) + '0');
-	} else {
-		SRate [0] = '\0';
-	}
-
-  entry (MO_IDLE)
-
-	delay (10 * 1024, MO_RUN);
-	
-	if (Talk)
-		ser_outf (MO_IDLE, "IDLE: %lu (%s/s) v = %lu hr = %u\r\n",
-			samples, (word) SRate, overflows, HeartRateCounter);
-
-	lcd_clear (0, 15);
-	form (ibuf, "%lu", samples);
-	lcd_write (0, ibuf);
-	lcd_clear (16, 31);
-	form (ibuf, "%s %lu", SRate, overflows);
-	lcd_write (16, ibuf);
-
-endprocess (1);
-
-#define	DU_RUN		0
-#define	DU_DIS		1
-
-process (dumper, void)
-
-  entry (DU_RUN)
-
-	ee_read (flash_addr, (byte*) dbuf, ADCS_SAMPLE_LENGTH * 2);
-
-  entry (DU_DIS)
-
-	ser_outf (DU_DIS, "%lx: %x %x %x %x %x %x\r\n",
-		flash_addr,
-		dbuf [0],
-		dbuf [1],
-		dbuf [2],
-		dbuf [3],
-		dbuf [4],
-		dbuf [5]);
-
-	if (--flash_samples == 0) {
-		FBusy = NO;
-		finish;
-	}
-
-	flash_addr += ADCS_SAMPLE_LENGTH * 2;
-
-	delay (100, DU_RUN);
-
-endprocess (1);
+thread (root)
 
 #define	RS_INIT		0
-#define	RS_RCMF		1
-#define	RS_RCMD		2
-#define	RS_RCME		3
-#define	RS_STA		4
-#define	RS_DON		5
-#define	RS_STO		6
-#define	RS_ERA		7
-#define	RS_ERB		8
-#define	RS_REA		9
-#define	RS_WRI		10
-#define	RS_XMT		11
-#define	RS_HEA		12
-#define	RS_HEK		13
-#define	RS_TAK		14
 
-process (root, int)
+    word scr;
 
-  word bs;
+    entry (RS_INIT)
 
-  entry (RS_INIT)
 
-	fork (reader, NULL);
-	fork (monitor, NULL);
 	lcd_on (0);
+	lcd_clear (0, 0);
 
-#if CC1100
-	phys_cc1100 (0, RF_MAXPLEN);
-	tcv_plug (0, &plug_null);
-	sfd = tcv_open (NONE, 0, 0);
+	memory_test ();
 
-	if (sfd < 0) {
-		diag ("RF open failed");
-		halt ();
+	lcd_clear (0, 0);
+	lcd_write (0, "OPENING RF      INTERFACE");
+
+	phys_cc1100 (0, 0);
+	tcv_plug (0, &plug_heart);
+	RSFD = tcv_open (NONE, 0, 0);
+	if (RSFD < 0) {
+		lcd_write (0, "FAILED TO START RF INTERFACE!");
+		while (1);
 	}
 
-	tcv_control (sfd, PHYSOPT_TXON, NULL);
-	err = RF_NETID;
-	tcv_control (sfd, PHYSOPT_SETSID, &err);
-#endif
+	lcd_clear (0, 0);
 
-  entry (RS_RCMF)
+	lcd_write (0,  "SENT: ");
+	lcd_write (16, "RCVD: ");
 
-	ser_out (RS_RCMF,
-		"\r\nADCS Test\r\n"
-		"Commands:\r\n"
-		"s bs         -> start\r\n"
-		"q            -> stop\r\n"
-		"e from upto  -> erase flash\r\n"
-		"w addr n     -> write n samples to flash\r\n"
-		"r addr n     -> read n samples from flash\r\n"
-		"x addr n     -> transmit n samples from flash\r\n"
-		"h            -> start heart rate monitor\r\n"
-		"k            -> stop heart rate monitor\r\n"
-		"t            -> toggle talk/quiet\r\n"
-	);
+	tcv_control (RSFD, PHYSOPT_TXON, NULL);
+	tcv_control (RSFD, PHYSOPT_RXON, NULL);
 
-  entry (RS_RCMD)
+	runthread (sender);
+	runthread (receiver);
 
-	err = 0;
-	ser_in (RS_RCMD, ibuf, 132-1);
+	finish;
 
-	switch (ibuf [0]) {
-		case 's': proceed (RS_STA);
-		case 'q': proceed (RS_STO);
-		case 'e': proceed (RS_ERA);
-		case 'w': proceed (RS_WRI);
-	  	case 'r': proceed (RS_REA);
-	  	case 'x': proceed (RS_XMT);
-	  	case 'h': proceed (RS_HEA);
-	  	case 'k': proceed (RS_HEK);
-	  	case 't': proceed (RS_TAK);
-	}
-	
-  entry (RS_RCME)
-
-	ser_out (RS_RCME, "?????????\r\n");
-	proceed (RS_RCMF);
-
-  entry (RS_STA)
-
-	bs = 0;
-	scan (ibuf + 1, "%u", &bs);
-	if (bs == 0)
-		proceed (RS_RCME);
-	samples = 0;
-	overflows = 0;
-	err = adcs_start (bs);
-	Time = seconds ();
-
-  entry (RS_DON)
-
-	ser_outf (RS_DON, "Done %u\r\n", err);
-	proceed (RS_RCMD);
-
-  entry (RS_STO)
-
-	adcs_stop ();
-	proceed (RS_DON);
-
-  entry (RS_ERA)
-
-	if (FBusy)
-		proceed (RS_RCME);
-
-	FBusy = YES;
-	scan (ibuf + 1, "%lu %lu", &a, &b);
-
-  entry (RS_ERB)
-
-	err = ee_erase (RS_ERB, a, b);
-	FBusy = NO;
-	proceed (RS_DON);
-
-  entry (RS_REA)
-
-	if (FBusy)
-		proceed (RS_RCME);
-
-	flash_samples = 0;
-	scan (ibuf + 1, "%lu %lu", &flash_addr, &flash_samples);
-	if (flash_samples == 0)
-		proceed (RS_RCME);
-
-	FBusy = YES;
-	fork (dumper, NULL);
-	proceed (RS_DON);
-
-  entry (RS_WRI)
-
-	if (FBusy)
-		proceed (RS_RCME);
-
-	flash_samples = 0;
-	scan (ibuf + 1, "%lu %lu", &flash_addr, &flash_samples);
-	if (flash_samples == 0)
-		proceed (RS_RCME);
-
-	FBusy = YES;
-	Load = YES;
-	proceed (RS_DON);
-
-  entry (RS_XMT)
-
-	if (FBusy)
-		proceed (RS_RCME);
-
-	flash_samples = 0;
-	scan (ibuf + 1, "%lu %lu", &flash_addr, &flash_samples);
-	if (flash_samples == 0)
-		proceed (RS_RCME);
-
-	FBusy = YES;
-	PCount = 0;
-	tcv_control (sfd, PHYSOPT_RXON, NULL);
-	fork (sender, NULL);
-	proceed (RS_DON);
-
-  entry (RS_HEA)
-
-	if (running (hrate))
-		proceed (RS_RCME);
-
-	hrc_start ();
-	fork (hrate, NULL);
-	proceed (RS_DON);
-
-  entry (RS_HEK)
-
-	if (!running (hrate))
-		proceed (RS_RCME);
-
-	hrc_stop ();
-	killall (hrate);
-	proceed (RS_DON);
-
-  entry (RS_TAK)
-
-	Talk = Talk ? NO : YES;
-	proceed (RS_DON);
-
-endprocess (1);
+endthread

@@ -8,8 +8,12 @@
 #include "adc_sampler.h"
 #include "tcvphys.h"
 #include "tcvplug.h"
+#include "board_rf.h"
 
 // #define	DONT_DISPLAY
+// #define	DEBUG_DISPLAY
+
+#define	TWO_INTERFACES
 
 heapmem {100};
 
@@ -79,6 +83,8 @@ const	byte
 
 #define	INTV_HELLO	(4096 - 0x1f + (rnd () & 0xff))
 #define	INTV_PERSTAT	7168
+#define	INTV_MPERSTAT	512	// Minimum READY status indication interval
+#define	INTV_DPERSTAT	256	// Decay
 #define	INTV_EOR	512	// End-Of-Round retransmissions
 
 #define	INTV_DISPLAY	512
@@ -145,6 +151,15 @@ byte	LostSamples = 0,
 	SamplesToStat,
 	XWS;			// Transmitting sample packets
 
+word	PersDelay = INTV_PERSTAT;	// Interval for sending READY status
+
+#ifdef	DEBUG_DISPLAY
+char	DBD = 0;
+#define	sdbd(a)		do { DBD = (char)(a); DISPIT; } while (0)
+#else
+#define	sdbd(a)		do { } while (0)
+#endif
+
 word	HeartRate = 0;
 
 // ============================================================================
@@ -153,8 +168,13 @@ word	SBuf [ADCS_SAMPLE_LENGTH * SAMPLES_PER_PACKET];
 
 int	Display = 0, TheSampler = 0, TheSender = 0, TheHRMonitor = 0;
 
-int	USFD, RSFD,	// Session IDs UART / RF
-	BSFD = NONE;	// Which one is bound
+int	RSFD = NONE;	// Radio/Bluetooth interface SID
+
+#ifdef TWO_INTERFACES
+int	USFD = NONE;	// UART interface SID
+#endif
+
+int	BSFD = NONE;	// Which one is bound
 
 // The Plugin =================================================================
 
@@ -396,11 +416,38 @@ thread (display)
 	if (BSFD == NONE) {
 		// Unbound
 		lcd_clear (0, 0);
-		if (DispToggle)
+		if (DispToggle) {
 			lcd_write (0, "UNBOUND");
+#ifdef	BLUETOOTH_PRESENT
+			if (blue_ready)
+				lcd_write (15, "!");
+#endif
+		}
+
+#ifdef	DEBUG_DISPLAY
+		lcd_setp (14);
+		lcd_putchar (DBD ? DBD : ' ');
+#endif
+
 	} else {
+
+#ifdef	DEBUG_DISPLAY
+		lcd_setp (14);
+		lcd_putchar (DBD ? DBD : ' ');
+#endif
 		// We are bound: fixed items first
-		lcd_write (15, BSFD == USFD ? "S" : "W");
+		lcd_write (15,
+
+#ifdef	TWO_INTERFACES
+				BSFD == USFD ? "S" :
+#endif
+
+#ifdef	BLUETOOTH_PRESENT
+			"B"
+#else
+			"W"
+#endif
+		);
 		for (w = 0, i = 0; i < MAX_SAMPLES; i++) 
 			if (SampCount [i])
 				w++;
@@ -408,18 +455,16 @@ thread (display)
 		cb [1] = '\0';
 		lcd_write (13, cb);
 
-		if (TheHRMonitor) {
+		if (TheHRMonitor && DispToggle) {
 			// Display the heart rate
-			if (DispToggle) {
-				form (cb, "%d", HeartRate);
-				i = 4 - strlen (cb);
-				if (i > 0) {
-					lcd_clear (16, i);
-					lcd_write (16 + i, cb);
-				}
-			} else {
-				lcd_clear (16, 4);
+			form (cb, "%d", HeartRate);
+			i = 4 - strlen (cb);
+			if (i > 0) {
+				lcd_clear (16, i);
+				lcd_write (16 + i, cb);
 			}
+		} else {
+			lcd_clear (16, 4);
 		}
 
 		if (LostSamples && DispToggle) {
@@ -657,7 +702,9 @@ NextSample:
 
 	TheSampler = 0;
 	send_status (BSFD);
+	PersDelay = INTV_MPERSTAT;
 	DISPIT;
+	BINDIT;
 	finish;
 
     entry (SM_EOR)
@@ -746,6 +793,13 @@ strand (listener, int)
 		put4 (packet, ESN);
 
 		tcv_endp (packet);
+
+#ifdef DEBUG_DISPLAY
+		if (DBD != '-')
+			DBD = '-';
+		else
+			DBD = '|';
+#endif
 	}
 
     entry (LI_WBIND)
@@ -801,8 +855,9 @@ BIgn:
 	// re-check when bound on the oher interface
 	when (&BSFD, LI_GETCMD);
 	// do periodic status reports even if nobody asks
-	delay (INTV_PERSTAT, LI_PERSTAT);
+	delay (PersDelay, LI_PERSTAT);
 
+	sdbd ('+');
 	packet = tcv_rnp (LI_GETCMD, MYFD);
 
 	if (tcv_left (packet) < 2) {
@@ -1002,9 +1057,12 @@ StartX:
 
     entry (LI_PERSTAT)
 
-	if (Status == ST_READY && !HRM_ACTIVE && BSFD == MYFD)
+	if (Status == ST_READY && !HRM_ACTIVE && BSFD == MYFD) {
 		// Periodic status report
 		send_status (MYFD);
+		if (PersDelay < INTV_PERSTAT)
+			PersDelay += INTV_DPERSTAT;
+	}
 
 	proceed (LI_GETCMD);
 
@@ -1030,17 +1088,29 @@ thread (root)
 #ifdef BLUETOOTH_PRESENT
 	// UART_B as the primary interface via BlueTooth
 	phys_uart (0, MAXPLEN, BLUETOOTH_PRESENT - 1);
+
+#ifdef TWO_INTERFACES
 	phys_uart (1, MAXPLEN, BLUETOOTH_PRESENT > 1 ? 0 : 1);
+#endif
+
 #else
 	phys_cc1100 (0, MAXPLEN);
+#ifdef TWO_INTERFACES
 	phys_uart (1, MAXPLEN, 0);
 #endif
+
+#endif	/* TWO_INTERFACES */
+
 	tcv_plug (0, &plug_heart);
 
 	RSFD = tcv_open (NONE, 0, 0);
-	USFD = tcv_open (NONE, 1, 0);
 
+#ifdef TWO_INTERFACES
+	USFD = tcv_open (NONE, 1, 0);
 	if (RSFD < 0 || USFD < 0) {
+#else
+	if (RSFD < 0) {
+#endif
 		lcd_write (0, "FAILED TO START INTERFACES!");
 		finish;
 	}
@@ -1049,26 +1119,25 @@ thread (root)
 
 	scr = 0;
 	tcv_control (RSFD, PHYSOPT_SETSID, &scr);
-	tcv_control (USFD, PHYSOPT_SETSID, &scr);
-
 	tcv_control (RSFD, PHYSOPT_TXON, NULL);
 	tcv_control (RSFD, PHYSOPT_RXON, NULL);
-
-	tcv_control (USFD, PHYSOPT_TXON, NULL);
-	tcv_control (USFD, PHYSOPT_RXON, NULL);
-
 #ifndef BLUETOOTH_PRESENT
 	scr = XMIT_POWER;
 	tcv_control (RSFD, PHYSOPT_SETPOWER, &scr);
 #endif
-
-	runstrand (listener, USFD);
 	runstrand (listener, RSFD);
+
+#ifdef TWO_INTERFACES
+	scr = 0;
+	tcv_control (USFD, PHYSOPT_SETSID, &scr);
+	tcv_control (USFD, PHYSOPT_TXON, NULL);
+	tcv_control (USFD, PHYSOPT_RXON, NULL);
+	runstrand (listener, USFD);
+#endif
 
 #ifndef	DONT_DISPLAY
 	Display = runthread (display);
 #endif
-
 	// We are not needed any more. This will provide a high-priority slot
 	// for the sampler.
 	finish;
