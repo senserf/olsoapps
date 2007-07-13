@@ -75,6 +75,7 @@ const	byte
 #define	HR_OFF		0x01
 
 #define	SM_XMIT		0x01	// Offset to PT_SAMPLE
+#define	SN_MAP		0x01	// Offset to PT_SEND
 
 #define	ST_READY	0x00	// These must work as offsets to PT_STATUS
 #define	ST_SAMPLING	0x02	// ...
@@ -111,7 +112,11 @@ const	byte
 #define	get2(p,b)	tcv_read (p, (char*)(&(b)), 2)
 
 #define	put3(p,b)	tcv_write (p, (const char*)(&(b)), 3)
-#define	get3(p,b)	tcv_read (p, (char*)(&(b)), 3)
+#define	get3(p,b)	do { \
+				((char*)(&(b))) [3] = 0; \
+				tcv_read (p, (char*)(&(b)), 3); \
+			} while (0)
+
 #define	put4(p,b)	tcv_write (p, (const char*)(&(b)), 4)
 #define	get4(p,b)	tcv_read (p, (char*)(&(b)), 4)
 
@@ -130,7 +135,12 @@ const	byte
 
 #define	BINDIT		trigger (&BSFD)			// Bind event
 
-lword	SRoster	[ROSTER_SIZE];				// Transmission list
+#define	SRS_NRI		0	// Map processing states for sender_map
+#define	SRS_RAN		1
+#define	SRS_RFM		2
+
+lword	SRoster [ROSTER_SIZE];
+#define	BRoster	((byte*)(&(SRoster[0])))
 lword	BufferIn, BufferLimit, SendFrom, SendUpto;
 
 lword	SampStart [MAX_SAMPLES];
@@ -145,7 +155,8 @@ byte	Status = ST_READY;
 byte	ThisSampleId;
 byte	ThisSampleSlot;
 byte	NextSampleSlot;
-byte	SRL, SRP;		// Roster length/ptr
+byte	SRL, SRP, SRI;		// Roster length/ptr/map index
+byte	SRS, SRK, SRM;		// State, map bit, map byte
 byte	DispToggle = 0;
 byte	LostSamples = 0,
 	SamplesToStat,
@@ -509,7 +520,7 @@ thread (display)
 				lcd_clear (9, i);
 			lcd_write (9 + i, cb);
 
-			form (cb, "%lu", SendFrom);
+			form (cb, "%lu", SendFrom == LNONE ? 0L : SendFrom);
 			i = 8 - strlen (cb);
 			if (i <= 0) {
 				i = 0;
@@ -532,7 +543,148 @@ endthread
 #define	SN_SEND		1
 #define	SN_EOR		2
 
-thread (sender)
+thread (sender_map)
+
+    lword sa;
+    address packet;
+
+    entry (SN_SEND)
+
+SN_send:
+
+	if (QPackets > PACKET_QUEUE_LIMIT) {
+		when (0, SN_SEND);
+		release;
+	}
+
+	packet = tcv_wnp (SN_SEND, BSFD, 6 + BUFFER_STORAGE_UNIT);
+	put1 (packet, PT_SDATA);
+	put1 (packet, ThisSampleId);
+	put1 (packet, HeartRate);
+	put3 (packet, SendFrom);
+
+	if ((sa = SampStart [ThisSampleSlot] + SendFrom) >= BufferLimit)
+		sa -= BufferLimit;
+
+	ee_read (MULT_STORAGE_UNIT (sa), ((byte*) packet) + 8,
+		BUFFER_STORAGE_UNIT);
+
+	tcv_endp (packet);
+
+    entry (SN_LOOP)
+
+	// This is where we start, i.e., SN_LOOP is state 0
+
+	switch (SRS) {
+
+		lword ORG;
+
+		case SRS_NRI:
+SN_rost:
+			// Read the roster
+			if (SRP > SRL - 4) {
+				// No more
+				SRP = SRL;
+				proceed (SN_EOR);
+			}
+
+			SRI  = BRoster [SRP++];
+			ORG  = (lword) BRoster [SRP++];
+			ORG |= (lword)(BRoster [SRP++]) << 8;
+			ORG |= (lword)(BRoster [SRP++]) << 16;
+
+			if ((SRI & 0x80) == 0) {
+				// This is a new starting point
+				SendFrom = ORG;
+				// Current mask bit
+				SRK = 0;
+				// Reading from mask
+				SRS = SRS_RFM;
+				goto SN_send;
+			} else {
+				// This is a range: recover map length
+				SRI &= 0x7f;
+				SendUpto = SendFrom + ORG;
+				// Note that SendFrom is one less than needed;
+				// thus SendUpto is the last one to be covered
+				SRS = SRS_RAN;
+				// Fall through
+			}
+			// Fall through
+
+		case SRS_RAN:
+
+			if (SendFrom == SendUpto) {
+				// Done, check the map
+				if (SRI) {
+					// Map present; continue at the next
+					// sample
+					SendFrom++;
+					SRK = 0;
+					SRS = SRS_RFM;
+					goto SN_send;
+				}
+				// No map, acquire next descriptor
+				goto SN_rost;
+			}
+
+			SendFrom++;
+			goto SN_send;
+
+		case SRS_RFM:
+
+			// Reading from map
+			while (1) {
+				if (SRK == 0) {
+					// Next map byte
+					if (SRI == 0)
+						// No more map
+						goto SN_rost;
+					SRI--;
+					if (SRP >= SRL)
+						// Strictly speaking, this is
+						// an error
+						proceed (SN_EOR);
+					SRM = BRoster [SRP++];
+					SRK = 1;
+				}
+				SendFrom++;
+				if ((SRM & SRK)) {
+					// Send this sample
+					SRK <<= 1;
+					goto SN_send;
+				}
+				// Keep trying
+				SRK <<= 1;
+			}
+
+		default:
+			// Impossible
+			syserror (EREQPAR, "sender state");
+
+	}
+
+    entry (SN_EOR)
+
+	if (QPackets > PACKET_QUEUE_LIMIT) {
+		when (0, SN_EOR);
+		release;
+	}
+
+	if ((packet = tcv_wnp (WNONE, BSFD, 4)) != NULL) {
+		put1 (packet, PT_SDATA);
+		put1 (packet, ThisSampleId);
+		put1 (packet, HeartRate);
+		tcv_endp (packet);
+	}
+
+	delay (INTV_EOR, SN_EOR);
+
+endthread
+
+// ============================================================================
+
+thread (sender_ran)
 
     lword sa;
     address packet;
@@ -602,7 +754,6 @@ SN_send:
 	delay (INTV_EOR, SN_EOR);
 
 endthread
-
 // ============================================================================
 
 #define	SM_INIT		0
@@ -1030,26 +1181,47 @@ StartX:
 
 		ThisSampleId = bsc;
 
-		// Unpack the request
-		SRL = 0;
+		if ((cmd & SN_MAP)) {
 
-		while (tcv_left (packet) >= 3) {
-			get3 (packet, SRoster [SRL]);
-			SRL++;
+			// Use the MAP version
+			SRL = tcv_left (packet);
+			if (SRL == 0)
+				// Just in case
+				goto Report;
+
+			memcpy (SRoster, (byte*)(packet+2), tcv_left (packet));
+			tcv_endp (packet);
+
+			SRP = 0;
+			SRS = SRS_NRI;
+			// In case the request starts with a block
+			SendFrom = LNONE;
+			TheSender = runthread (sender_map);
+
+		} else {
+
+			// Use the RANGE version
+			SRL = 0;
+
+			// Unpack the request
+			while (tcv_left (packet) >= 3) {
+				get3 (packet, SRoster [SRL]);
+				SRL++;
+			}
+
+			if (SRL == 0)
+				// Just in case
+				goto Report;
+
+			tcv_endp (packet);
+			SRP = 0;
+			TheSender = runthread (sender_ran);
 		}
 
-		if (SRL == 0)
-			// Just in case
-			goto Report;
-
-		tcv_endp (packet);
-		SRP = 0;
-
-		Status = ST_SENDING;
-
 		QPackets = 0;
+		Status = ST_SENDING;
 		XWS = 1;
-		TheSender = runthread (sender);
+
 		DISPIT;
 		proceed (LI_GETCMD);
 

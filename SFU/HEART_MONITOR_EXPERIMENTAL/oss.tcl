@@ -3,7 +3,9 @@
 
 			###############################
 			##                           ##
-			## P. Gburzynski, June 2007  ##
+			## P. Gburzynski, July 2007  ##
+			## Experimental version, not ##
+			## for HeartForce            ##
 			##                           ##
 			###############################
 
@@ -21,7 +23,7 @@ set SAMP(MAX)		600
 
 array set CMD		{ BIND 0 UNBIND 64 RESET 16 STOP 32 ABORT 33 REPORT 48
 				SAMPLE 80 SAMPLEX 81 HRMON 112 HRMOFF 113
-					SEND 96 HELLO 128 HRATE 208 SDATA 192
+					SEND 97 HELLO 128 HRATE 208 SDATA 192
 							STATUS 144 }
 
 array set INTV		{ BIND 1000 BINDTRIES 10 ERRLINGER 5000 PACKET 80
@@ -824,6 +826,7 @@ proc log { txt } {
 		addText $Logger \
 			"[clock format [clock seconds] -format %H:%M:%S] $out"
 		endLine $Logger
+		# puts "LOG: $out"
 		if { $txt == "" } {
 			return
 		}
@@ -1423,6 +1426,282 @@ proc start_download { lid } {
 	send_transmission_prompt $lid
 }
 
+proc find_range { } {
+#
+# This function is called from make_transmission_prompt to create a bit map
+# of missing samples and, possibly, locate a block following that map.
+#
+# Upon entry (outer variables in the caller):
+#
+#      i      - points to the first missing sampling in SAF
+#      l      - the first sampling index outside the sample
+#      n      - the remaining number of bytes in the message (assumed to be
+#               > 0, which must be checked by the caller)
+#
+# Upon return:
+#
+#      func   - the list of bytes comprising the bit map
+#      FILL   - if not zero, it gives the length of block following the map
+#      i      - updated to point to the first non-processed sampling
+#      n      - updated to reflect the number of bytes left in the message
+#               when the map + range returned by the function are added to it
+#               
+	global Wins SAF
+	upvar lid lid i i l l n n FILL FILL
+
+	# length of current hole run in bytes
+	set ern 0
+
+	# length of current block run in bytes
+	set frn 0
+
+	# the list of up to 4 pending block bytes; note that each such a
+	# a byte may contain one zero, so storing just the count (as for a
+	# hole) will not do
+	#
+	set FRN ""
+
+	# the current map (a list of bytes)
+	set MRN ""
+
+	# this is a return variable, for now it means "no block"
+	set FILL 0
+
+	# make sure the exit condition is decent; the main loop handles an
+	# entire number of bytes
+	set L [expr $i + ((($l - $i) >> 3) << 3)]
+
+	while { $i != $L } {
+
+		set emp 1
+		set fil 2
+		set byt 0
+
+		# acquire one map byte
+		for { set k 0 } { $k < 8 } { incr k } {
+			if { $SAF($lid,$i) != "" } {
+				# sample present
+				if $fil {
+					# this will become false on second
+					# present sample; means that the byte
+					# does not qualify as a block
+					incr fil -1
+				}
+			} else {
+				# sample absent, map bit is set
+				set emp 0
+				set byt [expr $byt | (1 << $k)]
+			}
+			incr i
+		}
+		# $fil set -> the byte is a block candidate
+		# $emp set -> candidate for a skip, i.e., switchover to a new
+		#             origin
+
+		if $fil {
+			# the byte might go into a block
+			if { $n < 4 } {
+				# do not even try to consider a block, if there
+				# are less than 4 bytes left in the message
+				set fil 0
+			} else {
+				if { $frn < 4 } {
+					# save only up to 4 bytes; these are
+					# the bytes that are temporarily 
+					# assigned to a block, but we are 
+					# holding them until we get > 4; if
+					# this number ever gets > 4, we shall
+					# stop the map and switch to a block;
+					# otherwise, we shall return those
+					# bytes to the map
+					lappend FRN $byt
+				}
+				incr frn
+			}
+		} elseif { $frn > 4 } {
+			# we hit a non-blockable byte, and the number of pending
+			# blockable bytes is > 4. This means that we stop having
+			# completed a block.
+			for { set k 0 } { $k < 8 } { incr k } {
+				# check if some "ones" in the current byte can
+				# be merged with the block; perhaps a useless
+				# optimization
+				if ![expr $byt & (1 << $k)] {
+					break
+				}
+			}
+			# this is the block length
+			set FILL [expr ($frn << 3) + $k]
+			# update the message length to account for the block
+			incr n -4
+			# update i to the new starting point for next turn
+			set i [expr $i - 8 + $k]
+			# and return the map + the block
+			return $MRN
+		} else {
+			# not a blockable byte and the blockable run too short;
+			# cancel any pending block
+			if $frn {
+				# there is a pending block (up to 4 bytes);
+				# concatenate them with the map
+				set MRN [concat $MRN $FRN]
+				# decrement the message length by the added map
+				# bytes
+				incr n -$frn
+				if { $n == 0 } {
+					# nothing more will fit into the
+					# message, in particular the new byte
+					# that has just ruined the block; thus
+					# backspace $i so that we can look at
+					# it again
+					incr i -8
+					return $MRN
+				}
+				# mark: no blockable bytes pending
+				set frn 0
+				set FRN ""
+			}
+		}
+
+		if $emp {
+			# the byte is all-zeroes
+			if { $ern == 4 } {
+				# we have at least five consecutive zeroes;
+				# stop it right here; note that $i points
+				# correctly behind the last present sampling
+				return $MRN
+			}
+			# keep counting them (without adding to the bit map)
+			incr ern
+		} else {
+			# here is one that breaks the chain
+			while { $ern && $n } {
+				# append the prescribed number of zeroes to the
+				# map, but mind the message length
+				lappend MRN 0
+				incr ern -1
+				incr n -1
+			}
+			if { $n == 0} {
+				# we have filled up the entire packet; backspace
+				# to the beginning of the byte that caused us to
+				# it
+				incr i -8
+				return $MRN
+			}
+		}
+
+		# here is a normal byte that will go into the map; but if any of
+		# these is up, the byte has already gone into one of the two
+		# lists
+		if { !$ern && !$frn } {
+			lappend MRN $byt
+			incr n -1
+			if { $n == 0 } {
+				# no more room
+				# set i $i
+				return $MRN
+			}
+		}
+	}
+
+	# we are done with the "nice" loop; time to take care of the crappy
+	# boundary; note that $n > 0, if we are here
+
+	if { $L != $l } {
+		# there is a boundary to handle, collect the last byte
+		set emp 1
+		set fil 1
+		set byt 0
+
+		set k 0
+		while { $L != $l } {
+			if { $SAF($lid,$L) != "" } {
+				# sample present; this time we allow no ones
+				set fil 0
+			} else {
+				# sample absent, map bit is set
+				set emp 0
+				set byt [expr $byt | (1 << $k)]
+			}
+			incr L
+			incr k
+		}
+
+		if $fil {
+			# blockable byte
+			if $frn {
+				# note that n >= 4 if we ever get here; this is
+				# because frn is forcibly zeroed out in the main
+				# loop otherwise
+				if { $frn >= 4 } {
+					# this last byte triggers a block
+					set FILL [expr ($frn << 3) + $k]
+					incr n -4
+					# all done
+					set i $l
+					return $MRN
+				}
+				# n >= 4, so there is room for one more byte on
+				# top of the partial block run
+				set MRN [concat $MRN $FRN]
+				set frn 0
+				set FRN ""
+				# the last byte is added later (see below); here
+				# we have only eliminated the block run
+			}
+		} else {
+			# not blockable
+			if $frn {
+				# partial block pending
+				if { $frn > 4 } {
+					# we actually have a block
+					for { set k 0 } { $k < 8 } { incr k } {
+						# the same stupid optimization
+						# as before
+						if ![expr $byt & (1 << $k)] {
+							break
+						}
+					}
+					set FILL [expr ($frn << 3) + $k]
+					incr n -4
+					# new starting point - just a handful of
+					# samplings before the end
+					incr i $k
+					return $MRN
+				}
+				# too short, eliminate the run
+				set MRN [concat $MRN $FRN]
+				incr n -$frn
+				if { $n == 0 } {
+					# set i $i
+					return $MRN
+				}
+				set frn 0
+				set FRN ""
+			}
+		}
+		if !$emp {
+			lappend MRN $byt
+			incr n -1
+		}
+		# note that an empty byte is fine here and we can ignore it;
+		# this is the very end of the sampling range
+		set i $l
+	}
+
+	# and the finale
+
+	if $frn {
+		if { $frn <= 4 } {
+			set MRN [concat $MRN $FRN]
+		} else {
+			set FILL [expr $frn << 3]
+		}
+	}
+	return $MRN
+}
+
 proc make_transmission_prompt { lid } {
 
 	global Wins SAF SIO CMD
@@ -1431,54 +1710,105 @@ proc make_transmission_prompt { lid } {
 	put1 $CMD(SEND)
 	put1 $Wins($lid,TSI)
 
-	set n 0
+	# the number of bytes left in the command buffer
+	set n 48
 
 	set i $Wins($lid,FRM)
 	set l $Wins($lid,UPT)
 
-	while { $i != $l } {
-		# opening a new range
-		if { $SAF($lid,$i) != "" } {
-			incr i
-			continue
-		}
+	# two things to handle in the main loop:
+	#
+	# State == 0:  look for a new origin
+	# State == 1:  handle a block
+	
+	set State 0
 
-		if { $n == 15 } {
-			# only one left
-			put3 $i
-			break
-		}
+	while 1 {
 
-		set s $i
-		incr i
+		if { $State == 0 } {
 
-		while { $i != $l } {
-			if { $SAF($lid,$i) != "" } {
+			# looking for a new origin
+		
+			if { $n < 8 } {
+				# no more room: require at least 4 map bytes
+				# to make sense out of it
 				break
 			}
+			while { $i != $l && $SAF($lid,$i) != "" } {
+				# look up the first missing sampling ans set the
+				# origin there
+				incr i
+				continue
+			}
+
+			if { $i == $l } {
+				# done; this is the end of request
+				break
+			}
+
+			# the ORG value
+			set R $i
+			# advance - the first bit map applies to ORG+1
 			incr i
+			# remove the room taken by the header
+			incr n -4
+			# and advance things
+			set map [find_range]
+			# map length
+			set mle [llength $map]
+
+			# send out the map
+			put1 $mle
+			put3 $R
+
+			foreach mi $map {
+				put1 $mi
+			}
+
+			# note that n has been updated by find_range; no need to
+			# do it here
+
+			if $FILL {
+				# there is a block following the map; we have to
+				# set up an element for it
+				set State 1
+			}
+
+		} else {
+
+			if { $n < 4 } {
+				# at least 4 bytes of map required; don't call
+				# find_range and issue a block with no map
+				put1 128
+				put3 $FILL
+				# request complete; no map following the block
+				break
+			}
+
+			# try a map past the block; preserve FILL as find_range
+			# will overwrite it
+			set F $FILL
+			set map [find_range]
+			set mle [llength $map]
+
+			# block + map
+			put1 [expr $mle | 0x80]
+			put3 $F
+
+			foreach mi $map {
+				put1 $mi
+			}
+
+			# if another block following the map, stay here;
+			# otherwise we have a hole, so go look up a new origin
+			if !$FILL {
+				set State 0
+			}
 		}
 
-		set t [expr $i - 1]
-		if { $s == $t } {
-			# a singleton
-			put3 $s
-			incr n
-			continue
-		}
-
-		# a range
-		put3 $t
-		put3 $s
-
-		incr n 2
-
-		if { $n == 16} {
-			break
-		}
 	}
 
-	if { $n == 0 } {
+	if { $n == 48 } {
 		log "LID $lid, illagal call to mtp, no missing samples"
 		return
 	}

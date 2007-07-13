@@ -11,7 +11,7 @@ heapmem {100};
 #include "phys_cc1100.h"
 #include "phys_uart.h"
 
-#define	XMIT_POWER	2
+#define	XMIT_POWER	7
 
 // The plugin
 
@@ -68,10 +68,27 @@ int tcv_clo_bridge (int phy, int fd) {
 	return 0;
 }
 
+#define	RSSI_MAX	220
+#define	RSSI_MIN	(RSSI_MAX - 127)
+
 int tcv_rcv_bridge (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
+
+	word rssi;
 
 	if (desc == NULL)
 		return TCV_DSP_PASS;
+
+	if (phy == 0 && (((byte*)p) [2] & 0xf0) == 0x90) {
+		// Convey RSSI scaled to 0-15
+		rssi = ((byte*)p) [len - 1];
+		if (rssi < RSSI_MIN)
+			rssi = RSSI_MIN;
+		else if (rssi > RSSI_MAX)
+			rssi = RSSI_MAX;
+		
+		((byte*)p) [len - 3] = (((byte*)p) [len - 3] & 0xf0) |
+			(rssi - RSSI_MIN) >> 3;
+	}
 
 	// Swap the sessions
 	phy = 1 - phy;

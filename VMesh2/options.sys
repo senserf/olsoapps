@@ -13,3 +13,5 @@
 #define WATCHDOG_ENABLED	1
 #undef SYSVER_B
 #define SYSVER_B		0x202
+
+#define	DM2200_CFG1		0x03
