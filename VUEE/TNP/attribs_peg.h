@@ -76,7 +76,7 @@ void 	_da (send_msg) (char * buf, int size);
 
 virtual Boolean _da (msg_isBind) (msg_t m) { return NO; };
 virtual Boolean _da (msg_isTrace) (msg_t m) { return NO; };
-virtual Boolean _da (msg_isMaster) (msg_t m) { m == msg_master; };
+virtual Boolean _da (msg_isMaster) (msg_t m) { return m == msg_master; };
 virtual Boolean _da (msg_isNew) (msg_t m) { return NO; }
 virtual Boolean _da (msg_isClear) (byte o) { return YES; };
 virtual void _da (set_master_chg) () { _da (app_flags) |= 2; };

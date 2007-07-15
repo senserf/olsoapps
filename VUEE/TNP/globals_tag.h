@@ -26,7 +26,7 @@ static char * ui_ibuf 	= NULL;
 static char * ui_obuf 	= NULL;
 static char * cmd_line	= NULL;
 
-const   lword	host_id		= 0xBACA0061;
+const   lword	host_id		= 0xBACADEAD;
 lword	host_passwd		= 0;
 
 word		app_flags	= 0;
@@ -35,9 +35,9 @@ appCountType	app_count	= {0, 0, 0};
 
 pongParamsType	pong_params = {	5120, 	// freq_maj
 				1024, 	// freq_min
-				0x0987, // 7-8-9 (3 levels)
+				0x0543, // cc1000 7-8-9 (3 levels) 3-4-5 cc1100
 				1024,	// rx_span
-				7	// rx_lev
+				5	// rx_lev: 7 on cc1000, 5 on cc1100
 };
 
 #endif

@@ -3,7 +3,7 @@
 	_da (ui_obuf)		= NULL;
 	_da (cmd_line)		= NULL;
 
-	_da (host_id)		= 0xBACA0001;
+	_da (host_id)		= (lword) preinit ("HID");
 	_da (host_password)	= 0;
 	_da (app_flags)		= 0;
 

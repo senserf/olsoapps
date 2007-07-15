@@ -32,7 +32,8 @@
 #define ui_inf	ser_inf
 
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
-#define DEF_LOCAL_HOST		1
+#define DEF_NID			85
+#define DEF_MHOST		99
 
 // Semaphores
 #define CMD_READER	(&cmd_line)
@@ -187,9 +188,9 @@ thread (rcv)
 	entry (RC_MSG)
 
 		if (in_header(rcv_buf_ptr, msg_type) == msg_pong)
-			app_diag (D_UI, "rss (%d.%d): %x",
+			app_diag (D_UI, "rss (%d.%d): %d",
 					in_header(rcv_buf_ptr, snd),
-					in_pong(rcv_buf_ptr, level), rcv_rssi);
+					in_pong(rcv_buf_ptr, level), rcv_rssi >>8);
 		process_incoming (RC_MSG, rcv_buf_ptr, rcv_packet_size,
 			map_rssi(rcv_rssi));
 		app_count.rcv++;
@@ -579,13 +580,11 @@ thread (root)
 
 	entry (RS_INIT)
 
-//		local_host = DEF_LOCAL_HOST;
-//		app_trace("init");
-
-		local_host = 1;
-		net_id = 85;
-		master_host = 1;
-
+		local_host = (word)host_id;
+#ifndef __SMURPH__
+		net_id = DEF_NID;
+		master_host = DEF_MHOST;
+#endif
 		// these survive for repeated commands;
 		rtin_tag = rtin_pass = rtin_npass = 0;
 		rtin_peg = rtin_rssi = rtin_pl = 0;
