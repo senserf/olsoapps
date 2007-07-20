@@ -1,59 +1,111 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2005.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 #include "sysio.h"
 #include "app.h"
-#include "diag.h"
 #include "msg_rtag.h"
 #include "net.h"
 
-#if CC1000
-#define DEF_PLEV	9
-#else
+// FIXIT: do something...
 #define DEF_PLEV	0
-#endif
+
+nid_t   net_id;
 
 // on the lib_app_if interface:
-id_t	host_id = 0xBACA;
-long   master_delta = 0;
+const lword	host_id = 0xBACA0001;
+long	master_delta = 0;
 appCountType app_count = {0, 0, 0};
-word   pow_level = DEF_PLEV;
+//nid_t	net_id  = 7;
+word	app_flags = DEFAULT_APP_FLAGS;
+word	pow_level = DEF_PLEV;
 word    beac_freq = 0;
+byte	cyc_ctrl = 0;
+byte	cyc_ap = 0;
+word	cyc_sp = 0;
+char * cmd_line  = NULL;
+cmdCtrlType cmd_ctrl = {0,0,0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
 int beacon (word, address); // process
+int cyc_man (word, address); // process
+
 char * get_mem (word state, int len);
 void send_msg (char * buf, int size);
-word check_passwd (lword p1, lword p2);
 
 // let's not include _if on any _if implementation, but list all externs:
-extern id_t local_host;
-extern void msg_master_out (word state, char** buf_out, id_t rcv);
-extern void msg_info_out (word state, char** buf_out, id_t rcv);
+extern nid_t local_host;
+extern void msg_master_out (word state, char** buf_out, nid_t rcv);
+//extern void msg_info_out (word state, char** buf_out, nid_t rcv);
+
+// cycle alignement is done to arbitrary mod 4 == 0 on the master's clock
+#define CS_INIT 	00
+#define CS_ACT		10
+#define CS_SLEEP	20
+process (cyc_man, void)
+	word align4;
+	nodata;
+
+	entry (CS_INIT)
+		// jic, shouldn't happen
+		if (cyc_ap == 0 && cyc_sp == 0)
+			kill (0);
+
+		align4 = 4 - (((word)(master_delta + seconds())) & 0x0003);
+		if (align4 != 0) {
+			delay (align4 << 10, CS_ACT);
+			release;
+		}
+
+	entry (CS_ACT)
+		if (cyc_ctrl & CYC_SLEEPING) {
+			cyc_ctrl &= ~CYC_SLEEPING;
+			clockup();
+			powerup();
+			net_opt (PHYSOPT_RXON, NULL);
+			net_opt (PHYSOPT_TXON, NULL);
+		}
+		if (cyc_ctrl & CYC_AU) // active unit set <=> in minutes
+			ldelay (cyc_ap, CS_SLEEP);
+		else
+			delay ((word)cyc_ap << 10, CS_SLEEP);
+		release;
+
+	entry (CS_SLEEP)
+		net_opt (PHYSOPT_RXOFF, NULL);
+		net_opt (PHYSOPT_TXOFF, NULL);
+		powerdown();
+		clockdown();
+		cyc_ctrl |= CYC_SLEEPING;
+		if (cyc_ctrl & CYC_SU)
+			ldelay (cyc_sp, CS_ACT);
+		else
+			delay (cyc_sp << 10, CS_ACT);
+		release;
+
+endprocess (1)
+#undef CS_INIT
+#undef CS_ACT
+#undef CS_SLEEP
 
 #define BS_ITER 00
 #define BS_SEND 10
 process (beacon, char)
-	static word len = 0;
 
 	entry (BS_ITER)
 		if (beac_freq == 0) {
-			app_diag (D_UI, "Beacon off");
+			diag ("Beacon off");
 			ufree (data);
 			kill (0);
 		}
-		delay (beac_freq, BS_SEND);
+		delay (beac_freq << 10, BS_SEND);
 		release;
 
 	entry (BS_SEND)
 		switch (in_header(data, msg_type)) {
-		  case msg_info:
-			msg_info_out (NONE, &data, in_header(data, rcv));
-			send_msg (data, sizeof(msgInfoType));
-			break;
 
 		  case msg_master:
-			msg_master_out (NONE, &data, in_header(data, rcv));
+			// better kill master's beacon if cyc changes
+			in_master(data, mtime) = wtonl(seconds());
 			send_msg (data, sizeof(msgMasterType));
 			break;
 
@@ -61,17 +113,8 @@ process (beacon, char)
 			send_msg (data, sizeof(msgTraceType));
 			break;
 
-		  case msg_rpc:
-			// for the kludge's origin, see oss_rpc_in
-			if (len == 0) {
-				len = (word)in_header(data, snd);
-				in_header(data, snd) = local_host;
-			}
-			send_msg (data, len);
-			break;
-
 		  default:
-			app_diag (D_WARNING, "Beacon failure");
+			diag ("Beacon failure");
 			beac_freq = 0;
 		}
 		proceed (BS_ITER);
@@ -79,43 +122,30 @@ endprocess (1)
 #undef	BS_ITER
 #undef	BS_SEND
 
-word check_passwd (lword p1, lword p2) {
-	const lword host_passwd = 0x0000BACA; // we'll se how it goes
-	if (host_passwd == p1)
-		return 1;
-	if (host_passwd == p2)
-		return 2;
-	app_diag (D_WARNING, "Failed passwd");
-	return 0;
-}
-
 char * get_mem (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
-		app_diag (D_WARNING, "Waiting for memory");
+		diag ("Waiting for memory");
 		umwait (state);
 	}
 	return buf;
 }
 
 void send_msg (char * buf, int size) {
-	// it doesn't seem like a good place to filter out
-	// local host, but it's convenient, for now...
 
 	// this shouldn't be... WARNING to see why it is needed...
 	if (in_header(buf, rcv) == local_host) {
-		app_diag (D_WARNING, "Dropped msg(%u) to lh",
+		diag ("Dropped msg(%u) to lh",
 			in_header(buf, msg_type));
 		return;
 	}
 
-	if (net_tx (NONE, buf, size) == 0) {
+	if (net_tx (NONE, buf, size, 0 /* encr_data */) == 0) {
 		app_count.snd++;
-		app_diag (D_DEBUG, "Sent %u to %lu",
-			in_header(buf, msg_type),
-			in_header(buf, rcv));
+		//diag ("Sent %u to %u",
+		//	in_header(buf, msg_type),
+		//	in_header(buf, rcv));
 	} else
-		app_diag (D_SERIOUS, "Tx %u failed",
-			in_header(buf, msg_type));
+		diag ("Tx %u failed", in_header(buf, msg_type));
  }
 

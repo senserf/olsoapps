@@ -1,31 +1,17 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "sysio.h"
-#include "form.h"
 #include "net.h"
 #include "tarp.h"
 #include "msg_rtag.h"
 #include "ser.h"
-#include "diag.h"
 #include "lib_app_if.h"
+#include "codes.h"
 // #include "trc.h"
 
 #define TINY_MEM 1
-
-heapmem {70, 30}; // how to find out a good ratio?
-
-// elsewhere may be a better place for this:
-#if CC1000
-#define INFO_PHYS_DEV INFO_PHYS_CC1000
-#else
-#if DM2100
-#define INFO_PHYS_DEV INFO_PHYS_DM2100
-#else
-#define INFO_PHYS_DEV INFO_PHYS_RADIO
-#endif
-#endif
 
 #if UART_DRIVER
 #define ui_out	ser_out
@@ -35,162 +21,36 @@ heapmem {70, 30}; // how to find out a good ratio?
 #define ui_in(a, b, c)  
 #endif
 
-#if TINY_MEM
-#define UI_BUFLEN		128
-#else
-#define UI_BUFLEN		256
-#endif
-
-static char * ui_ibuf = NULL;
-static char * ui_obuf = NULL;
-
-// command line and its semaphores
-static char * cmd_line	= NULL;
-#define CMD_READER	((word)&cmd_line)
-#define CMD_WRITER	((word)((&cmd_line)+1))
-
-// format strings
-#if TINY_MEM
-static const char welcome_str[] = "\r\nRTag cmds:\r\n"
-	"s lh mid pl hid ts tl\r\n"
-	"m, r, t, i [rcv]\r\n"
-	"o[{r|t| }{+|-}]\r\n"
-	"b msec\r\n"
-	"h, q\r\n";
-#else
-static const char welcome_str[] = "\r\nWelcome to RTag Testbed\r\n"
-	"Commands:\r\n"
-	"\tSet:\ts [ lh [ mid [ pl [ hid [ ts [ tl ]]]]]]\r\n"
-	"\tSnd Master:\tm [ rcv ]\r\n"
-	"\tSnd RPC:\tr [ rcv ]\r\n"
-	"\tSnd Trace:\tt [ rcv ]\r\n"
-	"\tSnd Info:\ti [ rcv ]\r\n"
-	"\tOpt RF:\t\to[{r|t| }{+|-}]\r\n"
-	"\tBeacon:\t\tb [ <msec> ]\r\n"
-	"\tHelp:\t\th\r\n"
-	"\tq(uit)\r\n";
-#endif
-static const char o_str[] =     "phys: %x, plug: %x, txrx: %x, pl: %u\r\n";
-
-static const char ill_str[] =	"Illegal command: %s\r\n";
-
-#if TINY_MEM
-#if MALLOC_STATS
-static const char stats_mem_str[] = " Mem (st, fr, ma, ch, fa) "
-					"%u, %u, %u, %u, %u"
-#if !MALLOC_SINGLEPOOL
-			         "\r\n                         "
-				 	"    %u, %u, %u, %u"
-#endif
-					;
-#endif
-static const char stats_str[] = "hid:lh(%lx:%lu)\r\n"
-	"In(%u:%u) Out(%u:%u) Fwd(%u:%u)\r\n"
-	"T(%lu) D(%ld) M(%lu) tarp s:l((%u:%u)"
-#else
-static const char stats_str[] = "Stats for hId: lHost (%lx:%lu):\r\n"
-	" In (%u:%u) Out (%u:%u) Fwd (%u:%u)\r\n"
-	" Time (%lu) Delta (%ld) to Master (%lu) PLev %x\r\n"
-	" phy %x plug %x txrx %x tarp s:l (%u:%u)\r\n"
-#if MALLOC_STATS
-	" Mem (st, fr, ma, ch, fa) %u, %u, %u, %u\r\n"
-#if !MALLOC_SINGLEPOOL
-	" Max free (%u, %u) chunks (%u, %u)\r\n"
-#endif
-#endif
-#endif
-	;
-
-extern tarpCountType tarp_count;
-extern word tarp_level;
-extern word tarp_slack;
-
-// Display node stats on UI
-static void stats () {
-#if MALLOC_STATS
-	word faults0, chunks0;
-	word mem0 = memfree(0, &faults0);
-	word max0 = maxfree(0, &chunks0);
-#if !MALLOC_SINGLEPOOL
-	word faults1, chunks1;
-	word mem1 = memfree(1, &faults1);
-	word max1 = maxfree(1, &chunks1);
-#endif
-#endif
-	
-#if TINY_MEM
-	app_diag (D_UI, stats_str, host_id, local_host,
-		app_count.rcv, tarp_count.rcv,
-		app_count.snd, tarp_count.snd,
-		app_count.fwd, tarp_count.fwd,
-		seconds(), master_delta, master_host,
-		tarp_slack, tarp_level);
-#if MALLOC_STATS
-	app_diag (D_UI, stats_mem_str, stackfree(),
-		mem0, max0, chunks0, faults0
-#if !MALLOC_SINGLEPOOL
-		, mem1, max1, chunks1, faults1
-#endif
-		);
-#endif
-
-#else
-	app_diag (D_UI, stats_str,
-			host_id, local_host, 
-			app_count.rcv, tarp_count.rcv,
-			app_count.snd, tarp_count.snd, 
-			app_count.fwd, tarp_count.fwd,
-			seconds(), master_delta, master_host,
-			net_opt (PHYSOPT_PHYSINFO, NULL),
-			net_opt (PHYSOPT_PLUGINFO, NULL),
-			net_opt (PHYSOPT_STATUS, NULL),
-			tarp_slack, tarp_level
-#if MALLOC_STATS
-			, stackfree(), mem0, max0, chunks0, faults0
-#if !MALLOC_SINGLEPOOL
-			, mem1, max1, chunks1, faults1
-#endif
-#endif
-			);
-#endif
-}
-
 static void process_incoming (word state, char * buf, word size, word rssi) {
-  int    	w_len;
   
   switch (in_header(buf, msg_type)) {
 
 	case msg_master:
 		msg_master_in (buf);
-		stats();
 		return;
 
-	case msg_rpc:
-		if (cmd_line != NULL) { // busy with another input
-			wait (CMD_WRITER, state);
-			release;
-		}
-		w_len = size - sizeof(msgRpcType);
-		cmd_line = get_mem (state, w_len);
-		memcpy (cmd_line, buf + sizeof(msgRpcType), w_len);
-		trigger (CMD_READER);
+	case msg_cmd:
+		msg_cmd_in (state, buf);
 		return;
 
 	case msg_trace:
 		msg_trace_in (state, buf);
 		return;
 
-	case msg_info:
-		in_header(buf, msg_type) = rssi; // hack alert!
-		msg_info_in (buf);
+	case msg_traceAck:
+		oss_traceAck_out (state, buf);
 		return;
 
-	case msg_traceAck:
-		msg_traceAck_in (buf, size);
+	case msg_bind:
+		msg_bind_in (state, buf);
+		return;
+
+	case msg_new:
+		oss_new_out (state, buf);
 		return;
 
 	default:
-		app_diag (D_SERIOUS, "Got ? (%u)", in_header(buf, msg_type));
+		diag ("Got ? (%u)", in_header(buf, msg_type));
 
   }
 }
@@ -218,20 +78,20 @@ process (rcv, void)
 			buf_ptr = NULL;
 			packet_size = 0;
 		}
-		packet_size = net_rx (RS_TRY, &buf_ptr, &rssi);
+		packet_size = net_rx (RS_TRY, &buf_ptr, &rssi, 0 /*encr */);
 		if (packet_size <= 0) {
-			app_diag (D_SERIOUS, "net_rx failed (%d)", packet_size);
+			diag ("net_rx failed (%d)", packet_size);
 			proceed (RS_TRY);
 		}
-
-		app_diag (D_DEBUG, "RCV (%d): %x-%u-%lu-%lu-%u-%u\r\n",
+#if 0
+		diag ("RCV (%d): %x-%u-%u-%u-%u-%u\r\n",
 			  packet_size, in_header(buf_ptr, msg_type),
 			  in_header(buf_ptr, seq_no),
 			  in_header(buf_ptr, snd),
 			  in_header(buf_ptr, rcv),
 			  in_header(buf_ptr, hoc),
 			  in_header(buf_ptr, hco));
-
+#endif
 	entry (RS_MSG)
 		process_incoming (RS_MSG, buf_ptr, packet_size, rssi);
 		app_count.rcv++;
@@ -248,40 +108,147 @@ endprocess (1)
    CS_ <-> Command State
    --------------------
 */
-#define CS_INIT 00
-#define CS_IN	10
-#define CS_WAIT 20
+#define CS_IN   00
+#define CS_WAIT 10
+#define UI_INLEN 64
 
 process (cmd_in, void)
+	static byte ui_ibuf[UI_INLEN];
 	nodata;
 
-	entry (CS_INIT)
-		if (ui_ibuf == NULL)
-			ui_ibuf = get_mem (CS_INIT, UI_BUFLEN);
-
 	entry (CS_IN)
-		// hangs on the uart_a interrupt or polling
-		ui_in (CS_IN, ui_ibuf, UI_BUFLEN);
-		if (strlen(ui_ibuf) == 0) // CR on empty line does it
+		memset (ui_ibuf, 0, UI_INLEN);
+		// hangs on the uart_a
+		ui_in (CS_IN, ui_ibuf, UI_INLEN);
+		// verify bin cmd at source:
+		if (*ui_ibuf == NULL &&
+			(ui_ibuf[1] < CMD_HEAD_LEN ||
+			 ui_ibuf[ui_ibuf[1] +2] != 0x04)) {
+			diag ("Bad bin cmd");
 			proceed (CS_IN);
+		}
 
 	entry (CS_WAIT)
 		if (cmd_line != NULL) {
 			wait (CMD_WRITER, CS_WAIT);
 			release;
 		}
+		if (*ui_ibuf) { // string
+			cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
+			strcpy (cmd_line, ui_ibuf);
+			trigger (CMD_READER);
+			proceed (CS_IN);
+		}
 
-		cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
-		strcpy (cmd_line, ui_ibuf);
+		// bin cmd
+		cmd_ctrl.p_q = ui_ibuf[2];
+		memcpy (&cmd_ctrl.p, &ui_ibuf[3], 2);
+		cmd_ctrl.t_q = ui_ibuf[5];
+		memcpy (&cmd_ctrl.t, &ui_ibuf[6], 2);
+		cmd_ctrl.opcode = ui_ibuf[8];
+		cmd_ctrl.opref  = ui_ibuf[9];
+		cmd_ctrl.s_q = ADQ_OSS;
+		cmd_ctrl.s = local_host;
+		cmd_ctrl.oprc   = RC_NONE;
+		cmd_ctrl.oplen  = ui_ibuf[1] - CMD_HEAD_LEN;
+
+	entry (CS_WAIT +1)
+		cmd_line = get_mem (CS_WAIT +1, cmd_ctrl.oplen +1);
+		cmd_line[0] = '\0';
+		if (cmd_ctrl.oplen)
+			memcpy (cmd_line +1, ui_ibuf +CMD_HEAD_LEN +2,
+				cmd_ctrl.oplen);
 		trigger (CMD_READER);
 		proceed (CS_IN);
+
 endprocess (1)
 
-#undef CS_INIT
 #undef CS_IN
 #undef CS_WAIT
+#undef UI_INLEN
 
+static void cmd_exec (word state) {
+	if (cmd_ctrl.t_q == ADQ_MASTER) {
+		if (master_host == 0) {
+			cmd_ctrl.oprc = RC_EMAS;
+			return;
+		}
+		cmd_ctrl.t = master_host;
+	}
+	if (cmd_ctrl.t_q == ADQ_LOCAL)
+		cmd_ctrl.t = local_host;
 
+	switch (cmd_ctrl.opcode) {
+		case CMD_MASTER:
+			oss_master_in (state);
+			return;
+
+		case CMD_DISP:
+			cmd_ctrl.oprc = RC_OK;
+			return;
+
+		case CMD_TRACE:
+			oss_trace_in (state);
+			return;
+
+		case CMD_SET:
+			oss_set_in();
+			return;
+
+		case CMD_INFO:
+			oss_info_in(state);
+			return;
+
+		case CMD_BIND:
+			oss_bind_in (state);
+			return;
+	}
+	cmd_ctrl.oprc = RC_ECMD;
+}
+			
+static void cmd_out (word state, nid_t rcv) {
+	char * out_buf;
+	if (net_opt (PHYSOPT_GETSID, NULL) == 0) {
+		cmd_ctrl.oprc = RC_ENET;
+		return;
+	}
+
+	out_buf = get_mem (state, sizeof(msgCmdType) + cmd_ctrl.oplen);
+	in_header(out_buf, msg_type) = msg_cmd;
+	in_header(out_buf, rcv) = rcv;
+	in_header(out_buf, hco) = 0;
+	in_cmd(out_buf, s) = cmd_ctrl.s;
+	in_cmd(out_buf, p) = cmd_ctrl.p;
+	in_cmd(out_buf, t) = cmd_ctrl.t;
+	in_cmd(out_buf, opcode) = cmd_ctrl.opcode;
+	in_cmd(out_buf, opref) = cmd_ctrl.opref;
+	in_cmd(out_buf, oplen) = cmd_ctrl.oplen;
+	in_cmd(out_buf, oprc) = cmd_ctrl.oprc;
+	if (cmd_ctrl.oplen)
+		 memcpy (out_buf+sizeof(msgCmdType), cmd_line +1,
+			 cmd_ctrl.oplen);
+	send_msg (out_buf, sizeof(msgCmdType) + cmd_ctrl.oplen);
+	ufree (out_buf);
+	// this may be called after cmd exec, and called for ret sending
+	// to target: don't "positively" override the ret code
+	if (cmd_ctrl.oprc == RC_NONE)
+		cmd_ctrl.oprc = RC_OK;
+	return;
+}
+
+// in more restricted applets, much more either error settings or
+// corrections should be here
+static void validate() {
+	if (cmd_ctrl.p_q == ADQ_MASTER) {
+		if (master_host == 0) {
+			cmd_ctrl.oprc = RC_EMAS;
+			return;
+		}
+		cmd_ctrl.p = master_host;
+	}
+	if (cmd_ctrl.p_q == ADQ_LOCAL)
+			 cmd_ctrl.p = local_host;
+}
 /*
    --------------------
    Root process
@@ -292,28 +259,29 @@ endprocess (1)
 #define RS_FREE		10
 #define RS_RCMD		20
 #define RS_DOCMD	30
-#define RS_UIOUT	50
-
+#define RS_TXTCMD	40
+#define RS_RETOUT	60
 
 process (root, void)
 
-	// input (s command)
-	word in_pl;
-	id_t in_lh, in_hid, in_mh;
-	
 	nodata;
 
 	entry (RS_INIT)
-		ui_out (RS_INIT, welcome_str);
-		if (net_init (INFO_PHYS_DEV, INFO_PLUG_TARP) < 0) {
-			app_diag (D_FATAL, "net_init failed");
+
+		// for now:
+		net_id = 7;
+
+
+		//counting on SID inited 0
+		
+		local_host = host_id;
+		
+		if (net_init (INFO_PHYS_DM2100, INFO_PLUG_TARP) < 0) {
+			diag ("net_init failed");
 			reset();
 		}
 		net_opt (PHYSOPT_RXON, NULL);
 		net_opt (PHYSOPT_TXON, NULL);
-#if CC1000
-		net_opt (PHYSOPT_SETPOWER, &pow_level);
-#endif
 		(void) fork (rcv, NULL);
 #if UART_DRIVER
 		(void) fork (cmd_in, NULL);
@@ -323,8 +291,7 @@ process (root, void)
 	entry (RS_FREE)
 		ufree (cmd_line);
 		cmd_line = NULL;
-		ufree (ui_obuf);
-		ui_obuf = NULL;
+		memset (&cmd_ctrl, 0, sizeof(cmd_ctrl));
 		trigger (CMD_WRITER);
 
 	entry (RS_RCMD)
@@ -332,135 +299,57 @@ process (root, void)
 			wait (CMD_READER, RS_RCMD);
 			release;
 		}
-		if (ui_obuf == NULL) 
-			ui_obuf = get_mem (RS_RCMD, UI_BUFLEN);
 
 	entry (RS_DOCMD)
+		if (cmd_line[0] != '\0') // txt cmd
+			proceed (RS_TXTCMD);
+
+		validate();
+		if (cmd_ctrl.oprc != RC_NONE)
+			proceed (RS_RETOUT);
+
+	 entry (RS_DOCMD +1)
+		if (cmd_ctrl.p_q != ADQ_MSG && cmd_ctrl.p != local_host) {
+			cmd_out (RS_DOCMD +1, cmd_ctrl.p);
+			proceed (RS_RETOUT);
+		}
+
+	entry (RS_DOCMD +2)
+		cmd_exec (RS_DOCMD +2);
+
+	entry (RS_DOCMD +3)
+		if (cmd_ctrl.t != local_host) {
+			// in some cases, we do NOT want ret going to
+			// the target(s)
+			if (cmd_ctrl.opcode != CMD_MASTER &&
+			    cmd_ctrl.opcode != CMD_TRACE &&
+			    cmd_ctrl.opcode != CMD_BIND)
+				cmd_out (RS_DOCMD +3, cmd_ctrl.t);
+		}
+		// in some other (damn blueprint) cases, the
+		// local ret is excessive, too:
+		if (cmd_ctrl.opcode == CMD_TRACE)
+			proceed (RS_FREE);
+		proceed (RS_RETOUT);
+
+	entry (RS_TXTCMD)
 		if (cmd_line[0] == ' ') // ignore if starts with blank
 			proceed (RS_FREE);
-
-                if (cmd_line[0] == 'h') {
-			strcpy (ui_obuf, welcome_str);
-			proceed (RS_UIOUT);
-		}
 
 		if (cmd_line[0] == 'q')
 			reset();
 
-		if (cmd_line[0] == 'b') {
-			scan (cmd_line+1, "%u", &beac_freq);
-			app_diag (D_UI, "Beacon at %u", beac_freq);
-			proceed (RS_FREE);
-		}
-
-		if (cmd_line[0] == 'm') {
-			in_lh = 0;
-			scan (cmd_line+1, "%lu", &in_lh);
-			oss_master_in (RS_DOCMD, in_lh);
-			proceed (RS_FREE);
-		}
-
-		if (cmd_line[0] == 'r') {
-			oss_rpc_in (RS_DOCMD, cmd_line+1);
-			proceed (RS_FREE);
-		}
-
-		if (cmd_line[0] == 't') {
-			in_lh = 0;
-			scan (cmd_line+1, "%lu", &in_lh);
-			oss_trace_in (RS_DOCMD, in_lh);
-			proceed (RS_FREE);
-		}
-
-		if (cmd_line[0] == 'i') {
-			in_lh = 0;
-			scan (cmd_line+1, "%lu", &in_lh);
-			oss_info_in (RS_DOCMD, in_lh);
-			proceed (RS_FREE);
-		}
-
-		if (cmd_line[0] == 'o') {
-			in_pl = 0;
-			if (strlen (cmd_line) > 2) {
-				switch (cmd_line[1]) {
-					case 'r':
-						in_pl = 1;
-						break;
-					case 't':
-						in_pl = 2;
-						break;
-					case ' ':
-						in_pl = 3;
-						break;
-					case 'p':
-					  scan (cmd_line+2, "%u", &in_pl);
-					  if (in_pl && in_pl != pow_level) {
-#if CC1000
-					    pow_level = in_pl;
-					    net_opt (PHYSOPT_SETPOWER,
-							&pow_level);
-#else
-					    app_diag (D_WARNING, "No var pLev");
-#endif
-					    }
-					    form (ui_obuf, o_str,
-					      net_opt (PHYSOPT_PHYSINFO, NULL),
-					      net_opt (PHYSOPT_PLUGINFO, NULL),
-					      net_opt (PHYSOPT_STATUS, NULL),
-					      pow_level);
-					    proceed (RS_UIOUT);
-					default:
-					  form (ui_obuf, ill_str, cmd_line);
-					  proceed (RS_UIOUT);
-				}
-				switch (cmd_line[2]) {
-					case '+':
-					  if (in_pl & 1)
-						net_opt (PHYSOPT_RXON, NULL);
-					  if (in_pl & 2)
-						net_opt (PHYSOPT_TXON, NULL);
-					  break;
-					case '-':
-					  if (in_pl & 1)
-						net_opt (PHYSOPT_RXOFF, NULL);
-					  if (in_pl & 2)
-						net_opt (PHYSOPT_TXOFF, NULL);
-					  break;
-					default:
-					  form (ui_obuf, ill_str, cmd_line);
-					  proceed (RS_UIOUT);
-				}
-			}
-			form (ui_obuf, o_str, net_opt (PHYSOPT_PHYSINFO, NULL),
-				net_opt (PHYSOPT_PLUGINFO, NULL),
-				net_opt (PHYSOPT_STATUS, NULL), pow_level);
-			proceed (RS_UIOUT);
-		}
-
-		if (cmd_line[0] == 's') {
-			in_lh = in_hid = in_mh = 0;
-			scan (cmd_line+1, "%lu %lu %lx %u %u",
-				&in_lh, &in_mh,
-				&in_hid, &tarp_slack, &tarp_level);
-			if (in_lh)
-				local_host = in_lh;
-			if (in_mh)
-				master_host = in_mh;
-			if (in_hid)
-				host_id = in_hid;
-			stats();
-			proceed (RS_FREE);
-		}
-
-		form (ui_obuf, ill_str, cmd_line);
-
-	entry (RS_UIOUT)
-		ui_out (RS_UIOUT, ui_obuf);
+		diag ("Bad txt cmd: %s", cmd_line);
 		proceed (RS_FREE);
 
-endprocess (0) // ganz egal? is (1) somehow more efficient? 
+	entry (RS_RETOUT)
+		oss_ret_out (RS_RETOUT);
+		proceed (RS_FREE);
+
+endprocess (0)
 #undef RS_INIT
 #undef RS_FREE
 #undef RS_RCMD
 #undef RS_DOCMD
-#undef RS_UIOUT
+#undef RS_TXTCMD
+#undef RS_RETOUT

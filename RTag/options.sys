@@ -1,1 +1,11 @@
-// Insert here applications-specific options
+//#undef  DIAG_MESSAGES
+//#define DIAG_MESSAGES		2	/* System messages to UART */
+
+// all on
+//#define dbg_level		0xFFFF
+// uart(9), 0, 1, 2
+#define dbg_level		0x0207
+#define dbg_binary		1
+#define WATCHDOG_ENABLED	1
+#undef SYSVER_B
+#define SYSVER_B		0x0EEE

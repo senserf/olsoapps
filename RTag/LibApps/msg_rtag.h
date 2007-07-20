@@ -7,8 +7,17 @@
 
 #include "msg_rtagStructs.h"
 
+#if 0
 typedef enum {
-	msg_null, msg_master, msg_rpc, msg_trace, msg_traceAck, msg_info
+	msg_null, msg_master, msg_rpc, msg_trace, msg_traceAck, msg_info,
+	msg_cmd, msg_disp
+} msgType;
+#endif
+
+typedef enum {
+	msg_null, msg_master, msg_trace, msg_traceAck, msg_cmd, msg_bind,
+	msg_new,
+	msg_traceF, msg_traceFAck, msg_traceB, msg_traceBAck /* not needed? */
 } msgType;
 
 #define APP_RTAG	0x0400
