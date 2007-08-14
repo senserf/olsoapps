@@ -176,6 +176,17 @@ proc put4 { v } {
 	append SIO(MSG) [binary format i $v]
 }
 
+proc putESN { v } {
+
+	global SIO
+
+	for { set i 0 } { $i < 8 } { incr i } {
+		set d [expr X[string range $v end-1 end]]
+		set v [string range $v 0 end-2]
+		append SIO(MSG) [binary format c $d]
+	}
+}
+
 proc get1 { } {
 
 	global SIO
@@ -229,6 +240,20 @@ proc get4 { } {
 	return $d
 }
 
+proc getESN { } {
+
+	global SIO
+
+	set esn ""
+	for { set i 0 } { $i < 8 } { incr i } {
+		binary scan $SIO(BUF) c b
+		set SIO(BUF) [string range $SIO(BUF) 1 end]
+		set esn "[format %2X $b]$esn"
+	}
+
+	return $esn
+}
+
 proc init_msg { lid } {
 
 	global SIO
@@ -243,12 +268,7 @@ proc handle_hello { } {
 #
 	global Wins SIO
 
-	set esn [get4]
-
-	if { $esn == 0 } {
-		log "received 0 ESN in HELLO, ignored"
-		return
-	}
+	set esn [getESN]
 
 	addESN $esn
 }
@@ -887,7 +907,7 @@ proc binder { esn } {
 		# create the bind message
 		init_msg $WBind($esn,LID)
 		put1 $CMD(BIND)
-		put4 $esn
+		putESN $esn
 		msg_close
 		set WBind($esn,MSG) $SIO(MSG)
 	}
@@ -1044,7 +1064,7 @@ proc updateESN { } {
 
 	set ne 0
 	foreach el $ESNLIST {
-		$ESNL insert end "[format %010u [lindex $el 0]]\n" "H$ne"
+		$ESNL insert end "[lindex $el 0]\n" "H$ne"
 		incr ne
 	}
 

@@ -39,7 +39,9 @@ const tcvplug_t plug_heart =
 			tcv_out_heart, tcv_xmt_heart, NULL,
 				0x0081 /* Plugin Id */ };
 
-const lword ESN = 0x80000001;
+const lword ESN0 = 0x00000000,
+	    ESN1 = 0x00000001;
+
 
 #define	MISSING_MAP_SIZE	2048	// Bytes
 
@@ -1014,8 +1016,8 @@ strand (listener, int)
 		packet = tcv_wnp (LI_INIT, MYFD, 6);
 
 		put1 (packet, PT_HELLO);
-		put4 (packet, ESN);
-
+		put4 (packet, ESN1);
+		put4 (packet, ESN0);
 		tcv_endp (packet);
 
 #ifdef DEBUG_DISPLAY
@@ -1050,8 +1052,11 @@ BIgn:
 		goto BIgn;
 
 	get4 (packet, lwsc);
-	if (lwsc != ESN)
+	if (lwsc != ESN1)
 		// Not my ESN
+		goto BIgn;
+	get4 (packet, lwsc);
+	if (lwsc != ESN0)
 		goto BIgn;
 
 	// Bind
