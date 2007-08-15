@@ -1013,7 +1013,7 @@ strand (listener, int)
 		// that if we are bound on the other interface, but we listen
 		// on this one in case somebody wants to re-bind us here.
 
-		packet = tcv_wnp (LI_INIT, MYFD, 6);
+		packet = tcv_wnp (LI_INIT, MYFD, 10);
 
 		put1 (packet, PT_HELLO);
 		put4 (packet, ESN1);
