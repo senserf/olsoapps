@@ -14,7 +14,7 @@ station	Node : NNode {
 #include "starter.h"
 
 	void setup (data_no_t*);
-	void _da (reset) ();
+	void reset ();
 	void init ();
 };
 

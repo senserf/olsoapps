@@ -4,7 +4,6 @@ void Node::setup (data_no_t *nddata) {
 
 	PicOSNode::setup (nddata);
 	NNode::setup ();
-	init ();
 }
 
 void Node::init () {
@@ -15,9 +14,7 @@ void Node::init () {
 	appStart ();
 }
 
-__PUBLF (Node, void, reset) () {
+void Node::reset () {
 
 	NNode::reset ();
-
-	init ();
 }

@@ -21,7 +21,7 @@ station	NodeTag : TNode {
 	void appStart ();
 
 	void setup (data_no_t*);
-	void _da (reset) ();
+	void reset ();
 	void init ();
 };
 

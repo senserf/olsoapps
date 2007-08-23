@@ -8,7 +8,6 @@ void NodeTag::setup (data_no_t* nddata) {
 
 	PicOSNode::setup (nddata);
 	TNode::setup ();
-	init ();
 }
 
 void NodeTag::init () {
@@ -19,11 +18,9 @@ void NodeTag::init () {
 	appStart ();
 }
 
-__PUBLF (NodeTag, void, reset) () {
+void NodeTag::reset () {
 
 	TNode::reset ();
-
-	init ();
 }
 
 void buildTagNode (data_no_t* nddata) {

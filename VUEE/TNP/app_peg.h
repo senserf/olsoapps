@@ -6,7 +6,6 @@
 /* ==================================================================== */
 
 #define	THREADNAME(a)	a ## _peg
-#define	NODENAME	NodePeg
 
 // Content of all LibApps
 

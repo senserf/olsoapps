@@ -6,7 +6,6 @@
 /* ==================================================================== */
 
 #define	THREADNAME(a)	a ## _tag
-#define	NODENAME	NodeTag
 
 //+++ "lib_app_tag.c"
 //+++ "msg_io_tag.c"

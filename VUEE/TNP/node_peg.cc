@@ -8,7 +8,6 @@ void NodePeg::setup (data_no_t *nddata) {
 
 	PicOSNode::setup (nddata);
 	TNode::setup ();
-	init ();
 }
 
 void NodePeg::init () {
@@ -19,11 +18,9 @@ void NodePeg::init () {
 	appStart ();
 }
 
-__PUBLF (NodePeg, void, reset) () {
+void NodePeg::reset () {
 
 	TNode::reset ();
-
-	init ();
 }
 
 void buildPegNode (data_no_t *nddata) {
