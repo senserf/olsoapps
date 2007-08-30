@@ -4,6 +4,7 @@
 /* ==================================================================== */
 
 #include "diag.h"
+#include "globals_peg.h"
 #include "app_peg.h"
 #include "msg_peg.h"
 
