@@ -57,3 +57,4 @@
 #endif
 #define RANDOM_NUMBER_GENERATOR 2
 
+#define RADIO_BITRATE	200000
