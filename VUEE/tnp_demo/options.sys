@@ -1,0 +1,59 @@
+#ifdef	__SMURPH__
+#define	TCV_PRESENT			1
+#define	TCV_HOOKS			0
+#define	TCV_TIMERS			0
+
+#define	UART_DRIVER			1
+
+// not needed ? #define	DM2200				1
+#define CC1100 1
+#define RADIO_USE_LEDS 6
+
+#define	dbg_0(c)	do { } while (0)
+#define	dbg_1(c)	do { } while (0)
+#define	dbg_2(c)	do { } while (0)
+#define	dbg_3(c)	do { } while (0)
+#define	dbg_4(c)	do { } while (0)
+#define	dbg_5(c)	do { } while (0)
+#define	dbg_6(c)	do { } while (0)
+#define	dbg_7(c)	do { } while (0)
+#define	dbg_8(c)	do { } while (0)
+#define	dbg_9(c)	do { } while (0)
+#define	dbg_a(c)	do { } while (0)
+#define	dbg_b(c)	do { } while (0)
+#define	dbg_c(c)	do { } while (0)
+#define	dbg_d(c)	do { } while (0)
+#define	dbg_e(c)	do { } while (0)
+#define	dbg_f(c)	do { } while (0)
+#endif
+
+#ifdef UART_INPUT_BUFFER_LENGTH
+#undef UART_INPUT_BUFFER_LENGTH
+#endif
+#define UART_INPUT_BUFFER_LENGTH 76
+
+#ifdef CODE_LONG_INTS
+#undef CODE_LONG_INTS
+#endif
+#define CODE_LONG_INTS 1
+
+#ifdef DIAG_MESSAGES
+#undef DIAG_MESSAGES
+#endif
+#define DIAG_MESSAGES 2
+
+#ifdef MCLOCK_FROM_CRYSTAL
+#undef MCLOCK_FROM_CRYSTAL
+#endif
+#define MCLOCK_FROM_CRYSTAL 0
+
+#ifdef SPIN_WHEN_HALTED
+#undef SPIN_WHEN_HALTED
+#endif
+#define SPIN_WHEN_HALTED 0
+
+#ifdef RANDOM_NUMBER_GENERATOR
+#undef RANDOM_NUMBER_GENERATOR
+#endif
+#define RANDOM_NUMBER_GENERATOR 2
+

@@ -1,0 +1,99 @@
+<network nodes="6">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <channel>
+        <shadowing bn="-110.0dBm" syncbits="8">
+		RP(d) = received power at distance d
+		XP    = transmitted power
+		X     = lognormal random Gaussian component
+ 		=======================================================
+		RP(d)/XP [dB] = -10 x 3.0 x log(d/1.0m) + X(1.0) - 38.0
+ 		=======================================================
+	</shadowing>
+	<cutoff>-115.0dBm</cutoff>
+	<ber>
+		Interpolated ber table:
+		======================
+		  SIR		  BER
+		50.0dB		1.0E-6
+		40.0dB		2.0E-6
+		30.0dB		5.0E-6
+		20.0dB		1.0E-5
+		10.0dB		1.0E-4
+		 5.0dB		1.0E-3
+		 2.0dB		1.0E-1
+		 0.0dB		2.0E-1
+		-2.0dB		5.0E-1
+		-5.0dB		9.9E-1
+	</ber>
+	<frame>9600 12 0</frame>
+    </channel>
+    <nodes>
+	<defaults>
+	    <memory>2048 bytes</memory>
+	    <power>
+		transmitter power	0.0dBm
+		receiver boost		0.0dB
+	    </power>
+	    <preamble>32 bits</preamble>
+	    <lbt>
+		delay			8msec
+		threshold		-109.0dBm
+	    </lbt>
+	    <backoff>
+		min			8msec
+		max			303msec
+	    </backoff>
+	    <leds number="4">
+	    	<output target="socket"></output>
+	    </leds>
+	    <iflash>256 bytes in 2 pages</iflash>
+	    <uart rate="9600" bsize="12">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	</defaults>
+	<node number="0" type="peg">
+	    <location>5.0 5.0</location>
+	</node>
+        <node number="1" type="peg">
+            <location>10.0 5.0</location>
+	</node>
+	<node number="2" type="tag">
+	    <location>15.0 5.0</location>
+	    <uart rate="9600" bsize="12">
+	        <input source="string" type="untimed">
+		  s15\r\n
+		</input>
+		<output target="device">/dev/tty</output>
+	    </uart>
+	</node>
+	<node number="3" type="tag">
+	    <location>21.0 5.0</location>
+ 	    <uart rate="9600" bsize="12">
+	   	<input source="string" type="untimed">
+	    	  s21\r\n
+	        </input>
+	        <output target="device">/dev/tty</output>
+	    </uart>
+	</node>
+	<node number="4" type="tag">
+	    <location>22.0 5.0</location>
+	    <uart rate="9600" bsize="12">
+	        <input source="string" type="untimed">
+	          s22\r\n
+	        </input>
+	        <output target="device">/dev/tty</output>
+	    </uart>
+	</node>
+        <node number="5" type="tag">
+            <location>23.0 5.0</location>
+            <uart rate="9600" bsize="12">
+                <input source="string" type="untimed">
+                  s23\r\n
+                </input>
+                <output target="device">/dev/tty</output>
+            </uart>
+        </node>
+    </nodes>
+</network>
