@@ -115,6 +115,8 @@ strand (sender, word)
     word pl;
     int  pp;
 
+#define tdelay	((word)data)
+
     entry (SN_SEND)
 
 	if (tkillflag) {

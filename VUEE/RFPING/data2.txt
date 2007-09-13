@@ -86,20 +86,32 @@
 	    <preinit tag="TEST3" type="string"></preinit>
 	</node>
 	<node number="2">
-		<location>11.0 11.0</location>
+	    <pins number="10" adc="8">
+		<output target="socket"></output>
+	    </pins>
+	    <location>11.0 11.0</location>
 	</node>
 	<node number="3">
-		<location>11.0 1.0</location>
+	    <pins number="10" adc="8">
+		<output target="socket"></output>
+	    </pins>
+	    <location>11.0 1.0</location>
 	</node>
 	<node number="4">
-		<location>6.0 6.0</location>
+	    <pins number="10" adc="8">
+		<output target="socket"></output>
+	    </pins>
+	    <location>6.0 6.0</location>
 	</node>
 	<node number="5">
 	    <uart rate="9600" bsize="12">
 		<input source="string">s 4096\r\n</input>
 	    </uart>
+	    <pins number="10" adc="8">
+		<output target="socket"></output>
+	    </pins>
 	    <preinit tag="TEST1" type="word">13</preinit>
-		<location>7.0 7.0</location>
+	    <location>7.0 7.0</location>
 	</node>
     </nodes>
 

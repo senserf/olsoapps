@@ -25,4 +25,20 @@
 #define	dbg_d(c)	do { } while (0)
 #define	dbg_e(c)	do { } while (0)
 #define	dbg_f(c)	do { } while (0)
+
+#else
+
+#undef	SPIN_WHEN_HALTED
+#define	RADIO_BITRATE	200000
+
+#undef	LEDS_DRIVER
+#undef	RADIO_USE_LEDS
+#undef	CODE_LONG_INTS
+#undef	DIAG_MESSAGES
+
+#define	LEDS_DRIVER	1
+#define	RADIO_USE_LEDS	7
+#define	CODE_LONG_INTS	1
+#define	DIAG_MESSAGES	2
+
 #endif

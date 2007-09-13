@@ -15,7 +15,7 @@ process	THREADNAME (receiver) (Node) {
 process THREADNAME (sender) (Node) {
 
 	address x_packet;
-	word	tdelay, packet_length;
+	word	data, packet_length;
 
 	states { SN_SEND, SN_NEXT, SN_NEXT1 };
 
@@ -23,7 +23,7 @@ process THREADNAME (sender) (Node) {
 
 	void setup (word del) {
 		packet_length = 12;
-		tdelay = del;
+		data = del;
 	};
 };
 
@@ -83,7 +83,7 @@ static address r_packet;
 #define	SN_NEXT1	20
 
 static address 	x_packet;
-static word	tdelay, packet_length;
+static word	packet_length;
 
 // ======================================
 
