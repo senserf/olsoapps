@@ -51,11 +51,11 @@ strandhdr (oss_out, NodeTag) {
 
 strandhdr (info_in, NodeTag) {
 
-	word *data;
+	word data;
 
 	states { II_INIT, II_DONE };
 
-	void setup (word *d) { data = d; };
+	void setup (word d) { data = d; };
 	
 	perform;
 };

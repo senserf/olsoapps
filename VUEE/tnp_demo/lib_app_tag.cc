@@ -62,7 +62,7 @@ __PUBLF (NodeTag, word, max_pwr) (word p_levs) {
  	word shift = 0;
  	word level = p_levs & 0x000f;
  	while ((shift += 4) < 16) {
-	 	if (level < (p_levs >> shift) & 0x000f) 
+	 	if (level < ((p_levs >> shift) & 0x000f)) 
 			level = (p_levs >> shift) & 0x000f;
  	}
  	return level;
@@ -73,7 +73,7 @@ int info_in (word, address);
 #endif
 
 __PUBLF (NodeTag, void, set_tag) (char * buf) {
-	word * blink;
+	word blink;
 	// we may need more scrutiny...
 	if (in_setTag(buf, node_addr) != 0)
 		local_host = in_setTag(buf, node_addr);
@@ -85,19 +85,19 @@ __PUBLF (NodeTag, void, set_tag) (char * buf) {
 		pong_params.freq_maj = in_setTag(buf, freq_maj);
 	if (in_setTag(buf, freq_min) != 0)
 		pong_params.freq_min = in_setTag(buf, freq_min);
-	if (in_setTag(buf, rx_span) != 0)
+	if (in_setTag(buf, rx_span) != 0) {
 		pong_params.rx_span = in_setTag(buf, rx_span);
+		if (pong_params.rx_span == 2)
+			pong_params.rx_span = 0;
+	}
 	if (in_setTag(buf, npasswd) != 0)
 		host_passwd = in_setTag(buf, npasswd);
 	if (in_setTag(buf, passwd) != 0 && !running (info_in)) {
-		if ((blink = (word *) get_mem (WNONE, 2)) != NULL) {
-			*blink = (word)in_setTag(buf, passwd);
-			if (*blink > 10)
-				*blink = 10;
-			*blink <<= 10;
-			if (runstrand (info_in, blink) == 0)
-				ufree (blink);
-		}
+		blink = (word)in_setTag(buf, passwd);
+		if (blink > 10)
+			blink = 10;
+		blink <<= 10;
+		(void)runstrand (info_in, blink);
 	}
 }
 

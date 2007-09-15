@@ -35,11 +35,10 @@ word		app_flags	= 0;
 
 appCountType	app_count	= {0, 0, 0};
 
-// dupa: was 0543, and rx_lev 5
 pongParamsType	pong_params = {	1024, //5120, 	// freq_maj
 				250, //1024, 	// freq_min
 				0x0001, // cc1000 7-8-9 (3 levels) 3-4-5 cc1100
-				500, //1024,	// rx_span
+				1, //500, //1024,	// rx_span
 				1	// rx_lev: 7 on cc1000, 5 on cc1100
 };
 

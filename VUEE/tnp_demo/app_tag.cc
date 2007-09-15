@@ -23,6 +23,8 @@
 #error "UNDEFINED RADIO"
 #endif
 
+#define DEF_NID	85
+
 // arbitrary
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 
@@ -45,12 +47,11 @@ endstrand
 strand (info_in, word)
     entry (II_INIT)
 	leds (0, 2);
-	delay (*data, II_DONE);
+	delay ((word)data, II_DONE);
 	release;
 
     entry (II_DONE)
 	leds (0, 0);
-	ufree (data);
 	finish;
 endstrand
 
@@ -291,9 +292,14 @@ thread (pong)
 		if (level > 0 ) { // pong with this power
 			in_pong (png_frame, level) = level;
 
-			if (level == pong_params.rx_lev) {
+			// this got complicated: we're at appropriate plev, and
+			// we're toggling rx on/off, or it is permanently ON
+			if (level == pong_params.rx_lev &&
+			    ((level = running (rxsw)) ||
+			     pong_params.rx_span == 1)) {
 				in_pong (png_frame, flags) |= PONG_RXON;
-				trigger (RX_SW_ON);
+				if (level) // means running (rxsw) now
+					trigger (RX_SW_ON);
 			} else
 				in_pong (png_frame, flags) = 0;
 
@@ -373,8 +379,8 @@ thread (root)
 	entry (RS_INIT)
 
 		local_host = (nid_t) host_id;
-		net_id = 85;	// 0x55 set network id to any value
-		master_host = 1;
+		net_id = DEF_NID;
+		master_host = local_host;
 
 		tarp_ctrl.param &= 0xFE; // routing off
 		ser_out (RS_INIT, welcome_str);
@@ -391,12 +397,21 @@ thread (root)
 			reset();
 		}
 		net_opt (PHYSOPT_SETSID, &net_id);
-		net_opt (PHYSOPT_RXOFF, NULL);
 		net_opt (PHYSOPT_TXOFF, NULL);
 
 		runthread (rcv);
 		runthread (cmd_in);
-		runthread (rxsw);
+		switch (pong_params.rx_span) {
+			case 0:
+			case 2:
+				net_opt (PHYSOPT_RXOFF, NULL);
+				break;
+			case 1:
+				break; // ON from net_init
+			default:
+				runthread (rxsw);
+		}
+
 		if (local_host)
 			runthread (pong);
 
@@ -454,8 +469,24 @@ thread (root)
 			}
 			if (in_min)
 				pong_params.freq_min = in_min;
-			if (in_span)
+			if (in_span && pong_params.rx_span != in_span) {
 				pong_params.rx_span = in_span;
+				switch (in_span) {
+					case 2:
+						pong_params.rx_span = 0;
+					// (zero can't be entered) case 0:
+						killall (rxsw);
+						net_opt (PHYSOPT_RXOFF, NULL);
+						break;
+					case 1:
+						killall (rxsw);
+						net_opt (PHYSOPT_RXON, NULL);
+						break;
+					default:
+						if (!running (rxsw))
+							runthread (rxsw);
+				}
+			}
 			stats ();
 			proceed (RS_FREE);
 		}

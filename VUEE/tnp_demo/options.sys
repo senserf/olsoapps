@@ -5,7 +5,6 @@
 
 #define	UART_DRIVER			1
 
-// not needed ? #define	DM2200				1
 #define CC1100 1
 #define RADIO_USE_LEDS 6
 
@@ -42,11 +41,6 @@
 #endif
 #define DIAG_MESSAGES 2
 
-#ifdef MCLOCK_FROM_CRYSTAL
-#undef MCLOCK_FROM_CRYSTAL
-#endif
-#define MCLOCK_FROM_CRYSTAL 0
-
 #ifdef SPIN_WHEN_HALTED
 #undef SPIN_WHEN_HALTED
 #endif
@@ -57,4 +51,18 @@
 #endif
 #define RANDOM_NUMBER_GENERATOR 2
 
+#ifdef RADIO_BITRATE
+#undef RADIO_BITRATE
+#endif
 #define RADIO_BITRATE	200000
+
+//#ifdef CRYSTAL_RATE
+//#undef CRYSTAL_RATE
+//#endif
+//#define CRYSTAL_RATE	8000000
+
+#ifdef RADIO_USE_LEDS
+#undef RADIO_USE_LEDS
+#endif
+#define RADIO_USE_LEDS 6
+
