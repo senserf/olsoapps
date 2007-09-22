@@ -181,7 +181,6 @@ __PUBLF (Node, int, snd_start) (int del) {
 
 	if (!XMTon) {
 		runstrand (sender, del);
-		// create sender (del);
 		XMTon = 1;
 		return 1;
 	}
@@ -213,7 +212,7 @@ thread (root)
 	// ... for now ...
 	// Thus, only the first tcv_plug operation is effective, and the
 	// subsequent ones (with the same ordinal) will be ignored. It is
-	// checked, however, whether the plugin is the same in their all
+	// checked, however, whether the plugin is the same in all their
 	// instances.
 	tcv_plug (0, &plug_null);
 	sfd = tcv_open (WNONE, 0, 0);
@@ -221,9 +220,6 @@ thread (root)
 		diag ("Cannot open tcv interface");
 		halt ();
 	}
-
-	pin_read_adc (WNONE, 3, 0, 0);
-	pin_read_adc (WNONE, 4, 0, 0);
 
     entry (RS_RCMDM2)
 
@@ -259,32 +255,21 @@ thread (root)
   
 	k = ser_in (RS_RCMD, ibuf, IBUFLEN-1);
 
-	if (ibuf [0] == 's')
-		proceed (RS_SND);
-	if (ibuf [0] == 'r')
-		proceed (RS_RCV);
-	if (ibuf [0] == 'd')
-		proceed (RS_PAR);
-	if (ibuf [0] == 'q')
-		proceed (RS_QUIT);
-	if (ibuf [0] == 'o')
-		proceed (RS_QRCV);
-	if (ibuf [0] == 't')
-		proceed (RS_QXMT);
-	if (ibuf [0] == 'i')
-		proceed (RS_SSID);
-	if (ibuf [0] == 'z')
-		proceed (RS_RES);
-	if (ibuf [0] == 'p')
-		proceed (RS_RPIN);
-	if (ibuf [0] == 'u')
-		proceed (RS_SPIN);
-	if (ibuf [0] == 'a')
-		proceed (RS_RANA);
-	if (ibuf [0] == 'x')
-		proceed (RS_SETP);
-	if (ibuf [0] == 'y')
-		proceed (RS_GETP);
+	switch (ibuf [0]) {
+	    case 's': proceed (RS_SND);
+	    case 'r': proceed (RS_RCV);
+	    case 'd': proceed (RS_PAR);
+	    case 'q': proceed (RS_QUIT);
+	    case 'o': proceed (RS_QRCV);
+	    case 't': proceed (RS_QXMT);
+	    case 'i': proceed (RS_SSID);
+	    case 'z': proceed (RS_RES);
+	    case 'p': proceed (RS_RPIN);
+	    case 'u': proceed (RS_SPIN);
+	    case 'a': proceed (RS_RANA);
+	    case 'x': proceed (RS_SETP);
+	    case 'y': proceed (RS_GETP);
+	}
 
     entry (RS_RCMD1)
 
@@ -337,7 +322,7 @@ thread (root)
 
     entry (RS_QUIT1)
 
-	ser_outf (RS_QUIT+1, fmt, obuf);
+	ser_outf (RS_QUIT1, fmt, obuf);
 	proceed (RS_RCMD);
 
     entry (RS_PAR)
