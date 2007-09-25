@@ -46,8 +46,19 @@ endstrand
 
 strand (info_in, word)
     entry (II_INIT)
-	leds (0, 2);
-	delay ((word)data, II_DONE);
+	if ((word)data > 20)
+#ifdef __SMURPH__
+		data = 10;
+#else
+		data = (word *)10;
+#endif
+	if ((word)data > 10) {
+		data -= 10;
+		leds (0, 1);
+	} else {
+		leds (0, 2);
+	}
+	delay ((word)data << 10, II_DONE);
 	release;
 
     entry (II_DONE)

@@ -73,7 +73,6 @@ int info_in (word, address);
 #endif
 
 __PUBLF (NodeTag, void, set_tag) (char * buf) {
-	word blink;
 	// we may need more scrutiny...
 	if (in_setTag(buf, node_addr) != 0)
 		local_host = in_setTag(buf, node_addr);
@@ -92,13 +91,8 @@ __PUBLF (NodeTag, void, set_tag) (char * buf) {
 	}
 	if (in_setTag(buf, npasswd) != 0)
 		host_passwd = in_setTag(buf, npasswd);
-	if (in_setTag(buf, passwd) != 0 && !running (info_in)) {
-		blink = (word)in_setTag(buf, passwd);
-		if (blink > 10)
-			blink = 10;
-		blink <<= 10;
-		(void)runstrand (info_in, blink);
-	}
+	if (in_setTag(buf, passwd) != 0 && !running (info_in))
+		(void)runstrand (info_in, (word)in_setTag(buf, passwd));
 }
 
 __PUBLF (NodeTag, word, check_passwd) (lword p1, lword p2) {

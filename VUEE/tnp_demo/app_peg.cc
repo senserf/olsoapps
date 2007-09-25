@@ -194,20 +194,22 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 // [0, FF] -> [1, F]
 // it can't be 0, as find_tags() will mask the rssi out!
 static word map_rssi (word r) {
-
-/* 113 is ca. 4.4m for security daemo. In VUEE:
- =======================================================
- RP(d)/XP [dB] = -10 x 4.6 x log(d/1.0m) + X(1.0) - 42.0
- =======================================================
- 	return (r >> 8) > 113 ? 2 : 1;
-
+#ifdef __SMURPH__
+/* temporary rough estimates
  =======================================================
  RP(d)/XP [dB] = -10 x 5.1 x log(d/1.0m) + X(1.0) - 33.5
  =======================================================
- 118
+ 151, 118
 
 */
-	return (r >> 8) > 118 ? 2 : 1;
+	if ((r >> 8) > 151) return 3;
+	if ((r >> 8) > 118) return 2;
+	return 1;
+#else
+	if ((r >> 8) > 161) return 3;
+	if ((r >> 8) > 140) return 2;
+	return 1;
+#endif
 }
 
 /*
@@ -388,6 +390,8 @@ static char * locatName (lword id) {
 	if (((id >> 16) & 0xFF) == 0)
 		return "no";
 	switch (id >> 24) {
+		case 3:
+			return "proxy";
 		case 2:
 			return "near";
 		case 1:

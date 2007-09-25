@@ -115,8 +115,8 @@ __PUBLF (NodePeg, int, insert_tag) (lword tag) {
 	return -1;
 }
 
-// For domplex osses, the 2 events (new rssi in, old rssi out) may be
-// convenient, but for demonstrations it is better to supress them
+// For complex osses, reporting the 2 events (new rssi in, old rssi out) may be
+// convenient, but for demonstrations 'old out' is supressed
 #define BLOCK_MOVING_GONERS 1
 __PUBLF (NodePeg, void, check_tag) (word state, word i, char** buf_out) {
 
