@@ -8,7 +8,8 @@
 #undef	DIAG_MESSAGES
 
 #define	UART_DRIVER			2
-#define	UART_RATE			115200
+//#define	UART_RATE			115200
+#define	UART_RATE			9600
 #define	UART_RATE_SETTABLE		1
 #define	UART_INPUT_BUFFER_LENGTH	256
 #define	DIAG_MESSAGES			2
