@@ -1,7 +1,6 @@
 #ifdef	__SMURPH__
 
 #define	UART_DRIVER	1
-#define	CODE_LONG_INTS	1
 
 #define	dbg_0(c)	do { } while (0)
 #define	dbg_1(c)	do { } while (0)
@@ -22,3 +21,10 @@
 #endif
 
 #define	INFO_FLASH	1
+#define LEDS_DRIVER	1
+#define LEDS_BLINKING	1
+
+#ifdef CODE_LONG_INTS
+#undef CODE_LONG_INTS
+#endif
+#define CODE_LONG_INTS	1

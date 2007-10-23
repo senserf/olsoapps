@@ -1,2 +1,0 @@
-#!/bin/sh
-rm -rf */KTMP */Image* */*.cyp */cstartup.* */irq.* */internal.map */out */temp */Makefile */.gdbinit */gdb.ini */*.o */side.* */side

@@ -31,6 +31,8 @@ thread (root)
 		"m adr w      -> write word to info flash\r\n"
 		"n adr        -> read word from info flash\r\n"
 		"o adr        -> erase info flash\r\n"
+		"l n m        -> led n m: 0-off, 1-on, 2-blink\r\n"
+		"r eset\r\n"
 	);
 
     entry (RS_RCMD)
@@ -53,6 +55,14 @@ thread (root)
 		case 'm': proceed (RS_FLW);
 		case 'n': proceed (RS_FLR);
 		case 'o': proceed (RS_FLE);
+		case 'l':
+			  scan (ibuf + 1, "%u %u", &w, &bs);
+			  if (w > 3 || bs > 2) // LED3?
+				  proceed (RS_RCMD_E);
+			  leds (w, bs);
+			  ser_out (RS_RCMD, "Done with leds");
+			  proceed (RS_RCMD);
+		case 'r': reset();
 	}
 
     entry (RS_RCMD_E)
