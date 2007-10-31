@@ -7,6 +7,7 @@
 #include "lib_app_if.h"
 #include "net.h"
 #include "tarp.h"
+#include "msg_gene.h"
 #include "codes.h"
 #if DM2100
 #include "phys_dm2100.h"

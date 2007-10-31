@@ -18,19 +18,18 @@
 #include "ser.h"
 #include "net.h"
 #include "tarp.h"
-#include "app_tarp_if.h"
 
 #include "attribs_peg.h"
 
 heapmem {80, 20}; // how to find out a good ratio?
 
-static char * ui_ibuf 	= NULL;
-static char * ui_obuf 	= NULL;
-static char * cmd_line	= NULL;
-
 const   lword	host_id		= 0xBACA0001;
 lword	host_passwd		= 0;
 word	host_pl			= 1;
+
+char	*ui_ibuf = NULL,
+	*ui_obuf = NULL,
+	*cmd_line = NULL;
 
 word	app_flags 		= 0;
 long   	master_delta 		= 0;

@@ -12,7 +12,6 @@
 #include "msg_pegs.h"
 #include "app.h"
 #include "lib_apps.h"
-#include "app_tarp_if.h"
 
 // #include "trc.h"
 

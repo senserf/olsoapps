@@ -34,14 +34,6 @@
 #include "attribs_tag.h"
 #include "tarp.h"
 
-// These ones do not belong to the application, so they must be explicitly
-// mentioned as externals (for SMURPH, they come from stdattr.h).
-
-extern 	tarpCtrlType	tarp_ctrl;
-extern	nid_t		net_id; 
-extern	nid_t		local_host;
-extern	nid_t   	master_host;
-
 #endif	/* SMURPH or PICOS */
 
 #endif

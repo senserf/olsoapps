@@ -20,7 +20,6 @@
 #else	/* PICOS */
 
 #include "net.h"
-#include "app_tarp_if.h"
 
 #endif
 

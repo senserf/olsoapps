@@ -32,6 +32,14 @@ wroomType msg4ward = {NULL, 0};
 
 appCountType app_count = {0, 0, 0};
 
+Boolean msg_isBind (msg_t m) { return NO; }
+Boolean msg_isTrace (msg_t m) { return NO; }
+Boolean msg_isMaster (msg_t m) { return m == msg_master; }
+Boolean msg_isNew (msg_t m) { return NO; }
+Boolean msg_isClear (msg_t m) { return YES; }
+void set_master_chg () { app_flags |= 2; }
+int tr_offset (headerType *mb) { return 0; }
+
 int find_tag (lword tag) {
 	int i = 0;
 	lword mask = 0xffffffff;

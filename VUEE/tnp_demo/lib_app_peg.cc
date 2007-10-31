@@ -22,6 +22,40 @@
 #include "attnames_peg.h"
 
 /*
+ * "Virtual" stuff needed by NET & TARP =======================================
+ */
+__PUBLF (NodePeg, int, tr_offset) (headerType *h) {
+	// Unused ??
+	return 0;
+}
+
+__PUBLF (NodePeg, Boolean, msg_isBind) (msg_t m) {
+	return NO;
+}
+
+__PUBLF (NodePeg, Boolean, msg_isTrace) (msg_t m) {
+	return NO;
+}
+
+__PUBLF (NodePeg, Boolean, msg_isMaster) (msg_t m) {
+	return (m == msg_master);
+}
+
+__PUBLF (NodePeg, Boolean, msg_isNew) (msg_t m) {
+	return NO;
+}
+
+__PUBLF (NodePeg, Boolean, msg_isClear) (byte o) {
+	return YES;
+}
+
+__PUBLF (NodePeg, void, set_master_chg) () {
+	app_flags |= 2;
+}
+
+// ============================================================================
+
+/*
    what == 0: find and return the index;
    what == 1: count
 */

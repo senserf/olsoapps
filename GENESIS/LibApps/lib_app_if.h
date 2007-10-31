@@ -7,8 +7,6 @@
 #include "app.h"
 #include "msg_tarp.h"
 
-#include "app_tarp_if.h"
-
 //+++ "app_tarp.c" "lib_app.c" "msg_io.c" "oss_io.c" "eep_esn.c" "app_ser.c"
 
 extern const lword ESN;
@@ -19,6 +17,7 @@ extern word app_flags;
 extern word l_rssi;
 extern word freqs;
 extern word sensrx_ver;
+extern word app_flags;
 
 // in app.h:
 //#define beac_freq	(freqs & 0x00FF)

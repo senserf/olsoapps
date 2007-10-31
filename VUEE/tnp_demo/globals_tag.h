@@ -18,7 +18,6 @@
 #include "ser.h"
 #include "net.h"
 #include "tarp.h"
-#include "app_tarp_if.h"
 
 #include "attribs_tag.h"
 

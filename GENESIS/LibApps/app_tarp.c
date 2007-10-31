@@ -5,22 +5,39 @@
 #include "sysio.h"
 #include "msg_tarp.h"
 #include "msg_gene.h"
+#include "lib_app_if.h"
 
 nid_t	local_host, master_host;
 
-#if 0
-bool msg_isMaster (msg_t m) {
-	return m == msg_master;
+Boolean msg_isBind (msg_t m) {
+	return	(m & 0x3F) == msg_bind;
 }
 
-bool msg_isTrace (msg_t m) {
-	return m == msg_trace || m == msg_traceAck ? YES : NO;
+Boolean msg_isTrace (msg_t m) {
+	m &= 0x3F;
+	return (m == msg_trace || m == msg_traceAck || m == msg_traceF ||
+		m == msg_traceBAck);
 }
 
-bool msg_isBind (msg_t m) {
-	return m == msg_bind;
+Boolean msg_isMaster (msg_t m) {
+	return (m & 0x3F) == msg_master;
 }
-#endif
+
+Boolean msg_isNew (msg_t m) {
+	return (m & 0x3F) == msg_new;
+}
+
+Boolean msg_isClear (msg_t m) {
+	if (msg_isBind (m) || msg_isTrace (m) || msg_isNew (m))
+		return YES;
+	m &= 0x3F;
+	return (m == msg_traceB) || (m == msg_traceFAck);
+}
+
+// clr_ in app.h
+void set_master_chg () {
+	app_flags |= 2;
+}
 
 // header (called from raw buf tarp_rx sees) + msg + # of appended ids
 int tr_offset (headerType * mb) {

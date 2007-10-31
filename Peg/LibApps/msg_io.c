@@ -8,7 +8,6 @@
 #include "msg_pegStructs.h"
 #include "msg_pegs.h"
 #include "lib_apps.h"
-#include "app_tarp_if.h"
 
 extern word 	host_pl;
 

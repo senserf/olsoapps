@@ -1,12 +1,6 @@
 #ifndef	__attribs_peg_h__
 #define	__attribs_peg_h__
 
-#ifdef	__SMURPH__
-
-	char	*_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
-
-#endif
-
 __EXTERN __CONST lword _da (host_id);
 __EXTERN lword _da (host_password);
 __EXTERN word _da (host_pl);
@@ -18,6 +12,7 @@ __EXTERN tagDataType _da (tagArray) [tag_lim];
 __EXTERN word _da (tag_auditFreq);
 __EXTERN word _da (tag_eventGran);
 __EXTERN word _da (app_flags);
+__EXTERN char *_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 
 // Methods/functions: need no EXTERN
 
@@ -68,18 +63,14 @@ void 	_da (oss_getTag_out) (char * buf, word fmt);
 
 void 	_da (send_msg) (char * buf, int size);
 
-#ifdef	__SMURPH__
+// Expected by NET and TARP
 
-// For PICOS, this stuff is included from app_tarp_if_tag.h (as macros). For
-// SMURPH, we need a bunch of virtual functions.
-
-virtual Boolean _da (msg_isBind) (msg_t m) { return NO; };
-virtual Boolean _da (msg_isTrace) (msg_t m) { return NO; };
-virtual Boolean _da (msg_isMaster) (msg_t m) { return m == msg_master; };
-virtual Boolean _da (msg_isNew) (msg_t m) { return NO; }
-virtual Boolean _da (msg_isClear) (byte o) { return YES; };
-virtual void _da (set_master_chg) () { _da (app_flags) |= 2; };
-
-#endif	/* SMURPH */
+int _da (tr_offset) (headerType*);
+Boolean _da (msg_isBind) (msg_t m);
+Boolean _da (msg_isTrace) (msg_t m);
+Boolean _da (msg_isMaster) (msg_t m);
+Boolean _da (msg_isNew) (msg_t m);
+Boolean _da (msg_isClear) (byte o);
+void _da (set_master_chg) ();
 
 #endif

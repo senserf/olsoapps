@@ -25,6 +25,40 @@
 
 #include "attnames_tag.h"
 
+/*
+ * "Virtual" stuff needed by NET & TARP =======================================
+ */
+__PUBLF (NodeTag, int, tr_offset) (headerType *h) {
+	// Unused ??
+	return 0;
+}
+
+__PUBLF (NodeTag, Boolean, msg_isBind) (msg_t m) {
+	return NO;
+}
+
+__PUBLF (NodeTag, Boolean, msg_isTrace) (msg_t m) {
+	return NO;
+}
+
+__PUBLF (NodeTag, Boolean, msg_isMaster) (msg_t m) {
+	return (m == msg_master);
+}
+
+__PUBLF (NodeTag, Boolean, msg_isNew) (msg_t m) {
+	return NO;
+}
+
+__PUBLF (NodeTag, Boolean, msg_isClear) (byte o) {
+	return YES;
+}
+
+__PUBLF (NodeTag, void, set_master_chg) () {
+	app_flags |= 2;
+}
+
+// ============================================================================
+
 __PUBLF (NodeTag, char*, get_mem) (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
