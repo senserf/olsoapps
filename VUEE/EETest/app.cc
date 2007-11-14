@@ -28,6 +28,7 @@ thread (root)
 		"x frm upt    -> erase eeprom from upto\r\n"
 		"s            -> sync eeprom\r\n"
 		"w fr ln pat  -> erase-write-read test\r\n"
+		"z            -> show flash size\r\n"
 		"m adr w      -> write word to info flash\r\n"
 		"n adr        -> read word from info flash\r\n"
 		"o adr        -> erase info flash\r\n"
@@ -52,6 +53,7 @@ thread (root)
 		case 'x': proceed (RS_ERA);
 		case 's': proceed (RS_SYN);
 		case 'w': proceed (RS_ETS);
+		case 'z': proceed (RS_SIZ);
 		case 'm': proceed (RS_FLW);
 		case 'n': proceed (RS_FLR);
 		case 'o': proceed (RS_FLE);
@@ -337,6 +339,15 @@ Done:
 
 	ser_outf (RS_ETS_L, "READ %lu (%lx)\r\n", a, a);
 	proceed (RS_ETS_N);
+
+  entry (RS_SIZ)
+
+	s = ee_size (NULL, &lw);
+
+  entry (RS_SIZ_A)
+
+	ser_outf (RS_SIZ_A, "Size: %ld [%ld]\r\n", s, lw);
+	proceed (RS_RCMD);
 
 endthread
 

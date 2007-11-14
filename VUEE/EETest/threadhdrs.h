@@ -48,7 +48,9 @@ process THREADNAME (root) (Node) {
 		RS_ETS_N,
 		RS_ETS_J,
 		RS_ETS_K,
-		RS_ETS_L
+		RS_ETS_L,
+		RS_SIZ,
+		RS_SIZ_A
 	};
 
 	perform;
@@ -99,6 +101,8 @@ static	lword s, a, u, lw, pat;
 #define	RS_ETS_J	34
 #define	RS_ETS_K	35
 #define	RS_ETS_L	36
+#define	RS_SIZ		37
+#define	RS_SIZ_A	38
 
 #endif
 #endif
