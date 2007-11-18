@@ -20,3 +20,10 @@ then
 	cleanall
 	cd ..
 fi
+
+if [ -d ECOPROJECT ]
+then
+	cd ECOPROJECT
+	cleanall
+	cd ..
+fi
