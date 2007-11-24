@@ -45,20 +45,20 @@ strand (oss_out, char)
 endstrand
 
 strand (info_in, word)
+	word dela;
+
     entry (II_INIT)
-	if ((word)data > 20)
-#ifdef __SMURPH__
-		data = 10;
-#else
-		data = (word *)10;
-#endif
-	if ((word)data > 10) {
-		data -= 10;
+	dela = (word)data;
+	if (dela > 20)
+		dela = 10;
+
+	if (dela > 10) {
+		dela -= 10;
 		leds (0, 1);
 	} else {
 		leds (0, 2);
 	}
-	delay ((word)data << 10, II_DONE);
+	delay (dela << 10, II_DONE);
 	release;
 
     entry (II_DONE)
@@ -392,7 +392,10 @@ thread (root)
 		local_host = (nid_t) host_id;
 		net_id = DEF_NID;
 		master_host = local_host;
-
+#if 0
+		leds (0, 0); // for the demo: on WARSAW, they're on
+		leds (1, 0); leds (2, 0);
+#endif
 		tarp_ctrl.param &= 0xFE; // routing off
 		ser_out (RS_INIT, welcome_str);
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);

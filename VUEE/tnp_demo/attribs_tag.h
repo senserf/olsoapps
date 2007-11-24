@@ -1,11 +1,6 @@
 #ifndef	__attribs_tag_h__
 #define	__attribs_tag_h__
 
-#ifdef	__SMURPH__
-	// These are static
-	char 	*_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
-#endif
-
 __EXTERN __CONST lword _da (host_id);
 __EXTERN lword	_da (host_passwd);
 
@@ -13,6 +8,7 @@ __EXTERN appCountType _da (app_count);
 __EXTERN pongParamsType _da (pong_params);
 
 __EXTERN word	_da (app_flags);
+__EXTERN char	*_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 
 // Methods/functions: need no EXTERN
 

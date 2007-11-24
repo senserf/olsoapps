@@ -27,6 +27,7 @@ byte	dat_seq = 0;
 cmdCtrlType cmd_ctrl = {0, 0x00, 0x00, 0x00, 0x00};
 brCtrlType br_ctrl;
 cycCtrlType cyc_ctrl;
+int shared_left; // shared by mutually exclusive st_rep, dat_rep and app.c
 
 int cyc_man (word, address);
 int con_man (word, address);
@@ -43,8 +44,7 @@ extern bool msg_br_out();
 extern bool msg_io_out();
 extern byte * dat_ptr;
 extern void oss_io_out (char * buf, bool acked);
-
-static int shared_left; // shared by mutually exclusive st_rep, dat_rep
+extern void app_leds (const word act);
 
 #define SRS_INIT	00
 #define SRS_DEL		10
@@ -52,10 +52,10 @@ static int shared_left; // shared by mutually exclusive st_rep, dat_rep
 #define SRS_BR		30
 #define SRS_FIN		70
 #define ST_REP_BOOT_DELAY	100
-process (st_rep, word)
+process (st_rep, void)
 
 	entry (SRS_INIT)
-		if (data)
+		if (shared_left == -1)
 			shared_left = rnd() % ST_REP_BOOT_DELAY;
 		else
 			shared_left = 0;
@@ -227,11 +227,11 @@ endprocess (1)
 #undef IRS_FIN
 
 
+extern void hstat (word); // kludge from phys_dm2200.c
+	
 #define CS_INIT         00
 #define CS_ACT          10
 #define CS_HOLD		20
-
-extern void hstat (word);
 process (cyc_man, void)
 	word a;
 	nodata;
@@ -259,7 +259,7 @@ process (cyc_man, void)
 					kill (0);
 				}
 				net_opt (PHYSOPT_RXOFF, NULL);
-				leds (CON_LED, LED_OFF);
+				app_leds (LED_OFF);
 				if (cyc_ctrl.mod == CYC_MOD_NET)
 					net_opt (PHYSOPT_TXOFF, NULL);
 				else // CYC_MOD_PNET
@@ -300,7 +300,7 @@ process (cyc_man, void)
 					cyc_ctrl.st = CYC_ST_ENA;
 					net_opt (PHYSOPT_RXON, NULL);
 					net_opt (PHYSOPT_TXON, NULL);
-					leds (CON_LED, LED_BLINK);
+					app_leds (LED_BLINK);
 					kill (0);
 			}
 			proceed (CS_INIT);
@@ -385,7 +385,7 @@ process (con_man, void)
 
 	entry (CS_INIT)
 		fastblink (0);
-		leds (CON_LED, LED_ON);
+		app_leds (LED_ON);
 	
 	entry (CS_ITER)
 		wait (CON_TRIG, CS_ACT);
@@ -394,20 +394,20 @@ process (con_man, void)
 
 	entry (CS_ACT)
 		if (master_host == local_host) {
-			leds (CON_LED, LED_ON);
+			app_leds (LED_ON);
 			kill (0);
 		}
 		if (audit_freq == 0) {
 			fastblink (1);
-			leds (CON_LED, LED_BLINK);
+			app_leds (LED_BLINK);
 			kill (0);
 		}
 		if (con_miss != 0xFF)
 			connect++;
 		if (con_miss >= con_bad + con_warn)
-			leds (CON_LED, LED_OFF);
+			app_leds (LED_OFF);
 		else if (con_miss >= con_warn)
-			leds (CON_LED, LED_BLINK);
+			app_leds (LED_BLINK);
 		proceed (CS_ITER);
 endprocess (1)
 #undef  CS_INIT
@@ -467,5 +467,27 @@ void send_msg (char * buf, int size) {
 			dbg_a (0x0500 | in_header(buf, msg_type));
 		}
 	}
+}
+
+void app_leds (const word act) {
+	leds (CON_LED, act);
+#if CON_ON_PINS
+	switch (act) {
+		case LED_BLINK:
+			pin_write (LED_PIN0, 0);
+			if (is_fastblink)
+				pin_write (LED_PIN1, 0);
+			else
+				pin_write (LED_PIN1, 1);
+			break;
+		case LED_ON:
+			pin_write (LED_PIN0, 1);
+			pin_write (LED_PIN1, 1);
+			break;
+		default: // OFF
+			pin_write (LED_PIN0, 1);
+			pin_write (LED_PIN1, 0);
+	}
+#endif
 }
 

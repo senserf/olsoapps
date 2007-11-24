@@ -78,7 +78,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		return;
 
 	case msg_nh:
-		msg_nh_in (buf);
+		msg_nh_in (buf, rssi);
 		return;
 
 	case msg_nhAck:
@@ -345,7 +345,7 @@ process (dat_in, void)
 
 	entry (DS_READ_START)
 		io (DS_READ_START, UART_A, READ, uart_ibuf, 1);
-		if (uart_ibuf[0] == 0x0D) { // discard empty CRs
+		if (is_crmode && uart_ibuf[0] == 0x0D) { // discard empty CRs
 			uart_ibuf[0] = '\0';
 			proceed (DS_READ_START);
 		}
@@ -354,7 +354,8 @@ process (dat_in, void)
 	entry (DS_READ)
 		delay (UI_TOUT, DS_TOUT);
 		io (DS_READ, UART_A, READ, uart_ibuf + uart_oset, 1);
-		if (uart_oset >= 64 || uart_ibuf [uart_oset] == 0x0D) {
+		if (uart_oset >= 64 ||
+			       (is_crmode && uart_ibuf [uart_oset] == 0x0D)) {
 			// CR is wanted as part of the string...
 			if (uart_oset < 64)
 				uart_oset++;
@@ -491,6 +492,8 @@ static void read_eprom_and_init() {
 	app_flags = DEFAULT_APP_FLAGS;
 	if ((w[NVM_APP] & 0x0F) != 0x0F)
 		set_encr_data (w[NVM_APP] & 0x0F);
+	if (!(w[NVM_APP] & 0x40))
+		clr_crmode;
 	if (!(w[NVM_APP] & 0x20))
 		clr_cmdmode;
 	if (!(w[NVM_APP] & 0x10))
@@ -529,6 +532,10 @@ static void read_eprom_and_init() {
 	// deal with IO pins before pmon
 	memcpy (&lw, w + NVM_IO_PINS, 4);
 	for (w[0] = 1; w[0] <= 10; w[0]++) {
+#if CON_ON_PINS
+		if (w[0] == LED_PIN0 || w[0] == LED_PIN1)
+			continue;
+#endif
 		if ((w[1] = (lw >> ((w[0] -1) * 3)) & 7) == 7)
 			def_pin (w[0]);
 		else
@@ -582,6 +589,9 @@ static void read_eprom_and_init() {
 	if (io_creg >> 26 != 0)
 		fork (io_back, NULL);
 
+	if (w[NVM_RSSI_THOLD] != 0xFFFF)
+		tarp_ctrl.rssi_th = w[NVM_RSSI_THOLD];
+
 	// 3 - warn, +4 - bad, (missed 0x00)
 	connect = 0x3400;
 	l_rssi = 0;
@@ -593,17 +603,19 @@ static void read_eprom_and_init() {
 		freqs = 31; // beacon on 31s RONIN_FREQ
 		msg_new_out();
 		fastblink (1);
-		leds (CON_LED, LED_BLINK);
+		app_leds (LED_BLINK);
 	} else {
 		if (master_host != local_host) {
 			freqs = 0;
-			if (is_cmdmode)
-				fork (st_rep, w); // w <=> !=NULL
-			leds (CON_LED, LED_BLINK);
+			if (is_cmdmode) {
+				shared_left = -1;
+				fork (st_rep, NULL);
+			}
+			app_leds (LED_BLINK);
 			
 		} else {
 			freqs = 0x1D1D; // 29s freq, 29s beacon
-			leds (CON_LED, LED_ON);
+			app_leds (LED_ON);
 			tarp_ctrl.param &= 0xFE; // routing off
 		}
 	}
@@ -652,6 +664,7 @@ process (root, void)
 	nodata;
 
 	entry (RS_INIT)
+
 		if (net_init (INFO_PHYS_, INFO_PLUG_TARP) < 0) {
 			dbg_0 (0x1000); // net_init failed, reset
 			reset();
@@ -664,7 +677,12 @@ process (root, void)
 		else
 			(void) fork (dat_in, NULL);
 #endif
-		//leds (CON_LED, LED_BLINK); // TXON sets it on on dm2100
+		// Show TR8100's CFG1 and CON_ON_PINS:
+		if (CON_ON_PINS)
+			dbg_1 (DM2200_CFG1 | 0x0100);
+		else
+			dbg_1 (DM2200_CFG1);
+
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)

@@ -3,7 +3,7 @@
 /* All rights reserved.							*/
 /* ==================================================================== */
 #include "sysio.h"
-#include "msg_vmeshStructs.h"
+#include "msg_vmesh.h"
 #include "lib_app_if.h"
 #include "net.h"
 #include "tarp.h"
@@ -91,14 +91,28 @@ void oss_set_in () {
 			break;
 		}
 		tarp_ctrl.param = 
-			(tarp_ctrl.param & 0xF1) | ((cmd_line[2] & 7) << 1);
+			(tarp_ctrl.param & 0xF9) | ((cmd_line[2] & 3) << 1);
 		cmd_ctrl.oprc = RC_OK;
 		nvm_read (NVM_APP, &val, 1);
 		val &= 0x00FF;
 		val |= (word)tarp_ctrl.param << 8;
 		nvm_write (NVM_APP, &val, 1);
 		break;
-		
+
+	case PAR_TARP_D:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		tarp_ctrl.param =
+			(tarp_ctrl.param & 0xF7) | ((cmd_line[2] & 1) << 3);
+		cmd_ctrl.oprc = RC_OK;
+		nvm_read (NVM_APP, &val, 1);
+		val &= 0x00FF;
+		val |= (word)tarp_ctrl.param << 8;
+		nvm_write (NVM_APP, &val, 1);
+		break;
+
 	case PAR_TARP_R:
 		if (cmd_ctrl.oplen != 2) {
 			cmd_ctrl.oprc = RC_ELEN;
@@ -458,11 +472,14 @@ void oss_set_in () {
 			cmd_ctrl.oprc = RC_EMAS;
 			break;
 		}
-		if ((cmd_line[2] == 0 && is_cmdmode) ||
-			(cmd_line[2] != 0 && !is_cmdmode)) {
+		// don't write empty SETs
+		if (!((cmd_line[2] & 1) &&  is_cmdmode) ||
+		     ((cmd_line[2] & 1) && !is_cmdmode) ||
+		    !((cmd_line[2] & 2) &&  is_crmode) ||
+		     ((cmd_line[2] & 2) && !is_crmode)) {
 			nvm_read (NVM_APP, &val, 1);
-			val &= ~32; // b5 in NVM_APP
-			if (cmd_line[2] != 0) {
+			val &= ~32; // clear b5 in NVM_APP
+			if (cmd_line[2] & 1) {
 				val |= 32;
 				set_cmdmode;
 				if (running (dat_in))
@@ -482,7 +499,28 @@ void oss_set_in () {
 				if (running (st_rep))
 					kill (running (st_rep));
 			}
+			// b6 in NVM_APP: crmod
+			if (cmd_line[2] & 2) {
+				val |= 64;
+				set_crmode;
+			} else {
+				val &= ~64;
+				clr_crmode;
+			}
 			nvm_write (NVM_APP, &val, 1);
+		}
+		cmd_ctrl.oprc = RC_OK;
+		break;
+
+	 case PAR_RSSI_THOLD:
+		if (cmd_ctrl.oplen != 2) {
+			cmd_ctrl.oprc = RC_ELEN;
+			break;
+		}
+		if (cmd_line[2] != tarp_ctrl.rssi_th) {
+			tarp_ctrl.rssi_th = cmd_line[2];
+			val = tarp_ctrl.rssi_th;
+			nvm_write (NVM_RSSI_THOLD, &val, 1);
 		}
 		cmd_ctrl.oprc = RC_OK;
 		break;
@@ -496,7 +534,8 @@ void oss_get_in (word state) {
 	long l;
 	word p, p1;
 
-	if (cmd_ctrl.oplen != 1) {
+	if (cmd_ctrl.oplen != 1 &&
+			(cmd_ctrl.oplen != 3 || cmd_line[1] != ATTR_NHOOD)) {
 		cmd_ctrl.oprc = RC_ELEN;
 		return;
 	}
@@ -527,6 +566,7 @@ void oss_get_in (word state) {
 	  case PAR_TARP_S:
 	  case PAR_TARP_R:
 	  case PAR_TARP_F:
+	  case PAR_TARP_D:
 		cmd_ctrl.oplen++;
 		cmd_line[2] = tarp_ctrl.param;
 		return;
@@ -697,9 +737,10 @@ void oss_get_in (word state) {
 		return;
 
 	  case ATTR_NHOOD:
-		// let's do it as GET... I feel sooner or later
-		// we'll have a request to return some local data...
-
+		if (cmd_ctrl.oplen != 3) { // fill; it used to be shorter
+			cmd_line[2] = 0;
+			cmd_line[3] = 0;
+		}
 		// don't return by default
 		if (msg_nh_out())
 			cmd_ctrl.oprc = RC_OK;
@@ -715,6 +756,13 @@ void oss_get_in (word state) {
 	  case PAR_CMD_MODE:
 		cmd_ctrl.oplen++;
 		cmd_line[2] = is_cmdmode ? 1 : 0;
+		if (is_crmode)
+			 cmd_line[2] |= 2;
+		return;
+
+	  case PAR_RSSI_THOLD:
+		cmd_ctrl.oplen++;
+		cmd_line[2] = tarp_ctrl.rssi_th;
 		return;
 
 	  default:
@@ -757,7 +805,7 @@ void oss_master_in (word state) {
 			master_host = local_host;
 			nvm_write (NVM_MID, &master_host, 1);
 			tarp_ctrl.param &= 0xFE; // routing off
-			leds (CON_LED, LED_ON);
+			app_leds (LED_ON);
 			// operator's inervention is likely, just adjust basics:
 			cyc_ctrl.st = CYC_ST_DIS;
 			cyc_ctrl.mod = CYC_MOD_NET;
@@ -792,7 +840,7 @@ void oss_traceAck_out (word state, char * buf) {
 	if (in_header(buf, msg_type) != msg_traceBAck)
 		num = in_traceAck(buf, fcount);
 	if (in_header(buf, msg_type) != msg_traceFAck)
-		num += in_header(buf, hoc);
+		num += in_header(buf, hoc) & 0x7F;
 	if (in_header(buf, msg_type) == msg_traceAck)
 		num--; // dst counted twice
 	char * lbuf = get_mem (state, num * sizeof (nid_t) +7);
@@ -801,7 +849,7 @@ void oss_traceAck_out (word state, char * buf) {
 	lbuf[2] = CMD_MSGOUT;
 	lbuf[3] = in_header(buf, msg_type);
 	lbuf[4] = in_traceAck(buf, fcount);
-	lbuf[5] = in_header(buf, hoc);
+	lbuf[5] = in_header(buf, hoc) & 0x7F;
 	
 	memcpy (lbuf +6, buf + sizeof(msgTraceAckType), num * sizeof(nid_t));
 	lbuf[num * sizeof (nid_t) +6] = 0x04;
@@ -846,13 +894,13 @@ void oss_bindReq_out (char * buf) {
 #endif
 }
 
-void oss_nhAck_out (char * buf) {
+void oss_nhAck_out (char * buf, word rssi) {
 #if UART_DRIVER
-	char * lbuf = get_mem (NONE, 4 + 9 + 1);
+	char * lbuf = get_mem (NONE, 4 + 11 + 1);
 	if (lbuf == NULL)
 		return;
 	lbuf[0] = '\0';
-	lbuf[1] = 2 + 9;
+	lbuf[1] = 2 + 11;
 	lbuf[2] = CMD_MSGOUT;
 	lbuf[3] = msg_nhAck;
 	switch (in_header(buf, msg_type)) {
@@ -860,20 +908,22 @@ void oss_nhAck_out (char * buf) {
 		memcpy (lbuf +4, &in_header(buf, snd), 2);
 		memcpy (lbuf +6, &ESN, 4);
 		memcpy (lbuf +10, &local_host, 2);
-		lbuf[12] = 0;
+		memcpy (lbuf +12, &rssi, 2);
+		lbuf[14] = 0;
 		break;
 	  case msg_nhAck:
 	  	memcpy (lbuf +4, &in_nhAck(buf, host), 2);
 		memcpy (lbuf +6, &in_nhAck(buf, esn_l), 4);
 		memcpy (lbuf +10, &in_header(buf, snd), 2);
-		lbuf[12] = in_header(buf, hoc);
+		memcpy (lbuf +12, &in_nhAck(buf, rssi), 2);
+		lbuf[14] = in_header(buf, hoc) & 0x7F;
 		break;
 	  default:
 		dbg_2 (0xBA00 | in_header(buf, msg_type)); // bad nhAck
 		ufree (lbuf);
 		return;
 	}
-	lbuf[13] = 0x04;
+	lbuf[15] = 0x04;
 	if (fork (oss_out, lbuf) == 0 ) {
 		dbg_2 (0xC404); // oss_nhAck_out fork failed ????
 		ufree (lbuf);
@@ -1145,6 +1195,13 @@ void oss_io_in() {
 				cmd_ctrl.oprc = RC_EVAL;
 				return;
 			}
+#if CON_ON_PINS
+			if (cmd_line[2] == LED_PIN0 || 
+					cmd_line[2] == LED_PIN1) {
+				cmd_ctrl.oprc = RC_ERES; 
+				return;
+			}
+#endif
 			if (pin_write (cmd_line[2], cmd_line[3]) < 0) {
 				cmd_ctrl.oprc = RC_ERES;
 			} else {

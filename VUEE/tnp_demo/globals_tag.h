@@ -27,7 +27,7 @@ static char * ui_ibuf 	= NULL;
 static char * ui_obuf 	= NULL;
 static char * cmd_line	= NULL;
 
-const   lword	host_id		= 0xBACADEAD;
+const   lword	host_id		= 0xBACA0065;
 lword	host_passwd		= 0;
 
 word		app_flags	= 0;

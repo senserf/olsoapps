@@ -1,17 +1,12 @@
-//#undef DIAG_MESSAGES
-//#define DIAG_MESSAGES		2	/* System messages to UART */
+#undef LBT_THRESHOLD
+#define LBT_THRESHOLD		33
 
-//#define LEDS_DRIVER		1
-//#define LEDS_BLINKING		1
-
-// all on
-// #define dbg_level		0xFFFF
-// uart(9), 0, 1, 2
-// #define dbg_level		0x0207
 #define dbg_level		7
 #define dbg_binary		1
-#define WATCHDOG_ENABLED	1
-#undef SYSVER_B
-#define SYSVER_B		0x202
 
-#define	DM2200_CFG1		0x03
+#define CON_ON_PINS		1
+
+#define DM2200_CFG1		0x03
+
+#undef SYSVER_B
+#define SYSVER_B		0x300

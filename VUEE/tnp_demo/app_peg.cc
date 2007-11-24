@@ -25,7 +25,7 @@
 
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 #define DEF_NID			85
-#define DEF_MHOST		99
+#define DEF_MHOST		10
 
 // Semaphores
 #define CMD_READER	(&cmd_line)

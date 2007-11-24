@@ -72,8 +72,7 @@ void msg_master_in (char * buf) {
 	}
 
 	// clear missed, set warn, bad and audit_freq
-	if (con_miss >= con_warn)
-		leds (CON_LED, LED_ON);
+	app_leds (LED_ON);
 
 	// this is quite regular and frequent, don't trigger con_man
 	if (in_master(buf, con) != 0) { // otherwise keep local settings
@@ -135,7 +134,7 @@ word msg_traceAck_out (word state, char * buf, char** out_buf) {
 	word len;
 	if (in_header(buf, msg_type) != msg_traceB)
 		len = sizeof(msgTraceAckType) +
-			in_header(buf, hoc) * sizeof(nid_t);
+			(in_header(buf, hoc) & 0x7F) * sizeof(nid_t);
 	else
 		len = sizeof(msgTraceAckType) + sizeof(nid_t);
 	if (*out_buf == NULL)
@@ -154,13 +153,14 @@ word msg_traceAck_out (word state, char * buf, char** out_buf) {
 	}
 	in_header(*out_buf, rcv) = in_header(buf, snd);
 	in_header(*out_buf, hco) = 0;
-	in_traceAck(*out_buf, fcount) = in_header(buf, hoc);
+	in_traceAck(*out_buf, fcount) = in_header(buf, hoc) & 0x7F;
 
 	// fwd part
-	if (in_header(buf, msg_type) != msg_traceB && in_header(buf, hoc) > 1)
+	if (in_header(buf, msg_type) != msg_traceB &&
+		       (in_header(buf, hoc) & 0x7F) > 1)
 		memcpy (*out_buf + sizeof(msgTraceAckType),
 			buf + sizeof(msgTraceType),
-			sizeof(nid_t) * (in_header(buf, hoc) -1));
+			sizeof(nid_t) * ((in_header(buf, hoc) & 0x7F) -1));
 
 	// note that this node is counted in hoc, but is not appended yet
 	memcpy (*out_buf + len - sizeof(nid_t),
@@ -228,6 +228,8 @@ void msg_bind_in (char * buf) {
 		w[NVM_APP] |= 1 << 4;
 	if (is_cmdmode)
 		w[NVM_APP] |= 1 << 5;
+	if (is_crmode)
+		w[NVM_APP] |= 1 << 6;
 	w[NVM_APP] |= tarp_ctrl.param << 8;
 	nvm_write (NVM_NID, w, 4);
 
@@ -278,10 +280,10 @@ bool msg_bindReq_out (char * buf, char** buf_out) {
 }
 
 void msg_nhAck_in (char * buf) {
-	oss_nhAck_out (buf);
+	oss_nhAck_out (buf, 0);
 }
 
-bool msg_nhAck_out (char * buf, char** buf_out) {
+bool msg_nhAck_out (char * buf, char** buf_out, word rssi) {
 	if (*buf_out == NULL) {
 		*buf_out = get_mem (NONE, sizeof(msgNhAckType));
 		if (*buf_out == NULL)
@@ -294,6 +296,7 @@ bool msg_nhAck_out (char * buf, char** buf_out) {
 	in_nhAck(*buf_out, host) = in_header(buf, snd);
 	in_nhAck(*buf_out, esn_l) = ESN;
 	in_nhAck(*buf_out, esn_h) = ESN >> 16;
+	in_nhAck(*buf_out, rssi) = rssi;
 	return YES;
 }
 
@@ -333,13 +336,13 @@ bool msg_new_out () {
 	return YES;
 }
 
-void msg_nh_in (char * buf) {
+void msg_nh_in (char * buf, word rssi) {
 	char * out_buf = NULL;
 	if (in_nh(buf, host) == local_host) {
-		oss_nhAck_out (buf);
+		oss_nhAck_out (buf, rssi);
 		return;
 	}
-	if (msg_nhAck_out (buf, &out_buf)) {
+	if (msg_nhAck_out (buf, &out_buf, rssi)) {
 		send_msg (out_buf, sizeof(msgNhAckType));
 		ufree (out_buf);
 	}
@@ -350,7 +353,7 @@ bool msg_nh_out () {
 	if (buf_out == NULL)
 		return NO;
 	in_header(buf_out, msg_type) = msg_nh;
-	in_header(buf_out, rcv) = 0;
+	memcpy (&in_header(buf_out, rcv), cmd_line +2, 2);
 	in_header(buf_out, hco) = 1;
 	in_nh(buf_out, host) = cmd_ctrl.s;
 	send_msg (buf_out, sizeof(msgNhType));

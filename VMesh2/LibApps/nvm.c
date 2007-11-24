@@ -1,11 +1,10 @@
 #include "nvm.h"
 #include "app.h"
-#include "app_tarp_if.h"
 #include "codes.h"
 #include "msg_vmesh.h"
-#include "lib_app_if.h"
 #include "pinopts.h"
 #include "tarp.h"
+#include "lib_app_if.h"
 
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
@@ -42,6 +41,8 @@ static void fpage_reset (word p) {
 		if_write (NVM_LH, local_host);
 		if_write (NVM_MID, master_host);
 		w = encr_data;
+		if (is_crmode)
+			w |= 1 << 6;
 		if (is_cmdmode)
 			w |= 1 << 5;
 		if (is_binder)
@@ -96,6 +97,8 @@ static void fpage_reset (word p) {
 		}
 		if_write (NVM_IO_PINS, (word)lw);
 		if_write (NVM_IO_PINS +1, (word)(lw >> 16));
+		w = tarp_ctrl.rssi_th;
+		if_write (NVM_RSSI_THOLD, w);
 	}
 }
 

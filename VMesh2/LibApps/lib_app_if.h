@@ -6,7 +6,6 @@
 /* ==================================================================== */
 #include "app.h"
 #include "msg_tarp.h"
-#include "app_tarp_if.h"
 
 //+++ "app_tarp.c" "lib_app.c" "msg_io.c" "oss_io.c" "app_ser.c"
 
@@ -36,6 +35,7 @@ extern byte * cmd_line;
 extern cmdCtrlType cmd_ctrl;
 extern brCtrlType br_ctrl;
 extern cycCtrlType cyc_ctrl;
+extern int shared_left;
 
 extern int beacon (word, address);
 extern int cyc_man (word, address);
@@ -67,7 +67,7 @@ extern void msg_io_in (char * buf);
 extern void msg_ioAck_in (char * buf);
 extern void msg_dat_in (char * buf); 
 extern void msg_datAck_in (char * buf); 
-extern void msg_nh_in (char * buf);
+extern void msg_nh_in (char * buf, word rssi);
 extern void msg_nhAck_in (char * buf);
 
 extern void msg_cmd_out (word state, char** buf_out);
@@ -85,7 +85,7 @@ extern bool msg_ioAck_out (char * buf);
 extern word msg_dat_out ();
 extern bool msg_datAck_out (char * buf);
 extern bool msg_nh_out ();
-extern bool msg_nhAck_out (char * buf, char** buf_out);
+extern bool msg_nhAck_out (char * buf, char** buf_out, word rssi);
 
 extern void send_msg (char * buf, int size);
 
@@ -99,7 +99,7 @@ extern void oss_br_out (char * buf, bool acked);
 extern void oss_io_out (char * buf, bool acked);
 extern void oss_dat_out (char * buf, bool acked);
 extern void oss_datack_out (char * buf);
-extern void oss_nhAck_out (char * buf);
+extern void oss_nhAck_out (char * buf, word rssi);
 
 extern void oss_master_in (word state);
 extern void oss_set_in ();
@@ -112,4 +112,5 @@ extern void oss_dat_in ();
 extern void oss_datack_in ();
 extern void oss_reset_in ();
 extern void oss_locale_in ();
+extern void app_leds (const word act);
 #endif

@@ -23,13 +23,13 @@
 
 heapmem {80, 20}; // how to find out a good ratio?
 
-const   lword	host_id		= 0xBACA0001;
+const   lword	host_id		= 0xBACA000A;
 lword	host_passwd		= 0;
 word	host_pl			= 1;
 
-char	*ui_ibuf = NULL,
-	*ui_obuf = NULL,
-	*cmd_line = NULL;
+char	*ui_ibuf	= NULL,
+	*ui_obuf	= NULL,
+	*cmd_line	= NULL;
 
 word	app_flags 		= 0;
 long   	master_delta 		= 0;

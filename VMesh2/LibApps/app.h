@@ -33,10 +33,21 @@ typedef struct cmdCtrlStruct {
 #define con_bad		((connect >> 8) &0x0F)
 #define con_miss	(connect & 0x00FF)
 
+
+/**************
+LED params:
+CON_LED -- connectivity LED number
+LED_PIN0-1 -- when CON_ON_PINS, these pins signal conn. LED status
+**************/
 #define CON_LED 0
 #define LED_ON	1
 #define LED_OFF 0
 #define LED_BLINK 2
+#define LED_PIN0 8
+#define LED_PIN1 9
+#ifndef CON_ON_PINS
+#define CON_ON_PINS 0
+#endif
 
 typedef struct brCtrlStruct {
 	lword	dont_esn;
@@ -104,11 +115,11 @@ b2-b3 - encryption key #
 b4    - encryption mode
 b5    - node can be a binder (1), or not (0)
 b6    - uart modes: cmd (1), dat (0)
-b7    - spare
+b7    - uart dat: cr (1), no termination (0)
 b8-b11 - timeout for reliable msgs
 b12-15 0 # of retries  -"-
 ---------------------------------------
-DEF: retries 3, tout 10, 1b spare, uart mode 1, binder, encr data 0,
+DEF: retries 3, tout 10, uart dat cr, uart mode cmd, binder, encr data 0,
 00, master chg 0, autoack 1
 Set in app.c::read_eprom_and_init()
 --------------------------------------*/ 
@@ -116,6 +127,10 @@ Set in app.c::read_eprom_and_init()
 #define is_autoack	(app_flags & 1)
 #define set_autoack	(app_flags |= 1)
 #define clr_autoack	(app_flags &= ~1)
+
+#define is_crmode      (app_flags & 128)
+#define set_crmode     (app_flags |= 128)
+#define clr_crmode     (app_flags &= ~128)
 
 #define is_cmdmode	(app_flags & 64)
 #define set_cmdmode	(app_flags |= 64)
@@ -138,4 +153,5 @@ Set in app.c::read_eprom_and_init()
 #define set_encr_mode(m) (app_flags = (m) == 0 ? app_flags & ~16 : app_flags | 16)
 #define set_encr_key(k) (app_flags = (app_flags & ~12) | ((k & 3) << 2))
 #define set_encr_data(d) (app_flags = (app_flags & ~28) | ((d & 7) << 2))
+
 #endif

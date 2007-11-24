@@ -75,5 +75,7 @@
 #define PAR_CYC_M_REST	33
 #define ATTR_CYC_LEFT	34
 #define PAR_CMD_MODE	35
-
+// racing genesis - vmesh leaves 36 unused
+#define PAR_RSSI_THOLD	37
+#define PAR_TARP_D	38
 #endif
