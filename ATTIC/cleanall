@@ -1,29 +1,29 @@
 #!/bin/sh
-rm -rf */KTMP */Image* */*.cyp */cstartup.* */irq.* */internal.map */out */temp */Makefile */.gdbinit */gdb.ini */*.o */side.* */side
+../Scripts/cleanapp
 if [ -d TESTS ]
 then
 	cd TESTS
-	cleanall
+	../../Scripts/cleanapp
 	cd ..
 fi
 
 if [ -d SFU ]
 then
 	cd SFU
-	cleanall
+	../../Scripts/cleanapp
 	cd ..
 fi
 
 if [ -d VUEE ]
 then
 	cd VUEE
-	cleanall
+	../../Scripts/cleanapp
 	cd ..
 fi
 
 if [ -d ECOPROJECT ]
 then
 	cd ECOPROJECT
-	cleanall
+	../../Scripts/cleanapp
 	cd ..
 fi
