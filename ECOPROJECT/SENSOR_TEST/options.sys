@@ -19,14 +19,9 @@
 #undef	LBT_THRESHOLD
 #endif
 
-#ifdef	SHTXX_SENSOR
-#undef	SHTXX_SENSOR
-#endif
-
 #define	LEDS_DRIVER	1
 #define	RADIO_USE_LEDS	7
 #define	CODE_LONG_INTS	1
-#define	SHTXX_SENSOR	1
 
 #undef	DIAG_MESSAGES
 #define	DIAG_MESSAGES		2
