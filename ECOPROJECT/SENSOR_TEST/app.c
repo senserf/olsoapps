@@ -17,6 +17,7 @@ heapmem {10, 90};
 #define	RS_INIT		00
 #define	RS_RCMD		10
 #define	RS_GSEN		20
+#define	RS_CSEN		30
 
 thread (root)
 
@@ -33,6 +34,7 @@ thread (root)
 		"\r\nSensor Test\r\n"
 		"Commands:\r\n"
 		"r s      -> read value of sensor s\r\n"
+		"c s d    -> read value of sensor s continually at d int\r\n"
 		);
 
   entry (RS_RCMD)
@@ -41,6 +43,7 @@ thread (root)
 
 	switch (ibuf [0]) {
 		case 'r' : proceed (RS_GSEN);
+		case 'c' : proceed (RS_CSEN);
 	}
 
   entry (RS_RCMD+1)
@@ -61,5 +64,20 @@ thread (root)
 
 	ser_outf (RS_GSEN+2, "Value: %u\r\n", p [1]);
 	proceed (RS_RCMD);
+
+  entry (RS_CSEN)
+
+	p [0] = 0;
+	p [1] = 1024;
+	scan (ibuf + 1, "%u", p+0);
+
+  entry (RS_CSEN+1)
+
+	read_sensor (RS_CSEN+1, p [0], p+2);
+
+  entry (RS_CSEN+2)
+
+	ser_outf (RS_GSEN+2, "Value: %u\r\n", p [2]);
+	delay (p [1], RS_CSEN+1);
 
 endthread
