@@ -35,6 +35,7 @@
 #include "form.h"
 #include "phys_cc1100.h"
 #include "plug_null.h"
+#include "pinopts.h"
 
 int	sfd;
 long	last_snt;
