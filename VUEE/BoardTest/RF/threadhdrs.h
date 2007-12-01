@@ -16,7 +16,7 @@ threadhdr (sender, Node) {
 
 	address x_packet;
 
-	states { SN_SEND, SN_MISS };
+	states { SN_SEND, SN_MISS, SN_OUT };
 
 	perform;
 
@@ -30,7 +30,7 @@ threadhdr (root, Node) {
 		RS_INIT,
 		RS_DONE,
 		RS_TOUT,
-		RS_MANUAL,
+		RS_OUT,
 		RS_OSS,
 		RS_CMD
 	};
@@ -51,6 +51,7 @@ static address r_packet;
 
 #define	SN_SEND		0
 #define	SN_MISS		10
+#define SN_OUT		20
 
 static address 	x_packet;
 
@@ -59,7 +60,7 @@ static address 	x_packet;
 #define		RS_INIT		0
 #define		RS_DONE		10
 #define		RS_TOUT		20
-#define		RS_MANUAL	30
+#define		RS_OUT		30
 #define		RS_OSS		40
 #define		RS_CMD		50
 	

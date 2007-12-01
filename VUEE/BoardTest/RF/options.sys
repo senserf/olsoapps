@@ -35,3 +35,4 @@
 #define INFO_FLASH	1
 #define LEDS_DRIVER     1
 #define RADIO_USE_LEDS  0
+#define RANDOM_NUMBER_GENERATOR 2

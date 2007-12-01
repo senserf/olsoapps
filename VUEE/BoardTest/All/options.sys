@@ -1,0 +1,39 @@
+#ifdef	__SMURPH__
+#define	TCV_PRESENT	1
+#define	TCV_HOOKS	0
+#define	TCV_TIMERS	0
+
+#define	UART_DRIVER	1
+
+//#define	DM2200		1
+
+#define	dbg_0(c)	do { } while (0)
+#define	dbg_1(c)	do { } while (0)
+#define	dbg_2(c)	do { } while (0)
+#define	dbg_3(c)	do { } while (0)
+#define	dbg_4(c)	do { } while (0)
+#define	dbg_5(c)	do { } while (0)
+#define	dbg_6(c)	do { } while (0)
+#define	dbg_7(c)	do { } while (0)
+#define	dbg_8(c)	do { } while (0)
+#define	dbg_9(c)	do { } while (0)
+#define	dbg_a(c)	do { } while (0)
+#define	dbg_b(c)	do { } while (0)
+#define	dbg_c(c)	do { } while (0)
+#define	dbg_d(c)	do { } while (0)
+#define	dbg_e(c)	do { } while (0)
+#define	dbg_f(c)	do { } while (0)
+
+#else
+
+#undef	SPIN_WHEN_HALTED
+#define	RADIO_BITRATE	200000
+#undef DIAG_MESSAGES
+#define DIAG_MESSAGES	2
+//#undef CRYSTAL_RATE
+//#define CRYSTAL_RATE	8000000
+#endif
+
+#define INFO_FLASH	1
+#define LEDS_DRIVER     1
+#define RADIO_USE_LEDS  0

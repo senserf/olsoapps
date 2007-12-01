@@ -14,6 +14,7 @@
 #define my_id		_dac (Node, my_id)
 #define rf_start	_dac (Node, rf_start)
 #define max_rss		_dac (Node, max_rss)
+#define plev		_dac (Node, plev)
 
 // ====================
 
@@ -29,10 +30,7 @@
 
 lword	my_id;
 int	sfd;
-word	last_snt;
-word	last_run;
-word	rf_start;
-word	max_rss;
+word	last_snt, last_run, rf_start, max_rss, plev;
 
 heapmem {10, 90};
 

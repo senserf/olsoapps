@@ -1,0 +1,78 @@
+<network nodes="3">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <channel>
+        <shadowing bn="-110.0dBm" syncbits="8">
+		RP(d) = received power at distance d
+		XP    = transmitted power
+		X     = lognormal random Gaussian component
+ 		=======================================================
+		RP(d)/XP [dB] = -10 x 5.1 x log(d/1.0m) + X(1.0) - 33.5
+ 		=======================================================
+	</shadowing>
+	<cutoff>-115.0dBm</cutoff>
+	<ber>
+		Interpolated ber table:
+		======================
+		  SIR		  BER
+		50.0dB		1.0E-6
+		40.0dB		2.0E-6
+		30.0dB		5.0E-6
+		20.0dB		1.0E-5
+		10.0dB		1.0E-4
+		 5.0dB		1.0E-3
+		 2.0dB		1.0E-1
+		 0.0dB		2.0E-1
+		-2.0dB		5.0E-1
+		-5.0dB		9.9E-1
+	</ber>
+	<frame>200000 12 0</frame>
+	<rssi mode="log,transform">-202.0 0 53.0 255</rssi>
+	<power mode="log,interp">
+		-30.0dBm        0
+                -15.0dBm        1
+                -10.0dBm        2
+                 -5.0dBm        3
+                  0.0dBm        4
+                  5.0dBm        5
+                  7.0dBm        6
+                 10.0dBm        7
+	</power>
+    </channel>
+    <nodes>
+	<defaults>
+	    <memory>2048 bytes</memory>
+	    <power>
+		transmitter power	10.0dBm
+		receiver boost		0.0dB
+	    </power>
+	    <preamble>32 bits</preamble>
+	    <lbt>
+		delay			8msec
+		threshold		-109.0dBm
+	    </lbt>
+	    <backoff>
+		min			8msec
+		max			303msec
+	    </backoff>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
+	    <eeprom>524288 bytes</eeprom>
+	    <iflash>256 bytes in 2 pages</iflash>
+	    <uart rate="9600" bsize="12">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	</defaults>
+	<node number="0">
+	    <location>5.0 5.0</location>
+	</node>
+        <node number="1" start="off">>
+            <location>10.0 5.0</location>
+	</node>
+	<node number="2" start="off">
+	    <location>5.0 15.0</location>
+	</node>
+    </nodes>
+</network>
