@@ -23,9 +23,9 @@
 
 heapmem {80, 20}; // how to find out a good ratio?
 
-static char * ui_ibuf 	= NULL;
-static char * ui_obuf 	= NULL;
-static char * cmd_line	= NULL;
+char * ui_ibuf 	= NULL;
+char * ui_obuf 	= NULL;
+char * cmd_line	= NULL;
 
 const   lword	host_id		= 0xBACA0065;
 lword	host_passwd		= 0;

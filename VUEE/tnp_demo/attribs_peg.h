@@ -71,6 +71,6 @@ Boolean _da (msg_isTrace) (msg_t m);
 Boolean _da (msg_isMaster) (msg_t m);
 Boolean _da (msg_isNew) (msg_t m);
 Boolean _da (msg_isClear) (byte o);
-void _da (set_master_chg) ();
+void _da (set_master_chg) (void);
 
 #endif

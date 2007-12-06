@@ -12,7 +12,7 @@ __EXTERN char	*_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 
 // Methods/functions: need no EXTERN
 
-void	_da (stats) ();
+void	_da (stats) (void);
 void	_da (app_diag) (const word, const char *, ...);
 void	_da (net_diag) (const word, const char *, ...);
 
@@ -40,6 +40,6 @@ Boolean _da (msg_isTrace) (msg_t m);
 Boolean _da (msg_isMaster) (msg_t m);
 Boolean _da (msg_isNew) (msg_t m);
 Boolean _da (msg_isClear) (byte o);
-void _da (set_master_chg) ();
+void _da (set_master_chg) (void);
 
 #endif
