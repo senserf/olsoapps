@@ -5,6 +5,7 @@
 
 #include "sysio.h"
 #include "sensors.h"
+#include "board_pins.h"
 
 heapmem {10, 90};
 
@@ -18,6 +19,7 @@ heapmem {10, 90};
 #define	RS_RCMD		10
 #define	RS_GSEN		20
 #define	RS_CSEN		30
+#define	RS_CSET		40
 
 thread (root)
 
@@ -35,6 +37,7 @@ thread (root)
 		"Commands:\r\n"
 		"r s      -> read value of sensor s\r\n"
 		"c s d    -> read value of sensor s continually at d int\r\n"
+		"x        -> turn reference on\r\n"
 		);
 
   entry (RS_RCMD)
@@ -44,6 +47,7 @@ thread (root)
 	switch (ibuf [0]) {
 		case 'r' : proceed (RS_GSEN);
 		case 'c' : proceed (RS_CSEN);
+		case 'x' : proceed (RS_CSET);
 	}
 
   entry (RS_RCMD+1)
@@ -79,5 +83,10 @@ thread (root)
 
 	ser_outf (RS_GSEN+2, "Value: %u\r\n", p [2]);
 	delay (p [1], RS_CSEN+1);
+
+  entry (RS_CSET)
+
+	qso_set_ref;
+	proceed (RS_RCMD);
 
 endthread

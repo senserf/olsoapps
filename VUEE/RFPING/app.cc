@@ -240,6 +240,8 @@ thread (root)
 		"p n      -> read pin n\r\n"
 		"u n v    -> set pin n\r\n"
 		"a n r d  -> read analog pin\r\n"
+		"S n      -> read n-th sensor\r\n"
+		"A n v    -> set n-th actuator\r\n"
 	);
 
     entry (RS_RCMDM1)
@@ -269,6 +271,8 @@ thread (root)
 	    case 'a': proceed (RS_RANA);
 	    case 'x': proceed (RS_SETP);
 	    case 'y': proceed (RS_GETP);
+	    case 'S': proceed (RS_GETS);
+	    case 'A': proceed (RS_SETA);
 	}
 
     entry (RS_RCMD1)
@@ -404,6 +408,30 @@ thread (root)
 
 	ser_outf (RS_GETP, "P = %d\r\n",
 		tcv_control (sfd, PHYSOPT_GETPOWER, NULL));
+	proceed (RS_RCMD);
+
+    entry (RS_GETS)
+
+	if (scan (ibuf + 1, "%u", p+0) < 1)
+		proceed (RS_RCMD1);
+
+    entry (RS_GETS1)
+	// Assume these sensors handle 2-byte values
+	read_sensor (RS_GETS1, p [0], p + 1);
+
+    entry (RS_GETS2)
+
+	ser_outf (RS_GETS2, "V = %u\r\n", p [1]);
+	proceed (RS_RCMD);
+
+    entry (RS_SETA)
+
+	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 1)
+		proceed (RS_RCMD1);
+
+    entry (RS_SETA1)
+
+	write_actuator (RS_SETA1, p [0], p + 1);
 	proceed (RS_RCMD);
 
 endthread

@@ -59,7 +59,12 @@ process THREADNAME (root) (Node) {
 		RS_RANA1,
 		RS_RANA2,
 		RS_SETP,
-		RS_GETP
+		RS_GETP,
+		RS_GETS,
+		RS_GETS1,
+		RS_GETS2,
+		RS_SETA,
+		RS_SETA1
 	};
 
 	perform;
@@ -112,6 +117,11 @@ static word	packet_length;
 #define		RS_RANA2	196
 #define		RS_SETP		200
 #define		RS_GETP		210
+#define		RS_GETS		220
+#define		RS_GETS1	230
+#define		RS_GETS2	240
+#define		RS_SETA		250
+#define		RS_SETA1	260
 	
 static	char *ibuf;
 static	int k, n1;

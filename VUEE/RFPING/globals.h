@@ -36,6 +36,8 @@
 #include "phys_cc1100.h"
 #include "plug_null.h"
 #include "pinopts.h"
+#include "sensors.h"
+#include "actuators.h"
 
 int	sfd;
 long	last_snt;

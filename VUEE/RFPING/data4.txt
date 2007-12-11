@@ -61,9 +61,14 @@
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
-	    <preinit tag="TEST1" type="word">13</preinit>
-	    <preinit tag="TEST2" type="lword">0xaaaaaaaa</preinit>
-	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
+	    <sensors>
+		<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
+		<sensor number="1" vsize="2" delay="0.220">16381</sensor>
+		<sensor number="2" vsize="2" delay="0.06">4095</sensor>
+		<actuator vsize="2" delay="0.0">15</actuator>
+	    </sensors>
 	</defaults>
 	<node number="0">
 	    <leds number="4"> <output target="socket"></output> </leds>
@@ -81,27 +86,39 @@
 	    <preinit tag="TEST1" type="word">0x13</preinit>
 	    <preinit tag="TEST3" type="string"></preinit>
 	</node>
-	<node number="2">
+	<node>
+	    <sensors></sensors>
 	    <location>11.0 11.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
 	</node>
-	<node number="3">
+	<node>
+	    <sensors>
+		<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor vsize="2" delay="0.5,4.5">15</sensor>
+	    </sensors>
 	    <leds number="4"> <output target="socket"></output> </leds>
 		<location>11.0 1.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
 	</node>
-	<node number="4">
+	<node>
+	    <sensors>
+		<output target="device">actuator_output4.txt</output>
+		<input source="string">T 12.0\r\nS 0 333\r\n</input>
+		<actuator vsize="2" delay="0.1">4095</actuator>
+		<sensor vsize="2"></sensor>
+	    </sensors>
 	    <leds number="4"> <output target="socket"></output> </leds>
 		<location>6.0 6.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
 	</node>
-	<node number="5">
+	<node>
 	    <leds number="4"> <output target="socket"></output> </leds>
 	    <uart rate="9600" bsize="12">
 		<input source="string">s 4096\r\n</input>
