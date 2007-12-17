@@ -24,7 +24,7 @@
 heapmem {80, 20}; // how to find out a good ratio?
 
 const   lword	host_id		= 0xBACA000A;
-word	host_pl			= 1;
+word	host_pl			= 7;
 
 char	*ui_ibuf	= NULL,
 	*ui_obuf	= NULL,

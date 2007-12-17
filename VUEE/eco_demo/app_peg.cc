@@ -883,7 +883,7 @@ thread (root)
 				proceed (RS_FREE);
 			}
 			rtin_tag = 0;
-			scan (cmd_line+1, "%lu", rtin_tag);
+			scan (cmd_line+1, "%lu", &rtin_tag);
 			if (rtin_tag != 0)
 				master_delta = rtin_tag - seconds();
 			proceed (RS_FREE);

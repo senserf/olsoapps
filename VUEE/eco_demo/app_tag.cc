@@ -61,6 +61,7 @@ __PUBLF (NodeTag, void, fatal_err) (word err, word w1, word w2, word w3) {
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
 	if_write (IFLASH_SIZE -4, w3);
+	app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
 	halt();
 }
 
@@ -549,8 +550,12 @@ thread (sens)
 		if (sens_data.ee.status != SENS_FF)
 			sens_data.eslot++;
 
-		if (sens_data.eslot >= EE_SENS_MAX) 
-			fatal_err (ERR_FULL, 0, 0, 0);
+		if (sens_data.eslot >= EE_SENS_MAX) {
+			// not now, if ever
+			// fatal_err (ERR_FULL, 0, 0, 0);
+			sens_data.eslot--;
+			app_diag (D_SERIOUS, "EEPROM FULL");
+		}
 
 		switch (sens_data.ee.status) {
 			case SENS_IN_USE:

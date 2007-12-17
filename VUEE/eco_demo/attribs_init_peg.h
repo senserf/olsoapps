@@ -7,7 +7,7 @@
 	_da (app_flags)		= 0;
 
 	_da (master_delta)	= 0;
-	_da (host_pl)		= 1;
+	_da (host_pl)		= 7;
 
 	_da (tag_auditFreq)	= 10240;	// in bin msec
 	_da (tag_eventGran)	= 10;		// in seconds

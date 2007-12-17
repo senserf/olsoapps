@@ -1,4 +1,4 @@
-<network nodes="3">
+<network nodes="9">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
     <channel>
@@ -60,7 +60,7 @@
 	    </leds>
 	    <eeprom>524288 bytes</eeprom>
 	    <iflash>256 bytes in 2 pages</iflash>
-	    <uart rate="200000" bsize="12">
+	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
@@ -77,20 +77,43 @@
 	</defaults>
 	<node number="0" type="peg">
 	    <sensors></sensors>
-	    <location>5.0 5.0</location>
+	    <location>65.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
-	    <!-- in this scenario, routing is absent, so we
-	         don't care about 'm 0'.
-	    -->
 	    <preinit tag="MHOST" type="word">10</preinit>
 	</node>
-	<node number="1" type="tag" start="on">
-	    <location>105.0 5.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0065</preinit>
+	<node number="1" type="peg">
+	    <sensors></sensors>
+	    <location>205.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
+	    <preinit tag="MHOST" type="word">10</preinit>
 	</node>
 	<node number="2" type="tag" start="on">
-	    <location>60.0 60.0</location>
+	    <location>5.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0066</preinit>
+	</node>
+	<node number="3" type="tag" start="on">
+	    <location>5.0 55.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0067</preinit>
+	</node>
+	<node number="4" type="tag" start="on">
+	    <location>5.0 105.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0068</preinit>
+	</node>
+	<node number="5" type="tag" start="on">
+	    <location>275.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0073</preinit>
+	</node>
+	<node number="6" type="tag" start="on">
+	    <location>275.0 55.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0074</preinit>
+	</node>
+	<node number="7" type="tag" start="on">
+	    <location>275.0 105.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0075</preinit>
+	</node>
+	<node number="8" type="tag" start="off">
+	    <location>120.0 50.0</location>
+	    <preinit tag="HID" type="lword">0xBACA00D0</preinit>
 	</node>
     </nodes>
 </network>

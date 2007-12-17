@@ -350,8 +350,12 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 	if (agg_data.ee.status != AGG_FF)
 		agg_data.eslot++;
 
-	if (agg_data.eslot >= EE_AGG_MAX)
-		fatal_err (ERR_FULL, 0, 0, 0);
+	if (agg_data.eslot >= EE_AGG_MAX) {
+		// no
+		// fatal_err (ERR_FULL, 0, 0, 0);
+		agg_data.eslot--;
+		app_diag (D_SERIOUS, "EEPROM FULL");
+	}
 
 	agg_data.ee.status = AGG_COLLECTED;
 	agg_data.ee.sval[0] = in_pongPload(buf, sval[0]);

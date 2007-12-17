@@ -92,7 +92,12 @@ r peg local_host power_level string
   Sets theses attributes on the remote Peg. Rather useless, other than to
   demontrate 2 way communication (e.g. 'string' is displayed on the Peg).
 
-h, q, D, E, F, Q same as in Tags.
+D from to tag upto
+  Similar to D in Tag, but selection by tag id replaced selstion by status.
+  Note that while selection by 'status' makes sense on Tags and doesn't on Pegs,
+  selection by 'tag id' works on Pegs, and doesn't on Tags.
+
+h, q, E, F, Q same as in Tags.
 
 T time
   Allowed only on the Master. 'time' is meant to be a reference time from OSS,
