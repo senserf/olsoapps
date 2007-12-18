@@ -41,10 +41,14 @@
 #endif
 #define DIAG_MESSAGES 2
 
-//#ifdef SPIN_WHEN_HALTED
-//#undef SPIN_WHEN_HALTED
-//#endif
-//#define SPIN_WHEN_HALTED 0
+#ifdef	BOARD_GENESIS
+
+#ifdef SPIN_WHEN_HALTED
+#undef SPIN_WHEN_HALTED
+#endif
+#define SPIN_WHEN_HALTED 0
+
+#endif	/* GENESIS */
 
 #ifdef RANDOM_NUMBER_GENERATOR
 #undef RANDOM_NUMBER_GENERATOR
@@ -56,10 +60,14 @@
 //#endif
 //#define RADIO_BITRATE	200000
 
-//#ifdef CRYSTAL_RATE
-//#undef CRYSTAL_RATE
-//#endif
-//#define CRYSTAL_RATE	8000000
+#ifdef	BOARD_GENESIS
+
+#ifdef CRYSTAL_RATE
+#undef CRYSTAL_RATE
+#endif
+#define CRYSTAL_RATE	8000000
+
+#endif	/* GENESIS */
 
 #ifdef RADIO_USE_LEDS
 #undef RADIO_USE_LEDS

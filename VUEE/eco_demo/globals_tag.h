@@ -31,7 +31,7 @@ const   lword	host_id		= 0xBACA0065;
 
 word		app_flags	= 0;
 
-pongParamsType	pong_params = {	30, 	// freq_maj in sec, max 63K
+pongParamsType	pong_params = {	60, 	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
 				0x7777, // levels / retries
 				1024, 	// rx_span in msec (max 63K) 1: ON
