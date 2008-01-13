@@ -24,4 +24,4 @@
 #define	CODE_LONG_INTS	1
 
 #undef	DIAG_MESSAGES
-#define	DIAG_MESSAGES		2
+#define	DIAG_MESSAGES	2
