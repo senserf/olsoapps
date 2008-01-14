@@ -27,3 +27,10 @@ then
 	../../Scripts/cleanapp
 	cd ..
 fi
+
+if [ -d LIB_EXAMPLE ]
+then
+	cd LIB_EXAMPLE
+	../../Scripts/cleanapp
+	cd ..
+fi
