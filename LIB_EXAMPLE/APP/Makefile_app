@@ -1,0 +1,30 @@
+#
+# Created by mkmk, DO NOT EDIT!!!
+#
+CC=msp430-gcc
+AS=msp430-as
+OC=msp430-objcopy -O ihex
+SI=msp430-size -Ax
+CF=-mmcu=msp430x1611 -mendup-at=main -D__MSP430__ -DBOARD_WARSAW
+AF=-mmcu=msp430x1611
+OF=-O2 -g -Wundef
+TR=Image
+# include directories
+LIB=../LIBRARY
+INC=$(LIB)/include
+
+all :	$(TR)
+
+# target: ""
+BF=app.o 
+
+$(TR) :	$(BF)
+	$(CC) -o $(TR) $(CF) $(BF) -L$(LIB) -lpicos
+	$(OC) $(TR) $(TR).a43
+	$(SI) $(TR)
+
+app.o : app.c 
+	$(CC) $(CF) $(OF) -I$(INC) -c app.c -o app.o
+
+clean :
+	rm -rf *.o
