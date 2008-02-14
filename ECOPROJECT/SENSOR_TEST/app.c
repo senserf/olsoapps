@@ -86,7 +86,7 @@ thread (root)
 
   entry (RS_CSET)
 
-	qso_set_ref;
+	EREF_ON;
 	proceed (RS_RCMD);
 
 endthread
