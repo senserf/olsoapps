@@ -1,0 +1,114 @@
+<network nodes="4">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <channel>
+        <shadowing bn="-110.0dBm" syncbits="8">
+		RP(d) = received power at distance d
+		XP    = transmitted power
+		X     = lognormal random Gaussian component
+ 		=======================================================
+		RP(d)/XP [dB] = -10 x 5.1 x log(d/1.0m) + X(1.0) - 33.5
+ 		=======================================================
+	</shadowing>
+	<cutoff>-115.0dBm</cutoff>
+	<ber>
+		Interpolated ber table:
+		======================
+		  SIR		  BER
+		50.0dB		1.0E-6
+		40.0dB		2.0E-6
+		30.0dB		5.0E-6
+		20.0dB		1.0E-5
+		10.0dB		1.0E-4
+		 5.0dB		1.0E-3
+		 2.0dB		1.0E-1
+		 0.0dB		2.0E-1
+		-2.0dB		5.0E-1
+		-5.0dB		9.9E-1
+	</ber>
+	<frame>200000 12 0</frame>
+	<rssi mode="log,transform">-202.0 0 53.0 255</rssi>
+	<power mode="log,interp">
+		-30.0dBm        0
+                -15.0dBm        1
+                -10.0dBm        2
+                 -5.0dBm        3
+                  0.0dBm        4
+                  5.0dBm        5
+                  7.0dBm        6
+                 10.0dBm        7
+	</power>
+    </channel>
+    <nodes>
+	<defaults>
+	    <memory>2048 bytes</memory>
+	    <power>
+		transmitter power	10.0dBm
+		receiver boost		0.0dB
+	    </power>
+	    <preamble>32 bits</preamble>
+	    <lbt>
+		delay			8msec
+		threshold		-109.0dBm
+	    </lbt>
+	    <backoff>
+		min			8msec
+		max			303msec
+	    </backoff>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
+	    <iflash>256 bytes in 2 pages</iflash>
+	    <uart rate="9600" bsize="12">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	    <preinit tag="NID" type="word">85</preinit>
+	    <preinit tag="HID" type="lword">3133857453</preinit>
+	    <preinit tag="PROFI" type="word">0xFFFF</preinit>
+	    <preinit tag="PINC" type="word">0xFFFF</preinit>
+	    <preinit tag="PEXC" type="word">0</preinit>
+	    <preinit tag="NICK" type="string">uninit</preinit>
+	    <preinit tag="DESC" type="string">uninit desc</preinit>
+	    <preinit tag="DBIZ" type="string">uninit biz desc</preinit>
+	    <preinit tag="DPRIV" type="string">uninit priv desc</preinit>
+	</defaults>
+	<node number="0" type="peg">
+	    <location>5.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
+	    <preinit tag="NICK" type="string">Alice</preinit>
+	    <preinit tag="DESC" type="string">white blouse</preinit>
+	    <preinit tag="DBIZ" type="string">Ala Inc.</preinit>
+	    <preinit tag="DPRIV" type="string">613-111-2222</preinit>
+	    <preinit tag="PROFI" type="word">0x6F26</preinit>
+	</node>
+        <node number="1" type="peg">
+            <location>15.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
+	    <preinit tag="NICK" type="string">Bob</preinit>
+	    <preinit tag="DESC" type="string">tall, red tie</preinit>
+	    <preinit tag="DBIZ" type="string">Bombardier</preinit>
+	    <preinit tag="DPRIV" type="string">room 666</preinit>
+	    <preinit tag="PROFI" type="word">0x55F0</preinit>
+	</node>
+	<node number="2" type="peg" start="off">
+	    <location>5.0 15.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0066</preinit>
+	    <preinit tag="NICK" type="string">Cat</preinit>
+	    <preinit tag="DESC" type="string">nice paws</preinit>
+	    <preinit tag="DBIZ" type="string">Mice Exterme</preinit>
+	    <preinit tag="DPRIV" type="string">on March break</preinit>
+	    <preinit tag="PROFI" type="word">0xE0FF</preinit>
+	    <preinit tag="PEXC" type="word">0x2000</preinit>
+	</node>
+	<node number="3" type="peg" start="off">
+	    <location>15.0 8.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0067</preinit>
+	    <preinit tag="NICK" type="string">Dog</preinit>
+	    <preinit tag="DESC" type="string">big jaws</preinit>
+	    <preinit tag="DBIZ" type="string">Hunt Extreme</preinit>
+	    <preinit tag="DPRIV" type="string">whistle high C</preinit>
+	    <preinit tag="PROFI" type="word">0xF014</preinit>
+	</node>
+    </nodes>
+</network>
