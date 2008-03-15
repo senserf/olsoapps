@@ -11,6 +11,7 @@
 
 #include "node_peg.h"
 #include "stdattr.h"
+#include "threadhdrs_peg.h"
 
 #else	/* PICOS */
 
@@ -19,7 +20,7 @@
 
 #endif	/* SMURPH or PICOS */
 
-#include "threadhdrs_peg.h"
+//#include "threadhdrs_peg.h"
 #include "attnames_peg.h"
 
 /*
@@ -82,7 +83,7 @@ __PUBLF (NodePeg, int, find_ign) (word tag) {
 __PUBLF (NodePeg, int, find_mon) (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
-		if (ignArray[i].id == tag) {
+		if (monArray[i].id == tag) {
 			return i;
 		}
 		i++;
@@ -187,7 +188,7 @@ __PUBLF (NodePeg, int, insert_ign) (word id, char * s) {
 		}
 		i++;
 	}
-	app_diag (D_SERIOUS, "Failed ign (5u) insert", id);
+	app_diag (D_SERIOUS, "Failed ign (%u) insert", id);
 	return -1;
 }
 
@@ -207,6 +208,8 @@ __PUBLF (NodePeg, int, insert_mon) (word id, char * s) {
 	app_diag (D_SERIOUS, "Failed mon (%u) insert", id);
 	return -1;
 }
+
+int mbeacon (word, address);
 
 __PUBLF (NodePeg, void, check_tag) (word i) {
 

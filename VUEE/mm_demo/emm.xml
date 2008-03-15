@@ -77,39 +77,18 @@
 	<node number="0" type="peg">
 	    <location>5.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
-	    <preinit tag="NICK" type="string">Alice</preinit>
-	    <preinit tag="DESC" type="string">white blouse</preinit>
-	    <preinit tag="DBIZ" type="string">Ala Inc.</preinit>
-	    <preinit tag="DPRIV" type="string">613-111-2222</preinit>
-	    <preinit tag="PROFI" type="word">0x6F26</preinit>
 	</node>
         <node number="1" type="peg">
             <location>15.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
-	    <preinit tag="NICK" type="string">Bob</preinit>
-	    <preinit tag="DESC" type="string">tall, red tie</preinit>
-	    <preinit tag="DBIZ" type="string">Bombardier</preinit>
-	    <preinit tag="DPRIV" type="string">room 666</preinit>
-	    <preinit tag="PROFI" type="word">0x55F0</preinit>
 	</node>
 	<node number="2" type="peg" start="off">
 	    <location>5.0 15.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0066</preinit>
-	    <preinit tag="NICK" type="string">Cat</preinit>
-	    <preinit tag="DESC" type="string">nice paws</preinit>
-	    <preinit tag="DBIZ" type="string">Mice Exterme</preinit>
-	    <preinit tag="DPRIV" type="string">on March break</preinit>
-	    <preinit tag="PROFI" type="word">0xE0FF</preinit>
-	    <preinit tag="PEXC" type="word">0x2000</preinit>
 	</node>
 	<node number="3" type="peg" start="off">
 	    <location>15.0 8.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0067</preinit>
-	    <preinit tag="NICK" type="string">Dog</preinit>
-	    <preinit tag="DESC" type="string">big jaws</preinit>
-	    <preinit tag="DBIZ" type="string">Hunt Extreme</preinit>
-	    <preinit tag="DPRIV" type="string">whistle high C</preinit>
-	    <preinit tag="PROFI" type="word">0xF014</preinit>
 	</node>
     </nodes>
 </network>

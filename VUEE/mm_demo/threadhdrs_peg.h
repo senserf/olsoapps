@@ -51,19 +51,20 @@ strandhdr (oss_out, NodePeg) {
 
 threadhdr (root, NodePeg) {
 
-	word	rt_ind;
+	word	rt_ind, rt_id;
 
 	states { RS_INIT, RS_PAUSE, RS_FREE, RS_RCMD, RS_DOCMD, RS_UIOUT,
        		 RS_SETS, RS_PROFILES, RS_HELPS, RS_LISTS, RS_Y, RS_N,
 		 RS_TARGET, RS_BIZ, RS_PRIV, RS_ALRM, RS_STOR, RS_RETR,
-		 RS_BEAC, RS_L_TAG, RS_L_IGN, RS_L_MON, RS_MLIST };
+		 RS_BEAC, RS_L_TAG, RS_L_IGN, RS_L_MON, RS_MLIST,
+       		 RS_S_NVM, RS_L_NVM, RS_AUTO };
 
 	perform;
 };
 
 #else	/* PICOS */
 
-int mbeacon (word, address);
+//int mbeacon (word, address);
 
 // ========================================= rcv
 
@@ -122,8 +123,11 @@ static word aud_ind;
 #define RS_L_IGN	20
 #define RS_L_MON	21
 #define RS_MLIST	22
+#define RS_S_NVM	23
+#define RS_L_NVM	24
+#define RS_AUTO		25
 
-static word	rt_ind;
+static word	rt_ind, rt_id;
 
 #endif
 #endif

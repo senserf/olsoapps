@@ -58,7 +58,16 @@ __PUBLF (NodePeg, void, msg_data_in) (char * buf) {
 
 	if (tagArray[tagIndex].state == confirmedTag)
 		set_tagState(tagIndex, matchedTag, YES);
-	
+
+	if (is_autoack) {
+		if (tagArray[tagIndex].state == reportedTag)
+			set_tagState (tagIndex, confirmedTag, NO);
+
+		if (!(in_data(buf, info) & INFO_ACK))
+			msg_data_out (in_header(buf, snd),
+					in_data(buf, info) | INFO_ACK);
+	}
+
 	oss_data_out (tagIndex);
 }
 
@@ -97,11 +106,17 @@ __PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level) {
 
 __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 	sint tagIndex;
-
 	app_diag (D_DEBUG, "Profi %u", in_header(buf, snd));
 
-	if ((tagIndex = find_ign (in_header(buf, snd))) >= 0) {
-		app_diag (D_INFO, "Ignoring %u", in_header(buf, snd));
+	if (find_ign (in_header(buf, snd)) >= 0) {
+		app_diag (D_INFO, "Ign %u", in_header(buf, snd));
+		return;
+	}
+
+	if ((in_profi(buf, profi) & p_exc) ||
+			!(in_profi(buf, profi) & p_inc)) {
+		app_diag (D_INFO, "Rejected %u (%x)", in_header(buf, snd),
+				in_profi(buf, profi));
 		return;
 	}
 
@@ -160,6 +175,21 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 }
 
 __PUBLF (NodePeg, void, msg_alrm_in) (char * buf) {
+	app_diag (D_DEBUG, "Alrm %u", in_header(buf, snd));
+
+	if (find_ign (in_header(buf, snd)) >= 0) {
+		app_diag (D_INFO, "Ign alrm %u", in_header(buf, snd));
+		return;
+	}
+
+	// not monitored and bad or no match
+	if (find_mon (in_header(buf, snd)) < 0 &&
+		((in_alrm(buf, profi) & p_exc) ||
+		!(in_alrm(buf, profi) & p_inc))) {
+		app_diag (D_INFO, "Rejected alrm %u (%x)", in_header(buf, snd),
+				in_alrm(buf, profi));
+		return;
+	}
 
 	oss_alrm_out (buf);
 	if (led_state.color != LED_R) {

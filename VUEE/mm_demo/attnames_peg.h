@@ -58,6 +58,7 @@
 #define	oss_profi_out		_dac (NodePeg, oss_profi_out)
 #define oss_alrm_out		_dac (NodePeg, oss_alrm_out)
 #define oss_data_out		_dac (NodePeg, oss_data_out)
+#define oss_nvm_out		_dac (NodePeg, oss_nvm_out)
 
 #define	send_msg		_dac (NodePeg, send_msg)
 #define strncpy			_dac (NodePeg, strncpy)

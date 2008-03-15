@@ -30,7 +30,7 @@ char	*ui_ibuf	= NULL,
 	*ui_obuf	= NULL,
 	*cmd_line	= NULL;
 
-word	app_flags 		= 0;
+word	app_flags 		= DEF_APP_FLAGS;
 word	tag_auditFreq 		= 4; // in seconds
 word	tag_eventGran		= 4;  // in seconds
 
@@ -40,14 +40,14 @@ tagShortType    monArray [LI_MAX];
 
 ledStateType	led_state	= {0, 0, 0};
 
-word	profi_att	= 0;
-word	p_inc 	= 0;
-word	p_exc	= 0;
-char	nick_att  [NI_LEN]	= {'\0'};
-char	desc_att  [PEG_STR_LEN]	= {'\0'};
-char	d_biz  [PEG_STR_LEN]	= {'\0'};
-char	d_priv  [PEG_STR_LEN]	= {'\0'};
-char	d_alrm  [PEG_STR_LEN]	= {'\0'};
+profi_t	profi_att	= 0xFFFF;
+profi_t	p_inc 	= 0xFFFF;
+profi_t	p_exc	= 0;
+char	nick_att  [NI_LEN +1]		= "uninit"; //{'\0'};
+char	desc_att  [PEG_STR_LEN +1]	= "uninit desc"; //{'\0'};
+char	d_biz  [PEG_STR_LEN +1]		= "uninit biz"; //{'\0'};
+char	d_priv  [PEG_STR_LEN +1]	= "uninit priv"; //{'\0'};
+char	d_alrm  [PEG_STR_LEN +1]	= {'\0'};
 
 #endif
 
@@ -55,21 +55,23 @@ char	d_alrm  [PEG_STR_LEN]	= {'\0'};
 
 // These are static const and can thus be shared
 
-static const char welcome_str[] = "Set / show matching (s, p):\r\n"
+static const char welcome_str[] = "***Seawolfie 0.1***\r\n"
+	"Set / show matching (s, p):\r\n"
 	"\tnickname:\tsn <nickname 7>\r\n"
 	"\tdesc:\t\tsd <description 15>\r\n"
 	"\tpriv:\t\tsp <priv desc 15>\r\n"
 	"\tbiz:\t\tsb <biz desc 15>\r\n"
 	"\talrm:\t\tsa <alrm desc 15>\r\n"
-	"\tprofile:\tpp 0xABCD\r\n"
-	"\texclude:\tpe 0xABCD\r\n"
-	"\tinclude:\tpi 0xABCD\r\n\r\n"
+	"\tprofile:\tpp <ABCD hex>\r\n"
+	"\texclude:\tpe <ABCD hex>\r\n"
+	"\tinclude:\tpi <ABCD hex>\r\n\r\n"
 	"Help / bulk shows:\r\n"
 	"\tsHow\tsettings:\ths\r\n"
 	"\tsHow\tparams\t\thp\r\n"
 	"\tHelp\th\r\n\r\n"
-	"Matching actions (X, Y, N, T, B, P, A, S, R, L, q, Q):\r\n"
-	"\tXmit on / off\tX <1, 0>\r\n"
+	"Matching actions (U, X, Y, N, T, B, P, A, S, R, L, q, Q):\r\n"
+	"\tAUto on / off\tU [1|0]\r\n"
+	"\tXmit on / off\tX [1|0]\r\n"
 	"\tAccept\t\tY <id>\r\n"
 	"\tReject\t\tN <id>\r\n"
 	"\tTargeted ping\tT <id>\r\n"
@@ -106,4 +108,11 @@ static const char alrm_ascii_def[] = "Alrm from %s(%u) profile(%x) lev(%u) "
 
 static const char alrm_ascii_raw[] = "nick(%s) id(%u) profi(%x) lev(%u) "
 	"hops(%u) for(%u) desc(%s)\r\n";
+
+static const char nvm_ascii_def[] = "\r\nnvm slot %u: id(%u) profi(%x) "
+	"nick(%s)\r\ndesc(%s) priv(%s) biz(%s)\r\n";
+
+static const char nvm_local_ascii_def[] = "\r\nnvm slot %u: id(%u) profi(%x) "
+	"inc (%x) exc (%x) nick(%s)\r\ndesc(%s) priv(%s) biz(%s)\r\n";
+
 #endif

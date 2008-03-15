@@ -70,7 +70,6 @@ __PUBLF (NodePeg, void, stats) (word state) {
 
 __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 								word rssi) {
-  int    w_len;
 
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
@@ -185,7 +184,6 @@ endthread
 thread (audit)
 
 	nodata;
-	word count = 0;
 
 	entry (AS_START)
 
@@ -350,6 +348,24 @@ __PUBLF (NodePeg, void, oss_data_out) (word ind) {
 	oss_profi_out (ind);
 }
 
+__PUBLF (NodePeg, void, oss_nvm_out) (nvmDataType * buf, word slot) {
+	char * lbuf = NULL;
+
+	// no matter what format
+	if (slot == 0)
+		lbuf = form (NULL, nvm_local_ascii_def, slot, buf->id,
+			buf->profi, buf->local_inc, buf->local_exc,
+			buf->nick, buf->desc, buf->dpriv, buf->dbiz);
+	else
+		lbuf = form (NULL, nvm_ascii_def, slot, buf->id, buf->profi,
+			buf->nick, buf->desc, buf->dpriv, buf->dbiz);
+
+	if (runstrand (oss_out, lbuf) == 0 ) {
+		app_diag (D_SERIOUS, "oss_out failed");
+		ufree (lbuf);
+	}
+}
+
 __PUBLF (NodePeg, void, oss_alrm_out) (char * buf) {
 	char * lbuf = NULL;
 
@@ -394,8 +410,12 @@ thread (root)
 	sint	i1;
 	word	w1, w2;
 	char	s1[NI_LEN];
+	nvmDataType nvm_dat;
 
 	entry (RS_INIT)
+	//w1 = memfree(0, &w2);
+	//diag ("dupa %u %u", w1, w2 );
+
 		ser_out (RS_INIT, welcome_str);
 		local_host = (word)host_id;
 #ifndef __SMURPH__
@@ -426,6 +446,24 @@ thread (root)
 		led_state.color = LED_G;
 		led_state.state = LED_ON;
 		leds (LED_G, LED_ON);
+
+		if (ee_read (NVM_OSET, (byte *)&nvm_dat, NVM_SLOT_SIZE)) {
+			app_diag (D_SERIOUS, "Can't read nvm");
+		} else {
+	 	  if (nvm_dat.id != 0xFFFF) {
+			if (nvm_dat.id != local_host)
+				app_diag (D_WARNING, "Bad nvm data");
+			else {
+				strncpy (nick_att, nvm_dat.nick, NI_LEN);
+				strncpy (desc_att, nvm_dat.desc, PEG_STR_LEN);
+				profi_att = nvm_dat.profi;
+				p_inc = nvm_dat.local_inc;
+				p_exc = nvm_dat.local_exc;
+				oss_nvm_out (&nvm_dat, 0);
+			}
+		  }
+		}
+
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)
@@ -461,6 +499,7 @@ thread (root)
 			case 'S': proceed (RS_STOR);
 			case 'R': proceed (RS_RETR);
 			case 'X': proceed (RS_BEAC);
+			case 'U': proceed (RS_AUTO);
 			default:
 				form (ui_obuf, ill_str, cmd_line);
 				proceed (RS_UIOUT);
@@ -483,7 +522,7 @@ thread (root)
 			if (w1 > 0)
 				strncpy (nick_att, cmd_line +3,
 					w1 > NI_LEN ? NI_LEN : w1);
-			form (ui_obuf, "Nick: %s", nick_att);
+			form (ui_obuf, "Nick: %s\r\n", nick_att);
 			proceed (RS_UIOUT);
 
 		  case 'd':
@@ -491,7 +530,7 @@ thread (root)
 				strncpy (desc_att, cmd_line +3,
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
-			form (ui_obuf, "Desc: %s", desc_att);
+			form (ui_obuf, "Desc: %s\r\n", desc_att);
 			proceed (RS_UIOUT);
 
 		  case 'b':
@@ -499,7 +538,7 @@ thread (root)
 				strncpy (d_biz, cmd_line +3,
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
-			form (ui_obuf, "Biz: %s", d_biz);
+			form (ui_obuf, "Biz: %s\r\n", d_biz);
 			proceed (RS_UIOUT);
 
 		  case 'p':
@@ -507,7 +546,7 @@ thread (root)
 				strncpy (d_priv, cmd_line +3,
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
-			form (ui_obuf, "Priv: %s", d_priv);
+			form (ui_obuf, "Priv: %s\r\n", d_priv);
 			proceed (RS_UIOUT);
 
 		  case 'a':
@@ -515,7 +554,7 @@ thread (root)
 				strncpy (d_alrm, cmd_line +3,
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
-			form (ui_obuf, "Alrm: %s", d_alrm);
+			form (ui_obuf, "Alrm: %s\r\n", d_alrm);
 			proceed (RS_UIOUT);
 
 		  default:
@@ -536,19 +575,19 @@ thread (root)
 		  case 'p':
 			if (scan (cmd_line +2, "%x", &w1) > 0)
 				profi_att = w1;
-			form (ui_obuf, "Profile: %x", profi_att);
+			form (ui_obuf, "Profile: %x\r\n", profi_att);
 			proceed (RS_UIOUT);
 
 		  case 'e':
 			if (scan (cmd_line +2, "%x", &w1) > 0)
 				p_exc = w1;
-			form (ui_obuf, "Exclude: %x", p_exc);
+			form (ui_obuf, "Exclude: %x\r\n", p_exc);
 			proceed (RS_UIOUT);
 
 		  case 'i':
 			if (scan (cmd_line +2, "%x", &w1) > 0)
 				p_inc = w1;
-			form (ui_obuf, "Include: %x", p_inc);
+			form (ui_obuf, "Include: %x\r\n", p_inc);
 			proceed (RS_UIOUT);
 
 		  default:
@@ -593,7 +632,7 @@ thread (root)
 				proceed (RS_FREE);
 			}
 			init_ign (i1);
-			form (ui_obuf, "ign: removed %u", w1);
+			form (ui_obuf, "ign: removed %u\r\n", w1);
 			proceed (RS_UIOUT);
 		}
 
@@ -693,10 +732,10 @@ thread (root)
 			}
 			if ((i1 = find_mon (w1)) < 0) {
 				insert_mon (w1, s1);
-				form (ui_obuf, "Mon add %u", w1);
+				form (ui_obuf, "Mon add %u\r\n", w1);
 			} else {
 				strncpy (monArray[i1].nick, s1, NI_LEN);
-				form (ui_obuf, "Mon upd %u", w1);
+				form (ui_obuf, "Mon upd %u\r\n", w1);
 			}
 			proceed (RS_UIOUT);
 
@@ -706,10 +745,10 @@ thread (root)
 				proceed (RS_UIOUT); 
 			}
 			if ((i1 = find_mon (w1)) < 0) {
-				form (ui_obuf, "Mon no %u", w1);
+				form (ui_obuf, "Mon no %u\r\n", w1);
 			} else {
 				init_mon (i1);
-				form (ui_obuf, "Mon del %u", w1);
+				form (ui_obuf, "Mon del %u\r\n", w1);
 			}
 			proceed (RS_UIOUT);
 
@@ -717,6 +756,88 @@ thread (root)
 			form (ui_obuf, bad_str, cmd_line);
 			proceed (RS_UIOUT); 
 		}
+
+	entry (RS_STOR)
+		rt_id = 0;
+		rt_ind = 0;
+		scan (cmd_line +1, "%u", &rt_id);
+
+		if (rt_id == 0)
+			proceed (RS_L_NVM);
+
+		if (rt_id == local_host) {
+			memset (&nvm_dat, 0xFF, NVM_SLOT_SIZE);
+			nvm_dat.id = rt_id;
+			nvm_dat.profi = profi_att;
+			nvm_dat.local_inc = p_inc;
+			nvm_dat.local_exc = p_exc;
+			strncpy (nvm_dat.nick, nick_att, NI_LEN);
+			strncpy (nvm_dat.desc, desc_att, PEG_STR_LEN);
+			strncpy (nvm_dat.dpriv, d_priv, PEG_STR_LEN);
+			strncpy (nvm_dat.dbiz, d_biz, PEG_STR_LEN);
+
+			if (ee_write (WNONE, NVM_OSET, (byte *)&nvm_dat,
+						NVM_SLOT_SIZE))
+				app_diag (D_SERIOUS, "ee_write failed");
+
+			proceed (RS_FREE);
+		}
+
+		if ((i1 = find_tag (rt_id)) < 0) {
+			form (ui_obuf, "No curr tag %u\r\n", rt_id);
+			proceed (RS_UIOUT);
+		}
+		rt_id = i1;
+		proceed (RS_S_NVM);
+
+	entry (RS_RETR)
+		rt_id = 0;
+		rt_ind = 0;
+		scan (cmd_line +1, "%u", &rt_id);
+		proceed (RS_L_NVM);
+
+	entry (RS_S_NVM)
+		if (++rt_ind >= NVM_SLOT_NUM) { // starting at 1
+			app_diag (D_WARNING, "NVM full");
+			proceed (RS_FREE);
+		}
+
+		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
+					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
+			app_diag (D_SERIOUS, "NMV read failed");
+			proceed (RS_FREE);
+		}
+
+		if (nvm_dat.id == 0xFFFF || nvm_dat.id == tagArray[rt_id].id) {
+
+			if (nvm_dat.id == 0xFFFF) {
+				nvm_dat.dpriv[0] = '\0';
+				nvm_dat.dbiz [0] = '\0';
+				nvm_dat.desc [0] = '\0';
+			}
+
+			nvm_dat.id = tagArray[rt_id].id;
+			nvm_dat.profi = tagArray[rt_id].profi;
+			strncpy (nvm_dat.nick, tagArray[rt_id].nick, NI_LEN);
+
+			if (tagArray[rt_id].info & INFO_PRIV) {
+				strncpy (nvm_dat.dpriv, tagArray[rt_id].desc,
+						PEG_STR_LEN);
+			} else if (tagArray[rt_id].info & INFO_BIZ) {
+				strncpy (nvm_dat.dbiz, tagArray[rt_id].desc,
+						PEG_STR_LEN);
+			} else {
+				strncpy (nvm_dat.desc, tagArray[rt_id].desc,
+						PEG_STR_LEN);
+			}
+
+			if (ee_write (WNONE, NVM_OSET + rt_ind * NVM_SLOT_SIZE,
+					(byte *)&nvm_dat, NVM_SLOT_SIZE))
+				app_diag (D_SERIOUS, "ee_write failed");
+
+			proceed (RS_FREE);
+		}
+		proceed (RS_S_NVM);
 
 	entry (RS_LISTS)
 		rt_ind = 0;
@@ -734,6 +855,29 @@ thread (root)
 			form (ui_obuf, bad_str, cmd_line);
 			proceed (RS_UIOUT);
 		}
+
+	entry (RS_L_NVM)
+		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
+					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
+			app_diag (D_SERIOUS, "NMV read failed");
+			proceed (RS_FREE);
+		}
+
+		if (nvm_dat.id == 0xFFFF) {
+			if (rt_ind != 0)
+				proceed (RS_FREE);
+			// local stuff was not saved
+			memset (&nvm_dat, 0, NVM_SLOT_SIZE);
+			nvm_dat.id = local_host;
+		}
+			
+		if (rt_id == 0 || nvm_dat.id == rt_id)
+			oss_nvm_out (&nvm_dat, rt_ind);
+
+		if (++rt_ind < NVM_SLOT_NUM)
+			proceed (RS_L_NVM);
+
+		proceed (RS_FREE);
 
 	entry (RS_L_TAG)
 		if (tagArray[rt_ind].id != 0)
@@ -756,11 +900,11 @@ thread (root)
 
 	entry (RS_L_MON)
 		if (monArray[rt_ind].id != 0)
-			ser_outf (RS_L_IGN, " %u %s\r\n", monArray[rt_ind].id,
+			ser_outf (RS_L_MON, " %u %s\r\n", monArray[rt_ind].id,
 				monArray[rt_ind].nick);
 
 		if (++rt_ind < LI_MAX)
-			proceed (RS_L_IGN);
+			proceed (RS_L_MON);
 
 		proceed (RS_FREE);
 
@@ -790,7 +934,18 @@ thread (root)
 		form (ui_obuf, "Beacon is%stransmitting\r\n",
 			       running (mbeacon) ?  " " : " not ");
 		proceed (RS_UIOUT);
-			
+
+	entry (RS_AUTO)
+		if (scan (cmd_line +1, "%u", &w1) > 0) {
+			if (w1)
+				set_autoack;
+			else
+				clr_autoack;
+		}
+		form (ui_obuf, "Automatch is %s\r\n",
+				is_autoack ? "on" : "off");
+		proceed (RS_UIOUT);
+
 	entry (RS_UIOUT)
 		ser_out (RS_UIOUT, ui_obuf);
 		proceed (RS_FREE);

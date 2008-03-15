@@ -13,12 +13,12 @@ __EXTERN word _da (tag_eventGran);
 __EXTERN word _da (app_flags);
 __EXTERN char *_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 
-__EXTERN word _da (profi_att), _da (p_inc), _da (p_exc);
-__EXTERN char _da (desc_att) [PEG_STR_LEN];
-__EXTERN char _da (d_biz) [PEG_STR_LEN];
-__EXTERN char _da (d_priv) [PEG_STR_LEN];
-__EXTERN char _da (d_alrm) [PEG_STR_LEN];
-__EXTERN char _da (nick_att) [NI_LEN];
+__EXTERN profi_t _da (profi_att), _da (p_inc), _da (p_exc);
+__EXTERN char _da (desc_att) [PEG_STR_LEN +1];
+__EXTERN char _da (d_biz) [PEG_STR_LEN +1];
+__EXTERN char _da (d_priv) [PEG_STR_LEN +1];
+__EXTERN char _da (d_alrm) [PEG_STR_LEN +1];
+__EXTERN char _da (nick_att) [NI_LEN +1];
 __EXTERN ledStateType _da (led_state);
 
 // Methods/functions: need no EXTERN
@@ -53,6 +53,7 @@ void	_da (msg_alrm_out) (nid_t peg, word level);
 void 	_da (oss_profi_out) (word ind);
 void	_da (oss_data_out) (word ind);
 void 	_da (oss_alrm_out) (char * buf);
+void	_da (oss_nvm_out) (nvmDataType * buf, word slot);
 
 void 	_da (send_msg) (char * buf, int size);
 void	_da (strncpy) (char *d, const char *s, sint n);

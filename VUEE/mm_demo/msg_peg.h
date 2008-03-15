@@ -14,8 +14,8 @@ typedef struct msgAlrmStruct {
 	headerType      header;
 	profi_t		profi;
 	word		level;
-	char		nick[NI_LEN];
-	char		desc[PEG_STR_LEN];
+	char		nick[NI_LEN +1];
+	char		desc[PEG_STR_LEN +1];
 } msgAlrmType;
 
 #define in_alrm(buf, field)   (((msgAlrmType *)(buf))->field)
@@ -25,14 +25,14 @@ typedef struct msgProfiStruct {
 	profi_t		profi;
 	word		pl:4;
 	word		spare:12;
-	char		nick[NI_LEN];
+	char		nick[NI_LEN +1];
 } msgProfiType;
 	
 #define in_profi(buf, field)   (((msgProfiType *)(buf))->field)
 
 typedef struct msgDataStruct {
 	headerType      header;
-	char		desc[PEG_STR_LEN];
+	char		desc[PEG_STR_LEN +1];
 	word		info;
 } msgDataType;
 
