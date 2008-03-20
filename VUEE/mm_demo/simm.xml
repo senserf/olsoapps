@@ -41,7 +41,7 @@
     </channel>
     <nodes>
 	<defaults>
-	    <memory>10240 bytes</memory>
+	    <memory>8666 bytes</memory>
 	    <power>
 		transmitter power	10.0dBm
 		receiver boost		0.0dB
@@ -88,7 +88,7 @@
 	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
 	    <preinit tag="NICK" type="string">Bob</preinit>
 	    <preinit tag="DESC" type="string">tall, red tie</preinit>
-	    <preinit tag="DBIZ" type="string">Bombardier</preinit>
+	    <preinit tag="DBIZ" type="string">Bobardier</preinit>
 	    <preinit tag="DPRIV" type="string">room 666</preinit>
 	    <preinit tag="PROFI" type="word">0x55F0</preinit>
 	</node>

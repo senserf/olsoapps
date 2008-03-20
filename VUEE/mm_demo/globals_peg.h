@@ -22,9 +22,8 @@
 
 heapmem {80, 20}; // how to find out a good ratio?
 
-const   lword	host_id		= 0xBACA000A;
-lword	host_passwd		= 0;
-word	host_pl			= 1;
+const   lword	host_id		= 0xBACA0067;
+word	host_pl			= 2; // PicOS differs from VUEE
 
 char	*ui_ibuf	= NULL,
 	*ui_obuf	= NULL,
@@ -69,7 +68,7 @@ static const char welcome_str[] = "***Seawolfie 0.1***\r\n"
 	"\tsHow\tsettings:\ths\r\n"
 	"\tsHow\tparams\t\thp\r\n"
 	"\tHelp\th\r\n\r\n"
-	"Matching actions (U, X, Y, N, T, B, P, A, S, R, L, q, Q):\r\n"
+	"Matching actions (U, X, Y, N, T, B, P, A, S, R, E, L, q, Q):\r\n"
 	"\tAUto on / off\tU [1|0]\r\n"
 	"\tXmit on / off\tX [1|0]\r\n"
 	"\tAccept\t\tY <id>\r\n"
@@ -80,6 +79,7 @@ static const char welcome_str[] = "***Seawolfie 0.1***\r\n"
 	"\tAlarm\t\tA <id> <level>\r\n"
 	"\tStore\t\tS <id>\r\n"
 	"\tRetrieve\tR [<id>]\r\n"
+	"\tErase\t\tE <id>\r\n"
 	"\tSave and reset\tq\r\n"
 	"\tClear and reset\tQ\r\n"
 	"\tList\r\n\t  tag/ign/mon\tL[t|i|m]\r\n"

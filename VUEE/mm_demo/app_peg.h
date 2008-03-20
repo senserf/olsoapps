@@ -33,7 +33,7 @@
 #define INFO_PRIV	4
 #define INFO_SPARE	8
 #define INFO_ACK	16
-
+#define INFO_IN		(INFO_DESC | INFO_BIZ | INFO_PRIV)
 #define LED_R	0
 #define LED_G	1
 #define LED_B	2

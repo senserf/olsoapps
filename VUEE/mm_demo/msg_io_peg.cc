@@ -87,7 +87,7 @@ __PUBLF (NodePeg, void, msg_profi_out) (nid_t peg) {
 	ufree (buf_out);
 }
 
-__PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level) {
+__PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level, char * desc) {
 	char * buf_out = get_mem (WNONE, sizeof(msgAlrmType));
 
 	if (buf_out == NULL)
@@ -98,7 +98,10 @@ __PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level) {
 	in_header(buf_out, hco) = 0;
 	in_alrm(buf_out, level) = level;
 	in_alrm(buf_out, profi) = profi_att;
-	strncpy (in_alrm(buf_out, desc), d_alrm, PEG_STR_LEN);
+	if (desc)
+		strncpy (in_alrm(buf_out, desc), desc, PEG_STR_LEN);
+	else
+		strncpy (in_alrm(buf_out, desc), d_alrm, PEG_STR_LEN);
 	strncpy (in_alrm(buf_out, nick), nick_att, NI_LEN);
 	send_msg (buf_out, sizeof (msgAlrmType));
 	ufree (buf_out);
@@ -129,11 +132,12 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 		return;
 	}
 
-	// these may change meaningfully:
+	// let's refresh all data (may be not that good with larger pings)
 	tagArray[tagIndex].rssi = rssi;
 	tagArray[tagIndex].pl = in_profi(buf, pl);
 	if (in_header(buf, rcv) != 0 && tagArray[tagIndex].intim == 0)
 		tagArray[tagIndex].intim = 1;
+	strncpy (tagArray[tagIndex].nick, in_profi(buf, nick), NI_LEN);
 
 	switch (tagArray[tagIndex].state) {
 		case noTag:
@@ -190,6 +194,9 @@ __PUBLF (NodePeg, void, msg_alrm_in) (char * buf) {
 				in_alrm(buf, profi));
 		return;
 	}
+
+	if (in_alrm(buf, level) == 7)
+		msg_alrm_out (in_header(buf, snd), 77, in_alrm(buf, desc));
 
 	oss_alrm_out (buf);
 	if (led_state.color != LED_R) {

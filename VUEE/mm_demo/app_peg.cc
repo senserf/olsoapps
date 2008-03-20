@@ -109,8 +109,17 @@ static word map_rssi (word r) {
 	if ((r >> 8) > 118) return 2;
 	return 1;
 #else
+	//diag ("dupa rssi %u", r >> 8);
+
+#if 0
+	plev 1:
 	if ((r >> 8) > 161) return 3;
 	if ((r >> 8) > 140) return 2;
+
+	plev 2:
+#endif
+	if ((r >> 8) > 181) return 3;
+	if ((r >> 8) > 150) return 2;
 	return 1;
 #endif
 }
@@ -192,6 +201,14 @@ thread (audit)
 			finish;
 		}
 		aud_ind = LI_MAX;
+
+		// leds should be better... when we know what's needed
+		if (led_state.state != LED_OFF &&
+				led_state.state != LED_ON) {
+			led_state.state = LED_ON;
+			leds (led_state.color, LED_ON);
+		}
+
 		app_diag (D_DEBUG, "Audit starts");
 
 	entry (AS_TAGLOOP)
@@ -456,12 +473,30 @@ thread (root)
 			else {
 				strncpy (nick_att, nvm_dat.nick, NI_LEN);
 				strncpy (desc_att, nvm_dat.desc, PEG_STR_LEN);
+				strncpy (d_biz, nvm_dat.dbiz, PEG_STR_LEN);
+				strncpy (d_priv, nvm_dat.dpriv, PEG_STR_LEN);
 				profi_att = nvm_dat.profi;
 				p_inc = nvm_dat.local_inc;
 				p_exc = nvm_dat.local_exc;
 				oss_nvm_out (&nvm_dat, 0);
 			}
 		  }
+#ifdef __SMURPH__
+		  else { // model doesn't hold eprom, but has preinits
+			  memset (&nvm_dat, 0xFF, NVM_SLOT_SIZE);
+			  nvm_dat.id = local_host;
+			  nvm_dat.profi = profi_att;
+			  nvm_dat.local_inc = p_inc;
+			  nvm_dat.local_exc = p_exc;
+			  strncpy (nvm_dat.nick, nick_att, NI_LEN);
+			  strncpy (nvm_dat.desc, desc_att, PEG_STR_LEN);
+			  strncpy (nvm_dat.dpriv, d_priv, PEG_STR_LEN);
+			  strncpy (nvm_dat.dbiz, d_biz, PEG_STR_LEN);
+			  if (ee_write (WNONE, NVM_OSET, (byte *)&nvm_dat,
+						  NVM_SLOT_SIZE))
+				  app_diag (D_SERIOUS, "ee_write failed");
+		  }
+#endif
 		}
 
 		proceed (RS_RCMD);
@@ -487,6 +522,7 @@ thread (root)
 			case 'Q': ee_erase (WNONE, 0, 0); reset();
 			case 's': proceed (RS_SETS);
 			case 'p': proceed (RS_PROFILES);
+			case '?':
 			case 'h': proceed (RS_HELPS);
 			case 'L': proceed (RS_LISTS);
 			case 'M': proceed (RS_MLIST);
@@ -498,6 +534,7 @@ thread (root)
 			case 'A': proceed (RS_ALRM);
 			case 'S': proceed (RS_STOR);
 			case 'R': proceed (RS_RETR);
+			case 'E': proceed (RS_ERA);
 			case 'X': proceed (RS_BEAC);
 			case 'U': proceed (RS_AUTO);
 			default:
@@ -638,7 +675,8 @@ thread (root)
 
 		if (tagArray[i1].state == reportedTag)
 			set_tagState (i1, confirmedTag, NO);
-		else if (tagArray[i1].state == confirmedTag)
+		else if (tagArray[i1].state == confirmedTag &&
+				tagArray[i1].info & INFO_IN)
 			set_tagState (i1, matchedTag, YES);
 
 		msg_data_out (w1, INFO_DESC);
@@ -658,7 +696,8 @@ thread (root)
 
 		if (tagArray[i1].state == reportedTag)
 			set_tagState (i1, confirmedTag, NO);
-		else if (tagArray[i1].state == confirmedTag)
+		else if (tagArray[i1].state == confirmedTag &&
+				tagArray[i1].info & INFO_IN)
 			set_tagState (i1, matchedTag, YES);
 
 		msg_data_out (w1, INFO_BIZ);
@@ -677,7 +716,8 @@ thread (root)
 
 		if (tagArray[i1].state == reportedTag)
 			set_tagState (i1, confirmedTag, NO);
-		else if (tagArray[i1].state == confirmedTag)
+		else if (tagArray[i1].state == confirmedTag &&
+				tagArray[i1].info & INFO_IN)
 			set_tagState (i1, matchedTag, YES);
 
 		msg_data_out (w1, INFO_PRIV);
@@ -701,7 +741,7 @@ thread (root)
 			proceed (RS_UIOUT);
 		}
 #endif
-		msg_alrm_out (w1, w2);
+		msg_alrm_out (w1, w2, NULL);
 		proceed (RS_FREE);
 
 	entry (RS_N)
@@ -757,6 +797,16 @@ thread (root)
 			proceed (RS_UIOUT); 
 		}
 
+	entry (RS_ERA)
+		rt_id = 0;
+		scan (cmd_line +1, "%u", &rt_id);
+		if (rt_id == 0) {
+			form (ui_obuf, bad_str, cmd_line);
+			proceed (RS_UIOUT);
+		}
+		rt_ind = 0;
+		proceed (RS_E_NVM);
+
 	entry (RS_STOR)
 		rt_id = 0;
 		rt_ind = 0;
@@ -795,6 +845,29 @@ thread (root)
 		rt_ind = 0;
 		scan (cmd_line +1, "%u", &rt_id);
 		proceed (RS_L_NVM);
+
+	entry (RS_E_NVM)
+		if (++rt_ind >= NVM_SLOT_NUM) { // starting at 1
+			app_diag (D_WARNING, "No nvm entry %u", rt_id);
+			proceed (RS_FREE);
+		}
+		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
+					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
+			app_diag (D_SERIOUS, "NMV read failed");
+			proceed (RS_FREE);
+		}
+		if (nvm_dat.id == rt_id) {
+			memset (&nvm_dat, 0xFFFF, NVM_SLOT_SIZE);
+			if (ee_write (WNONE, NVM_OSET + rt_ind * NVM_SLOT_SIZE,
+					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
+				app_diag (D_SERIOUS, "ee_write failed");
+				proceed (RS_FREE); 
+			}
+			rt_id = 0;
+			rt_ind = 0;
+			proceed (RS_L_NVM);
+		}
+		proceed (RS_E_NVM);
 
 	entry (RS_S_NVM)
 		if (++rt_ind >= NVM_SLOT_NUM) { // starting at 1
@@ -863,15 +936,7 @@ thread (root)
 			proceed (RS_FREE);
 		}
 
-		if (nvm_dat.id == 0xFFFF) {
-			if (rt_ind != 0)
-				proceed (RS_FREE);
-			// local stuff was not saved
-			memset (&nvm_dat, 0, NVM_SLOT_SIZE);
-			nvm_dat.id = local_host;
-		}
-			
-		if (rt_id == 0 || nvm_dat.id == rt_id)
+		if (nvm_dat.id != 0xFFFF && (rt_id == 0 || nvm_dat.id == rt_id))
 			oss_nvm_out (&nvm_dat, rt_ind);
 
 		if (++rt_ind < NVM_SLOT_NUM)

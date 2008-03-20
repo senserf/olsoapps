@@ -41,7 +41,7 @@
     </channel>
     <nodes>
 	<defaults>
-	    <memory>10240 bytes</memory>
+	    <memory>8666 bytes</memory>
 	    <power>
 		transmitter power	10.0dBm
 		receiver boost		0.0dB

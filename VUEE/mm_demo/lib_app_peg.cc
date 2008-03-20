@@ -257,7 +257,9 @@ __PUBLF (NodePeg, void, check_tag) (word i) {
 			break;
 
 		case goneTag:
-			oss_profi_out (i);
+			app_diag (D_SERIOUS, "Gone?? %u", tagArray[i].id);
+			init_tag (i);
+			//oss_profi_out (i);
 			break;
 
 		case reportedTag:
@@ -275,7 +277,7 @@ __PUBLF (NodePeg, void, check_tag) (word i) {
 		case fadingReportedTag:
 		case fadingConfirmedTag:
 		case fadingMatchedTag:
-			set_tagState (i, goneTag, YES);
+			set_tagState (i, goneTag, NO /*YES not here*/);
 			oss_profi_out (i);
 			init_tag (i);
 			break;

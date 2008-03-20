@@ -6,7 +6,7 @@
 	_da (host_id)		= (lword) preinit ("HID");
 	_da (app_flags)		= DEF_APP_FLAGS;
 
-	_da (host_pl)		= 1;
+	_da (host_pl)		= 1; // note that VUEE differs from PicOS
 
 	_da (tag_auditFreq)	= 4;
 	_da (tag_eventGran)	= 4;
