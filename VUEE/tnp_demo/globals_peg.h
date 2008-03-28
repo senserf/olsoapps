@@ -3,9 +3,18 @@
 
 #define TINY_MEM 1
 
+// Make the generic headers look as close as possible in both cases. This
+// involves adding a few (dummy) links to VUEE/PICOS (done).
+
 #include "app_peg.h"
 #include "msg_peg.h"
 #include "diag.h"
+#include "tarp.h"
+#include "form.h"
+#include "ser.h"
+#include "net.h"
+
+heapmem {80, 20}; // how to find out a good ratio?
 
 #ifdef	__SMURPH__
 
@@ -14,14 +23,7 @@
 
 #else	/* PICOS */
 
-#include "form.h"
-#include "ser.h"
-#include "net.h"
-#include "tarp.h"
-
 #include "attribs_peg.h"
-
-heapmem {80, 20}; // how to find out a good ratio?
 
 const   lword	host_id		= 0xBACA000A;
 lword	host_passwd		= 0;

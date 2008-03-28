@@ -83,6 +83,7 @@ thread (root)
 
 	ser_outf (RS_GSEN+2, "Value: %u\r\n", p [2]);
 	delay (p [1], RS_CSEN+1);
+	release;
 
   entry (RS_CSET)
 
