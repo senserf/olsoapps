@@ -27,12 +27,31 @@ process THREADNAME (sender) (Node) {
 	};
 };
 
+process THREADNAME (pin_monitor) (Node) {
+
+	long CNT, CMP;
+	word STA;
+	char *MSG;
+
+	states {
+		PM_START,
+		PM_OUT,
+		PM_NOTIFIER,
+		PM_COUNTER,
+		PM_EVENT,
+		PM_EVENT1
+	};
+
+	perform;
+};
+
 process THREADNAME (root) (Node) {
 
 	char *ibuf;
 	int k, n1;
 	char *fmt, obuf [32];
 	word p [2];
+	long lp;
 
 	states {
 		RS_INIT,
@@ -58,6 +77,17 @@ process THREADNAME (root) (Node) {
 		RS_RANA,
 		RS_RANA1,
 		RS_RANA2,
+		RS_WANA,
+		RS_PSCN,
+		RS_PSCM,
+		RS_PGCN,
+		RS_PGCN1,
+		RS_PQCN,
+		RS_PSNT,
+		RS_PQNT,
+		RS_PSMT,
+		RS_PSMT1,
+		RS_PQMT,
 		RS_SETP,
 		RS_GETP,
 		RS_GETS,
@@ -92,6 +122,19 @@ static word	packet_length;
 
 // ======================================
 
+#define	PM_START	0
+#define	PM_OUT		10
+#define	PM_NOTIFIER	20
+#define	PM_COUNTER	30
+#define	PM_EVENT	40
+#define	PM_EVENT1	50
+
+static	word STA;
+static	long CNT, CMP;
+static	char *MSG;
+
+// ======================================
+
 #define		RS_INIT		0
 #define		RS_RCMDM2	10
 #define		RS_RCMDM1	20
@@ -115,18 +158,30 @@ static word	packet_length;
 #define		RS_RANA		190
 #define		RS_RANA1	193
 #define		RS_RANA2	196
-#define		RS_SETP		200
-#define		RS_GETP		210
-#define		RS_GETS		220
-#define		RS_GETS1	230
-#define		RS_GETS2	240
-#define		RS_SETA		250
-#define		RS_SETA1	260
+#define		RS_WANA		197
+#define		RS_PSCN		198
+#define		RS_PSCM		199
+#define		RS_PGCN		200
+#define		RS_PGCN1	201
+#define		RS_PQCN		202
+#define		RS_PSNT		203
+#define		RS_PQNT		204
+#define		RS_PSMT		205
+#define		RS_PSMT1	206
+#define		RS_PQMT		207
+#define		RS_SETP		210
+#define		RS_GETP		220
+#define		RS_GETS		230
+#define		RS_GETS1	240
+#define		RS_GETS2	250
+#define		RS_SETA		260
+#define		RS_SETA1	270
 	
 static	char *ibuf;
 static	int k, n1;
 static	char *fmt, obuf [32];
 static	word p [2];
+static	long lp;
 
 #endif
 #endif

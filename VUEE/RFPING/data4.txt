@@ -72,7 +72,7 @@
 	</defaults>
 	<node number="0">
 	    <leds number="4"> <output target="socket"></output> </leds>
-	    <pins number="12" adc="8" dac="2">
+	    <pins number="12" adc="8" counter="1,48,48" notifier="2,64,1600" dac="6">
 		<output target="socket"></output>
 	    </pins>
 	    <location>1.0 1.0</location>

@@ -199,6 +199,55 @@ __PUBLF (Node, int, snd_stop) () {
 	return 0;
 }
 
+thread (pin_monitor)
+
+    entry (PM_START)
+
+	if (pmon_pending_not ()) {
+		MSG = "NOTIFIER PENDING\r\n";
+		proceed (PM_OUT);
+	}
+	if (pmon_pending_cmp ()) {
+		MSG = "COUNTER PENDING\r\n";
+		proceed (PM_OUT);
+	}
+	when (PMON_NOTEVENT, PM_NOTIFIER);
+	when (PMON_CNTEVENT, PM_COUNTER);
+	release;
+
+  entry (PM_OUT)
+
+	ser_out (PM_OUT, MSG);
+	proceed (PM_START);
+
+  entry (PM_NOTIFIER)
+
+	MSG = "NOTIFIER EVENT\r\n";
+	proceed (PM_EVENT);
+
+  entry (PM_COUNTER)
+
+	MSG = "COUNTER EVENT\r\n";
+
+  entry (PM_EVENT)
+
+	ser_out (PM_EVENT, MSG);
+
+	STA = pmon_get_state ();
+	CNT = pmon_get_cnt ();
+	CMP = pmon_get_cmp ();
+
+  entry (PM_EVENT1)
+
+	ser_outf (PM_EVENT1, "STATE: %x, CNT: %lu, CMP: %lu\r\n",
+		STA, CNT, CMP);
+	pmon_pending_cmp ();
+	pmon_pending_not ();
+
+	proceed (PM_START);
+
+endthread
+
 thread (root)
 
     entry (RS_INIT)
@@ -226,23 +275,32 @@ thread (root)
 	ser_out (RS_RCMDM2,
 		"\r\nRF Ping Test\r\n"
 		"Commands:\r\n"
-		"s intvl  -> start/reset sending interval (2 secs default)\r\n"
-		"r        -> start receiver\r\n"
-		"d i v    -> change phys parameter i to v\r\n"
-		"x p      -> set transmit power\r\n"
-		"y        -> get current transmit power\r\n"
-		"g        -> get received power\r\n"
-		"o        -> stop receiver\r\n"
-		"t        -> stop transmitter\r\n"
-		"q        -> stop both\r\n"
-		"i        -> set station Id\r\n"
-		"z        -> reset the node\r\n"
-		"p n      -> read pin n\r\n"
-		"u n v    -> set pin n\r\n"
-		"a n r d  -> read analog pin\r\n"
+		"s intvl  -> snd int\r\n"
+		"r        -> rcv\r\n"
+		"d i v    -> chg par i\r\n"
+		"x p      -> xmt pwr\r\n"
+		"y        -> get xmt pwr\r\n"
+		"o        -> stop rcv\r\n"
+		"t        -> stop xmt\r\n"
+		"q        -> stop rf\r\n"
+		"i        -> set sid\r\n"
+		"z        -> reset\r\n"
+		"p n      -> read pin\r\n"
+		"u n v    -> set pin\r\n"
+		"a n r d  -> read ADC pin\r\n"
+		"w n v r  -> write DAC pin\r\n"
+		"C c e    -> start cnt\r\n"
+		"P c      -> set cmp\r\n"
+		"G        -> get cnt\r\n"
+		"D        -> stop cnt\r\n"
+		"N e      -> start ntf\r\n"
+		"M        -> stop ntf\r\n"
+		"X        -> start mtr\r\n"
+		"Y        -> stop mtr\r\n"
 		"S n      -> read n-th sensor\r\n"
 		"A n v    -> set n-th actuator\r\n"
 	);
+// FIXME: interrupts must be triggered while pending to preserve semantics
 
     entry (RS_RCMDM1)
 
@@ -261,16 +319,25 @@ thread (root)
 	    case 's': proceed (RS_SND);
 	    case 'r': proceed (RS_RCV);
 	    case 'd': proceed (RS_PAR);
-	    case 'q': proceed (RS_QUIT);
+	    case 'x': proceed (RS_SETP);
+	    case 'y': proceed (RS_GETP);
 	    case 'o': proceed (RS_QRCV);
 	    case 't': proceed (RS_QXMT);
+	    case 'q': proceed (RS_QUIT);
 	    case 'i': proceed (RS_SSID);
 	    case 'z': proceed (RS_RES);
 	    case 'p': proceed (RS_RPIN);
 	    case 'u': proceed (RS_SPIN);
 	    case 'a': proceed (RS_RANA);
-	    case 'x': proceed (RS_SETP);
-	    case 'y': proceed (RS_GETP);
+	    case 'w': proceed (RS_WANA);
+	    case 'C': proceed (RS_PSCN);
+	    case 'P': proceed (RS_PSCM);
+	    case 'G': proceed (RS_PGCN);
+	    case 'D': proceed (RS_PQCN);
+	    case 'N': proceed (RS_PSNT);
+	    case 'M': proceed (RS_PQNT);
+	    case 'X': proceed (RS_PSMT);
+	    case 'Y': proceed (RS_PQMT);
 	    case 'S': proceed (RS_GETS);
 	    case 'A': proceed (RS_SETA);
 	}
@@ -394,6 +461,74 @@ thread (root)
     entry (RS_RANA2)
 
 	ser_outf (RS_RANA2, "A[%u] = %d\r\n", p [0], n1);
+	proceed (RS_RCMD);
+
+    entry (RS_WANA)
+
+	if (scan (ibuf + 1, "%u %u %u", p+0, &k, p+1) < 3)
+		proceed (RS_RCMD1);
+
+	pin_write_dac (p [0], k, p [1]);
+	proceed (RS_RCMD);
+
+    entry (RS_PSCN)
+
+	k = 0;
+	lp = 0;
+	scan (ibuf + 1, "%lu %u", &lp, &k);
+	pmon_start_cnt (lp, (Boolean) k);
+	proceed (RS_RCMD);
+
+    entry (RS_PSCM)
+
+	if (scan (ibuf + 1, "%lu", &lp) < 1)
+		proceed (RS_RCMD1);
+
+	pmon_set_cmp (lp);
+	proceed (RS_RCMD);
+
+    entry (RS_PGCN)
+
+	lp = pmon_get_cnt ();
+
+    entry (RS_PGCN1)
+
+	ser_outf (RS_PGCN1, "Counter = %lu\r\n", lp);
+	proceed (RS_RCMD);
+
+    entry (RS_PQCN)
+
+	pmon_stop_cnt ();
+	proceed (RS_RCMD);
+
+    entry (RS_PSNT)
+
+	k = 0;
+	scan (ibuf + 1, "%u", &k);
+	pmon_start_not ((Boolean) k);
+	proceed (RS_RCMD);
+
+    entry (RS_PQNT)
+
+	pmon_stop_not ();
+	proceed (RS_RCMD);
+
+    entry (RS_PSMT)
+
+	if (running (pin_monitor))
+		proceed (RS_PSMT1);
+
+	runthread (pin_monitor);
+	proceed (RS_RCMD);
+
+    entry (RS_PSMT1)
+
+	ser_out (RS_PSMT1, "Already running!\r\n");
+	proceed (RS_RCMD);
+
+    entry (RS_PQMT)
+
+	killall (pin_monitor);
 	proceed (RS_RCMD);
 
     entry (RS_SETP)
