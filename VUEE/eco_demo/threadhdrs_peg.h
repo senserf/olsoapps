@@ -16,10 +16,11 @@ threadhdr (rcv, NodePeg) {
 
 threadhdr (audit, NodePeg) {
 
+	lword lh_time;
 	char *aud_buf_ptr;
 	word aud_ind;
 
-	states 	{ AS_INIT, AS_START, AS_TAGLOOP, AS_TAGLOOP1 };
+	states 	{ AS_INIT, AS_START, AS_TAGLOOP, AS_TAGLOOP1, AS_HOLD };
 
 	perform;
 
@@ -52,10 +53,6 @@ strandhdr (oss_out, NodePeg) {
 
 threadhdr (root, NodePeg) {
 
-	lword	rtin_tag;
-	nid_t	rtin_peg;
-	word	rtin_rssi, rtin_pl, rtin_maj, rtin_min, rtin_span;
-
 	states { RS_INIT, RS_PAUSE, RS_FREE, RS_RCMD, RS_DOCMD, RS_UIOUT,
        			RS_DUMP	};
 
@@ -82,7 +79,9 @@ static word rcv_rssi;
 #define	AS_START	10
 #define	AS_TAGLOOP	20
 #define	AS_TAGLOOP1	30
+#define AS_HOLD		40
 
+static lword lh_time;
 static char *aud_buf_ptr;
 static word aud_ind;
 
@@ -110,10 +109,6 @@ static word aud_ind;
 #define RS_DOCMD	30
 #define RS_UIOUT	40
 #define RS_DUMP		50
-
-static lword	rtin_tag;
-static nid_t	rtin_peg;
-static word	rtin_rssi, rtin_pl, rtin_maj, rtin_min, rtin_span;
 
 #endif
 #endif

@@ -7,10 +7,6 @@
 
 #define THREADNAME(a)   a ## _peg
 
-#define EPOCH_REF	1111111111
-
-#define NUM_SENS	3
-
 // Content of all LibApps
 
 //+++ "lib_app_peg.c"
@@ -25,7 +21,7 @@
 #define EE_AGG_MAX	(ee_size (NULL, NULL) / EE_AGG_SIZE -1)
 #define EE_AGG_MIN	0
 
-#define NUM_SENS	3
+#define NUM_SENS	5
 
 #define AGG_FF		0xFF
 #define AGG_IN_USE	0xFC
@@ -41,10 +37,31 @@ typedef enum {
 	fadingReportedTag, fadingConfirmedTag, goneTag, sumTag
 } tagStateType;
 
+typedef union {
+	lword sec;
+	struct {
+		word d:11;
+		word h:5;
+		word m:6;
+		word s:6;
+		word spare:3;
+		word f:1;
+	} hms;
+} mclock_t;
+
 typedef struct tagDataStruct {
-	lword	id;
-	word	state; // 4 bits enough
-	word	count; // 8b enough
+	word	id;
+	
+	word	rssi:8;
+	word	pl:4;
+	word	state:4;
+	
+	word	count:8;
+	word	rxperm:1;
+	word	spare7:7;
+	
+	word	freq;
+	
 	lword	evTime;
 	lword	lastTime;
 	reportPloadType rpload;
@@ -61,11 +78,11 @@ typedef struct aggEEDataStruct {
 	word status:8; // 1st in ee slot
 	word spare:8;
 	word sval[NUM_SENS]; // aligned
-	long ts;
-	long t_ts;
+	lword ts;
+	lword t_ts;
 	lword t_eslot;
 	word  tag;
-	word sspare[5];
+	word sspare[4];
 } aggEEDataType;
 // for now, keep it at 2^N (32), we'll see about eeprom pages, etc.
 
@@ -85,17 +102,17 @@ typedef struct aggDataStruct {
 	lword eslot;
 } aggDataType;
 
+#define clr_rustic	(app_flags &= ~1)
+#define set_rustic	(app_flags |= 1)
+#define is_rustic	(app_flags & 1)
+
 #define clr_master_chg	(app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)
 
-#define tag_lim	6
+#define tag_lim	20
 
-#define ALRM_SILENCE	60
-
-#define OSS_HT 		0
-#define OSS_TCL		1
-#define OSS_LOCDEMO	2
-#define OSS_ECODEMO	3
+#define OSS_ECODEMO	0
+// not sure which way (is_rustic app_flags?) #define OSS_ECORUSTIC	1
 #define oss_fmt	OSS_ECODEMO
 
 #endif

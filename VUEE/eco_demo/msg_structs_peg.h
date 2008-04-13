@@ -1,42 +1,28 @@
 #ifndef __msg_structs_peg_h
 #define __msg_structs_peg_h
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "msg_tarp.h"
 #include "msg_structs_tag.h"
 
-#define PEG_STR_LEN 16
-
-typedef struct msgNewStruct {
-	headerType      header;
-} msgNewType;
-
-#define in_new(buf, field)   (((msgNewType *)(buf))->field)
-
-typedef struct msgNewAckStruct {
-	headerType      header;
-	word            master;
-	word		hco:8;
-	word		spare:8;
-	lword           mtime;
-} msgNewAckType;
-
-#define in_newAck(buf, field)   (((msgNewAckType *)(buf))->field)
-
 typedef struct msgMasterStruct {
-	headerType      header;
-	lword           mtime;
+	headerType	header;
+	lword		mtime; // this is mclock_t, what a mess with types...
 } msgMasterType;
 
 #define in_master(buf, field)   (((msgMasterType *)(buf))->field)
 
 typedef struct msgReportStruct {
 	headerType	header;
-	long		tStamp;
-	lword		tagId;
-	word		state;
+	lword		tStamp;
+
+	word		tagid;
+	word		rssi:8;
+	word		pl:4;
+	word		state:4;
+
 	word 		count;
 	word		flags; // events, housekeeping
 } msgReportType;
@@ -49,47 +35,54 @@ typedef struct msgReportStruct {
 
 typedef struct msgReportAckStruct {
 	headerType	header;
-	lword		tagId;
+	word		tagid;
 	word		state;
-	word		count; // may be useless here...
+	//word		count; // may be useless here...
 } msgReportAckType;
 
 #define in_reportAck(buf, field)   (((msgReportAckType *)(buf))->field)
 
 typedef struct msgFwdStruct {
 	headerType      header;
-	lword		target;
+	nid_t		target;
 } msgFwdType;
 
 #define in_fwd(buf, field)   (((msgFwdType *)(buf))->field)
 
-typedef struct msgAlrmStruct {
-	headerType      header;
-	word		level;
-	word		spare;
-} msgAlrmType;
-
-#define in_alrm(buf, field)   (((msgAlrmType *)(buf))->field)
-
 typedef struct msgFindTagStruct {
 	headerType	header;
-	lword		target;
+	nid_t		target;
 } msgFindTagType;
 
 #define in_findTag(buf, field)   (((msgFindTagType *)(buf))->field)
 
 typedef struct msgSetPegStruct {
 	headerType      header;
+	word		audi;
 	word		level;
-	word		new_id;
-	char            str[PEG_STR_LEN];
 } msgSetPegType;
 
-#define in_setPeg(buf, field)   (((msgSetPegType *)(buf))->field)
+#define in_setPeg(buf, field)	(((msgSetPegType *)(buf))->field)
+
+typedef struct msgStatsPegStruct {
+	headerType      header;
+	lword		hostid;
+	lword		ltime;
+	lword		mdelta;
+	lword		slot;
+	word		audi;
+	word		pl; // :4 would be enough
+	word		mhost;
+	word		mem;
+	word		mmin;
+	word		spare;
+} msgStatsPegType;
+
+#define in_statsPeg(buf, field)   (((msgStatsPegType *)(buf))->field)
 
 typedef struct reportPloadStruct {
 	pongPloadType ppload;
-	long	ts;
+	lword	ts;
 	lword	eslot;
 } reportPloadType;
 #define in_reportPload(buf, field) (((reportPloadType *)(buf + \

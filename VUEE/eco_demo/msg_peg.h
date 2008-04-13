@@ -10,9 +10,9 @@
 #include "msg_structs_peg.h"
 
 typedef enum {
-	msg_null, msg_getTag, msg_getTagAck, msg_setTag, msg_setTagAck,
-	msg_rpc, msg_pong, msg_pongAck, msg_new, msg_newAck, msg_master, 
-	msg_report, msg_reportAck, msg_fwd, msg_alrm, msg_findTag, msg_setPeg
+	msg_null, msg_setTag, msg_rpc, msg_pong, msg_pongAck, msg_statsTag, 
+	msg_master, msg_report, msg_reportAck, msg_fwd, msg_findTag, msg_setPeg,
+	msg_statsPeg
 } msgType;
 
 

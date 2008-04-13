@@ -41,7 +41,7 @@
     </channel>
     <nodes>
 	<defaults>
-	    <memory>2048 bytes</memory>
+	    <memory>8666 bytes</memory>
 	    <power>
 		transmitter power	10.0dBm
 		receiver boost		0.0dB
@@ -70,6 +70,8 @@
 		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
 		<sensor number="1" vsize="2" delay="0.220">16381</sensor>
 		<sensor number="2" vsize="2" delay="0.06">4095</sensor>
+		<sensor number="3" vsize="2" delay="0.1">4095</sensor>
+		<sensor number="4" vsize="2" delay="0.1">4095</sensor>
 	    </sensors>
 	    <preinit tag="HID" type="lword">3133857453</preinit>
 	    <preinit tag="MHOST" type="word">0</preinit>

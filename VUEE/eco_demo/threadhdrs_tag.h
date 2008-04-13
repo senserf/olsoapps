@@ -15,7 +15,8 @@ threadhdr (rcv, NodeTag) {
 
 threadhdr (sens, NodeTag) {
 
-	states { SE_INIT, SE_PAR, SE_TEMP, SE_HUMID, SE_DONE };
+	states { SE_INIT, SE_PAR, SE_TEMP, SE_HUMID, SE_PHOTO, SE_TEMPA,
+	 	 SE_DONE };
 
 	perform;
 
@@ -69,6 +70,8 @@ threadhdr (root, NodeTag) {
 #else	/* PICOS */
 
 int sens (word, address);
+int rxsw (word, address);
+int pong (word, address);
 
 // ========================================= sens
 
@@ -76,7 +79,9 @@ int sens (word, address);
 #define SE_PAR		10
 #define SE_TEMP		20
 #define SE_HUMID	30
-#define SE_DONE		40
+#define SE_PHOTO	40
+#define SE_TEMPA	50
+#define SE_DONE		60
 
 // ========================================= rcv
 

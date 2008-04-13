@@ -42,7 +42,7 @@ __PUBLF (NodeTag, Boolean, msg_isTrace) (msg_t m) {
 }
 
 __PUBLF (NodeTag, Boolean, msg_isMaster) (msg_t m) {
-	return (m == msg_master);
+	return NO; //(m == msg_master);
 }
 
 __PUBLF (NodeTag, Boolean, msg_isNew) (msg_t m) {
@@ -101,32 +101,45 @@ __PUBLF (NodeTag, word, max_pwr) (word p_levs) {
  	return level;
 }
 
-__PUBLF (NodeTag, void, set_tag) (char * buf) {
-	// we may need more scrutiny...
-	if (in_setTag(buf, node_addr) != 0)
-		local_host = in_setTag(buf, node_addr);
+// ============================================================================
 
-	if (in_setTag(buf, pow_levels) != 0) {
-		if (pong_params.rx_lev != 0)
-			pong_params.rx_lev = 
-				max_pwr(in_setTag(buf, pow_levels));
+// IN: mc->sec: # of s. from NOW, can't go back before m_ref time
+//     mc->hms.f == 1 <=> go back in time mc->sec seconds
+// OUT: *mc: wall time with the input offset (usually 0)
 
-		if (pong_params.pload_lev != 0)
-			pong_params.pload_lev = pong_params.rx_lev;
-		pong_params.pow_levels = in_setTag(buf, pow_levels);
+// Different than in Pegs, just for fun and lack of past events
+__PUBLF (NodeTag, void, wall_time) (mclock_t *mc) {
+	lword lw = seconds() - ref_time;
+	word w1, w2, w3, w4;
+
+	if (mc->hms.f &&  (mc->sec && 0x7FFFFFFF) > lw) {
+		app_diag (D_SERIOUS, "Ignoring bad offset");
+		mc->sec = 0;
 	}
-	
-	if (in_setTag(buf, freq_maj) != 0)
-		pong_params.freq_maj = in_setTag(buf, freq_maj);
-	
-	if (in_setTag(buf, freq_min) != 0)
-		pong_params.freq_min = in_setTag(buf, freq_min);
-	
-	if (in_setTag(buf, rx_span) != 0) {
-		pong_params.rx_span = in_setTag(buf, rx_span);
-	
-		if (pong_params.rx_span == 2)
-			pong_params.rx_span = 0;
+
+	lw += mc->sec;
+	mc->sec = 0;
+
+	w1 = lw / (24L * 3600) + ref_clock.hms.d;
+	lw %= 24L * 3600;
+	w2 = lw / 3600 + ref_clock.hms.h;
+	lw %= 3600;
+	w3 = lw / 60 + ref_clock.hms.m;
+	w4 = lw % 60 + ref_clock.hms.s;
+
+	if (w4 >= 60) {
+		w4 -= 60;
+		w3++;
 	}
+	if (w3 >= 60) {
+		w3 -= 60;
+		w2++;
+	}
+	if (w2 >= 24) {
+		w2 -= 24;
+		w1++;
+	}
+	mc->hms.d = w1; mc->hms.h = w2; mc->hms.m = w3; mc->hms.s = w4;
+	mc->hms.f = ref_clock.hms.f;
 }
 

@@ -14,6 +14,8 @@
 #define	SENSOR_PAR	0
 #define SENSOR_TEMP	1
 #define SENSOR_HUMID	2
+#define SENSOR_PHOTO	3
+#define SENSOR_TEMPA	4
 #define SENSOR_LIST dupajas
 #endif
 
@@ -63,6 +65,25 @@ __PUBLF (NodeTag, void, fatal_err) (word err, word w1, word w2, word w3) {
 	if_write (IFLASH_SIZE -4, w3);
 	app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
 	halt();
+}
+
+// will go away when we can see processes from other files
+__PUBLF (NodeTag, void, tmpcrap) (word what) {
+	switch (what) {
+		case 0:
+			if (!running(rxsw))
+				runthread (rxsw);
+			break;
+		case 1:
+			if (!running(pong))
+				runthread (pong);
+			break;
+		case 2:
+			killall (rxsw);
+			break;
+		default:
+			app_diag (D_SERIOUS, "Crap");
+	}
 }
 
 __PUBLF (NodeTag, void, sens_init) () {
@@ -163,13 +184,20 @@ __PUBLF (NodeTag, word, r_a_d) () {
 
 	if (sens_dump->status == 0 ||
 			sens_dump->status == sens_dump->ee.status) {
-		lbuf = form (NULL, "\r\n%s slot %lu ts %ld: "
-					"PAR: %d, T: %d, H: %d\r\n",
-			statusName (sens_dump->ee.status), sens_dump->ind, 
-			sens_dump->ee.ts,
+		lbuf = form (NULL, "\r\n%s slot %lu %s %u.%u:%u:%u: "
+				"PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n",
+			statusName (sens_dump->ee.status), sens_dump->ind,
+			((mclock_t *)&sens_dump->ee.ts)->hms.f ?
+				"time" : "ts",
+			((mclock_t *)&sens_dump->ee.ts)->hms.d,
+			((mclock_t *)&sens_dump->ee.ts)->hms.h,
+			((mclock_t *)&sens_dump->ee.ts)->hms.m,
+			((mclock_t *)&sens_dump->ee.ts)->hms.s,
 			sens_dump->ee.sval[0],
 			sens_dump->ee.sval[1],
-			sens_dump->ee.sval[2]);
+			sens_dump->ee.sval[2],
+			sens_dump->ee.sval[3],
+			sens_dump->ee.sval[4]);
 
 		if (runstrand (oss_out, lbuf) == 0 ) {
 			app_diag (D_SERIOUS, "oss_out failed");
@@ -218,62 +246,22 @@ ThatsIt:
 
 // Display node stats on UI
 __PUBLF (NodeTag, void, stats) () {
-
-	word faults0, faults1;
-	word mem0 = memfree (0, &faults0);
-	word mem1 = memfree (1, &faults1);
-
-#if TINY_MEM
 	char * mbuf;
-	mbuf = form (NULL, stats_str1, host_id, local_host);
-	if (runstrand (oss_out, mbuf) == 0) {
-		app_diag (D_SERIOUS, "oss_out failed");
-		ufree (mbuf);
-		return;
-	}
+	word mmin;
+	word mem = memfree(0, &mmin);
 
-	mbuf = form (NULL, stats_str2, tarp_ctrl.rcv,
-			tarp_ctrl.snd, tarp_ctrl.fwd);
-	if (runstrand (oss_out, mbuf) == 0) {
-		app_diag (D_SERIOUS, "oss_out failed");
-		ufree (mbuf);
-		return;
-	}
-
-	mbuf = form (NULL, stats_str3, seconds(), pong_params.freq_maj,
-			pong_params.freq_min, pong_params.pow_levels);
-	if (runstrand (oss_out, mbuf) == 0) {
-		app_diag (D_SERIOUS, "oss_out failed");
-		ufree (mbuf);
-		return;
-	}
-
-	mbuf = form (NULL, stats_str4, net_opt (PHYSOPT_PHYSINFO, NULL),
-			net_opt (PHYSOPT_PLUGINFO, NULL),
-			net_opt (PHYSOPT_STATUS, NULL));
-	if (runstrand (oss_out, mbuf) == 0) {
-		app_diag (D_SERIOUS, "oss_out failed");
-		ufree (mbuf);
-		return;
-	}
-
-	mbuf = form (NULL, stats_str5, mem0, mem1, faults0, faults1);
-	if (runstrand (oss_out, mbuf) == 0) {
-		app_diag (D_SERIOUS, "oss_out failed");
-		ufree (mbuf);
-		return;
-	}
-#else
-	app_diag (D_UI, stats_str,
+	mbuf = form (NULL, stats_str,
 			host_id, local_host, 
-			tarp_ctrl.rcv, tarp_ctrl.snd, tarp_ctrl.fwd,
-			seconds(), pong_params.freq_maj, pong_params.freq_min, 
-			pong_params.pow_levels,
-			net_opt (PHYSOPT_PHYSINFO, NULL),
-			net_opt (PHYSOPT_PLUGINFO, NULL),
-			net_opt (PHYSOPT_STATUS, NULL),
-			mem0, mem1, faults0, faults1);
-#endif
+			pong_params.freq_maj, pong_params.freq_min,
+			pong_params.rx_span, pong_params.pow_levels,
+			seconds(),
+			sens_data.eslot == 0 && sens_data.ee.status == SENS_FF ?
+			0 : sens_data.eslot +1,
+			mem, mmin);
+	if (runstrand (oss_out, mbuf) == 0) {
+		app_diag (D_SERIOUS, "oss_out fork");
+		ufree (mbuf);
+	}
 }
 
 __PUBLF (NodeTag, void, process_incoming) (word state, char * buf, word size) {
@@ -282,13 +270,8 @@ __PUBLF (NodeTag, void, process_incoming) (word state, char * buf, word size) {
   
   switch (in_header(buf, msg_type)) {
 
-	case msg_getTag:
-		msg_getTag_in (state, buf);
-		return;
-
 	case msg_setTag:
-		msg_setTag_in (state, buf);
-		stats ();
+		msg_setTag_in (buf);
 		return;
 
 	case msg_rpc:
@@ -306,16 +289,8 @@ __PUBLF (NodeTag, void, process_incoming) (word state, char * buf, word size) {
 		msg_pongAck_in (buf);
 		return;
 
-	case msg_getTagAck:
-	case msg_setTagAck:
-	case msg_pong:
-	case msg_master:
-
-		return;
-
 	default:
-		app_diag (D_INFO, "Got ? (%u)", in_header(buf, msg_type));
-
+		return;
   }
 }
 
@@ -376,6 +351,10 @@ thread (rxsw)
 
 		net_opt (PHYSOPT_RXON, NULL);
 		net_diag (D_DEBUG, "Rx on %x", net_opt (PHYSOPT_STATUS, NULL));
+		if (pong_params.rx_span == 0) {
+			app_diag (D_SERIOUS, "Bad rx span");
+			proceed (RX_OFF);;
+		}
 		delay ( pong_params.rx_span, RX_OFF);
 		release;
 
@@ -436,14 +415,12 @@ thread (pong)
 
 		in_header(png_frame, msg_type) = msg_pong;
 		in_header(png_frame, rcv) = 0;
-		// we do not want pong msg be forwarded by 
+		// we do not want pong msg multihopping
 		in_header(png_frame, hco) = 1;
 
 	entry (PS_NEXT)
 
-		// let's say 1ms is bad -- helps with input, and
-		// doesn't make any sense anyway
-		if (local_host == 0 || pong_params.freq_maj < 2) {
+		if (local_host == 0 || pong_params.freq_maj == 0) {
 			app_diag (D_WARNING, "Pong's suicide");
 			finish;
 		}
@@ -458,6 +435,7 @@ thread (pong)
 			net_diag (D_DEBUG, "Tx on %x",
 					net_opt (PHYSOPT_STATUS, NULL));
 			in_pong (png_frame, level) = level;
+			in_pong (png_frame, freq) = pong_params.freq_maj;
 			in_pong (png_frame, flags) = 0; // reset flags
 
 			// this got complicated: we're at appropriate plev, and
@@ -474,6 +452,9 @@ thread (pong)
 					trigger (RX_SW_ON);
 			
 			}
+
+			if (pong_params.rx_span == 1) // always on
+				in_pong (png_frame, flags) |= PONG_RXPERM;
 
 			w = map_level (level);
 			net_opt (PHYSOPT_SETPOWER, &w);
@@ -544,6 +525,7 @@ thread (pong)
 endthread
 
 thread (sens)
+	mclock_t mc;
 
 	entry (SE_INIT)
 		leds (0, 1);
@@ -568,7 +550,9 @@ thread (sens)
 				sens_data.ee.status = SENS_IN_USE;
 		}
 
-		sens_data.ee.ts = seconds() + ref_time;
+		mc.sec = 0;
+		wall_time (&mc);
+		sens_data.ee.ts = mc.sec;
 #ifdef SENSOR_LIST
 	entry (SE_PAR)
 		read_sensor (SE_PAR, SENSOR_PAR, &sens_data.ee.sval[0]);
@@ -578,6 +562,12 @@ thread (sens)
 
 	entry (SE_HUMID)
 		read_sensor (SE_HUMID, SENSOR_HUMID,  &sens_data.ee.sval[2]);
+
+	entry (SE_PHOTO)
+		read_sensor (SE_PHOTO, SENSOR_PHOTO, &sens_data.ee.sval[3]);
+
+	entry (SE_TEMPA)
+		read_sensor (SE_TEMPA, SENSOR_TEMPA, &sens_data.ee.sval[4]);
 #else
 		app_diag (D_WARNING, "FAKE SENSORS");
 		// sensor 0 PAR
@@ -588,6 +578,12 @@ thread (sens)
 
 		// sensor 2 H
 		sens_data.ee.sval[2]++;
+
+		// sensor 3 PD
+		sens_data.ee.sval[3]++;
+
+		// sensor 4 T2
+		sens_data.ee.sval[4]++;
 
 		delay (SENS_COLL_TIME, SE_DONE);
 		release;
@@ -649,9 +645,7 @@ endthread
 */
 
 thread (root)
-
-	// input (s command)
-	word in_lh, in_pl, in_maj, in_min, in_span;
+	sint i1, i2, i3, i4;
 
 	entry (RS_INIT)
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
@@ -667,12 +661,12 @@ thread (root)
 			proceed (RS_RCMD);
 		}
 
+		ser_out (RS_INIT, welcome_str);
 		init();
 		local_host = (nid_t) host_id;
 		net_id = DEF_NID;
 		master_host = local_host;
 		tarp_ctrl.param &= 0xFE; // routing off
-		ser_out (RS_INIT, welcome_str);
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 		runthread (sens);
 
@@ -726,8 +720,8 @@ thread (root)
 			proceed (RS_FREE);
 
                 if (cmd_line[0] == 'h') {
-			strcpy (ui_obuf, welcome_str);
-			proceed (RS_UIOUT);
+			ser_out (RS_DOCMD, welcome_str);
+			proceed (RS_FREE);
 		}
 
 		if (cmd_line[0] == 'q')
@@ -741,16 +735,31 @@ thread (root)
 				proceed (RS_FREE);
 
 			memset (sens_dump, 0, sizeof(sensEEDumpType));
-			in_lh = 0;
+			i1 = 0;
+			sens_dump->to = sens_data.eslot;
+
 			scan (cmd_line+1, "%lu %lu %u %u",
 					&sens_dump->fr, &sens_dump->to,
-					&in_lh, &sens_dump->upto);
-			sens_dump->status = (byte)in_lh;
-			if (sens_dump->fr > EE_SENS_MAX)
-				sens_dump->fr = 0;
+					&i1, &sens_dump->upto);
+			switch (i1) {
+				case 1:
+					sens_dump->status = SENS_CONFIRMED;
+					break;
+				case 2:
+					sens_dump->status = SENS_COLLECTED;
+					break;
+				case 3:
+					sens_dump->status = SENS_IN_USE;
+					break;
+				default: // including 0
+					sens_dump->status = 0;
+			}
 
-			if (sens_dump->to > EE_SENS_MAX)
-				sens_dump->to = EE_SENS_MAX;
+			if (sens_dump->fr > sens_data.eslot)
+				sens_dump->fr = sens_data.eslot;
+
+			if (sens_dump->to > sens_data.eslot)
+				sens_dump->to = sens_data.eslot; // EE_SENS_MAX
 
 			sens_dump->ind = sens_dump->fr;
 
@@ -779,52 +788,39 @@ thread (root)
 		}
 
 		if (cmd_line[0] == 's') {
-			in_lh = in_pl = in_maj = in_min = in_span = 0;
-			scan (cmd_line+1, "%u %u %u %x %u",
-				&in_lh, &in_maj, &in_min,  &in_pl, &in_span);
-			
-			if (in_lh) {
-				if (local_host == 0) {
-					local_host = in_lh;
-					runthread (pong);
-				} else {
-					local_host = in_lh;
-				}
-			}
+			i1 = i2 = i3 = i4 = -1;
 
-			// we follow max power, but likely rx i pload levels
+			// Maj, min, rx_span, pow_levels
+			scan (cmd_line+1, "%d %d %d %x", &i1, &i2, &i3, &i4);
+			
+			// we follow max power, but likely rx and pload levels
 			// should be independent
-			if (in_pl) {
+			if (i4 >= 0) {
 				if (pong_params.rx_lev != 0) // 'all' stays
-					pong_params.rx_lev = max_pwr(in_pl);
+					pong_params.rx_lev = max_pwr(i4);
 				
 				if (pong_params.pload_lev != 0)
 					pong_params.pload_lev =
 						pong_params.rx_lev;
 				
-				pong_params.pow_levels = in_pl;
+				pong_params.pow_levels = i4;
 			}
 
-			if (in_maj) {
-				
-				if (pong_params.freq_maj < 2) {
-					pong_params.freq_maj = in_maj;
+			if (i1 >= 0) {
+				pong_params.freq_maj = i1;
+				if (pong_params.freq_maj != 0 &&
+						!running (pong))
 					runthread (pong);
-				} else {
-					pong_params.freq_maj = in_maj;
-				}
 			}
 
-			if (in_min)
-				pong_params.freq_min = in_min;
+			if (i2 >= 0)
+				pong_params.freq_min = i2;
 
-			if (in_span && pong_params.rx_span != in_span) {
-				pong_params.rx_span = in_span;
+			if (i3 >= 0 && pong_params.rx_span != i3) {
+				pong_params.rx_span = i3;
 				
-				switch (in_span) {
-					case 2:
-						pong_params.rx_span = 0;
-					// (zero can't be entered) case 0:
+				switch (i3) {
+					case 0:
 						killall (rxsw);
 						net_opt (PHYSOPT_RXOFF, NULL);
 						break;

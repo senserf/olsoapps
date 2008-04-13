@@ -15,13 +15,13 @@
 #define lh_time		_dac (NodeTag, lh_time)
 #define ref_time	_dac (NodeTag, ref_time)
 #define sens_dump	_dac (NodeTag, sens_dump)
+#define ref_clock	_dac (NodeTag, ref_clock)
 
 // Methods
 #define	stats			_dac (NodeTag, stats)
 #define	app_diag		_dac (NodeTag, app_diag)
 #define	net_diag		_dac (NodeTag, net_diag)
 #define	get_mem			_dac (NodeTag, get_mem)
-#define	set_tag			_dac (NodeTag, set_tag)
 #define	msg_getTag_in		_dac (NodeTag, msg_getTag_in)
 #define	msg_setTag_in		_dac (NodeTag, msg_setTag_in)
 #define	msg_getTagAck_out	_dac (NodeTag, msg_getTagAck_out)
@@ -34,6 +34,8 @@
 #define sens_init		_dac (NodeTag, sens_init)
 #define init			_dac (NodeTag, init)
 #define r_a_d			_dac (NodeTag, r_a_d)
+#define wall_time		_dac (NodeTag, wall_time)
+#define tmpcrap			_dac (NodeTag, tmpcrap)
 
 #else	/* PICOS */
 

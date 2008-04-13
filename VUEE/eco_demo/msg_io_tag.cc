@@ -23,7 +23,11 @@
 __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
 	byte b;
 
-	ref_time = in_pongAck(buf, ref_t) - seconds();
+	if (in_pongAck(buf, reftime) != 0) {
+		ref_clock.sec = in_pongAck(buf, reftime);
+		ref_time = seconds();
+	}
+
 	if (sens_data.ee.status = SENS_COLLECTED &&
 			sens_data.ee.ts == in_pongAck(buf, ts)) {
 		leds (0, 0);
@@ -42,65 +46,76 @@ __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
 				in_header(buf, snd));
 }
 
-__PUBLF (NodeTag, void, msg_getTag_in) (word state, char * buf) {
-	char * out_buf = NULL;
+__PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
+	word mmin, mem;
+	char * out_buf = get_mem (WNONE, sizeof(msgStatsTagType));
 
-	msg_getTagAck_out (state, &out_buf, in_header(buf, snd),
-			in_header(buf, seq_no));
+	if (out_buf == NULL)
+		return;
 
-	net_opt (PHYSOPT_TXON, NULL);
-	send_msg (out_buf, sizeof(msgGetTagAckType));
-	net_opt (PHYSOPT_TXOFF, NULL);
-	ufree (out_buf);
-}
+	if (in_setTag(buf, pow_levels) != 0xFFFF) {
+		if (pong_params.rx_lev != 0) // 'all' stays
+			pong_params.rx_lev =
+				max_pwr(in_setTag(buf, pow_levels));
 
-__PUBLF (NodeTag, void, msg_getTagAck_out) (word state, char** out_buf,
-					nid_t rcv, seq_t seq) {
+		if (pong_params.pload_lev != 0)
+			pong_params.pload_lev = pong_params.rx_lev;
 
-	if (*out_buf == NULL)
-		*out_buf = get_mem (state, sizeof(msgGetTagAckType));
+		pong_params.pow_levels = in_setTag(buf, pow_levels);
+	}
+
+	if (in_setTag(buf, freq_maj) != 0xFFFF) {
+		pong_params.freq_maj = in_setTag(buf, freq_maj);
+		if (pong_params.freq_maj != 0)
+			tmpcrap (1);
+	}
+
+	if (in_setTag(buf, freq_min) != 0xFFFF)
+		pong_params.freq_min = in_setTag(buf, freq_min);
+
+	if (in_setTag(buf, rx_span) != 0xFFFF &&
+			pong_params.rx_span != in_setTag(buf, rx_span)) {
+
+		pong_params.rx_span = in_setTag(buf, rx_span);
+
+		switch (in_setTag(buf, rx_span)) {
+			case 0:
+				tmpcrap (2); //killall (rxsw);
+				net_opt (PHYSOPT_RXOFF, NULL);
+				break;
+			case 1:
+				tmpcrap (2); //killall (rxsw);
+				net_opt (PHYSOPT_RXON, NULL);
+				break;
+			default:
+				tmpcrap (0);
+		}
+	}
+
+	mem = memfree (0, &mmin);
+	in_header(out_buf, hco) = 1; // no mhopping
+	in_header(out_buf, msg_type) = msg_statsTag;
+	in_header(out_buf, rcv) = in_header(buf, snd);
+	in_statsTag(out_buf, hostid) = host_id;
+	in_statsTag(out_buf, ltime) = seconds();
+
+	// in_statsTag(out_buf, slot) is really # of entries
+	if (sens_data.eslot == 0 && sens_data.ee.status == SENS_FF)
+		in_statsTag(out_buf, slot) = 0;
 	else
-		memset (*out_buf, 0, sizeof(msgGetTagAckType));
+		in_statsTag(out_buf, slot) = sens_data.eslot +1;
 
-	in_header(*out_buf, msg_type) = msg_getTagAck;
-	in_header(*out_buf, rcv) = rcv;
+	in_statsTag(out_buf, maj) = pong_params.freq_maj;
+	in_statsTag(out_buf, min) = pong_params.freq_min;
+	in_statsTag(out_buf, span) = pong_params.rx_span;
+	in_statsTag(out_buf, pl) = pong_params.pow_levels;
+	in_statsTag(out_buf, mem) = mem;
+	in_statsTag(out_buf, mmin) = mmin;
 
-	in_getTagAck(*out_buf, ackSeq) = seq;
-	in_getTagAck(*out_buf, ltime) = seconds();
-	in_getTagAck(*out_buf, host_ident) = host_id;
-	in_getTagAck(*out_buf, tag) = local_host;
-
-	in_getTagAck(*out_buf, pow_levels) = pong_params.pow_levels;
-	in_getTagAck(*out_buf, freq_maj) = pong_params.freq_maj;
-	in_getTagAck(*out_buf, freq_min) = pong_params.freq_min;
-	in_getTagAck(*out_buf, rx_span) = pong_params.rx_span;
-	in_getTagAck(*out_buf, spare) = 0xff;
-}
-
-__PUBLF (NodeTag, void, msg_setTag_in) (word state, char * buf) {
-	char * out_buf = NULL;
-
-	msg_setTagAck_out (state, &out_buf, in_header(buf, snd),
-			in_header(buf, seq_no));
+	// should be SETPOWER here... FIXME?
     	net_opt (PHYSOPT_TXON, NULL);
-	send_msg (out_buf, sizeof(msgSetTagAckType));
+	send_msg (out_buf, sizeof(msgStatsTagType));
 	net_opt (PHYSOPT_TXOFF, NULL);
 	ufree (out_buf);
-
-	set_tag (buf);
 }
 
-__PUBLF (NodeTag, void, msg_setTagAck_out) (word state, char** out_buf,
-					nid_t rcv, seq_t seq) {
-
-	if (*out_buf == NULL)
-		*out_buf = get_mem (state, sizeof(msgSetTagAckType));
-	else
-		memset (*out_buf, 0, sizeof(msgSetTagAckType));
-
-	in_header(*out_buf, msg_type) = msg_setTagAck;
-	in_header(*out_buf, rcv) = rcv;
-	in_setTagAck(*out_buf, tag) = local_host;
-	in_setTagAck(*out_buf, ackSeq) = seq;
-	in_setTagAck(*out_buf, ack) = 1; // used to be 0, 1, 2, from check_pass
-}

@@ -16,6 +16,7 @@
 
 #include "net.h"
 #include "tarp.h"
+#include "form.h"
 
 #endif	/* SMURPH or PICOS */
 
@@ -55,35 +56,71 @@ __PUBLF (NodePeg, void, set_master_chg) () {
 
 // ============================================================================
 
+// IN: mc->sec: # of s. from NOW, can't go back before T == 0.0:0:0
+//     mc->hms.f == 1 <=> go back in time mc->sec seconds
+// OUT: *mc: wall time with the input offset (usually 0)
+
+__PUBLF (NodePeg, void, wall_time) (mclock_t *mc) {
+	word w1, w2, w3, w4;
+
+	lword lw = seconds() - master_delta +
+		24L * 3600 * master_clock.hms.d +
+		3600L * master_clock.hms.h +
+		60 * master_clock.hms.m + master_clock.hms.s;
+
+	if (mc->hms.f &&  (mc->sec & 0x7FFFFFFF) > lw) {
+		app_diag (D_SERIOUS, "Ignoring bad offset %u",
+				(word)mc->sec);
+		mc->sec = 0;
+	}
+
+	if (mc->hms.f)
+		lw -= mc->sec;
+	else
+		lw += mc->sec;
+	mc->sec = 0;
+
+	w1 = lw / (24L * 3600);
+	lw %= 24L * 3600;
+	w2 = lw / 3600;
+	lw %= 3600;
+	w3 = lw / 60;
+	w4 = lw % 60;
+
+	if (w4 >= 60) {
+		w4 -= 60;
+		w3++;
+	}
+	if (w3 >= 60) {
+		w3 -= 60;
+		w2++;
+	}
+	if (w2 >= 24) {
+		 w2 -= 24;
+		 w1++;
+	}
+	mc->hms.d = w1; mc->hms.h = w2; mc->hms.m = w3; mc->hms.s = w4;
+	mc->hms.f = master_clock.hms.f;
+}
+
 /*
    what == 0: find and return the index;
    what == 1: count
 */
-__PUBLF (NodePeg, int, find_tags) (lword tag, word what) {
+__PUBLF (NodePeg, int, find_tags) (word tag, word what) {
 	int i = 0;
 	int count = 0;
-	lword mask = 0xffffffff;
-	
-	if (!(tag & 0xff000000))  // rss irrelevant
-		mask &= 0x00ffffff;
-
-	if (!(tag & 0x00ff0000)) // power level 
-		mask &= 0xff00ffff;
-
-	if (!(tag & 0x0000ffff)) // first or all tags
-		mask &= 0xffff0000;
 
 	while (i < tag_lim) {
-		if ((word) tag == 0) { // any tag counts
-			if (tagArray[i].id != 0 &&
-					(tagArray[i].id & mask) == tag) {
+		if (tag == 0) { // any tag counts
+			if (tagArray[i].id != 0) {
 				if (what == 0)
 					return i;
 				else 
 					count ++;
 			}
 		} else {
-			if ((tagArray[i].id & mask) == tag) {
+			if (tagArray[i].id == tag) {
 				if (what == 0)
 					return i;
 				else
@@ -111,7 +148,11 @@ __PUBLF (NodePeg, char*, get_mem) (word state, int len) {
 
 __PUBLF (NodePeg, void, init_tag) (word i) {
 	tagArray[i].id = 0;
+	tagArray[i].rssi = 0;
+	tagArray[i].pl = 0;
+	tagArray[i].rxperm = 0;
 	tagArray[i].state = noTag;
+	tagArray[i].freq = 0;
 	tagArray[i].count = 0;
 	tagArray[i].evTime = 0;
 	tagArray[i].lastTime = 0;
@@ -133,7 +174,7 @@ __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
 		tagArray[i].evTime = tagArray[i].lastTime;
 }
 
-__PUBLF (NodePeg, int, insert_tag) (lword tag) {
+__PUBLF (NodePeg, int, insert_tag) (word tag) {
 
 	int i = 0;
 
@@ -161,7 +202,7 @@ __PUBLF (NodePeg, void, check_tag) (word state, word i, char** buf_out) {
 	}
 	
 	if (tagArray[i].id == 0 ||
-		seconds() - tagArray[i].lastTime < tag_eventGran)
+		seconds() - tagArray[i].lastTime < tag_auditFreq)
 		return;	
 
 	switch (tagArray[i].state) {
@@ -171,15 +212,13 @@ this is for mobile tags, to cut off flickering ones
 			app_diag (D_DEBUG, "Delete %lx", tagArray[i].id);
 			init_tag (i);
 #endif
-			app_diag (D_DEBUG, "Rep new %x %u",
-				(word)(tagArray[i].id >> 16),
+			app_diag (D_DEBUG, "Rep new %u",
 				(word)tagArray[i].id);
 			set_tagState (i, reportedTag, NO);
 			break;
 
 		case goneTag:
-			app_diag (D_DEBUG, "Rep gone %x %u",
-				(word)(tagArray[i].id >> 16),
+			app_diag (D_DEBUG, "Rep gone %u",
 				(word)tagArray[i].id);
 			msg_report_out (state, i, buf_out, REP_FLAG_PLOAD);
 			break;
@@ -190,17 +229,17 @@ this is for mobile tags, to cut off flickering ones
 				tagArray[i].id);
 			set_tagState (i, fadingReportedTag, NO);
 #endif
-			app_diag (D_DEBUG, "Re rep %x %u",
-				(word)(tagArray[i].id >> 16),
+			app_diag (D_DEBUG, "Re rep %u",
 				(word)tagArray[i].id);
 			msg_report_out (state, i, buf_out, REP_FLAG_PLOAD);
 			break;
 
 		case confirmedTag:
-			if (seconds() - tagArray[i].lastTime > ALRM_SILENCE) {
+			// missed 2 beats
+			if (seconds() - tagArray[i].lastTime >
+					((lword)tagArray[i].freq << 1)) {
 
-				app_diag (D_DEBUG, "Rep going %x %u",
-					(word)(tagArray[i].id >> 16),
+				app_diag (D_DEBUG, "Rep going %u",
 					(word)tagArray[i].id);
 				set_tagState (i, goneTag, YES);
 				msg_report_out (state, i, buf_out, 
@@ -234,8 +273,7 @@ this is for mobile tags, to cut off flickering ones
 			break;
 #endif
 		default:
-			app_diag (D_SERIOUS, "Tag? State? %x %u in %u",
-				(word)(tagArray[i].id >> 16),
+			app_diag (D_SERIOUS, "Tag? State? %u in %u",
 				(word)tagArray[i].id, tagArray[i].state);
 	}
 }
@@ -309,16 +347,6 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 				return 0;
 			break;
 
-		case msg_getTagAck:
-			if ((expSize = sizeof(msgGetTagAckType)) == size)
-				 return 0;
-			break;
-
-		case msg_setTagAck:
-			if ((expSize = sizeof(msgSetTagAckType)) == size)
-				return 0;
-			break;
-
 		case msg_findTag:
 			if ((expSize = sizeof(msgFindTagType)) == size)
 				return 0;
@@ -328,6 +356,21 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 		case msg_fwd:
 		case msg_rpc:
 			return 0;
+
+		case msg_setPeg:
+			if ((expSize = sizeof(msgSetPegType)) == size)
+				return 0;
+			break;
+
+		case msg_statsPeg:
+			if ((expSize = sizeof(msgStatsPegType)) == size)
+				return 0;
+			break;
+
+		 case msg_statsTag:
+			if ((expSize = sizeof(msgStatsTagType)) == size)
+				return 0;
+			break;
 
 		default:
 			app_diag (repLevel, "Can't check size of %u (%d)",
@@ -345,7 +388,7 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 }
 
 __PUBLF (NodePeg, void, write_agg) (char * buf) {
-	// queueing? unlikely...
+	mclock_t mc;
 
 	if (agg_data.ee.status != AGG_FF)
 		agg_data.eslot++;
@@ -361,7 +404,11 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 	agg_data.ee.sval[0] = in_pongPload(buf, sval[0]);
 	agg_data.ee.sval[1] = in_pongPload(buf, sval[1]);
 	agg_data.ee.sval[2] = in_pongPload(buf, sval[2]);
-	agg_data.ee.ts = seconds() + master_delta;
+	agg_data.ee.sval[3] = in_pongPload(buf, sval[3]);
+	agg_data.ee.sval[4] = in_pongPload(buf, sval[4]);
+	mc.sec = 0;
+	wall_time (&mc);
+	agg_data.ee.ts = mc.sec;
 	agg_data.ee.t_ts = in_pongPload(buf, ts);
 	agg_data.ee.t_eslot = in_pongPload(buf, eslot);
 	agg_data.ee.tag = in_header(buf, snd);
@@ -383,22 +430,27 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 */
 
 __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
-//	diag ("check msg");
+	mclock_t mc;
+
 	if (in_pong_pload(buf)) {
 		pong_ack.header.rcv = in_header(buf, snd);
 		pong_ack.header.hco = in_header(buf, hoc);
 		pong_ack.ts = in_pongPload(buf, ts);
-		// master's curr time
-		pong_ack.ref_t = master_delta + seconds();
+
+		if (master_delta == 0) { // do NOT send down your own clock
+			pong_ack.reftime = 0;
+		} else {
+			mc.sec = 0;
+			wall_time (&mc);
+			pong_ack.reftime = mc.sec;
+		}
 		
 		send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
 	}
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) ==
 		       in_header(buf, snd)) {
 		if (seconds() - msg4tag.tstamp <= 77) // do it
-			send_msg (msg4tag.buf,
-				in_header(msg4tag.buf, msg_type) == msg_getTag ?
-				sizeof(msgGetTagType) : sizeof(msgSetTagType));
+			send_msg (msg4tag.buf, sizeof(msgSetTagType));
 		ufree (msg4tag.buf);
 		msg4tag.buf = NULL;
 		msg4tag.tstamp = 0;
@@ -428,12 +480,14 @@ __PUBLF (NodePeg, word, r_a_d) () {
 	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag) {
 		lbuf = form (NULL, "\r\nCol %u slot %lu (A: %lu), "
 				"ts: %ld (A; %ld)\r\n"
-				" PAR: %d, T: %d, H: %d\r\n",
+				" PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n",
 			agg_dump->ee.tag, agg_dump->ee.t_eslot, agg_dump->slot,
 		       	agg_dump->ee.t_ts, agg_dump->ee.ts,
 			agg_dump->ee.sval[0],
 		       	agg_dump->ee.sval[1],
-		       	agg_dump->ee.sval[2]);
+		       	agg_dump->ee.sval[2],
+			agg_dump->ee.sval[3],
+			agg_dump->ee.sval[4]);
 		if (runstrand (oss_out, lbuf) == 0 ) {
 			app_diag (D_SERIOUS, "oss_out failed");
 			ufree (lbuf);
