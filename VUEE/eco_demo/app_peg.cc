@@ -376,6 +376,7 @@ thread (cmd_in)
 
 endthread
 
+#if 0
 static char * stateName (unsigned state) {
 	switch ((tagStateType)state) {
 		case noTag:
@@ -416,6 +417,7 @@ static char * locatName (word id, word rssi) {
 	return "rssi?";
 	// should be more... likely a number with  distance?
 }
+#endif
 
 __PUBLF (NodePeg, void, oss_report_out) (char * buf, word fmt) {
 

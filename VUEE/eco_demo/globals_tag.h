@@ -28,7 +28,8 @@ char * ui_ibuf 	= NULL;
 char * ui_obuf 	= NULL;
 char * cmd_line	= NULL;
 
-const   lword	host_id		= 0xBACA0065;
+extern const lword host_id;
+//+++ "hostid.c"
 
 word		app_flags	= 0;
 
