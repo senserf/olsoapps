@@ -158,7 +158,7 @@ static const char * statusName (word s) {
 		case SENS_FF: 		return "FFED";
 		case 0: 		return "ALL";
 	}
-	app_diag (D_SERIOUS, "ffed %x", s);
+	app_diag (D_SERIOUS, "unexpected eeprom %x", s);
 	return				"really ffed";
 }
 
@@ -184,8 +184,7 @@ __PUBLF (NodeTag, word, r_a_d) () {
 
 	if (sens_dump->status == 0 ||
 			sens_dump->status == sens_dump->ee.status) {
-		lbuf = form (NULL, "\r\n%s slot %lu %s %u.%u:%u:%u: "
-				"PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n",
+		lbuf = form (NULL, dump_str,
 			statusName (sens_dump->ee.status), sens_dump->ind,
 			((mclock_t *)&sens_dump->ee.ts)->hms.f ?
 				"time" : "ts",
@@ -231,8 +230,7 @@ Finish:
 
 ThatsIt:
 	sens_dump->dfin = 0; // just in case
-	lbuf = form (NULL, "Collector %u direct dump: slots %lu -> %lu "
-			"status %s upto %u #%lu\r\n",
+	lbuf = form (NULL, dumpend_str,
 			local_host, sens_dump->fr, sens_dump->to,
 			statusName (sens_dump->status), 
 			sens_dump->upto, sens_dump->cnt);
@@ -253,7 +251,7 @@ __PUBLF (NodeTag, void, stats) () {
 	mbuf = form (NULL, stats_str,
 			host_id, local_host, 
 			pong_params.freq_maj, pong_params.freq_min,
-			pong_params.rx_span, pong_params.pow_levels,
+			pong_params.rx_span, pong_params.pow_levels & 0x0F,
 			seconds(),
 			sens_data.eslot == 0 && sens_data.ee.status == SENS_FF ?
 			0 : sens_data.eslot +1,
@@ -649,8 +647,8 @@ thread (root)
 
 	entry (RS_INIT)
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
-			app_diag (D_UI, "Error mode (D, E, F, Q)\r\n"
-				"%x %u %u %u",
+			diag (OPRE_APP_MENU_C "Error mode (D, E, F, Q)"
+				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
 				if_read (IFLASH_SIZE -3),
@@ -768,21 +766,21 @@ thread (root)
 
 		if (cmd_line[0] == 'E') { 
 			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_UI, "ee_erase failed");
+				app_diag (D_SERIOUS, "ee_erase failed");
 			else
-				app_diag (D_UI, "eprom erased");
+				diag (OPRE_APP_ACK "eprom erased");
 			reset();
 		}
 
 		if (cmd_line[0] == 'F') {
 			if_erase (-1);
-			app_diag (D_UI, "flash erased");
+			diag (OPRE_APP_ACK "flash erased");
 			reset();
 		}
 
 		if (cmd_line[0] == 'Q') {
 			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_UI, "ee_erase failed");
+				app_diag (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
 			reset();
 		}
@@ -790,12 +788,16 @@ thread (root)
 		if (cmd_line[0] == 's') {
 			i1 = i2 = i3 = i4 = -1;
 
-			// Maj, min, rx_span, pow_levels
-			scan (cmd_line+1, "%d %d %d %x", &i1, &i2, &i3, &i4);
+			// Maj, min, rx_span, pow_level
+			scan (cmd_line+1, "%d %d %d %d", &i1, &i2, &i3, &i4);
 			
 			// we follow max power, but likely rx and pload levels
 			// should be independent
 			if (i4 >= 0) {
+				if (i4 > 7)
+					i4 = 7;
+				i4 |= (i4 << 4) | (i4 << 8) | (i4 << 12);
+
 				if (pong_params.rx_lev != 0) // 'all' stays
 					pong_params.rx_lev = max_pwr(i4);
 				

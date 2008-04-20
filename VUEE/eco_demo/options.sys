@@ -75,3 +75,6 @@
 #define RADIO_USE_LEDS 6
 
 #define INFO_FLASH	1
+
+//#define OSS_FMT	FMT_TERM
+

@@ -11,6 +11,7 @@
 #include "diag.h"
 #include "app_peg.h"
 #include "msg_peg.h"
+#include "oss_fmt.h"
 
 #ifdef	__SMURPH__
 
@@ -124,7 +125,7 @@ __PUBLF (NodePeg, void, msg_findTag_in) (word state, char * buf) {
 	if (out_buf) {
 		if (local_host == master_host) {
 			in_header(out_buf, snd) = local_host;
-			oss_report_out (out_buf, oss_fmt);
+			oss_report_out (out_buf);
 		} else
 			send_msg (out_buf,
 				in_report_pload(out_buf) ?
@@ -248,7 +249,7 @@ __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
 		clr_master_chg;
 		if (running (mbeacon))
 			killall (mbeacon);
-		app_diag (D_INFO, "Set master to %u at %ld", master_host,
+		diag (OPRE_APP_ACK "Set master to %u at %ld", master_host,
 			master_delta);
 	}
 }
@@ -374,7 +375,7 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 		if (local_host == master_host) {
 			// master with tags - hack the sender
 			in_header(out_buf, snd) = local_host;
-			oss_report_out (out_buf, oss_fmt);
+			oss_report_out (out_buf);
 		} else
 			send_msg (out_buf,
 			in_report_pload(out_buf) ?
@@ -399,7 +400,7 @@ __PUBLF (NodePeg, void, msg_report_in) (word state, char * buf) {
 			app_diag (D_SERIOUS, "ack not sent");
 		}
 	}
-	oss_report_out (buf, oss_fmt);
+	oss_report_out (buf);
 
 	// master stacking came free
 	if (master_host != local_host) {

@@ -54,14 +54,19 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 		return;
 
 	if (in_setTag(buf, pow_levels) != 0xFFFF) {
+		mmin = in_setTag(buf, pow_levels);
+		if (mmin > 7)
+			mmin = 7;
+		mmin |= (mmin << 4) | (mmin << 8) | (mmin << 12);
+
 		if (pong_params.rx_lev != 0) // 'all' stays
 			pong_params.rx_lev =
-				max_pwr(in_setTag(buf, pow_levels));
+				max_pwr(mmin);
 
 		if (pong_params.pload_lev != 0)
 			pong_params.pload_lev = pong_params.rx_lev;
 
-		pong_params.pow_levels = in_setTag(buf, pow_levels);
+		pong_params.pow_levels = mmin;
 	}
 
 	if (in_setTag(buf, freq_maj) != 0xFFFF) {

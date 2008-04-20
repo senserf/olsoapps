@@ -457,67 +457,6 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 	}
 }
 
-#if 0
-
-jebane lokalne globale FIXME
-
-__PUBLF (NodePeg, word, r_a_d) () {
-	char * lbuf = NULL;
-
-	if (ee_read (agg_dump->ind * EE_AGG_SIZE, (byte *)&agg_dump->ee,
-			EE_AGG_SIZE)) {
-		app_diag (D_SERIOUS, "Failed ee_read");
-		goto Finish;
-	}
-
-	if (ee.status == 0xFF)
-		if (agg_dump->fr <= agg_dump.to) {
-			goto Finish;
-		} else {
-			goto Continue;
-		}
-
-	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag) {
-		lbuf = form (NULL, "\r\nCol %u slot %lu (A: %lu), "
-				"ts: %ld (A; %ld)\r\n"
-				" PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n",
-			agg_dump->ee.tag, agg_dump->ee.t_eslot, agg_dump->slot,
-		       	agg_dump->ee.t_ts, agg_dump->ee.ts,
-			agg_dump->ee.sval[0],
-		       	agg_dump->ee.sval[1],
-		       	agg_dump->ee.sval[2],
-			agg_dump->ee.sval[3],
-			agg_dump->ee.sval[4]);
-		if (runstrand (oss_out, lbuf) == 0 ) {
-			app_diag (D_SERIOUS, "oss_out failed");
-			ufree (lbuf);
-		}
-		agg_dump->cnt++;
-		if (agg_dump->upto != 0 && agg_dump->upto <= agg_dump->cnt)
-			goto Finish;
-	}
-
-Continue:
-	if (agg_dump->fr <= agg_dump->to) {
-		if (agg_dump->ind >= agg_dump->to)
-			goto Finish;
-		else
-			agg_dump->ind++;
-	}
-	return 1;
-
-Finish:
-	lbuf = form (NULL, "Dump data: Col %u,fr %lu to %lu up to %u #%lu",
-			agg_dump->tag, agg_dump->fr, agg_dump->to,
-			agg_dump->upto, agg_dump->cnt);
-	if (runstrand (oss_out, lbuf) == 0 ) {
-		app_diag (D_SERIOUS, "oss_out sum failed");
-		ufree (lbuf);
-	}
-	return 0;
-}
-#endif
-
 __PUBLF (NodePeg, void, agg_init) () {
 	lword l, u, m;
 	byte b;

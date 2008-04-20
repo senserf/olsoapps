@@ -88,7 +88,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			in_statsTag(buf, hostid),
 			(word)in_statsTag(buf, hostid), in_header(buf, snd),
 			in_statsTag(buf, maj), in_statsTag(buf, min),
-			in_statsTag(buf, span), in_statsTag(buf, pl),
+			in_statsTag(buf, span), in_statsTag(buf, pl) & 0x0F,
 			in_statsTag(buf, ltime), in_statsTag(buf, slot),
 			in_statsTag(buf, mem), in_statsTag(buf, mmin));
 		break;
@@ -310,7 +310,7 @@ thread (audit)
 		if (aud_buf_ptr) {
 			if (local_host == master_host) {
 				in_header(aud_buf_ptr, snd) = local_host;
-				oss_report_out (aud_buf_ptr, oss_fmt);
+				oss_report_out (aud_buf_ptr);
 			} else
 				send_msg (aud_buf_ptr,
 					in_report_pload(aud_buf_ptr) ?
@@ -419,79 +419,61 @@ static char * locatName (word id, word rssi) {
 }
 #endif
 
-__PUBLF (NodePeg, void, oss_report_out) (char * buf, word fmt) {
+__PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 
-	char * lbuf = NULL;
+  char * lbuf = NULL;
 
-	switch (fmt) {
+  if (in_report_pload(buf)) {
 
-		case OSS_ECODEMO:
+	lbuf = form (NULL, rep_str,
 
-		    if (in_report_pload(buf)) {
+		in_header(buf, snd),
+		in_reportPload(buf, eslot),
 
-		      lbuf = form (NULL,
-			"\r\n"	
-			"  Agg %u slot: %lu, %s: %u.%u:%u:%u\r\n"
-			"  Col %u slot: %lu, %s: %u.%u:%u:%u%s\r\n"
-			"  PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n",
-			
-			in_header(buf, snd),
-			in_reportPload(buf, eslot),
+		((mclock_t *)&in_reportPload(buf, ts))->hms.f ?
+			"time" : "ts",
+		((mclock_t *)&in_reportPload(buf, ts))->hms.d,
+		((mclock_t *)&in_reportPload(buf, ts))->hms.h,
+		((mclock_t *)&in_reportPload(buf, ts))->hms.m,
+		((mclock_t *)&in_reportPload(buf, ts))->hms.s,
 
-			((mclock_t *)&in_reportPload(buf, ts))->hms.f ?
-				"time" : "ts",
-			((mclock_t *)&in_reportPload(buf, ts))->hms.d,
-			((mclock_t *)&in_reportPload(buf, ts))->hms.h,
-			((mclock_t *)&in_reportPload(buf, ts))->hms.m,
-			((mclock_t *)&in_reportPload(buf, ts))->hms.s,
+		in_report(buf, tagid),
+		in_reportPload(buf, ppload.eslot),
 
-			in_report(buf, tagid),
-			in_reportPload(buf, ppload.eslot),
+		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.f ?
+			"time" : "ts",
+		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.d,
+		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.h,
+		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.m,
+		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.s,
 
-			((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.f ?
-				"time" : "ts",
-			((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.d,
-			((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.h,
-			((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.m,
-			((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.s,
+		in_report(buf, state) == goneTag ?
+			" ***gone***" : " ",
 
-			in_report(buf, state) == goneTag ?
-				" ***gone***" : " ",
+		in_reportPload(buf, ppload.sval[0]),
+		in_reportPload(buf, ppload.sval[1]),
+		in_reportPload(buf, ppload.sval[2]),
+		in_reportPload(buf, ppload.sval[3]),
+		in_reportPload(buf, ppload.sval[4])); // eoform
 
-			in_reportPload(buf, ppload.sval[0]),
-			in_reportPload(buf, ppload.sval[1]),
-			in_reportPload(buf, ppload.sval[2]),
-			in_reportPload(buf, ppload.sval[3]),
-			in_reportPload(buf, ppload.sval[4])); // eoform
+    } else if (in_report(buf, state) == sumTag) {
+		lbuf = form (NULL, repSum_str,
+			in_header(buf, snd), in_report(buf, count));
 
-		    } else if (in_report(buf, state) == sumTag) {
-			lbuf = form (NULL, "Agg %u handles "
-					"%u collectors\r\n",
-				in_header(buf, snd),
-				in_report(buf, count));
+    } else if (in_report(buf, state) == noTag) {
+		lbuf = form (NULL, repNo_str,
+			in_report(buf, tagid), in_header(buf, snd));
 
-		    } else if (in_report(buf, state) == noTag) {
-			lbuf = form (NULL, "No Col %u at Agg %u\r\n",
-				in_report(buf, tagid),
-				in_header(buf, snd));
+    } else {
+		app_diag (D_WARNING, "%sReport? %u %u %u", OPRE_DIAG,
+			in_header(buf, snd), in_report(buf, tagid),
+			in_report(buf, state));
+    }
 
-		    } else
-			    app_diag (D_WARNING, "Report? %u %u %u",
-				in_header(buf, snd),
-				in_report(buf, tagid),
-				in_report(buf, state));
-
-			break;
-
-		default:
-			app_diag (D_SERIOUS, "**Unsupported fmt %u", fmt);
-			return;
-
-	}
-	if (runstrand (oss_out, lbuf) == 0 ) {
-		app_diag (D_SERIOUS, "oss_out failed");
-		ufree (lbuf);
-	}
+    if (runstrand (oss_out, lbuf) == 0 ) {
+	app_diag (D_SERIOUS, "oss_out failed");
+	ufree (lbuf);
+    }
 }
 
 __PUBLF (NodePeg, word, r_a_d) () {
@@ -515,9 +497,7 @@ __PUBLF (NodePeg, word, r_a_d) () {
 	}
 
 	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag) {
-		lbuf = form (NULL, "\r\nCol %u slot %lu (A: %lu) "
-				"%s: %u.%u:%u:%u (A %s: %u.%u:%u:%u)\r\n"
-				" PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n",
+		lbuf = form (NULL, dump_str,
 
 			agg_dump->ee.tag, agg_dump->ee.t_eslot, agg_dump->ind,
 
@@ -571,8 +551,7 @@ Finish:
 
 ThatsIt:
 	agg_dump->dfin = 0; // just in case
-	lbuf = form (NULL, "Did coll %u slots %lu -> %lu "
-			"upto %u #%lu\r\n",
+	lbuf = form (NULL, dumpend_str,
 			agg_dump->tag, agg_dump->fr, agg_dump->to,
 			agg_dump->upto, agg_dump->cnt);
 
@@ -614,7 +593,7 @@ __PUBLF (NodePeg, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
 		in_header(out_buf, snd) = local_host;
 		// don't report bulk missing (but do summary)
 		if ((word)tag == 0 || peg != 0 || tagIndex >= 0)
-			oss_report_out (out_buf, oss_fmt);
+			oss_report_out (out_buf);
 
 	}
 
@@ -651,11 +630,13 @@ __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 	char * set_buf = NULL;
 	int size = sizeof(msgFwdType) + sizeof(msgSetTagType);
 
+#if 0
+       	already checked
 	if (peg == 0 || tag == 0) {
 		app_diag (D_WARNING, "set: no zeroes");
 		return;
 	}
-
+#endif
 	// alloc and prepare msg fwd
 	msg_fwd_out (state, &out_buf, size, tag, peg);
 	// get offset for payload - setTag msg
@@ -705,8 +686,8 @@ thread (root)
 
 	entry (RS_INIT)
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
-			app_diag (D_UI, "Error mode (D, E, F, Q)\r\n"
-				"%x %u %u %u",
+			diag (OPRE_APP_MENU_A "Error mode (D, E, F, Q)"
+				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
 				if_read (IFLASH_SIZE -3),
@@ -765,7 +746,7 @@ thread (root)
 		if (master_host != local_host &&
 				(cmd_line[0] == 'T' || cmd_line[0] == 'c' ||
 				 cmd_line[0] == 'f')) {
-			app_diag (D_UI, "Only at the Master");
+			diag (OPRE_APP_ILL "Only at the Master");
 			proceed (RS_FREE);
 		}
 
@@ -836,25 +817,32 @@ thread (root)
 
 		case 'E':
 			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_UI, "ee_erase failed");
+				app_diag (D_SERIOUS, "ee_erase failed");
 			else
-				app_diag (D_UI, "eprom erased");
+				diag (OPRE_APP_ACK "eprom erased");
 			reset();
 
 		case 'F':
 			if_erase (-1);
-			app_diag (D_UI, "flash erased");
+			diag (OPRE_APP_ACK "flash erased");
 			reset();
 
 		case 'Q':
 			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_UI, "ee_erase failed");
+				app_diag (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
 			reset();
 
 		case 'm':
 			 i1 = 0;
 			 scan (cmd_line+1, "%u", &i1);
+			 
+			 if (i1 != local_host && (local_host == master_host ||
+					 i1 != 0))
+				 diag (OPRE_APP_ACK "Sent Master beacon");
+			 else if (local_host != master_host)
+				 diag (OPRE_APP_ACK "Became Master");
+
 			 oss_master_in (RS_DOCMD, i1);
 			 proceed (RS_FREE);
 
@@ -867,8 +855,8 @@ thread (root)
 		case 'c':
 			i1 = i2 = i3 = i4 = i5 = i6 = -1;
 			
-			// tag peg fM fm span pl_vec
-			scan (cmd_line+1, "%d %d %d %d %d %x",
+			// tag peg fM fm span pl
+			scan (cmd_line+1, "%d %d %d %d %d %d",
 				&i1, &i2, &i3, &i4, &i5, &i6);
 			
 			if (i1 <= 0 || i3 < -1 || i4 < -1 || i5 < -1) {

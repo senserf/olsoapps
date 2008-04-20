@@ -102,17 +102,8 @@ typedef struct aggDataStruct {
 	lword eslot;
 } aggDataType;
 
-#define clr_rustic	(app_flags &= ~1)
-#define set_rustic	(app_flags |= 1)
-#define is_rustic	(app_flags & 1)
-
 #define clr_master_chg	(app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)
 
 #define tag_lim	20
-
-#define OSS_ECODEMO	0
-// not sure which way (is_rustic app_flags?) #define OSS_ECORUSTIC	1
-#define oss_fmt	OSS_ECODEMO
-
 #endif

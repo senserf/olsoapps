@@ -7,7 +7,7 @@
 	_da (host_id)		= (lword) preinit ("HID");
 	_da (app_flags)		= 0;
 
-	_da (pong_params).freq_maj	= 900; //30;
+	_da (pong_params).freq_maj	= 30;
 	_da (pong_params).freq_min	= 5;
 	_da (pong_params).pow_levels	= 0x7777;
 	_da (pong_params).rx_span	= 1; // in msec; 1 <-> always ON

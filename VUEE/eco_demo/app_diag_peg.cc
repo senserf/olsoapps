@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -9,6 +9,7 @@
 #include "diag.h"
 #include "app_peg.h"
 #include "msg_peg.h"
+#include "oss_fmt.h"
 
 #ifdef	__SMURPH__
 
@@ -19,6 +20,7 @@
 #else	/* PICOS */
 
 #include "form.h"
+#include "oss_fmt.h"
 
 #endif	/* SMURPH or PICOS */
 
@@ -39,10 +41,10 @@ __PUBLF (NodePeg, void, app_diag) (const word level, const char * fmt, ...) {
 	// if not, go by #if DIAG_MESSAGES as well
 
 	if ((buf = vform (NULL, fmt, va_par (fmt))) == NULL) {
-		diag ("no mem");
+		diag (OPRE_DIAG "no mem");
 		return;
 	}
-	diag ("app_diag: %s", buf);
+	diag (OPRE_DIAG "L%u: %s", level, buf);
 	ufree (buf);
 }
 
@@ -60,10 +62,10 @@ __PUBLF (NodePeg, void, net_diag) (const word level, const char * fmt, ...) {
 	// compiled out if both levels are constant?
 
 	if ((buf = vform (NULL, fmt, va_par (fmt))) == NULL) {
-		diag ("no mem");
+		diag (OPRE_DIAG "no mem");
 		return;
 	}
-	diag ("net_diag: %s", buf);
+	diag (OPRE_DIAG "L%u: %s", level, buf);
 	ufree (buf);
 }
 
