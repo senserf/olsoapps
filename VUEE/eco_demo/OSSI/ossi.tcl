@@ -387,6 +387,46 @@ proc log { m } {
 ###############################################################################
 
 #
+# Data storage function
+#
+
+proc data_out { cid lab nam val } {
+#
+# Write the sensor value to the data log
+#
+	global Files Time
+
+	if { $Files(DATA) == "" } {
+		# no data logging
+		return
+	}
+
+	set day [clock format $Time -format %y%m%d]
+
+	if { $day != $Files(DATA,DY) } {
+		# close the current file
+		catch { close $Files(DATA,FD) }
+		set Files(DATA,DY) $day
+		set fn $Files(DATA)_$day
+		if [catch { open $fn "a" } fd] {
+			msg "cannot open data log file $fn: $fd"
+			set Files(DATA) ""
+			return
+		}
+
+		set Files(DATA,FD) $fd
+	}
+
+	catch {
+		puts $Files(DATA,FD) \
+		  "[clock format $Time -format %H%M%S] $cid +$lab+ @$nam@ =$val"
+		flush $Files(DATA,FD)
+	}
+}
+
+###############################################################################
+
+#
 # Error detectors and handlers
 #
 
@@ -1144,10 +1184,12 @@ proc assoc_agg { ag co } {
 	set ca [lindex $dp 3]
 
 	if { $ca != $ag } {
-		if { $ca != "" } {
+		if { $ag == "" } {
+			msg "collector $co detached from aggregator $ca"
+		} elseif { $ca != "" } {
 			msg "collector $co changed aggregator $ca -> $ag"
 		} else {
-			msg "collector $co assigned to aggregator $ag"
+			msg "collector $co attached to aggregator $ag"
 		}
 		set Nodes($co) [lrep $col 3 [lrep $dp 3 $ag]]
 	}
@@ -1307,11 +1349,11 @@ proc input_csts { inp } {
 
 	if { $tp == $pl && $tf == $fr } {
 		# ten minutes until next poll
-		msg "collector params acknowledge: $aid = ($fr, $pl)"
+		msg "collector params acknowledge: $cid = ($fr, $pl)"
 		set rate 600
 	} else {
 		# until next poll
-		msg "collector params still wrong: $aid = ($fr, $pl)\
+		msg "collector params still wrong: $cid = ($fr, $pl)\
 			!= ($tf, $tp)"
 		set rate 30
 	}
@@ -1370,10 +1412,12 @@ proc input_avrp { inp } {
 	if { [string first "gone" $inp] >= 0 } {
 		# this is void, so ignore it
 		msg "collector $cid is gone, values ignored"
+		assoc_agg "" $cid
+		roster_schedule "cmd_cpoll $cid" "" 30
 		return
 	}
 
-	# previous aggragator
+	# previous aggregator
 	set oai [lindex [lindex $co 3] 3]
 
 	# store the parameters, leave room for the aggregator Id
@@ -1435,6 +1479,7 @@ proc input_avrp { inp } {
 
 		# the value is ready
 		value_update $s $value
+		data_out $cid $sl $sn $value
 		incr uc
 	}
 	msg "updated $uc values from collector $cid"
@@ -1670,6 +1715,25 @@ proc loop { } {
 # Process the arguments
 #
 
+proc bad_usage { } {
+
+	global argv0
+
+	puts "Usage: $argv0 options, where options can be:\n"
+	puts "       -h hostname, default is localhost"
+	puts "       -p port, default is 4443"
+	puts "       -n OSSI_node_number (VUEE), default is 0"
+	puts "       -u uart_device, default is VUEE (no -u)"
+	puts "       -e uart_encoding_params, default is 9600,n,8,1"
+	puts "       -d data_logging_file_prefix, default is no datalogging"
+	puts "       -l log_file_name, default is log"
+	puts "       -s sensor_map_file, default is sensors.xml"
+	puts "       -v values_file, default is values"
+	puts "       -c external_command_file, default is command"
+	puts ""
+	exit 99
+}
+
 set Uart(MODE) ""
 
 while { $argv != "" } {
@@ -1680,7 +1744,7 @@ while { $argv != "" } {
 	if { $va == "" || [string index $va 0] == "-" } {
 		set va ""
 	} else {
-		set argv [lindex $argv 1 end]
+		set argv [lrange $argv 1 end]
 	}
 
 	if { $fg == "-h" } {
@@ -1777,6 +1841,19 @@ while { $argv != "" } {
 		continue
 	}
 
+	if { $fg == "-d" } {
+		if [info exists Files(DATA)] {
+			bad_usage
+		}
+		if { $va == "" } {
+			# this is the prefix
+			set Files(DATA) "data"
+		} else {
+			set Files(DATA) $va
+		}
+		continue
+	}
+
 	if { $va == "" } {
 		bad_usage
 	}
@@ -1812,7 +1889,6 @@ while { $argv != "" } {
 		set Files(ECMD) $va
 		continue
 	}
-
 }
 
 if { $Uart(MODE) == "" } {
@@ -1856,6 +1932,12 @@ if ![info exists Files(SVAL)] {
 if ![info exists Files(ECMD)] {
 	set Files(ECMD) "command"
 }
+
+if ![info exists Files(DATA)] {
+	set Files(DATA) ""
+}
+
+set Files(DATA,DY) ""
 
 ###############################################################################
 	
