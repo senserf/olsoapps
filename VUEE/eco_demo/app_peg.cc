@@ -614,6 +614,7 @@ __PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
 		master_host = local_host;
 		master_delta = 0;
 		master_clock.sec = 0;
+		tarp_ctrl.param &= 0xFE;
 		if (local_host == peg)
 			return;
 	}
@@ -724,8 +725,10 @@ thread (root)
 		runthread (rcv);
 		runthread (cmd_in);
 		runthread (audit);
-		if (master_host == local_host)
+		if (master_host == local_host) {
 			runthread (mbeacon);
+			tarp_ctrl.param &= 0xFE;
+		}
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)

@@ -247,8 +247,10 @@ __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
 
 	if (is_master_chg) {
 		clr_master_chg;
-		if (running (mbeacon))
+		if (running (mbeacon)) { // I was the Master
 			killall (mbeacon);
+			tarp_ctrl.param |= 0x01; // routing ON
+		}
 		diag (OPRE_APP_ACK "Set master to %u at %ld", master_host,
 			master_delta);
 	}

@@ -19,7 +19,7 @@
 #define EE_SENS_MIN	0
 
 // check what it really is
-#define SENS_COLL_TIME	1500
+#define SENS_COLL_TIME	3000
 #define NUM_SENS	5
 
 #define SENS_FF		0xFF
