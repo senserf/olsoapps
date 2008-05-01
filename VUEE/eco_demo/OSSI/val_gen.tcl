@@ -344,7 +344,16 @@ proc msg { m } {
 
 proc abt { m } {
 
+	global Agent
+
+	set Agent(READY) 0
+
 	error $m
+}
+
+proc bgerror { m} {
+
+	error "in background: $m"
 }
 
 #
@@ -383,6 +392,7 @@ proc dbinB { s } {
 proc agent_tmout { } {
 
 	global Agent
+
 	set Agent(READY) 0
 	
 }
@@ -688,7 +698,8 @@ proc read_map { } {
 		set hi 32768
 		set ix ""
 
-		if { [regexp "^(\[0-9\])+/" $de junk ix] && ![napin ix] } {
+		if [regexp "^(\[0-9\])+/" $de junk ix] {
+			set ix [expr $ix]
 			set de [string range $de [string length $junk] end]
 		}
 

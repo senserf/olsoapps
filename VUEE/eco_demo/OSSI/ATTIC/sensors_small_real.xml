@@ -44,13 +44,13 @@
 
     <sensors>
 
-	<!-- Values in text are for emulation -->
-	<sensor name="PAR 128" label="PAR" node="128" emu="0/0-1024"></sensor>
+	<!-- Values in "emu" are for emulation -->
+	<sensor name="PAR 128" label="PAR" node="128" emu="0/12-1024"></sensor>
 	<sensor name="TMP 128" label="T" node="128" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 128" label="H" node="128" emu="2/1000-3000"></sensor>
 	<sensor name="DIO 128" label="PD" node="128" emu="3/0-2000"></sensor>
 
-	<sensor name="PAR 129" label="PAR" node="129" emu="0/0-1024"></sensor>
+	<sensor name="PAR 129" label="PAR" node="129" emu="0/12-1024"></sensor>
 	<sensor name="TMP 129" label="T" node="129" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 129" label="H" node="129" emu="2/1000-3000"></sensor>
 	<sensor name="DIO 129" label="PD" node="129" emu="3/0-2000"></sensor>
