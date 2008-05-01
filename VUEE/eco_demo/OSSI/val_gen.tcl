@@ -382,7 +382,9 @@ proc dbinB { s } {
 
 proc agent_tmout { } {
 
-	abt "connection failed: timeout"
+	global Agent
+	set Agent(READY) 0
+	
 }
 
 proc agent_ctmout { } {
@@ -478,7 +480,7 @@ proc agent_vuee { node ser pp } {
 	}
 
 	if { $i == 10 } {
-		agent_tmout
+		abt "connection failed: timeout"
 	}
 
 	# wait for a reply
@@ -487,6 +489,11 @@ proc agent_vuee { node ser pp } {
 	agent_stmout 10000 agent_tmout
 
 	vwait Agent(READY)
+
+	if { $Agent(READY) == 0 } {
+		catch { close $sok }
+		abt "connection failed: timeout"
+	}
 }
 
 proc agent_init { rfun node } {
@@ -677,11 +684,15 @@ proc read_map { } {
 
 		set no [sxml_attr $c "node"]
 		set de [sxml_attr $c "emu"]
+		set lo 0
+		set hi 32768
+		set ix ""
 
-		if ![regexp "(\[0-9\]+)\[^0-9\]+(\[0-9\]+)" $de junk lo hi] {
-			set lo 0
-			set hi 32768
+		if { [regexp "^(\[0-9\])+/" $de junk ix] && ![napin ix] } {
+			set de [string range $de [string length $junk] end]
 		}
+
+		regexp "(\[0-9\]+)\[^0-9\]+(\[0-9\]+)" $de junk lo hi
 
 		if ![info exists NID($no)] {
 			continue
@@ -689,7 +700,7 @@ proc read_map { } {
 
 		set ci $NID($no)
 
-		lappend SBN($ci) [list $lo $hi]
+		lappend SBN($ci) [list $lo $hi $ix]
 	}
 }
 
@@ -707,7 +718,8 @@ proc genvalues { nn } {
 
 		set lo [lindex $se 0]
 		set hi [lindex $se 1]
-		set pv [lindex $se 2]
+		set ix [lindex $se 2]
+		set pv [lindex $se 3]
 
 		if { $pv == "" } {
 			# first time around
@@ -729,7 +741,7 @@ proc genvalues { nn } {
 			}
 		}
 
-		lappend re [list $lo $hi $pv]
+		lappend re [list $lo $hi $ix $pv]
 	}
 
 	set SBN($nn) $re
@@ -753,7 +765,11 @@ proc update { nn } {
 	set ix 0 
 
 	foreach sn $SBN($nn) {
-		agent_write "S $ix [expr int([lindex $sn 2])]"
+		set iy [lindex $sn 2]
+		if { $iy == "" } {
+			set iy $ix
+		}
+		agent_write "S $iy [expr int([lindex $sn 3])]"
 		incr ix
 	}
 

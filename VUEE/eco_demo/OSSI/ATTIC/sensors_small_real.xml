@@ -6,8 +6,10 @@
     </aggregators>
 
     <collectors>
-	<node id="128" power="7" frequency="30">Palmtree</node>
-	<node id="129" power="7" frequency="30">Cactus</node>
+	<node id="128" power="7" frequency="30">Node 128 (window)</node>
+	<node id="129" power="7" frequency="30">Node 129 (window)</node>
+	<node id="130" power="7" frequency="30">Node 130 (shelf)</node>
+	<node id="131" power="7" frequency="30">Node 131 (door)</node>
     </collectors>
 
     <ossi id="10"></ossi>
@@ -43,17 +45,25 @@
     <sensors>
 
 	<!-- Values in text are for emulation -->
-	<sensor name="PAR A" label="PAR" node="128" emu="0-1024"></sensor>
-	<sensor name="TMP A" label="T" node="128" emu="5500-6500"></sensor>
-	<sensor name="HUM A" label="H" node="128" emu="1000-3000"></sensor>
-	<sensor name="DIO A" label="PD" node="128" emu="0-2000"></sensor>
-	<sensor name="TMB A" label="T2" node="128" emu="2300-2500"></sensor>
+	<sensor name="PAR 128" label="PAR" node="128" emu="0/0-1024"></sensor>
+	<sensor name="TMP 128" label="T" node="128" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 128" label="H" node="128" emu="2/1000-3000"></sensor>
+	<sensor name="DIO 128" label="PD" node="128" emu="3/0-2000"></sensor>
 
-	<sensor name="PAR B" label="PAR" node="129" emu="0-1024"></sensor>
-	<sensor name="TMP B" label="T" node="129" emu="5500-6500"></sensor>
-	<sensor name="HUM B" label="H" node="129" emu="1000-3000"></sensor>
-	<sensor name="DIO B" label="PD" node="129" emu="0-2000"></sensor>
-	<sensor name="TMB B" label="T2" node="129" emu="2300-2500"></sensor>
+	<sensor name="PAR 129" label="PAR" node="129" emu="0/0-1024"></sensor>
+	<sensor name="TMP 129" label="T" node="129" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 129" label="H" node="129" emu="2/1000-3000"></sensor>
+	<sensor name="DIO 129" label="PD" node="129" emu="3/0-2000"></sensor>
+
+	<sensor name="TMP 130" label="T" node="130" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 130" label="H" node="130" emu="2/1000-3000"></sensor>
+	<sensor name="DIO 130" label="PD" node="130" emu="3/0-2000"></sensor>
+	<sensor name="TMB 130" label="T2" node="130" emu="4/2300-2500"></sensor>
+
+	<sensor name="TMP 131" label="T" node="131" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 131" label="H" node="131" emu="2/1000-3000"></sensor>
+	<sensor name="DIO 131" label="PD" node="131" emu="3/0-2000"></sensor>
+	<sensor name="TMB 131" label="T2" node="131" emu="4/2300-2500"></sensor>
 
     </sensors>
 

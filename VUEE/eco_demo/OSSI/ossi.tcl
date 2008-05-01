@@ -498,8 +498,7 @@ proc msg { m } {
 
 proc abt { m } {
 
-	puts "Aborted: $m"
-	log "aborted: $m"
+	msg "aborted: $m"
 	exit 99
 }
 
@@ -540,7 +539,11 @@ proc dbinB { s } {
 
 proc uart_tmout { } {
 
-	abt "connection failed: timeout"
+	global Turn Uart
+
+	catch { close $Uart(TS) }
+	set Uart(TS) ""
+	incr Turn
 }
 
 proc uart_ctmout { } {
@@ -569,98 +572,72 @@ proc uart_sokin { } {
 #
 # Initial read: VUEE handshake
 #
-	global Uart
+	global Uart Turn
 
 	uart_ctmout
 
-	if [catch { read $Uart(FD) 1 } res] {
+	if { [catch { read $Uart(TS) 1 } res] || $res == "" } {
 		# disconnection
-		abt "connection failed: $res"
-	}
-
-	if { $res == "" } {
-		abt "connection closed by VUEE"
+		catch { close $Uart(TS) }
+		set Uart(TS) ""
+		incr Turn
+		return
 	}
 
 	set code [dbinB res]
 
 	if { $code != 129 } {
-		abt "connection rejected by VUEE, code $code"
+		catch { close $Uart(TS) }
+		set Uart(TS) ""
+		incr Turn
+		return
 	}
 
 	# so far, so good
-
-	set Uart(READY) 1
+	incr Turn
 }
 
-proc uart_vuee { node ser pp } {
+proc uart_incoming { sok h p } {
 #
-# Connect to VUEE
+# Incoming connection
 #
-	global Uart
-	
-	msg "Connecting to a VUEE model: node $node, host $ser, port $pp ..."
+	global Uart Turn
 
-	if [catch { socket -async $ser $pp } sok] {
-		abt "connection failed: $sok"
+	if { $Uart(FD) != "" } {
+		# connection already in progress
+		msg "incoming connection from $h:$p ignored, already connected"
+		catch { close $sok }
+		return
 	}
 
 	if [catch { fconfigure $sok -blocking 0 -buffering none -translation \
 	    binary -encoding binary } err] {
-		abt "connection failed: $err"
+		msg "cannot configure socket for incoming connection: $err"
+		set Uart(FD) ""
+		return
 	}
 
 	set Uart(FD) $sok
-
-	# send the request
-	set rqs ""
-	abinS rqs 0xBAB4
-
-	abinS rqs 1
-	abinI rqs $node
-
-	if [catch { puts -nonewline $sok $rqs } err] {
-		abt "connection failed: $err"
-	}
-
-	# wait for it to be accepted
-
-	for { set i 0 } { $i < 10 } { incr i } {
-		if [catch { flush $sok } err] {
-			abt "connection failed: $err"
-		}
-		if ![fblocked $sok] {
-			break
-		}
-		after 1000
-	}
-
-	if { $i == 10 } {
-		uart_tmout
-	}
-
-	# wait for a reply
-	fileevent $sok readable "uart_sokin"
-
-	uart_stmout 10000 uart_tmout
-
-	vwait Uart(READY)
+	set Uart(BF) ""
+	fileevent $sok readable "uart_read"
+	incr Turn
 }
 
 proc uart_init { rfun } {
 
-	global Uart
+	global Uart Turn
 
-	if [info exists Uart(FD)] {
+	set Uart(RF) $rfun
+
+	if { [info exists Uart(FD)] && $Uart(FD) != "" } {
 		catch { close $Uart(FD) }
 		unset Uart(FD)
 	}
 
-	if $Uart(MODE) {
-		# socket connection
-		uart_vuee $Uart(NODE) $Uart(HOST) $Uart(PORT)
-	} else {
-		msg "Connecting to UART $Uart(DEV), encoding $Uart(PAR) ..."
+	if { $Uart(MODE) == 0 } {
+
+		# straightforward UART
+		msg "connecting to UART $Uart(DEV), encoding $Uart(PAR) ..."
 		# try a regular UART
 		if [catch { open $Uart(DEV) RDWR } ser] {
 			abt "cannot open UART $Uart(DEV): $ser"
@@ -670,12 +647,80 @@ proc uart_init { rfun } {
 			abt "cannot configure UART $Uart(DEV)/$Uart(PAR): $err"
 		}
 		set Uart(FD) $ser
+		set Uart(BF) ""
+		fileevent $Uart(FD) readable "uart_read"
+		incr Turn
+		return
 	}
-	set Uart(READY) 1
-	set Uart(BF) ""
-	# OK, start reading
-	fileevent $Uart(FD) readable "uart_read"
-	set Uart(RF) $rfun
+
+	if { $Uart(MODE) == 1 } {
+
+		# VUEE: a single socket connection
+		msg "connecting to a VUEE model: node $Uart(NODE),\					host $Uart(HOST), port $Uart(PORT) ..."
+
+		if [catch { socket -async $Uart(HOST) $Uart(PORT) } ser] {
+			abt "connection failed: $ser"
+		}
+
+		if [catch { fconfigure $ser -blocking 0 -buffering none \
+		    -translation binary -encoding binary } err] {
+			abt "connection failed: $err"
+		}
+
+		set Uart(TS) $ser
+
+		# send the request
+		set rqs ""
+		abinS rqs 0xBAB4
+
+		abinS rqs 1
+		abinI rqs $Uart(NODE)
+
+		if [catch { puts -nonewline $ser $rqs } err] {
+			abt "connection failed: $err"
+		}
+
+		for { set i 0 } { $i < 10 } { incr i } {
+			if [catch { flush $ser } err] {
+				abt "connection failed: $err"
+			}
+			if ![fblocked $ser] {
+				break
+			}
+			after 1000
+		}
+
+		if { $i == 10 } {
+			abt "Timeout"
+		}
+
+		catch { flush $ser }
+
+		# wait for a reply
+		fileevent $ser readable "uart_sokin"
+		uart_stmout 10000 uart_tmout
+		vwait Turn
+
+		if { $Uart(TS) == "" } {
+			abt "connection failed: timeout"
+		}
+		set Uart(FD) $Uart(TS)
+		unset Uart(TS)
+
+		set Uart(BF) ""
+		fileevent $Uart(FD) readable "uart_read"
+		incr Turn
+		return
+	}
+
+	# server
+
+	msg "setting up server socket on port $Uart(PORT) ..."
+	if [catch { socket -server uart_incoming $Uart(PORT) } ser] {
+		abt "cannot set up server socket: $ser"
+	}
+
+	# wait for connections: Uart(FD) == ""
 }
 
 proc uart_read { } {
@@ -688,16 +733,16 @@ proc uart_read { } {
 
 		if [catch { read $Uart(FD) } chunk] {
 			# disconnection
-			msg "connection broken by VUEE: $chunk"
+			msg "connection broken by peer: $chunk"
 			catch { close $Uart(FD) }
-			set Uart(READY) 0
+			set Uart(FD) ""
 			return
 		}
 
 		if [eof $Uart(FD)] {
-			msg "connection closed by VUEE"
+			msg "connection closed by peer"
 			catch { close $Uart(FD) }
-			set Uart(READY) 0
+			set Uart(FD) ""
 			return
 		}
 
@@ -757,9 +802,9 @@ proc uart_write { w } {
 		flush $Uart(FD)
 	} err] {
 		if $Uart(MODE) {
-			msg "connection closed by VUEE"
+			msg "connection closed by peer"
 			catch { close $Uart(FD) }
-			set Uart(READY) 0
+			set Uart(FD) ""
 		}
 	}
 }
@@ -801,7 +846,7 @@ proc read_map { } {
 	global OSSI		;# OSSI aggregator node (ID)
 
 	if [catch { file mtime $Files(SMAP) } ix] {
-		smerr "cannot stat map file $Files(SMAP): $fd"
+		smerr "cannot stat map file $Files(SMAP): $ix"
 		return 0
 	}
 	# check the time stamp of the map file
@@ -1688,8 +1733,17 @@ proc loop { } {
 
 	set Turn 0
 
-	# Uart(READY) will become zero, if we should stop
-	while { $Uart(READY) } {
+	while 1 {
+
+		if { $Uart(FD) == "" } {
+			# we are not connected
+			if { $Uart(MODE) < 2 } {
+				# that's it
+				break
+			}
+			vwait Turn
+			continue
+		}
 
 		set Time [clock seconds]
 
@@ -1771,7 +1825,6 @@ while { $argv != "" } {
 			bad_usage
 		}
 		if { $va != "" } {
-			# the default
 			if { [napin va] || $va > 65535 } {
 				bad_usage
 			}
@@ -1792,7 +1845,6 @@ while { $argv != "" } {
 			bad_usage
 		}
 		if { $va != "" } {
-			# the default
 			if [napin va] {
 				bad_usage
 			}
@@ -1813,7 +1865,6 @@ while { $argv != "" } {
 			bad_usage
 		}
 		if { $va != "" } {
-			# the default
 			set Uart(DEV) $va
 		} else {
 			# must be specified
@@ -1831,7 +1882,6 @@ while { $argv != "" } {
 			bad_usage
 		}
 		if { $va != "" } {
-			# the default
 			set Uart(PAR) $va
 		} else {
 			# default
@@ -1902,7 +1952,13 @@ if { $Uart(MODE) == "" } {
 	if ![info exists Uart(HOST)] {
 		set Uart(HOST) "localhost"
 	}
-	if ![info exists Uart(PORT)] {
+	if { $Uart(HOST) == "server" } {
+		set Uart(MODE) 2
+		if ![info exists Uart(PORT)] {
+			# the default is different
+			set Uart(PORT) 4445
+		}
+	} elseif ![info exists Uart(PORT)] {
 		set Uart(PORT) 4443
 	}
 	if ![info exists Uart(NODE)] {
@@ -1940,6 +1996,9 @@ if ![info exists Files(DATA)] {
 set Files(DATA,DY) ""
 
 ###############################################################################
+
+set Turn 0
+set Uart(FD) ""
 	
 log_open
 
