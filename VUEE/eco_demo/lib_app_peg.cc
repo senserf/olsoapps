@@ -137,11 +137,14 @@ __PUBLF (NodePeg, int, find_tags) (word tag, word what) {
 __PUBLF (NodePeg, char*, get_mem) (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
-		app_diag (D_WARNING, "No mem %d", len);
+		app_diag (D_SERIOUS, "No mem reset");
+		reset();
+#if 0
 		if (state != WNONE) {
 			umwait (state);
 			release;
 		}
+#endif
 	}
 	return buf;
 }
@@ -393,13 +396,6 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 	if (agg_data.ee.status != AGG_FF)
 		agg_data.eslot++;
 
-	if (agg_data.eslot >= EE_AGG_MAX) {
-		// no
-		// fatal_err (ERR_FULL, 0, 0, 0);
-		agg_data.eslot--;
-		app_diag (D_SERIOUS, "EEPROM FULL");
-	}
-
 	agg_data.ee.status = AGG_COLLECTED;
 	agg_data.ee.sval[0] = in_pongPload(buf, sval[0]);
 	agg_data.ee.sval[1] = in_pongPload(buf, sval[1]);
@@ -413,12 +409,19 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 	agg_data.ee.t_eslot = in_pongPload(buf, eslot);
 	agg_data.ee.tag = in_header(buf, snd);
 
-	if (ee_write (WNONE, agg_data.eslot * EE_AGG_SIZE,
-		(byte *)&agg_data.ee, EE_AGG_SIZE)) {
-		app_diag (D_SERIOUS, "ee_write failed %x %x",
+	if (agg_data.eslot >= EE_AGG_MAX) {
+		agg_data.eslot = EE_AGG_MAX -1;
+		app_diag (D_SERIOUS, "EEPROM FULL");
+
+	} else {
+
+		if (ee_write (WNONE, agg_data.eslot * EE_AGG_SIZE,
+			(byte *)&agg_data.ee, EE_AGG_SIZE)) {
+			app_diag (D_SERIOUS, "ee_write failed %x %x",
 				(word)(agg_data.eslot >> 16),
 				(word)agg_data.eslot);
-		agg_data.eslot--;
+			agg_data.eslot--;
+		}
 	}
 }
 
@@ -461,20 +464,20 @@ __PUBLF (NodePeg, void, agg_init) () {
 	lword l, u, m;
 	byte b;
 
-	if (ee_read (0, &b, 1))
+	if (ee_read ((lword)EE_AGG_MIN * EE_AGG_SIZE, &b, 1))
 		fatal_err (ERR_EER, 0, 0, 1);
 
 	memset (&agg_data, 0, sizeof(aggDataType));
 
 	if (b == 0xFF) { // normal operations
-		agg_data.eslot = 0;
+		agg_data.eslot = EE_AGG_MIN;
 		agg_data.ee.status = AGG_FF;
 		return;
 	}
 
 	// only efter power down / soft reset there could be anything in eeprom
 	l = EE_AGG_MIN; u = EE_AGG_MAX;
-	while (u - l > 1) {
+	while ((u - l) > 1) {
 		m = l + ((u -l) >> 1);
 
 		if (ee_read (m * EE_AGG_SIZE, &b, 1))

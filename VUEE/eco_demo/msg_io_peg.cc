@@ -174,10 +174,11 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 	in_statsPeg(out_buf, mdelta) = master_delta;
 
 	//in_statsPeg(out_buf, slot) is really # of entries
-	if (agg_data.eslot == 0 && agg_data.ee.status == AGG_FF)
+	if (agg_data.eslot == EE_AGG_MIN && agg_data.ee.status == AGG_FF)
 		in_statsPeg(out_buf, slot) = 0;
 	else
-		in_statsPeg(out_buf, slot) = agg_data.eslot +1;
+		in_statsPeg(out_buf, slot) = agg_data.eslot -
+			EE_AGG_MIN +1;
 
 	in_statsPeg(out_buf, audi) = tag_auditFreq;
 	in_statsPeg(out_buf, pl) = host_pl;

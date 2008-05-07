@@ -32,13 +32,16 @@ __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
 			sens_data.ee.ts == in_pongAck(buf, ts)) {
 		leds (0, 0);
 		b = sens_data.ee.status = SENS_CONFIRMED;
-#if 1
+
+		if (sens_data.eslot == EE_SENS_MAX -1)
+			return; // don;t update the last slot: eeprom full
+
 		if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE, &b, 1)) {
 			app_diag (D_SERIOUS, "ee upd failed %x %x",
 					(word)(sens_data.eslot >> 16),
 					(word)sens_data.eslot);
 		}
-#endif
+
 	} else
 		app_diag (D_DEBUG, "Redundant pongAck %x %x from %u",
 				(word)(sens_data.eslot >> 16),
@@ -105,10 +108,11 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	in_statsTag(out_buf, ltime) = seconds();
 
 	// in_statsTag(out_buf, slot) is really # of entries
-	if (sens_data.eslot == 0 && sens_data.ee.status == SENS_FF)
+	if (sens_data.eslot == EE_SENS_MIN && sens_data.ee.status == SENS_FF)
 		in_statsTag(out_buf, slot) = 0;
 	else
-		in_statsTag(out_buf, slot) = sens_data.eslot +1;
+		in_statsTag(out_buf, slot) = sens_data.eslot -
+			EE_SENS_MIN +1;
 
 	in_statsTag(out_buf, maj) = pong_params.freq_maj;
 	in_statsTag(out_buf, min) = pong_params.freq_min;

@@ -91,7 +91,7 @@ static const char stats_str[] = OPRE_APP_STATS_A
 	" Stored entries %lu Mem free %u min %u\r\n";
 
 static const char statsCol_str[] = OPRE_APP_STATS_CA
-	"Stats for coll (%lx: %u) via agg %u:" OMID_CR
+	"Stats for coll (%lx: %u) via %u:" OMID_CR
 	" Maj_freq %u min_freq %u rx_span %u pl %u" OMID_CR
 	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
 

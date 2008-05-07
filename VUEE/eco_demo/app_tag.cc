@@ -90,19 +90,19 @@ __PUBLF (NodeTag, void, sens_init) () {
 	lword l, u, m; 
 	byte b; 
 
-	if (ee_read (0, &b, 1))
+	if (ee_read (EE_SENS_MIN * EE_SENS_SIZE, &b, 1))
 		fatal_err (ERR_EER, 0, 0, 1);
 
 	memset (&sens_data, 0, sizeof (sensDataType));
 	if (b == 0xFF) { // normal operations (empty eeprom)
-		sens_data.eslot = 0;
+		sens_data.eslot = EE_SENS_MIN;
 		sens_data.ee.status = SENS_FF;
 		return;
 	}
 
 	// only efter power down / soft reset there could be anything in eeprom
 	l = EE_SENS_MIN; u = EE_SENS_MAX;
-	while (u - l > 1) {
+	while ((u - l) > 1) {
 		m = l + ((u -l) >> 1);
 		if (ee_read (m * EE_SENS_SIZE, &b, 1))
 			fatal_err (ERR_EER, (word)((m * EE_SENS_SIZE) >> 16),
@@ -253,8 +253,9 @@ __PUBLF (NodeTag, void, stats) () {
 			pong_params.freq_maj, pong_params.freq_min,
 			pong_params.rx_span, pong_params.pow_levels & 0x0F,
 			seconds(),
-			sens_data.eslot == 0 && sens_data.ee.status == SENS_FF ?
-			0 : sens_data.eslot +1,
+			sens_data.eslot == EE_SENS_MIN &&
+			  sens_data.ee.status == SENS_FF ?
+			0 : sens_data.eslot - EE_SENS_MIN +1,
 			mem, mmin);
 	if (runstrand (oss_out, mbuf) == 0) {
 		app_diag (D_SERIOUS, "oss_out fork");
@@ -588,15 +589,21 @@ thread (sens)
 #endif
 	entry (SE_DONE)
 		sens_data.ee.status = SENS_COLLECTED;
-#if 1 
-		if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE,
-				(byte *)&sens_data.ee, EE_SENS_SIZE)) {
-			app_diag (D_SERIOUS, "ee_write failed %x %x",
+
+		if (sens_data.eslot >= EE_SENS_MAX) {
+			sens_data.eslot = EE_SENS_MAX -1;
+			app_diag (D_SERIOUS, "EEPROM FULL");
+		} else {
+
+			if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE,
+					(byte *)&sens_data.ee, EE_SENS_SIZE)) {
+				app_diag (D_SERIOUS, "ee_write failed %x %x",
 					(word)(sens_data.eslot >> 16),
 					(word)sens_data.eslot);
-			sens_data.eslot--;
+				sens_data.eslot--;
+			}
 		}
-#endif
+
 		leds (0, 2);
 		finish;
 endthread

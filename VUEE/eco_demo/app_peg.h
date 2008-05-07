@@ -24,13 +24,13 @@
 #define NUM_SENS	5
 
 #define AGG_FF		0xFF
-#define AGG_IN_USE	0xFC
+// not needed? #define AGG_IN_USE	0xFC
 #define AGG_COLLECTED	0xF8
-#define AGG_CONFIRMED	0xF0
+// not needed? #define AGG_CONFIRMED	0xF0
 
 #define ERR_EER		0xFFFE
 #define ERR_SLOT	0xFFFC
-#define ERR_FULL	0xFFF8
+// not needed? #define ERR_FULL	0xFFF8
 
 typedef enum {
 	noTag, newTag, reportedTag, confirmedTag,
@@ -82,7 +82,7 @@ typedef struct aggEEDataStruct {
 	lword t_ts;
 	lword t_eslot;
 	word  tag;
-	word sspare[4];
+	word sspare[3];
 } aggEEDataType;
 // for now, keep it at 2^N (32), we'll see about eeprom pages, etc.
 

@@ -62,11 +62,14 @@ __PUBLF (NodeTag, void, set_master_chg) () {
 __PUBLF (NodeTag, char*, get_mem) (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
-		app_diag (D_WARNING, "No mem %d", len);
+		app_diag (D_SERIOUS, "No mem reset");
+		reset();
+#if 0
 		if (state != WNONE) {
 			umwait (state);
 			release;
 		}
+#endif
 	}
 	return buf;
 }

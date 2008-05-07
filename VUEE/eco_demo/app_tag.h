@@ -29,7 +29,7 @@
 
 #define ERR_EER		0xFFFE
 #define ERR_SLOT	0xFFFC
-#define ERR_FULL	0xFFF8
+// not needed? #define ERR_FULL	0xFFF8
 
 typedef union {
 	lword sec;

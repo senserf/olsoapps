@@ -69,8 +69,9 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 		mbuf = form (NULL, stats_str,
 			host_id, local_host, tag_auditFreq,
 			host_pl, seconds(), master_delta, master_host,
-			agg_data.eslot == 0 && agg_data.ee.status == AGG_FF ?
-			0 : agg_data.eslot +1,
+			agg_data.eslot == EE_AGG_MIN &&
+			  agg_data.ee.status == AGG_FF ?
+			0 : agg_data.eslot - EE_AGG_MIN +1,
 			mem, mmin);
 	} else {
 	  switch (in_header (buf, msg_type)) {
@@ -160,7 +161,7 @@ moved to msg_pong_in() to filter out 'duplicates'
 			in_header(buf, hco) = 0; // was 1
 			send_msg (buf, sizeof(msgStatsTagType));
 		} else {
-			in_header(buf, snd) = local_host;
+			//in_header(buf, snd) = local_host;
 			stats (buf);
 		}
 
