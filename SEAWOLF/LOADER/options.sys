@@ -1,0 +1,31 @@
+// Insert here applications-specific options
+// #define	INFO_FLASH	1
+
+#undef	DIAG_MESSAGES
+#undef	RADIO_USE_LEDS
+
+#define	DIAG_MESSAGES	2
+#define	NO_LONG_DELAYS	1
+
+#define	RADIO_USE_LEDS	7
+// #define	DIAG_MESSAGES_TO_LCD		1
+
+
+
+
+// These options are for testing only, feel free to remove
+
+#undef	RADIO_GUARD
+#define	RADIO_GUARD	1
+
+#undef	CRC_ISO3309
+#define	CRC_ISO3309	1
+
+#undef	MCLOCK_FROM_CRYSTAL
+#define	MCLOCK_FROM_CRYSTAL	0
+
+#undef	CRYSTAL2_RATE
+#define	CRYSTAL2_RATE		6000000
+
+#undef	SPIN_WHEN_HALTED
+#define	SPIN_WHEN_HALTED	0

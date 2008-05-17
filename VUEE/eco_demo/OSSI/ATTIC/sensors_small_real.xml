@@ -20,14 +20,14 @@
     </plots>
 
     <aggregators>
-	<node id="10" power="7" frequency="10"></node>
+	<node id="10" power="7" frequency="60"></node>
     </aggregators>
 
     <collectors>
-	<node id="128" power="7" frequency="30" rxspan="100" x="0.1" y="1.4" z="4.5">window #1</node>
-	<node id="129" power="7" frequency="30" rxspan="100" x="0.1" y="2.3" z="4.5">window #2</node>
-	<node id="130" power="7" frequency="30" rxspan="100" x="4.5" y="2.4" z="7">shelf</node>
-	<node id="131" power="7" frequency="30" rxspan="100" x="5.9" y="0.4" z="0">door</node>
+	<node id="128" power="7" frequency="60" rxspan="2" x="0.1" y="1.4" z="4.5">window #1</node>
+	<node id="129" power="7" frequency="60" rxspan="2" x="0.1" y="2.3" z="4.5">window #2</node>
+	<node id="130" power="7" frequency="60" rxspan="2" x="4.5" y="2.4" z="7">shelf</node>
+	<node id="131" power="7" frequency="60" rxspan="2" x="5.9" y="0.4" z="0">door</node>
     </collectors>
 
     <ossi id="10"></ossi>
