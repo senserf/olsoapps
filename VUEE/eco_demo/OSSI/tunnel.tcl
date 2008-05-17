@@ -204,17 +204,20 @@ set SO ""
 
 while 1 {
 
+	catch { exec killall -9 "ssh" }
+	after 2000
+
 	if [catch {
 
 	    msg "connecting ..."
 	    if ![info exists Net(USER)] {
 
-		set SO [exec ssh $Net(HOST) -L \
+		set SO [exec ssh $Net(HOST) -f -N -T -n -L \
 					$Net(PORT):$Net(HOST):$Net(REMOTE)]
 
 	    } else {
 
-		set SO [exec ssh $Net(HOST) -l $Net(USER) \
+		set SO [exec ssh $Net(HOST) -f -N -T -n -l $Net(USER) \
 			-L $Net(PORT):$Net(HOST):$Net(REMOTE)]
 	    }
 	} err] {

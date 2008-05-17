@@ -34,3 +34,9 @@ then
 	../../Scripts/cleanapp
 	cd ..
 fi
+if [ -d SEAWOLF ]
+then
+	cd SEAWOLF
+	../../Scripts/cleanapp
+	cd ..
+fi

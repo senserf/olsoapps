@@ -930,7 +930,22 @@ proc read_map { } {
 				return 0
 			}
 		}
-	
+		set xs [sxml_attr $c "rxspan"]
+		if { $xs != "" } {
+			if [nannin xs] {
+				smerr "illegal rx span in collector $ix"
+				return 0
+			}
+			if { $xs > 30 } {
+				set xs 1
+			} else {
+				# in seconds
+				set xs [expr $xs * 1024]
+			}
+		} else {
+			set xs -1
+		}
+
 		#
 		# the record layout is the same for both node types:
 		# 	- class (c,a)
@@ -938,7 +953,7 @@ proc read_map { } {
 		#	- configuration parameters (a list)
 		#	- dynamic parameters (another list)
 		#
-		set nodes($sn) [list c [sxml_txt $c] [list $pl $fr] ""]
+		set nodes($sn) [list c [sxml_txt $c] [list $pl $fr $xs] ""]
 		# this is just a list of IDs
 		lappend colls $sn
 	}
@@ -1157,6 +1172,13 @@ proc values_init { } {
 
 ###############################################################################
 
+proc iran { val } {
+#
+# Randomize the specified integer value within 30%
+#
+	return [expr int($val * (1.0 + 0.3 * (rand() * 2.0 - 1.0)))]
+}
+
 proc lrep { lst ix el } {
 #
 # Replaces element ix in the list ls (my version)
@@ -1267,8 +1289,38 @@ proc input_line { inp } {
 	1005 { input_asts $inp }
 	1006 { input_csts $inp }
 	0003 { input_mast $inp }
+	8000 { input_eful $inp }
 
 	}
+}
+
+proc input_eful { inp } {
+#
+# EEPROM full on the master
+#
+	global Nodes OSSI
+
+	if { [string first "EEPROM FULL" $inp] < 0 } {
+		return
+	}
+
+	set ag $Nodes($OSSI)
+	set dp [lindex $ag 3]
+	set osc [lindex $dp 3]
+
+	if { $osc == "" || $osc >= 4 } {
+		# either haven't tried to erase yet, or have waited for 4
+		# cycles and nothing happened
+		msg "queueing eeprom erase for aggregator $OSSI (master)"
+		# once
+		roster_schedule "cmd_aerase $OSSI"
+		set osc 0
+	}
+
+	incr osc
+
+	set dp [lrep $dp 3 $osc]
+	set Node($OSSI) [lrep $ag 3 $dp]
 }
 
 proc input_mast { inp } {
@@ -1276,7 +1328,7 @@ proc input_mast { inp } {
 # Master beacon notification
 #
 	msg "master beacon acknowledge"
-	roster_schedule "cmd_master" 700 700
+	roster_schedule "cmd_master" [iran 3600] 3600
 }
 
 proc input_asts { inp } {
@@ -1323,15 +1375,15 @@ proc input_asts { inp } {
 	if { $tp == $pl && $tf == $fr } {
 		# ten minutes until next poll
 		msg "aggregator params acknowledge: $aid = ($fr, $pl)"
-		set rate 600
+		set rate 1800
 	} else {
 		# until next poll
 		msg "aggregator params still wrong: $aid = ($fr, $pl)\
 			!= ($tf, $tp)"
-		set rate 30
+		set rate 60
 	}
 
-	roster_schedule "cmd_apoll $aid" $rate $rate
+	roster_schedule "cmd_apoll $aid" [iran $rate] $rate
 }
 
 proc input_csts { inp } {
@@ -1340,8 +1392,8 @@ proc input_csts { inp } {
 #
 	global Nodes
 
-	if ![regexp "(\[0-9\]+)\\) +via agg +(\[0-9\]+)(.*)"\
-	    $inp mat cid aid inp] {
+	if ![regexp "(\[0-9\]+)\\) +via +(\[0-9\]+)(.*)"\
+	    $inp mat cid vid inp] {
 		return
 	}
 
@@ -1357,23 +1409,6 @@ proc input_csts { inp } {
 		msg "aggregator $cid sending stats as a collector"
 		return
 	}
-
-	# locate the aggregator
-	if { [napin aid] || ![info exists Nodes($aid)] } {
-		msg "aggregator $aid in collector's stats $cid unknown, ignored"
-		return
-	}
-
-	set ag $Nodes($aid)
-	if { [lindex $ag 0] != "a" } {
-		# this isn't an aggregator
-		msg "aggregator $aid in collector's stats $cid is a collector"
-		return
-	}
-
-	# make sure the aggregator is associated with this collector from now
-	# on
-	assoc_agg $aid $cid
 
 	# FIXME: should detect when memory is filled and do something;
 	# also concerns the aggregator
@@ -1395,22 +1430,22 @@ proc input_csts { inp } {
 	if { $tp == $pl && $tf == $fr } {
 		# ten minutes until next poll
 		msg "collector params acknowledge: $cid = ($fr, $pl)"
-		set rate 600
+		set rate 3600
 	} else {
 		# until next poll
 		msg "collector params still wrong: $cid = ($fr, $pl)\
 			!= ($tf, $tp)"
-		set rate 30
+		set rate 240
 	}
 
-	roster_schedule "cmd_cpoll $cid" $rate $rate
+	roster_schedule "cmd_cpoll $cid" [iran $rate] $rate
 }
 
 proc input_avrp { inp } {
 #
 # Aggregator/sensor value report
 #
-	global Nodes Time SBN Sensors Converters
+	global Nodes Time SBN Sensors Converters OSSI
 
 	if ![regexp "Agg +(\[0-9\]+) +slot: +(\[0-9\]+),\
 	    +ts: +(\[^ \]+) +Col +(\[0-9\]+) +slot: +(\[0-9\]+), +ts:\
@@ -1436,9 +1471,11 @@ proc input_avrp { inp } {
 		return
 	}
 
-	# dynamic parameters; for now, we just store them in case we find some
-	# use for them later
-	set dp [list $Time $asl $ats]
+	# dynamic parameters; for now, we only store the slot number
+
+	set dp [lindex $ag 3]
+	set osc [lindex $dp 3]
+	set dp [list $Time $asl $ats $osc]
 	set Nodes($aid) [lrep $ag 3 $dp]
 
 	# locate the collector
@@ -1458,14 +1495,20 @@ proc input_avrp { inp } {
 		# this is void, so ignore it
 		msg "collector $cid is gone, values ignored"
 		assoc_agg "" $cid
-		roster_schedule "cmd_cpoll $cid" "" 30
+		roster_schedule "cmd_cpoll $cid" [iran 10] 240
 		return
 	}
 
-	# previous aggregator
-	set oai [lindex [lindex $co 3] 3]
-
-	# store the parameters, leave room for the aggregator Id
+	# dynamic parameters
+	set dp [lindex $co 3]
+	# previous aggeregator
+	set oai [lindex $dp 3]
+	# last slot
+	set osl [lindex $dp 1]
+	if { $osl != "" && $osl == $csl } {
+		# EEPROM full on the collector
+		msg "eeprom full on collector $cid"
+	}
 	set dp [list $Time $csl $cts $oai]
 	set Nodes($cid) [lrep $co 3 $dp]
 
@@ -1551,7 +1594,7 @@ proc cmd_cpoll { co } {
 	# static parameters
 	set dp [lindex $no 2]
 
-	uart_write "c $co $ag [lindex $dp 1] -1 [lindex $dp 0]"
+	uart_write "c $co $ag [lindex $dp 1] -1 [lindex $dp 2] [lindex $dp 0]"
 }
 
 proc cmd_apoll { ag } {
@@ -1571,6 +1614,24 @@ proc cmd_master { } {
 # Request our node to become master
 #
 	uart_write "m"
+}
+
+proc cmd_aerase { ag } {
+#
+# Request to erase EEPROM at the aggregator
+#
+	global OSSI
+
+	if { $ag == $OSSI } {
+		uart_write "E"
+	}
+}
+
+proc cmd_cerase { ag co } {
+#
+# Can this be done at all?
+#
+	return
 }
 
 proc external_command { } {
@@ -1599,12 +1660,12 @@ proc external_command { } {
 		return
 	}
 
-	set cmd [string trim [string range 0 $nl]]
+	set cmd [string trim [string range $cmd 0 $nl]]
 
 	if { $cmd != "" } {
 		# issue it
 		msg "external command: $cmd"
-		roster_schedule $cmd
+		roster_schedule "uart_write \"$cmd\"" "" ""
 	}
 
 	# delete the file
@@ -1713,12 +1774,12 @@ proc roster_init { } {
 
 	# set up the parameters of aggregators
 	foreach ag $Aggregators {
-		roster_schedule "cmd_apoll $ag" "" 30
+		roster_schedule "cmd_apoll $ag" 2 30
 	}
 
 	set tm 10
 	foreach co $Collectors {
-		roster_schedule "cmd_cpoll $co" $tm 50
+		roster_schedule "cmd_cpoll $co" $tm 60
 		incr tm 10
 	}
 }

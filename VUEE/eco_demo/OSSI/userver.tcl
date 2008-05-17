@@ -164,7 +164,7 @@ proc open_uart { } {
 	}
 
 	if [catch { fconfigure $ser -mode $Uart(PAR) -handshake none \
-		-blocking 0 -translation { auto crlf } } err] {
+		-buffering none -blocking 0 -translation { auto crlf } } err] {
 		msg "cannot configure UART $Uart(DEV)/$Uart(PAR): $err"
 		return 0
 	}
@@ -184,7 +184,7 @@ proc establish_connection { } {
 		return
 	}
 
-	if [catch { fconfigure $sok -blocking 0 -buffering line \
+	if [catch { fconfigure $sok -blocking 0 -buffering none \
 	    -translation auto -encoding binary } err] {
 		msg "socket configuration failed: $err"
 		return
@@ -200,13 +200,72 @@ proc establish_connection { } {
 
 	msg "connected"
 
-	set Uart(DONE) 0
+	set Uart(MORE) 1
+	set Uart(BUF) ""
+	set Uart(LS) 0
 
 	# wait for events
 	fileevent $Uart(SO) readable "uart_sokin"
 	fileevent $Uart(DE) readable "uart_devin"
 
-	vwait Uart(DONE)
+	while 1 {
+		vwait Uart(MORE)
+		if { $Uart(MORE) == 0 } {
+			# disconnected
+			return
+		}
+		uart_send
+	}
+}
+
+proc uart_send { } {
+#
+# Send a line to the master
+#
+	global Uart
+
+	# check if there is a line pending
+
+	set ix [string first "\n" $Uart(BUF)]
+	if { $ix < 0 } {
+		return
+	}
+
+	set tim [clock seconds]
+	if { $tim == $Uart(LS) } {
+		# no more than one line per second
+		set bs [string length $Uart(BUF)]
+		# drop lines if there's a lot
+		if { $bs > 256 } {
+			while 1 {
+				incr ix
+				set Uart(BUF) [string range $Uart(BUF) $ix end]
+				set bs [expr $bs - $ix]
+				if { $bs <= 128 } {
+					return
+				}
+				set ix [string first "\n" $Uart(BUF)]
+				if { $ix < 0 } {
+					return
+				}
+			}
+		}
+		return
+	}
+
+	# extract one line
+
+	set line [string trim [string range $Uart(BUF) 0 $ix]]
+	incr ix
+	set Uart(BUF) [string range $Uart(BUF) $ix end]
+
+	# and write it to the UART
+	set Uart(LS) $tim
+
+	# ignore UART errors
+	msg "-> $line"
+	catch { puts $Uart(DE) $line }
+	catch { flush $Uart(DE) }
 }
 
 proc uart_sokin { } {
@@ -220,7 +279,7 @@ proc uart_sokin { } {
 		catch { close $Uart(SO) }
 		set Uart(SO) ""
 		msg "broken connection: $res"
-		set Uart(DONE) 1
+		set Uart(MORE) 0
 		return
 	}
 
@@ -228,12 +287,12 @@ proc uart_sokin { } {
 		catch { close $Uart(SO) }
 		set Uart(SO) ""
 		msg "connection closed by peer"
-		set Uart(DONE) 1
+		set Uart(MORE) 0
 		return
 	}
 
-	# ignore UART errors
-	catch { puts -nonewline $Uart(DE) $res }
+	append Uart(BUF) $res
+	set Uart(MORE) 1
 }
 
 proc uart_devin { } {
@@ -260,7 +319,7 @@ proc uart_devin { } {
 		catch { close $Uart(SO) }
 		set Uart(SO) ""
 		msg "connection closed, write failed: $err"
-		set Uart(DONE) 1
+		set Uart(MORE) 0
 	}
 }
 
@@ -276,7 +335,7 @@ proc bad_usage { } {
 	puts "       -u uart_device, no default, required"
 	puts "       -h hostname, default is localhost"
 	puts "       -p port, default is 4445"
-	puts "       -e uart_encoding_params, default is 9600,n,8,1"
+	puts "       -e uart_encoding_params, default is 19200,n,8,1"
 	puts ""
 	exit 99
 }
@@ -345,12 +404,12 @@ if ![info exists Uart(DEV)] {
 }
 
 if ![info exists Uart(PAR)] {
-	set Uart(PAR) "9600,n,8,1"
+	set Uart(PAR) "19200,n,8,1"
 }
 
 set Uart(SO) ""
 
-open_log
+log_open
 
 while 1 {
 

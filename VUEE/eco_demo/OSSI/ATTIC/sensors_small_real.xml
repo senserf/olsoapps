@@ -1,15 +1,33 @@
 <!-- This is the network map file -->
 <map>
+    <plots>
+        <plot slice="z" min="0" max="10" units="m" src="images/above.png"
+              width="480" xdim="x" xlim="0,6" height="400" ydim="y" ylim="0,4">
+            from above
+        </plot>
+<!--         <plot slice="z" min="0" max="5" units="m" src="" -->
+<!--               width="600" xdim="x" xlim="0,3" height="400" ydim="y" ylim="0,3"> -->
+<!--             from above (&lt; 5m, cropped) -->
+<!--         </plot> -->
+<!--         <plot slice="z" min="5" max="10" units="m" src="" -->
+<!--               width="600" xdim="x" xlim="0,6" height="400" ydim="y" ylim="0,4"> -->
+<!--             from above (&gt; 5m) -->
+<!--         </plot> -->
+        <plot slice="x" min="0" max="10" units="m" src="images/side.png"
+              width="454" xdim="y" xlim="0,4" height="400" ydim="z" ylim="0,10">
+            from the east
+        </plot>
+    </plots>
 
     <aggregators>
 	<node id="10" power="7" frequency="10"></node>
     </aggregators>
 
     <collectors>
-	<node id="128" power="7" frequency="30">Node 128 (window)</node>
-	<node id="129" power="7" frequency="30">Node 129 (window)</node>
-	<node id="130" power="7" frequency="30">Node 130 (shelf)</node>
-	<node id="131" power="7" frequency="30">Node 131 (door)</node>
+	<node id="128" power="7" frequency="30" rxspan="100" x="0.1" y="1.4" z="4.5">window #1</node>
+	<node id="129" power="7" frequency="30" rxspan="100" x="0.1" y="2.3" z="4.5">window #2</node>
+	<node id="130" power="7" frequency="30" rxspan="100" x="4.5" y="2.4" z="7">shelf</node>
+	<node id="131" power="7" frequency="30" rxspan="100" x="5.9" y="0.4" z="0">door</node>
     </collectors>
 
     <ossi id="10"></ossi>
@@ -44,13 +62,13 @@
 
     <sensors>
 
-	<!-- Values in "emu" are for emulation -->
-	<sensor name="PAR 128" label="PAR" node="128" emu="0/12-1024"></sensor>
+	<!-- Values in text are for emulation -->
+	<sensor name="PAR 128" label="PAR" node="128" emu="0/0-1024"></sensor>
 	<sensor name="TMP 128" label="T" node="128" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 128" label="H" node="128" emu="2/1000-3000"></sensor>
 	<sensor name="DIO 128" label="PD" node="128" emu="3/0-2000"></sensor>
 
-	<sensor name="PAR 129" label="PAR" node="129" emu="0/12-1024"></sensor>
+	<sensor name="PAR 129" label="PAR" node="129" emu="0/0-1024"></sensor>
 	<sensor name="TMP 129" label="T" node="129" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 129" label="H" node="129" emu="2/1000-3000"></sensor>
 	<sensor name="DIO 129" label="PD" node="129" emu="3/0-2000"></sensor>
