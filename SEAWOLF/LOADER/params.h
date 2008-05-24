@@ -8,14 +8,24 @@
 // Fixed component of every packet (excluding the plugin-defined frame, i.e.,
 // Link Id and CRC). It covers the type and request number, which yield 2 bytes.
 #define	PSIZE_FRAME		2
-#define	PSIZE_BACK		(PSIZE_FRAME+0)	// No extra content
-#define	PSIZE_BACK_D		(PSIZE_BACK +8) // + status
 #define	PSIZE_NAK		(PSIZE_FRAME+2)	// Error code
 #define	PSIZE_RTS		(PSIZE_FRAME+0)	// Varies
 #define	PSIZE_GO		(PSIZE_FRAME+0)	// Varies
 #define	PSIZE_WTR		(PSIZE_FRAME+6)	// RLink + otype + oid
 #define	PSIZE_CHK		(PSIZE_FRAME+0)	// Varies
 #define	PSIZE_OSS		(PSIZE_FRAME+0)	// Varies
+#define	PSIZE_OSS_D		(PSIZE_OSS  +8) // + status
+#define	PSIZE_HELLO		(PSIZE_FRAME+4)	// ESN
+
+#define	OSS_PSIZE_GETI		6
+#define	OSS_PSIZE_PING		0
+#define	OSS_PSIZE_CLEAN		2
+#define	OSS_PSIZE_SHOW		2
+#define	OSS_PSIZE_LCDP		2
+#define	OSS_PSIZE_DUMP		6
+#define	OSS_PSIZE_EE		8
+
+#define	PACKET_QUEUE_LIMIT	16
 
 #define	XMIT_POWER		7			// Default
 #define	MAXPLEN			60			// Payload
@@ -25,10 +35,28 @@
 #define	MAXNEIGHBORS		16			// Neighbor table size
 #define	CHUNKSIZE		54
 
+#define	MAXNAGE			120			// Neighbor age
+
 // Object types
 #define	OTYPE_IMAGE	0	// Image
 #define	OTYPE_ILIST	1	// Image list
 #define	OTYPE_NLIST	2	// Neighbor list
+
+// Packet types
+#define	PT_DEBUG	0
+#define	PT_HELLO	1
+#define	PT_OSS		2
+#define	PT_GO		3
+#define	PT_WTR		4
+#define	PT_RTS		5
+#define	PT_CHUNK	6
+#define	PT_NAK		7
+
+// NAK codes
+#define	NAK_NF		0	// Not found
+#define	NAK_BUSY	1
+#define	NAK_REJECT	2
+#define	NAK_UNEXP	3
 
 // OSS codes (one nibble)
 #define	OSS_DONE	0
@@ -36,9 +64,21 @@
 #define	OSS_BAD		2
 #define	OSS_BUSY	3
 #define	OSS_UNIMPL	4
-#define	OSS_GETI	8
-#define	OSS_CLEAN	9
-#define	OSS_PING	10
+#define	OSS_GETI	5
+#define	OSS_CLEAN	6
+#define	OSS_PING	7
+#define	OSS_SHOW	8
+#define	OSS_LCDP	9
+
+#ifdef DEBUGGING
+
+#define	OSS_DUMP	10
+#define	OSS_EE		11
+
+#endif
+
+// Remote request types (only one supported at present)
+#define	RQ_GET		1
 
 // Endianness dependencies
 
@@ -50,7 +90,7 @@
 // Two words to long
 #define lofw(a,b)	((lword)(a) | ((lword)(b) << 16))
 // Word of bytes (a is a byte pointer)
-#define	wofb(a)		((word)(*(a  )) << 8) | *(a+1))
+#define	wofb(a)		(((word)(*(a  )) << 8) | *(a+1))
 #else
 #define	fhol(a)		((word)((a) >> 16))
 #define	shol(a)		((word)((a)      ))
@@ -60,6 +100,14 @@
 
 // Randomized HELLO interval
 #define	INTV_HELLO	(8192 - 0x7f + (rnd () & 0xff))
+// Response timeout
+#define	INTV_REPLY	1024	// one second?
+// Inter chunk space
+#define	INTV_CHUNK	256
+// Between multiple STOP packets
+#define	INTV_STOP	512
+// Number of STOPs
+#define	NSTOPS		2
 
 // Macros to extract/fill packet contents
 #define	put1(p,b)	tcv_write (p, (const char*)(&(b)), 1)
@@ -73,15 +121,15 @@
 // object type
 typedef struct {
 
-	Boolean (fun_lkp_snd*)(word);		// Object lookup for xmission
-	word    (fun_rts_snd*)(address);	// Send object params
-	Boolean (fun_cls_snd*)(address);	// Unpack chunk list
-	word	(fun_cnk_snd*)(address);	// Fill chunk and advance
+	Boolean (*fun_lkp_snd)(word);		// Object lookup for xmission
+	word    (*fun_rts_snd)(address);	// Send object params
+	Boolean (*fun_cls_snd)(address);	// Unpack chunk list
+	word	(*fun_cnk_snd)(address);	// Fill chunk and advance
 
-	Boolean (fun_ini_rcp*)(address);	// Initialize reception
-	Boolean (fun_stp_rcp*)();		// Stop reception (OK or bad)
-	Boolean (fun_cnk_rcp*)(address, word);	// Receive a chunk
-	word    (fun_cls_rcp*)(address);	// Remaining chunk list
+	Boolean (*fun_ini_rcp)(address);	// Initialize reception
+	Boolean (*fun_stp_rcp)();		// Stop reception (OK or bad)
+	Boolean (*fun_cnk_rcp)(word, address);	// Receive a chunk
+	word    (*fun_cls_rcp)(address);	// Remaining chunk list
 
 } fun_pak_t;
 
@@ -128,7 +176,7 @@ typedef	struct {
 
 #define	OLSData		((old_s_t*)DHook)
 #define olsd_size	(OLSData->size)
-#define olsd_cbf	(OLSData->cbf)
+#define olsd_cbf	(&(OLSData->cbf[0]))
 #define	olsd_ros	(OLSData->ros)
 #define	olsd_cch	(OLSData->cch)
 #define	olsd_ccs	(OLSData->ccs)
@@ -140,6 +188,24 @@ typedef struct {
 	ctally_t	cta;
 
 } old_r_t;
+
+//
+// Chunk handler macros
+//
+Boolean croster_init (croster_t*, address);
+word croster_next (croster_t*);
+
+#define	ctally_present(ct,cn)	((ct)->cstat [(cn)>>3] & (1 << ((cn)&7)))
+#define	ctally_missing(ct,cn)	(!ctally_present (ct, cn))
+#define ctally_update(ct)	do { while ((ct)->f < (ct)->n && \
+					ctally_present (ct, (ct)->f)) \
+						(ct)->f++; } while (0)
+#define	ctally_ctsize(nc)	(((nc)+7) >> 3)
+
+void ctally_init (ctally_t*, word);
+word ctally_fill (ctally_t*, address);
+Boolean ctally_full (ctally_t*);
+Boolean ctally_add (ctally_t*, word);
 
 #define	OLRData 	((old_r_t*)DHook)
 #define	olrd_cta	(OLRData->cta)
@@ -161,7 +227,17 @@ Boolean objl_cls_snd (address);
 word objl_cnk_snd (address);
 Boolean objl_ini_rcp (address, olist_t**);
 Boolean objl_cnk_rcp (address, olist_t**);
-word objl_cls_rcp (packet);
+word objl_cls_rcp (address);
 Boolean objl_stp_rcp (olist_t**);
+
+#include "lcdg_n6100p.h"
+
+#ifdef DEBUGGING
+void diagg (const char*);
+void diagl (word);
+#else
+#define	diagg(a)	CNOP
+#define	diagl(a)	CNOP
+#endif
 
 #endif

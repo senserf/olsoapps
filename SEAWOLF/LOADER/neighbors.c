@@ -36,7 +36,7 @@ void neighbors_clean (byte what) {
 
 	if ((what & CLEAN_NEI)) {
 		// Own neighbor list
-		for (i = wc = 0; i < MAXNEIGHBORS; i++)
+		for (i = 0; i < MAXNEIGHBORS; i++)
 			NTable [i] . esn = 0;
 	}
 
@@ -56,8 +56,11 @@ void hello_in (address p) {
 	lword e;
 	word i, j;
 
-	if (tcv_left (p) < 4)
+	if (tcv_left (p) < 5)
 		return;
+
+	// Ignore the request number byte
+	get1 (p, e);
 	get4 (p, e);
 	for (j = MAXNEIGHBORS, i = 0; i < MAXNEIGHBORS; i++) {
 		// First try to look up this one
@@ -65,7 +68,7 @@ void hello_in (address p) {
 			NTable [i] . when = (word) seconds ();
 			return;
 		}
-		if (NTable [i] == 0)
+		if (NTable [i] . esn == 0)
 			j = i;
 	}
 
@@ -87,7 +90,7 @@ static word do_neilist (byte *buf) {
 	size = 2;	// Link Id of the owner
 
 	if (buf)
-		*((word*)buf = MCN;
+		*((word*)buf) = MCN;
 
 	for (i = 0; i < MAXNEIGHBORS; i++) {
 		if (NTable [i] . esn != 0) {
@@ -116,7 +119,7 @@ static Boolean neil_lkp_snd (word oid) {
 			// No memory, refuse
 			return NO;
 
-		do_imglist (&olsd_cbf);
+		do_neilist (olsd_cbf);
 	
 	} else if (oid == 1) {
 
@@ -146,7 +149,7 @@ static Boolean neil_ini_rcp (address packet) {
 	return objl_ini_rcp (packet, &RNList);
 }
 
-static Boolean neil_cnk_rcp (address packet, word st) {
+static Boolean neil_cnk_rcp (word st, address packet) {
 //
 // Receive a chunk
 //
@@ -176,8 +179,7 @@ thread (nager)
 			if ((s >= (t = NTable [i] . when) && s < t + MAXNAGE) ||
 			    (s < t && t + MAXNAGE > s))
 				// Delete
-				NTable [i] = 0;
-			}
+				NTable [i] . esn = 0;
 		}
 	}
 

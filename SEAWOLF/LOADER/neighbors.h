@@ -11,6 +11,8 @@ typedef struct {
 
 } neighbor_t;
 
+#define	NAGFREQ		4096	// Run frequency for the neighbor ager
+
 // Cleanups flags
 #define	CLEAN_NEI	0x01	// Own table
 #define	CLEAN_NEI_LIST	0x02	// List received from elsewhere

@@ -14,7 +14,7 @@ const tcvplug_t plug_sea =
 		{ tcv_ope_sea, tcv_clo_sea, tcv_rcv_sea, tcv_frm_sea,
 			tcv_out_sea, tcv_xmt_sea, NULL,
 				0x0083 /* Plugin Id */ };
-static word QPackets = 0;
+static int* desc = NULL;
 
 int tcv_ope_sea (int phy, int fd, va_list plid) {
 /*
@@ -67,16 +67,12 @@ int tcv_frm_sea (address p, int phy, tcvadp_t *bounds) {
 
 int tcv_out_sea (address p) {
 
-	QPackets++;
 	return TCV_DSP_XMT;
 
 }
 
 int tcv_xmt_sea (address p) {
 
-	QPackets--;
-	if (QPackets == PACKET_QUEUE_LIMIT)
-		SENDIT;
 	return TCV_DSP_DROP;
 }
 

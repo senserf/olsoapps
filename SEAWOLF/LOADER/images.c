@@ -9,6 +9,10 @@ static	word	NEPages,	// Number of pages in EEPROM
 		INOld,		// Oldest used file number
 		INNew;		// First available file number
 
+static	byte	Flags;		// Internal flags (one used at present)
+
+#define	FLAG_GOTOWN	0x01	// Own image present (here's the one)
+
 // ===========================================================================
 
 typedef struct {
@@ -16,17 +20,25 @@ typedef struct {
 // Transaction structure for sending an image
 //
 	croster_t	ros;
-	word		n,	// The number of chunks
-			cch,	// Current outgoing chunk number
-			x, y;	// Geometry
-	word		pp [0];	// Page numbers
+// ----------------
+	word		n;			// The number of chunks
+	word		x;
+	word		y;
+	word		np;
+	word		ppt [IMG_MAXPPI];	// Page numbers
+	byte		lab [IMG_MAX_LABEL];
+// ----------------
+	word		cch;			// Current outgoing chunk number
+	word		cmap [0];		// Chunk map
 
 } img_s_t;
 
 #define	IMSData		((img_s_t*)DHook)
 #define	imsd_n		(IMSData->n)
-#define	imsd_pp		(IMSData->pp)
+#define	imsd_ppt	(IMSData->ppt)
+#define	imsd_cmap	(IMSData->cmap)
 #define	imsd_ros	(IMSData->ros)
+#define	imsd_lab	(IMSData->lab)
 #define	imsd_cch	(IMSData->cch)
 #define	imsd_x		(IMSData->x)
 #define	imsd_y		(IMSData->y)
@@ -37,28 +49,62 @@ typedef struct {
 //
 // For receiving an image
 //
-	lword		ccp;	// Chunk pointer to write to eeprom
-	address		pap;	// Pointer to the chunk in the packet
-
-	ctally_t	cta;
-	word		x, y,	// geometry
-	word		fc;	// first chunk behind the label
+	lword		cpp;	// Chunk pointer to write to eeprom
+// ----------------
+	word		n;	// This looks like the image signature
+	word		x, y;	// geometry
+	word		np;	// Number or pages
+	word		ppt [IMG_MAXPPI];	// Page numbers
+// ----------------
+	word		cp;	// Current page index
 	byte		bpp;	// bits per pixel (nonzero == 8)
 	Boolean		rdy;	// eeprom ready flag
-	word		pp [0];	// page numbers
+
+	ctally_t	cta;
 
 } img_r_t;
 
 #define	IMRData		((img_r_t*)DHook)
-#define	imrd_ccp	(IMRData->ccp)
-#define	imrd_pap	(IMRData->pap)
-#define	imrd_cta	(IMRData->cta)
+#define	imrd_cpp	(IMRData->cpp)
+#define	imrd_cp		(IMRData->cp)
+#define	imrd_n		(IMRData->n)
 #define	imrd_x		(IMRData->x)
 #define	imrd_y		(IMRData->y)
-#define	imrd_fc		(IMRData->fc)
+#define	imrd_np		(IMRData->np)
 #define	imrd_bpp	(IMRData->bpp)
 #define	imrd_rdy	(IMRData->rdy)
-#define	imrd_pp		(IMRData->pp)
+#define	imrd_ppt	(IMRData->ppt)
+#define	imrd_cta	(IMRData->cta)
+
+// ===========================================================================
+
+typedef struct {
+//
+// For rendering an image from EEPROM
+//
+	word		x, y;			// geometry
+	word		cx;			// current pixel to render
+	word		fc;			// first chunk behind the label
+	word		n;			// Number of chunks
+	byte		bpp;			// bits per pixel (nonzero == 8)
+	byte		chk [CHUNKSIZE];
+	word		pp [IMG_MAXPPI];	// page numbers
+
+} img_d_t;
+
+#define	IMDData		((img_d_t*)DHook)
+#define	imdd_x		(IMDData->x)
+#define	imdd_y		(IMDData->y)
+#define	imdd_cx		(IMDData->cx)
+#define	imdd_fc		(IMDData->fc)
+#define	imdd_n		(IMDData->n)
+#define	imdd_bpp	(IMDData->bpp)
+#define	imdd_chk	(IMDData->chk)
+#define	imdd_pp		(IMDData->pp)
+
+// ============================================================================
+
+static const word errw = 0xffff;
 
 // ============================================================================
 
@@ -66,24 +112,25 @@ void images_init () {
 //
 // Initializes the page map
 //
-	lword ep, ch;
-	word pn, min, max;
+	lword ep;
+	word ch, pn, cp, min, max;
 
-	NEPages = (word)(ee_size () >> IMG_PAGE_SHIFT);
+	NEPages = (word)(ee_size (NULL, NULL) >> IMG_PAGE_SHIFT);
 
 	max = 0;
 	min = MAX_WORD;
+	Flags = 0;
 
 	for (pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
-		ee_read (ep + IMG_PO_MAGIC, (byte*)(&ch), 4);
-		if (ch != IMG_MAGIC_FIRST)
-			// Not the first page of an image
+		ee_read (ep + IMG_PO_MAGIC, (byte*)(&ch), 2);
+		if (ch != 0x7f00)
 			continue;
 		ee_read (ep + IMG_PO_NUMBER, (byte*)(&cp), 2);
-		if ((cp & 0x8000))
-			// Special, ignore
+		if ((cp & 0x8000)) {
+			Flags |= FLAG_GOTOWN;
 			continue;
+		}
 		if (cp > max)
 			max = cp;
 		if (cp < min)
@@ -102,8 +149,8 @@ void images_init () {
 	INNew = min;
 	for (pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
-		ee_read (ep + IMG_PO_MAGIC, (byte*)(&ch), 4);
-		if (ch != IMG_MAGIC_FIRST)
+		ee_read (ep + IMG_PO_MAGIC, (byte*)(&ch), 2);
+		if (ch != 0x7f00)
 			// Not the first page of an image
 			continue;
 		ee_read (ep + IMG_PO_NUMBER, (byte*)(&cp), 2);
@@ -125,33 +172,55 @@ void images_init () {
 		INNew = 0;
 }
 
-static void image_delete (word num, word *pa, word max) {
+static word image_delete (word num, word *pa, word max) {
 //
-// Erase the image with the specified number, return the number of released
-// pages
+// Erase the image with the specified number, return the number of pages
+// that remain needed after the operation
 //
-	lword ep,
-	word cw, pn;
+	lword ep;
+	word pn, cw;
+	img_sig_t *sig;
+
+	if ((sig = (img_sig_t*) umalloc (IMG_SIGSIZE)) == NULL)
+		return max;
 
 	for (pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
-		if (cw == IMAGE_MAGIC_USED) {
+		if (cw == 0x7f00) {
 			ee_read (ep + IMG_PO_NUMBER, (byte*)(&cw), 2);
-			if (cw == num) {
-				cw = IMG_MAGIC_FREE;
-				ee_write (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
-				if (pa && max) {
-					*pa++ = pn;
-					max--;
-				}
-			}
+			if (cw != num)
+				continue;
+			ee_read (ep + IMG_PO_SIG, (byte*)sig, IMG_SIGSIZE);
+			if (sig->ppt [0] != pn)
+				// Basic consistency check
+				continue;
+
+			goto Erase;
 		}
 	}
+
+	// Not found
+	ufree (sig);
+	return max;
+Erase:
+	while (sig->np) {
+		--(sig->np);
+		pn = sig->ppt [sig->np];
+		if (pa && max) {
+			*pa++ = pn;
+			max--;
+		}
+		ep = pntopa (pn);
+		ee_write (WNONE, ep + IMG_PO_MAGIC, (byte*)(&errw), 2);
+	}
+
+	ufree (sig);
+	ee_sync (WNONE);
 	return max;
 }
 
-static void linum (word wc) {
+static word linum (word wc) {
 //
 // Transform image number from internal to logical
 //
@@ -164,18 +233,24 @@ static void linum (word wc) {
 	return wc - INOld + 1;
 }
 
-static void iinum (word wc) {
+static word iinum (word wc) {
 //
 // Transform image number from logical to internal
 //
-	if (wc == 0)
-		// Image zero 
-		return IMG_NUM_OWN;
-	wc--;
-	if ((wc += INOld) >= 0x8000)
-		wc -= 0x8000;
+	word ix;
 
-	return wc;
+	if (wc == 0)
+		return IMG_NUM_OWN;
+
+	ix = INOld;
+	while (1) {
+		if (ix == INNew)
+			return WNONE;
+		if (--wc == 0)
+			return ix;
+		if (++ix == 0x8000)
+			ix = 0;
+	}
 }
 
 void images_status (address packet) {
@@ -206,15 +281,20 @@ void images_clean (byte what) {
 //
 	lword ep;
 	word pn, cw;
+	img_sig_t *sig;
+
+	if ((sig = (img_sig_t*) umalloc (IMG_SIGSIZE)) == NULL)
+		return;
 
 	if ((what & (CLEAN_IMG_OWN | CLEAN_IMG))) {
 		// Erase images in eeprom
 		for (pn = 0; pn < NEPages; pn++) {
 			ep = pntopa (pn);
 			ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
-			if (cw != IMAGE_MAGIC_USED)
-				// No need to touch this one
+			if (cw != 0xf700) 
+				// Continue
 				continue;
+
 			if ((what & (CLEAN_IMG_OWN | CLEAN_IMG)) !=
 			    (CLEAN_IMG_OWN | CLEAN_IMG)) {
 				// Have to check what it is
@@ -225,12 +305,25 @@ void images_clean (byte what) {
 				    cw == IMG_NUM_OWN)
 					continue;
 			}
-			// Erase it
-			cw = IMG_MAGIC_FREE;
-			ee_write (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
+
+			ee_read (ep + IMG_PO_SIG, (byte*)sig, IMG_SIGSIZE);
+			if (sig->ppt [0] != pn || sig->np > IMG_MAXPPI)
+				// Something wrong
+				continue;
+
+			// Erase pages
+			while (sig->np) {
+				--(sig->np);
+				ep = pntopa (sig->ppt [sig->np]);
+				ee_write (WNONE, ep + IMG_PO_MAGIC,
+					(byte*)(&errw), 2);
+			}
+			ee_sync (WNONE);
 		}
 		if ((what & CLEAN_IMG))
 			INOld = INNew = 0;
+		if ((what & CLEAN_IMG_OWN))
+			Flags &= ~FLAG_GOTOWN;
 	}
 
 	if ((what & CLEAN_IMG_LIST)) {
@@ -240,6 +333,78 @@ void images_clean (byte what) {
 			RIList = NULL;
 		}
 	}
+	ufree (sig);
+}
+
+Boolean images_show (word in) {
+//
+// Show the image with the given logical number; note that logical 0 stands for
+// 'own' image
+//
+	lword ep;
+	word pn, cw, cx, cy;
+	img_sig_t *sig;
+	byte bpp;
+
+	if ((in = iinum (in)) == WNONE)
+		return NO;
+
+	// Locate the first page of the image
+	for (pn = 0; pn < NEPages; pn++) {
+		ep = pntopa (pn);
+		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
+		if (cw != 0x7f00)
+			continue;
+		ee_read (ep + IMG_PO_NUMBER, (byte*)(&cw), 2);
+		if (cw == in)
+			goto Render;
+	}
+
+	// Not found
+	return NO;
+Render:
+	if ((sig = (img_sig_t*) umalloc (sizeof (img_sig_t))) == NULL)
+		return NO;
+
+	ee_read (ep + IMG_PO_SIG, (byte*)sig, IMG_SIGSIZE);
+	if (sig->ppt [0] != pn || sig->np > IMG_MAXPPI) {
+		// Something wrong
+		ufree (sig);
+		return NO;
+	}
+
+	bpp = (sig->x & 0x8000) != 0;
+	sig->x &= ~0x8000;
+
+	lcdg_set (0, 0, 0, 0, 0);
+	lcdg_clear (COLOR_BLACK);
+	lcdg_set (0, 0, (byte)(sig->x), (byte)(sig->y), bpp);
+
+	bpp = bpp ? PIXPERCHK8 : PIXPERCHK12;
+
+	// Initial offset on first page
+	cw = 0;
+	ep = pntopa (sig->ppt [pn = 0]);
+	while (sig->nc) {
+		if ((cw += CHUNKSIZE+2) > IMG_MAX_COFF) {
+			pn++;
+			ep = pntopa (sig->ppt [pn]);
+			cw = 0;
+		}
+		// Render this chunk
+		ee_read (ep + cw, (byte*)(&(sig->cn)), CHUNKSIZE + 2);
+
+		// Starting pixel of the chunk
+		cx = sig->cn * bpp;
+		cy = cx / sig->x;
+		cx = cx % sig->x;
+		lcdg_render ((byte)cx, (byte)cy, sig->chunk, bpp);
+		sig->nc--;
+	}
+
+	// Done
+	ufree (sig);
+	return YES;
 }
 
 // ============================================================================
@@ -248,10 +413,11 @@ void images_clean (byte what) {
 
 static word do_imglist (byte *buf) {
 //
-// Calculate the list length and (optionally) fill the list is pointer != NULL
+// Calculate the list length and (optionally) fill the list if pointer != NULL
 //
-	lword ep, ch;
+	lword ep;
 	word size, wc, pn, wls;
+	byte bc;
 
 	size = 2;
 	// The minimum size is 2. The first word contains the link Id of the
@@ -262,19 +428,23 @@ static word do_imglist (byte *buf) {
 
 	for (pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
-		ee_read (ep + IMG_PO_MAGIC, (byte*)(&ch), 4);
-		if (ch != IMG_MAGIC_FIRST)
+		ee_read (ep + IMG_PO_MAGIC, (byte*)(&wc), 2);
+		if (wc != 0x7f00)
 			continue;
-		// Label size
-		ee_read (ep + IMG_PO_LL, (byte*)(&wls), 2);
-		if (wls) {
-			// There is a label, its actual length is in the first
-			// word of the image
-			ee_read (ep + IMG_PO_CHUNKS, (byte*)(&wls), 2);
-			if (wls > 64)
-				// This is in words
-				wls = 64;
+
+		// Label size, not extremely efficient
+		for (wls = 0; wls < IMG_MAX_LABEL; wls++) {
+			ee_read (ep + IMG_PO_LABEL, &bc, 1);
+			if (bc == 0)
+				break;
 		}
+
+		if (wls < IMG_MAX_LABEL)
+			// Sentinel included
+			wls++;
+		if ((wls & 1))
+			wls++;
+
 		if (buf) {
 			// Total description size; the size word doesn't
 			// count
@@ -282,7 +452,7 @@ static word do_imglist (byte *buf) {
 			size += 2;
 
 			// Image number
-			ee_read (ep + IMG_PO_NUMBER, wc, 2);
+			ee_read (ep + IMG_PO_NUMBER, (byte*)(&wc), 2);
 			// Transform into external
 			wc = linum (wc);
 			*((word*)(buf+size)) = wc;
@@ -293,12 +463,11 @@ static word do_imglist (byte *buf) {
 			size += 2;
 
 			// Geometry
-			ee_read (ep + IMG_PO_X, by + size, 4);
+			ee_read (ep + IMG_PO_X, buf + size, 4);
 			size += 4;
 
 			// The label
-			if (wls)
-				ee_read (ep + IMG_PO_CHUNKS+1, buf + size, wls);
+			ee_read (ep + IMG_PO_LABEL, buf + size, wls);
 		} else {
 			// - size word (next pointer)
 			// - node's file number
@@ -331,7 +500,7 @@ static Boolean imgl_lkp_snd (word oid) {
 			// No memory, refuse
 			return NO;
 
-		do_imglist (&olsd_cbf);
+		do_imglist (olsd_cbf);
 	
 	} else if (oid == 1) {
 
@@ -365,7 +534,7 @@ static Boolean imgl_ini_rcp (address packet) {
 	return objl_ini_rcp (packet, &RIList);
 }
 
-static Boolean imgl_cnk_rcp (address packet, word st) {
+static Boolean imgl_cnk_rcp (word st, address packet) {
 //
 // Receive a chunk (state is ignored, we are always ready)
 //
@@ -383,85 +552,88 @@ static Boolean imgl_stp_rcp () {
 // Functions for sending/receiving images =====================================
 // ============================================================================
 
-static img_lkp_snd (word oid) {
+static Boolean img_lkp_snd (word oid) {
 //
 // The Id is the 'logical' image number, e.g., as conveyed in the image list
 //
 	lword ep;
-	word cw, ic, np, pn;
+	word cw, np, pn, ws;
 
 	// Logical to internal
-	oid = iinum (oid);
+	if ((oid = iinum (oid)) == WNONE)
+		return NO;
 
 	for (np = pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
-		if (cw == IMG_MAGIC_USED) {
-			ee_read (ep + IMG_PO_NUMBER, (byte*)(&cw), 2);
-			if (cw == oid)
-				np++;
-		}
-	}
-
-	if (np == 0)
-		return NO;
-
-	if (alloc_dhook (sizeof (img_s_t) + sizeof (word) * np) == NULL)
-		return NO;
-
-	for (cw = 0; cw < np; cw++)
-		// To detect inconsistencies
-		imsd_pp [cw] = WNONE;
-
-	// The second round
-	for (pn = 0; pn < NEPages; pn++) {
-		ep = pntopa (pn);
-		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
-		if (cw != IMG_MAGIC_USED)
+		if (cw != 0x7f00)
 			continue;
 		ee_read (ep + IMG_PO_NUMBER, (byte*)(&cw), 2);
 		if (cw != oid)
-			continue;
-		// One of ours: get the page number
-		ee_read (ep + IMG_PO_PN, (byte*)(&cw), 2);
-		if (cw >= np || imsd_pp [cw] != WNONE) {
-			// Illegal
-BadImg:
+			break;
+	}
+
+	if (pn == NEPages)
+		return NO;
+
+	ee_read (ep + IMG_PO_NCHUNKS, (byte*)(&cw), 2);
+	if (cw == 0 || cw > IMG_MAXCHUNKS)
+		return NO;
+
+	if (alloc_dhook (sizeof (img_s_t) + (cw >> 1)) == NULL)
+		return NO;
+
+	// Build the chunk map
+	ee_read (ep + IMG_PO_SIG, (byte*)(&imsd_n), IMG_SIGSIZE+IMG_MAX_LABEL);
+
+	for (cw = 0; cw < imsd_n; cw++)
+		imsd_cmap [cw] = WNONE;
+
+	ep = pntopa (imsd_ppt [pn = 0]);
+	for (ws = cw = 0; cw < imsd_n; cw++) {
+		if (ws > IMG_MAX_COFF) {
+			pn++;
+			ep = pntopa (imsd_ppt [pn]);
+			ws = 0;
+		}
+
+		ee_read (ep + ws, (byte*)(&np), 2);
+
+		if (imsd_cmap [cw] != WNONE) {
+			// Bad image
 			ufree (DHook);
 			DHook = NULL;
 			return NO;
 		}
-		imsd_pp [cw] = pn;
-		if (cw == 0) {
-			// Image parameters
-			ee_read (ep + IMG_PO_NCHUNKS, (byte*)(&imsd_n), 2);
-			if (chunks_to_pages (imsd_n) != np)
-				goto BadImg;
-			ee_read (ep + IMG_PO_X, (byte*)(&imsd_x), 2);
-			ee_read (ep + IMG_PO_Y, (byte*)(&imsd_y), 2);
-			// Label bypass (needed temporarily)
-			ee_read (ep + IMG_PO_LL, (byte*)(&imsd_cch), 2);
-		}
-	}
 
-	for (cw = 0; cw < np; cw++)
-		if (imsd_pp [cw] == WNONE)
-			goto BadImg;
+		imsd_cmap [cw] = (pn << IMG_PAGE_SHIFT) | ws;
+	}
 
 	return YES;
 }
 
 static word img_rts_snd (address packet) {
 //
-// Send the image parameters; for now, it is only the total number of chunks
+// Send the image parameters
 //
+	word ll;
+
+	for (ll = 0; ll < IMG_MAX_LABEL; ll++)
+		if (imsd_lab [ll] == 0)
+			break;
+
+	// No sentinel
+	if ((ll & 1))
+		ll++;
+
 	if (packet != NULL) {
 		put2 (packet, imsd_n);
 		put2 (packet, imsd_x);
 		put2 (packet, imsd_y);
-		put2 (packet, imsd_cch);
+		memcpy ((byte*)(packet + 10), imsd_lab, ll);
 	}
-	return 8;
+
+	return 6 + ll;
 }
 
 static Boolean img_cls_snd (address packet) {
@@ -483,17 +655,18 @@ static word img_cnk_snd (address packet) {
 		return CHUNKSIZE;
 	}
 
-	cn = imsd_cch;
-	put2 (packet, cn);
+	// Note: this assumes that the variant with packet != NULL is
+	// called immediately after one with packet == NULL; thus, imsd_cch
+	// is set in the previous turn
 
-	pn = 0;
-	// Avoid division: this is max 4 turns
-	while (cn >= IMG_CHK_PAGE) {
-		pn++;
-		cn -= IMG_CHK_PAGE;
-	}
+	put2 (packet, imsd_cch);
 
-	ee_read (pntopa (imsd_pp [pn]) + cn * CHUNKSIZE, (byte*)(packet+3),
+	// Chunk coordinates
+	cn = imsd_ppt [imsd_cch];
+	pn = cn >> IMG_PAGE_SHIFT;
+	cn &= IMG_PAGE_MASK;
+
+	ee_read (pntopa (imsd_ppt [pn]) + cn + 2, (byte*)(packet+3),
 		CHUNKSIZE);
 
 	return CHUNKSIZE;
@@ -514,34 +687,32 @@ static Boolean img_ini_rcp (address packet) {
 
 	// The total number of chunks
 	get2 (packet, nc);
-	if (nc == 0)
-		// Something wrong
-		return NO;
 
 	// The number of pages required (at least 1)
-	np = chunks_to_pages (nc);
+	if (nc == 0 || (np = chunks_to_pages (nc)) > IMG_MAXPPI)
+		// Illegal image size
+		return NO;
 
 	// Allocate the operation structure
-	if (alloc_dhook (sizeof (img_r_t) + sizeof (word) * np) == NULL)
+	if (alloc_dhook (sizeof (img_r_t) + ctally_ctsize (nc)) == NULL)
 		// No memory
 		return NO;
 
+	imrd_np = np;
+	imrd_n = nc;
 	ctally_init (&imrd_cta, nc);
 
 	// X
-	get2 (packet, nc);
-	imrd_bpp = (nc & 0x8000) ? LCDGF_8BPP : 0;
-	imrd_x = (nc & 0x7fff);
+	get2 (packet, imrd_x);
+	imrd_bpp = (imrd_x & 0x8000) ? LCDGF_8BPP : 0;
 
 	// Y
 	get2 (packet, imrd_y);
 
-	// Label bypass
-	get2 (packet, imrd_fc);
-
 	if ((RQFlag & IRT_OWN)) {
 		// Replace own image: erase old version
 		image_delete (IMG_NUM_OWN, NULL, 0);
+		Flags &= ~FLAG_GOTOWN;
 	}
 
 	// Need np free pages
@@ -549,17 +720,18 @@ static Boolean img_ini_rcp (address packet) {
 	for (nc = pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
-		if (cw != IMG_MAGIC_USED) {
+		if (cw == errw) {
 			// A free page
-			imrd_pp [nc++] = pn;
+			imrd_ppt [nc++] = pn;
 			if (nc == np)
 				// All we need
 				break;
+		}
 	}
 
 	while (nc < np) {
 		// Delete old files
-		if (INOld == INNew)
+		if (INOld == INNew) {
 			// This cannot happen
 Drop:
 			ufree (DHook);
@@ -567,11 +739,38 @@ Drop:
 			return NO;
 		}
 		// Delete image number INOld
-		nc = np - image_delete (INOld, imrd_pp + nc, np - nc);
+		nc = np - image_delete (INOld, imrd_ppt + nc, np - nc);
 
 		if (++INOld == 0x8000)
 			INOld = 0;
 	}
+
+	// Intialize the out pointer
+	imrd_cp = 0;
+	imrd_cpp = pntopa (imrd_ppt [imrd_cp]);
+
+	// Start the first page
+	cw = 0x7f00;
+	ee_write (WNONE, imrd_cpp + IMG_PO_MAGIC, (byte*)(&cw), 2);
+
+	// The number
+	cw = (RQFlag & IRT_OWN) ? IMG_NUM_OWN : INNew;
+	ee_write (WNONE, imrd_cpp + IMG_PO_NUMBER, (byte*)(&cw), 2);
+
+	// The sigature
+	ee_write (WNONE, imrd_cpp + IMG_PO_SIG, (byte*)(&imrd_n), IMG_SIGSIZE);
+
+	// The label
+	cw = tcv_left (packet);
+	nc = 0;
+	if (cw) {
+		ee_write (WNONE, imrd_cpp + IMG_PO_LABEL, (byte*)(packet + 5),
+			cw);
+	}
+	ee_write (WNONE, imrd_cpp + IMG_PO_LABEL + cw, (byte*)(&nc), 1);
+
+	imrd_x &= 0x7fff;
+	imrd_cpp += CHUNKSIZE + 2;
 
 	if ((RQFlag & IRT_SHOW)) {
 		lcdg_set (0, 0, 0, 0, 0);
@@ -582,25 +781,38 @@ Drop:
 
 	imrd_rdy = YES;
 
-	return OK;
+	return YES;
 }
 
 static Boolean img_stp_rcp () {
 //
 // Terminate image reception
 // 
-	if (ctally_full (&imrd_cta))
+	lword ep, ch;
+	word pn, fn, wc;
+
+	if (ctally_full (&imrd_cta)) {
+		// Reception OK
+		if ((RQFlag & IRT_OWN)) {
+			Flags |= FLAG_GOTOWN;
+		} else {
+			if (++INNew == 0x8000)
+				INNew = 0;
+		}
+		ee_sync (WNONE);
 		return YES;
+	}
 
-	if ((RQFlag & IRT_SHOW))
-		// The image is bad
-		lcdg_set (0, 0, 0, 0, 0);
-		lcdg_clear (COLOR_BLACK);
-
+	// Release the pages back
+	for (pn = 0; pn < imrd_np; pn++) {
+		ep = pntopa (imrd_ppt [pn]);
+		ee_write (WNONE, ep + IMG_PO_MAGIC, (byte*)(&errw), 2);
+	}
+	ee_sync (WNONE);
 	return NO;
 }
 
-static Boolean img_cnk_rcp (address packet, word st) {
+static Boolean img_cnk_rcp (word st, address packet) {
 //
 // Receive a chunk of image
 //
@@ -610,7 +822,7 @@ static Boolean img_cnk_rcp (address packet, word st) {
 		// Starting write
 		if ((cn = tcv_left (packet)) != CHUNKSIZE+2) {
 			// It can only be zero or max
-			if (cn != 0) {
+			if (cn != 0)
 				// Just ignore
 				return YES;
 		}
@@ -618,45 +830,43 @@ static Boolean img_cnk_rcp (address packet, word st) {
 		// The chunk number
 		get2 (packet, cn);
 
-		if (cn >= imrd_n)
+		if (cn >= imrd_cta.n)
 			// Illegal, ignore
 			return YES;
 
 		// Tally it in
-		ctally_add (&imrd_cta, cn);
+		if (ctally_add (&imrd_cta, cn))
+			// Void, present already
+			return YES;
 
-		// Where the chunk starts
-		imrd_pap = packet + 3;
-
-		if ((RQFlag & IRT_SHOW) && cn >= imrd_fc) {
+		if ((RQFlag & IRT_SHOW)) {
 			// Displaying while we go
-			pc = imrd_bpp ? PICPERCHK8 : PIXPERCHK12;
+			pc = imrd_bpp ? PIXPERCHK8 : PIXPERCHK12;
 			// Starting pixel number of the chunk
-			cs = (ch - imrd_fc) * pc;
+			cs = cn * pc;
 			// Is there a way to avoid division? Have to calculate
 			// starting row and column
 			rc = cs / imrd_x;
 			cs = cs % imrd_x;
-			lcdg_render ((byte)cs, (byte)rc, (byte*)imrd_pap, pc);
+			lcdg_render ((byte)cs, (byte)rc, (byte*)(packet + 3),
+				pc);
 		}
 
 		// Prepare for possible blocking
 		imrd_rdy = NO;
-
-		// Calculate where the chunk goes in the eeprom
-		pc = 0;
-		while (cn >= IMG_CHK_PAGE) {
-			pc++;
-			cn -= IMG_CHK_PAGE;
-		}
-
-		imrd_cpp = pntopa (imrd_pp [pn]) + cn * CHUNKSIZE;
 	}
 
-	ee_write (st, imrd_cpp, imrd_pap, CHUNKSIZE);
+	ee_write (st, imrd_cpp, (byte*)(packet+2), CHUNKSIZE+2);
 	// If we succeed
 	imrd_rdy = YES;
 
+	// Advance the pointer
+	if ((word)(imrd_cpp & IMG_PAGE_MASK) >= IMG_MAX_COFF) {
+		if (++imrd_cp < imrd_np)
+			imrd_cpp = pntopa (imrd_ppt [imrd_cp]);
+	} else {
+		imrd_cpp += CHUNKSIZE + 2;
+	}
 	return YES;
 }
 
@@ -667,8 +877,6 @@ static word img_cls_rcp (address packet) {
 	return ctally_fill (&imrd_cta, packet) << 1;
 }
 
-// ============================================================================
-
 const fun_pak_t imgl_pak = {
 				imgl_lkp_snd,
 				objl_rts_snd,
@@ -678,9 +886,9 @@ const fun_pak_t imgl_pak = {
 				imgl_stp_rcp,
 				imgl_cnk_rcp,
 				objl_cls_rcp
-			   },
+			   };
 
-		img_pak  = {
+const fun_pak_t img_pak  = {
 				img_lkp_snd,
 				img_rts_snd,
 				img_cls_snd,
@@ -690,5 +898,3 @@ const fun_pak_t imgl_pak = {
 				img_cnk_rcp,
 				img_cls_rcp
 		};
-
-//=============================================================================
