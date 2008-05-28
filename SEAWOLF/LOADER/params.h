@@ -14,16 +14,8 @@
 #define	PSIZE_WTR		(PSIZE_FRAME+6)	// RLink + otype + oid
 #define	PSIZE_CHK		(PSIZE_FRAME+0)	// Varies
 #define	PSIZE_OSS		(PSIZE_FRAME+0)	// Varies
-#define	PSIZE_OSS_D		(PSIZE_OSS  +8) // + status
+#define	PSIZE_OSS_D		(PSIZE_OSS +10) // + status
 #define	PSIZE_HELLO		(PSIZE_FRAME+4)	// ESN
-
-#define	OSS_PSIZE_GETI		6
-#define	OSS_PSIZE_PING		0
-#define	OSS_PSIZE_CLEAN		2
-#define	OSS_PSIZE_SHOW		2
-#define	OSS_PSIZE_LCDP		2
-#define	OSS_PSIZE_DUMP		6
-#define	OSS_PSIZE_EE		8
 
 #define	PACKET_QUEUE_LIMIT	16
 
@@ -41,6 +33,8 @@
 #define	OTYPE_IMAGE	0	// Image
 #define	OTYPE_ILIST	1	// Image list
 #define	OTYPE_NLIST	2	// Neighbor list
+
+#define	OTYPE_MAX	2
 
 // Packet types
 #define	PT_DEBUG	0
@@ -62,20 +56,27 @@
 #define	OSS_DONE	0
 #define	OSS_FAILED	1
 #define	OSS_BAD		2
-#define	OSS_BUSY	3
-#define	OSS_UNIMPL	4
-#define	OSS_GETI	5
-#define	OSS_CLEAN	6
-#define	OSS_PING	7
-#define	OSS_SHOW	8
-#define	OSS_LCDP	9
+#define	OSS_ALREADY	3
+#define	OSS_BUSY	4
+#define	OSS_UNIMPL	5
+#define	OSS_GET		6
+#define	OSS_QUERY	7
+#define	OSS_CLEAN	8
+#define	OSS_PING	9
+#define	OSS_SHOW	10
+#define	OSS_LCDP	11
+#define	OSS_BUZZ	12
+#define	OSS_RFPARAM	13
 
 #ifdef DEBUGGING
 
-#define	OSS_DUMP	10
-#define	OSS_EE		11
+#define	OSS_DUMP	14
+#define	OSS_EE		15
 
 #endif
+
+// Status flags
+#define	FLG_EEPR	0x01	// EEProm incosistency found
 
 // Remote request types (only one supported at present)
 #define	RQ_GET		1
@@ -90,12 +91,12 @@
 // Two words to long
 #define lofw(a,b)	((lword)(a) | ((lword)(b) << 16))
 // Word of bytes (a is a byte pointer)
-#define	wofb(a)		(((word)(*(a  )) << 8) | *(a+1))
+#define	wofb(a)		(((word)(*(a+1)) << 8) | *(a  ))
 #else
 #define	fhol(a)		((word)((a) >> 16))
 #define	shol(a)		((word)((a)      ))
 #define lofw(a,b)	((lword)(b) | ((lword)(a) << 16))
-#define	wofb(a)		((word)(*(a+1)) << 8) | *(a  ))
+#define	wofb(a)		(((word)(*(a  )) << 8) | *(a+1))
 #endif	/* LITTLE_ENDIAN */
 
 // Randomized HELLO interval
@@ -103,7 +104,7 @@
 // Response timeout
 #define	INTV_REPLY	1024	// one second?
 // Inter chunk space
-#define	INTV_CHUNK	256
+#define	INTV_CHUNK	20
 // Between multiple STOP packets
 #define	INTV_STOP	512
 // Number of STOPs
@@ -218,8 +219,8 @@ extern const 	lword host_id;
 // Common data hook for current-transaction-related dynamic structures
 extern void *DHook;
 
-// Current request type and flags
-extern byte RQType, RQFlag;
+// Current request type and flags + status flags
+extern byte RQType, RQFlag, SFlags;
 
 // Generic transaction functions for list transcation plug-ins
 word objl_rts_snd (address);

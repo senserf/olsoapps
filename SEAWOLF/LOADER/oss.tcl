@@ -16,8 +16,11 @@ set CHUNKSIZE		54
 
 array set CCOD 		{ DBG 0 HELLO 1 OSS 2 GO 3 WTR 4 RTS 5 CHUNK 6 NAK 7 }
 
-array set OSSC		{ DONE 0 FAILED 1 BAD 2 BUSY 3 UNIMPL 4 GETI 5 CLEAN 6
-				PING 7 SHOW 8 LCDP 9 DUMP 10 EE 11 }
+array set OSSC		{ DONE 0 FAILED 1 BAD 2 ALREADY 3 BUSY 4 UNIMPL 5
+				GET 6 QUERY 7 CLEAN 8 PING 9 SHOW 10 LCDP 11
+					BUZZ 12 RFPAR 13 DUMP 14 EE 15 }
+
+array set NAKS		{ NOTFOUND 0 BUSY 1 REJECT 2 UNEXPECTED 3 }
 
 array set INTV		{ PACKET 50 RETRY 1000 CHUNK 2048 SPACE 80 GO 4096 }
 
@@ -25,10 +28,11 @@ set CHAR(PRE)		[format %c [expr 0x55]]
 set CHAR(0)		\x00
 
 # user commands
-set UCMDS       "verbose retrieve getimage ping clean show lcd dump erase quit"
+set UCMDS \
+"verbose retrieve getobject ping clean query show lcd buzz rfparam dump erase quit"
 
 
-set SIO(VER) 7
+set SIO(VER) 1
 set SIO(ADV) 0
 
 
@@ -270,7 +274,9 @@ proc r_serial { } {
 			if { $chunk == "" } {
 				# check if the timeout flag is set
 				if { $SIO(TIM) != "" } {
-					log "packet timeout $SIO(STA)"
+					if { $SIO(VER) > 0 } {
+						log "packet timeout $SIO(STA)"
+					}
 					# reset
 					catch { after cancel $SIO(TIM) }
 					set SIO(TIM) ""
@@ -342,7 +348,9 @@ proc r_serial { } {
 		set chunk [string range $chunk 1 end]
 		if { $bl <= 0 || [expr $bl & 0x01] } {
 			# illegal
-			log "illegal packet length $bl"
+			if { $SIO(VER) > 0 } {
+				log "illegal packet length $bl"
+			}
 			set SIO(STA) -1
 			continue
 		}
@@ -364,7 +372,7 @@ proc w_serial { } {
 
 	flush $SFD
 
-	if { $SIO(VER) > 3 } {
+	if { $SIO(VER) > 2 } {
 		dump "S" $SIO(MSG)
 	}
 }
@@ -413,7 +421,9 @@ proc runit { } {
 
 	# validate CRC
 	if [w_chk $SIO(BUF)] {
-		log "illegal checksum, packet ignored"
+		if { $SIO(VER) > 0 } {
+			log "illegal checksum, packet ignored"
+		}
 		return
 	}
 	
@@ -430,7 +440,9 @@ proc runit { } {
 	}
 
 	if ![info exists CMD($cmd)] {
-		log "illegal packet type $cmd, ignored"
+		if { $SIO(VER) > 0 } {
+			log "illegal packet type $cmd, ignored"
+		}
 		return
 	}
 
@@ -572,7 +584,6 @@ proc abtreq { code } {
 # Abort current request, e.g., on a NAK
 #
 	global SIO
-puts "ABT"
 
 	catch { after cancel $SIO(CBA) }
 	catch { unset SIO(MSG) }
@@ -820,7 +831,6 @@ proc handle_wtr_nak { } {
 # Receive NAK
 #
 	global SIO MyRQN MyLink
-puts "NAK $SIO(LID) $MyLink"
 
 	if { $SIO(LID) != $MyLink } {
 		# ignore, although perhaps shouldn't
@@ -828,7 +838,6 @@ puts "NAK $SIO(LID) $MyLink"
 	}
 
 	set rq [get1]
-puts "NAK2 $rq $MyRQN"
 	if { $rq != $MyRQN } {
 		# obsolete, irrelevant
 		return
@@ -836,6 +845,10 @@ puts "NAK2 $rq $MyRQN"
 
 	# applies to my request
 	set rq [get2]
+
+	if { $SIO(VER) > 0 } {
+		log "NAK [nak_code $rq]"
+	}
 
 	abtreq $rq
 }
@@ -863,13 +876,14 @@ proc handle_rts { } {
 			set na [get2]
 			set nb [get2]
 			set nc [get2]
+			set nd [get2]
 			set ix [string first $CHAR(0) $SIO(BUF)]
 			if { $ix >= 0 } {
 				set lab [string range $SIO(BUF) 0 [expr $ix-1]]
 			} else {
 				set lab [string range $SIO(BUF) 0 end-1]
 			}
-			set SIO(RTS) [list $na $nb $nc $lab]
+			set SIO(RTS) [list $na $nb $nc $nd $lab]
 		}
 
 		default {
@@ -912,6 +926,9 @@ proc handle_chunk { } {
 
 	if { $rq >= $SIO(NCK) } {
 		# illegal
+		if { $SIO(VER) > 0 } {
+			log "received illegal chunk number $rq / $SIO(NCK)"
+		}
 		abtreq 12
 		return
 	}
@@ -919,10 +936,17 @@ proc handle_chunk { } {
 	if { $CHUNKS($rq) == "" } {
 		set CHUNKS($rq) $SIO(BUF)
 		incr SIO(RCK) -1
+		if { $SIO(VER) > 1 } {
+			log "received chunk $rq ([string length $SIO(BUF)])"
+		}
+	} else {
+		if { $SIO(VER) > 1 } {
+			log "received superfluous chunk $rq"
+		}
 	}
 }
 
-proc user_getimage { par } {
+proc user_getobject { par } {
 #
 # Tell the node to get an object
 #
@@ -934,41 +958,42 @@ proc user_getimage { par } {
 	}
 
 	set lnk [exnum par]
-	set rqt [exnum par]
+	set otp [exnum par]
+	set oid [exnum par]
+	set rqf [exnum par]
 
-	if { $lnk == "" || $rqt == "" } {
-		log "numeric input expected: link request_type ..."
+	if { $lnk == "" || $otp == "" || $oid == "" || $rqf == "" } {
+		log "numeric input expected: lk ot oid rqf \[fname\]"
 		return
 	}
 
 	if { $lnk == $MyLink } {
 		# over UART
 		set ifc 1
+		if { $otp != 0 } {
+			log "we only send images (ot must be zero)"
+			return
+		}
 		# expect a file name
 		set par [string trim $par]
-		if { [set_image $par] == 0 } {
+		if { [set_image $oid $par] == 0 } {
 			# problem diagnosed by the function
 			return
 		}
-		set oid 0
 	} else {
 		# over radio
 		set ifc 0
-		set oid [exnum par]
-		if { $oid == "" } {
-			log "numeric input expected: image_object_id"
-			return
-		}
 	}
 
 	# create the packet
 	init_msg $YourLink
 	put1 $CCOD(OSS)
-	put1 $OSSC(GETI)
+	put1 $OSSC(GET)
 	put2 $lnk
+	put2 $otp
 	put2 $oid
 	put1 $ifc
-	put1 $rqt
+	put1 $rqf
 	msg_close
 
 	if { $ifc == 0 } {
@@ -1002,8 +1027,9 @@ proc user_getimage { par } {
 	put2 [lindex $SIO(RTS) 0]
 	put2 [lindex $SIO(RTS) 1]
 	put2 [lindex $SIO(RTS) 2]
+	put2 [lindex $SIO(RTS) 3]
 	# the label
-	append SIO(MSG) [lindex $SIO(RTS) 3]
+	append SIO(MSG) [lindex $SIO(RTS) 4]
 	msg_close
 
 	# transmit chunks
@@ -1019,7 +1045,6 @@ proc user_getimage { par } {
 		clear_image
 		return
 	}
-puts "ENTRIES: $SIO(RCK)"
 
 	while 1 {
 		clear_handlers
@@ -1039,7 +1064,9 @@ puts "ENTRIES: $SIO(RCK)"
 				incr cp
 			}
 			while { $fp <= $sp } {
-puts "Sending chunk: $fp"
+				if { $SIO(VER) > 1 } {
+					log "sending chunk: $fp"
+				}
 				init_msg $YourLink
 				put1 $CCOD(CHUNK)
 				put1 $YourRQN
@@ -1063,17 +1090,12 @@ puts "Sending chunk: $fp"
 		retrans 512 8
 
 		if $SIO(ADV) {
-			log "GO timeout, code $SIO(ADV)"
+			if { $SIO(VER) > 0 } {
+				log "GO timeout, code $SIO(ADV)"
+			}
 			clear_handlers
 			clear_image
 			return
-		}
-
-		vwait SIO(ADV)
-
-		if $SIO(ADV) {
-			log "GO timeout"
-			break
 		}
 	}
 
@@ -1099,6 +1121,11 @@ proc handle_rts_nak { } {
 	}
 
 	set rq [get2]
+
+	if { $SIO(VER) > 0 } {
+		log "NAK [nak_code $rq]"
+	}
+
 	abtreq $rq
 }
 
@@ -1134,12 +1161,11 @@ proc handle_go { } {
 
 proc handle_wtr { } {
 #
-# WTR prompt (in response to OSS GETI)
+# WTR prompt (in response to OSS GET)
 #
 	global SIO YourRQN YourLink MyLink
 
 	if { $SIO(LID) != $YourLink } {
-puts "$SIO(LID) $YourLink"
 		abtreq 13
 		return
 	}
@@ -1155,7 +1181,9 @@ puts "$SIO(LID) $YourLink"
 	set mn [get2]
 	# must be image, we send out nothing else
 	if { $ml != 0 } {
-		log "illegal WTR request: $ml $mn"
+		if { $SIO(VER) > 0 } {
+			log "illegal WTR request: $ml $mn"
+		}
 		abtreq 15
 		return
 	}
@@ -1166,10 +1194,14 @@ puts "$SIO(LID) $YourLink"
 
 proc handle_wtr_oss { } {
 #
-# OSS response to our GETI
+# OSS response to our GET
 #
+	global SIO
+
 	set tp [get1]
-	log "received OSS $tp in response to GETI"
+	if { $SIO(VER) > 0 } {
+		log "received OSS $tp in response to GET"
+	}
 	abtreq $tp
 }
 
@@ -1259,7 +1291,7 @@ proc getis { n } {
 	return $B
 }
 
-proc set_image { fn } {
+proc set_image { oid fn } {
 #
 # Unpack image to be sent out
 #
@@ -1338,11 +1370,10 @@ proc set_image { fn } {
 	unset SIO(IB) IDX IDL
 
 	if $bpp {
-		set x [expr $x | 0x800]
+		set x [expr $x | 0x8000]
 	}
 
-	set SIO(RTS) [list $nc $x $y $la]
-puts "RTS PARAMS: $SIO(RTS)"
+	set SIO(RTS) [list $nc $oid $x $y $la]
 
 	return 1
 }
@@ -1376,7 +1407,7 @@ proc receive_ilist { chk oid } {
 
 	set id [geti2]
 
-	log "Image list $oid, owner link id: $id, [format %04x $id]"
+	log "image list $oid, owner link id: $id, [format %04x $id]"
 
 	while { $IDX < $IDL } {
 		set nx [geti2]
@@ -1470,23 +1501,65 @@ proc user_clean { par } {
 		return
 	}
 
-	set img [exnum par]
-	set nei [exnum par]
+	set otp [exnum par]
 
-	if { $img == "" || $nei == "" } {
-		log "two numbers expected: img nei"
+	if { $otp < 0 || $otp > 2 } {
+		log "object type must be 0, 1, or 2"
 		return
 	}
 
 	init_msg $YourLink
 	put1 $CCOD(OSS)
 	put1 $OSSC(CLEAN)
-	put1 $img
-	put1 $nei
+	put2 $otp
+
+	set nob 0
+	while 1 {
+		set oid [exnum par]
+		if { $oid == "" } {
+			break
+		}
+		put2 $oid
+		incr nob
+		if { $nob == 27 } {
+			break
+		}
+	}
 	msg_close
-
 	set_handler OSS handle_oss
+	w_serial
+}
 
+proc user_query { par } {
+#
+# Object query
+#
+	global SIO CCOD OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set otp [exnum par]
+	set oid [exnum par]
+
+	if { $otp == "" || $oid == "" } {
+		log "two numbers required: ot oid"
+	}
+
+	if { $otp < 0 || $otp > 2 } {
+		log "object type must be 0, 1, or 2"
+		return
+	}
+
+	init_msg $YourLink
+	put1 $CCOD(OSS)
+	put1 $OSSC(QUERY)
+	put2 $otp
+	put2 $oid
+	msg_close
+	set_handler OSS handle_oss
 	w_serial
 }
 
@@ -1559,6 +1632,66 @@ proc user_lcd { par } {
 	for { set i 0 } { $i < $ac } { incr i } {
 		put1 [lindex $arg $i]
 	}
+	msg_close
+
+	set_handler OSS handle_oss
+
+	w_serial
+}
+
+proc user_buzz { par } {
+#
+# Issue an LCD command
+#
+	global SIO CCOD OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set dur [exnum par]
+
+	if { $dur == "" } {
+		log "expected: dur"
+		return
+	}
+
+	init_msg $YourLink
+	put1 $CCOD(OSS)
+	put1 $OSSC(BUZZ)
+	put2 $dur
+	msg_close
+
+	set_handler OSS handle_oss
+
+	w_serial
+}
+
+proc user_rfparam { par } {
+#
+# Issue an RF control command
+#
+	global SIO CCOD OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set cmd [exnum par]
+	set val [exnum par]
+
+	if { $cmd == "" || $val == "" } {
+		log "two values expected: cmd val"
+		return
+	}
+
+	init_msg $YourLink
+	put1 $CCOD(OSS)
+	put1 $OSSC(RFPAR)
+	put1 $cmd
+	put1 $val
 	msg_close
 
 	set_handler OSS handle_oss
@@ -1644,6 +1777,32 @@ proc user_erase { par } {
 	w_serial
 }
 
+proc nak_code { cd } {
+
+	global NAKS
+
+	foreach c [array names NAKS] {
+		if { $NAKS($c) == $cd } {
+			return $c
+		}
+	}
+
+	return $cd
+}
+
+proc oss_code { cd } {
+
+	global OSSC
+
+	foreach c [array names OSSC] {
+		if { $OSSC($c) == $cd } {
+			return $c
+		}
+	}
+
+	return $cd
+}
+
 proc handle_oss { } {
 #
 # Displays OSS packets arriving from the node
@@ -1654,15 +1813,30 @@ proc handle_oss { } {
 	set cod [get1]
 
 	if { $cod == $OSSC(DONE) } {
-		set isa [get2]
-		set isb [get2]
-		set nsa [get2]
-		set nsb [get2]
-		log "OSS DONE: $isa [format %04x $isb] $nsa [format %04x $nsb]"
+		log "OSS DONE:"
+		set flg [get1]
+		set nim [get1]
+		set fre [get2]
+		set rio [get2]
+		set nec [get2]
+		set rno [get2]
+		if { $flg != 0 } {
+			log " EEPROM inconsistency detected"
+		}
+		log " $nim images, $fre free pages"
+		if { $rio != 0 } {
+			log " acquired image list from $rio"
+		}
+		if { $nec != 0 } {
+			log " $nec neighbors"
+		}
+		if { $rno != 0 } {
+			log " acquired neighbor list from $rno"
+		}
 		return
 	}
 
-	log "OSS $cod"
+	log "OSS [oss_code $cod]"
 }
 
 proc user_quit { } {

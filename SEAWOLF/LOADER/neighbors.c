@@ -10,6 +10,11 @@ static olist_t *RNList = NULL;
 
 // ===========================================================================
 
+Boolean neighbors_havenlist () {
+//
+	return RNList != NULL;
+}
+
 void neighbors_status (address packet) {
 //
 // Return neighbors-related status (two words)
@@ -28,19 +33,33 @@ void neighbors_status (address packet) {
 	put2 (packet, wc);
 }
 
-void neighbors_clean (byte what) {
+void neighbors_clean (address lst, word n) {
 //
 // Cleans up neighbor info
 //
-	word i;
+	byte what;
 
-	if ((what & CLEAN_NEI)) {
-		// Own neighbor list
-		for (i = 0; i < MAXNEIGHBORS; i++)
-			NTable [i] . esn = 0;
+	if (n == 0) {
+		// Both
+		what = 3;
+	} else {
+		what = 0;
+		do {
+			n--;
+			if (lst [n] == 0)
+				what |= 1;
+			else if (lst [n] == 1)
+				what |= 2;
+		} while (n);
 	}
 
-	if ((what & CLEAN_NEI_LIST)) {
+	if ((what & 1)) {
+		// Own neighbor list
+		for (n = 0; n < MAXNEIGHBORS; n++)
+			NTable [n] . esn = 0;
+	}
+
+	if ((what & 2)) {
 		// Acquired list of neighbors
 		if (RNList != NULL) {
 			ufree (RNList);
@@ -173,11 +192,11 @@ thread (nager)
 
     entry (NAG_RUN)
 
-	s = seconds ();
+	s = (word) seconds ();
 	for (i = 0; i < MAXNEIGHBORS; i++) {
 		if (NTable [i] . esn) {
-			if ((s >= (t = NTable [i] . when) && s < t + MAXNAGE) ||
-			    (s < t && t + MAXNAGE > s))
+			if ((s >= (t = NTable [i] . when) && s > t + MAXNAGE) ||
+			    (s < t && t + MAXNAGE < s))
 				// Delete
 				NTable [i] . esn = 0;
 		}

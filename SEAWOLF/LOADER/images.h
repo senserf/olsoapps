@@ -77,9 +77,14 @@ typedef	struct {
 #define	CLEAN_IMG	0x01	// Acquired
 
 void images_init ();
+word image_find (word);
 void images_status (address);
-void images_clean (byte);
-Boolean images_show (word);
+void images_clean (address, word);
+void images_cleanil ();
+Boolean image_show (word);
+Boolean images_haveilist ();
+void images_show_next ();
+void images_show_previous ();
 
 extern const fun_pak_t img_pak, imgl_pak;
 

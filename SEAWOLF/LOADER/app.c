@@ -19,7 +19,8 @@ heapmem {100};
 void *DHook = NULL;	// Common data hook for transaction-related structures
 
 byte RQType,		// Request type
-     RQFlag;		// And flags (generally object specific)
+     RQFlag,		// And flags (generally object specific)
+     SFlags;		// Status flags
 
 // ============================================================================
 // 
@@ -73,10 +74,24 @@ static	const fun_pak_t *FPack;	// Function package for current transaction
 static void oss_in (address, int);
 
 // OSS packet size table (-request type/ordinal)
-const byte oss_psize [] = { 8, 0, 0, 0, 0, 6, 2, 0, 2, 2
-
+const byte oss_psize [] = {
+	10, // DONE 	flb,nib,frw,low,ncw,low
+	 0, // FAILED
+	 0, // BAD
+	 0, // ALREADY
+	 0, // BUSY
+	 0, // UNIMPL
+	 8, // GET	ylw,otw,oiw,isb,rfb
+	 4, // QUERY	otw,oiw
+	 2, // CLEAN	otw, [listw]
+	 0, // PING
+	 2, // SHOW
+	 2, // LCDP	cmb,nab, [listb]
+	 2, // BUZZ
+	 2  // RFPARAM
 #ifdef	DEBUGGING
-, 6, 8
+,	 6, // DUMP	tpb,nbb,adl
+	 8  // EE	frl,upl
 #endif
 };
 
@@ -879,6 +894,7 @@ static void oss_in (address packet, int ifa) {
 #define	cw	(* ((word*)(&ac))   )
 #define	tp	(*(((byte*)(&ac))+3))
 #define	nb	(*(((byte*)(&ac))+2))
+#define	cv	(*(((word*)(&ac))+1))
 
 	// We are at odd boundary, so this one is always available
 	get1 (packet, tp);
@@ -899,15 +915,25 @@ Error:
 
 	switch (tp) {
 
-	    case OSS_GETI:
+	    case OSS_GET:
 
 		get2 (packet, YLink);
+		get2 (packet, OType);
 		get2 (packet, OID);
 
 		// Interface selector
 		get1 (packet, tp);
 
-		FPack = OPLUGS [OType = OTYPE_IMAGE];
+		if (OType > OTYPE_MAX)
+			goto Error;
+
+		// Check if this is an image that you already have
+		if (OType == OTYPE_IMAGE && image_find (OID)) {
+			send_back (OSS_ALREADY, ifa);
+			return;
+		}
+
+		FPack = OPLUGS [OType];
 		// Incoming interface
 		IIF = ifa;
 		RQType = RQ_GET;
@@ -924,6 +950,37 @@ Error:
 
 		return;
 
+	    case OSS_QUERY:
+
+		get2 (packet, OType);
+		get2 (packet, OID);
+
+		if (OType > OTYPE_MAX)
+			goto Error;
+
+		tp = NO;
+
+		switch (OType) {
+
+		    case OTYPE_IMAGE:
+
+			tp = image_find (OID);
+			break;
+
+		    case OTYPE_ILIST:
+
+			tp = (OID == 0 || OID == 1 && images_haveilist ());
+			break;
+
+		    case OTYPE_NLIST:
+
+			tp = (OID == 0 || OID == 1 && neighbors_havenlist ());
+			break;
+		}
+
+		send_back (tp ? OSS_DONE : OSS_FAILED, ifa);
+		return;
+
 	    case OSS_PING:
 DRet:
 		send_back (OSS_DONE, ifa);
@@ -931,23 +988,33 @@ DRet:
 
 	    case OSS_CLEAN:
 
-		// Images
-		get1 (packet, tp);
-		if (tp != 0)
-			images_clean (tp);
+		// Object type
+		get2 (packet, OType);
 
-		// Neighbors
-		get1 (packet, tp);
-		if (tp != 0)
-			neighbors_clean (tp);
+		switch (OType) {
 
+		    case OTYPE_IMAGE:
+
+			images_clean (packet + 3, tcv_left (packet) >> 1);
+			break;
+
+		    case OTYPE_ILIST:
+
+			images_cleanil ();
+			break;
+
+		    case OTYPE_NLIST:
+
+			neighbors_clean (packet + 3, tcv_left (packet) >> 1);
+			break;
+		}
 		goto DRet;
 
 	    case OSS_SHOW:
 
 		// Display image number i
 		get2 (packet, cw);
-		send_back (images_show (cw) ? OSS_DONE : OSS_FAILED, ifa);
+		send_back (image_show (cw) ? OSS_DONE : OSS_FAILED, ifa);
 		return;
 
 	    case OSS_LCDP:
@@ -959,6 +1026,56 @@ DRet:
 			goto Error;
 
 		lcdg_cmd (tp, (byte*)(packet+3), nb);
+		goto DRet;
+	
+ 	    case OSS_BUZZ:
+
+		// To test the buzzer
+		get2 (packet, cw);
+		buzz (cw);
+		goto DRet;
+
+	    case OSS_RFPARAM:
+
+		get1 (packet, tp);
+		get1 (packet, nb);
+		cw = nb;
+
+		switch (tp) {
+
+		    case 0:	// On/Off
+
+			if (cw) {
+				tcv_control (RSFD, PHYSOPT_TXON, NULL);
+				tcv_control (RSFD, PHYSOPT_RXON, NULL);
+			} else {
+				tcv_control (RSFD, PHYSOPT_TXOFF, NULL);
+				tcv_control (RSFD, PHYSOPT_RXOFF, NULL);
+			}
+
+			break;
+
+		    case 1:	// Power
+
+			tcv_control (RSFD, PHYSOPT_SETPOWER, &cw);
+			break;
+
+		    case 2:	// Channel
+
+			tcv_control (RSFD, PHYSOPT_SETCHANNEL, &cw);
+			break;
+
+		    case 3:	// Rate
+
+			tcv_control (RSFD, PHYSOPT_SETRATE, &cw);
+			break;
+
+		    default:
+
+			send_back (OSS_UNIMPL, ifa);
+			return;
+		}
+
 		goto DRet;
 
 #ifdef	DEBUGGING
@@ -1107,7 +1224,7 @@ Boolean objl_cnk_rcp (address packet, olist_t **tl) {
 			if (pt + ln > (*tl)->size)
 				ln = (*tl)->size - pt;
 		}
-		memcpy ((*tl)->buf + pt, (byte*)(packet+2), ln);
+		memcpy ((*tl)->buf + pt, (byte*)(packet+3), ln);
 	}
 
 	return YES;
@@ -1133,6 +1250,33 @@ Boolean objl_stp_rcp (olist_t **tl) {
 	*tl = NULL;
 	return NO;
 }
+
+// ============================================================================
+
+thread (buttons_handler)
+
+#define	BH_LOOP		0
+
+    entry (BH_LOOP)
+
+	if (PRESSED_BUTTON0) {
+		diagg ("BUT 0");
+		images_show_next ();
+	} else if (PRESSED_BUTTON1) {
+		diagg ("BUT 1");
+        	images_show_previous ();
+	}
+
+	if (JOYSTICK_N) diagg ("JOY N");
+	if (JOYSTICK_E) diagg ("JOY E");
+	if (JOYSTICK_S) diagg ("JOY S");
+	if (JOYSTICK_W) diagg ("JOY W");
+	if (JOYSTICK_PUSH) diagg ("JOY PUSH");
+
+	when (BUTTON_PRESSED_EVENT, BH_LOOP);
+	release;
+
+endthread
 
 // ============================================================================
 
@@ -1185,6 +1329,10 @@ thread (root)
 
 	// Neighbor table ager
 	runthread (nager);
+
+	// Button service
+	buttons_init ();
+	runthread (buttons_handler);
 
 	// We are not needed any more
 	finish;
