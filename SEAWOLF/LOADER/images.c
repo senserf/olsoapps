@@ -239,6 +239,7 @@ void images_clean (address lst, word n) {
 	lword ep;
 	word cw;
 
+	// diagg ("CLEAN", n, lst [0]);
 	if (n == 0) {
 		// Delete all images
 		for (n = 0; n < NEPages; n++) {
@@ -410,7 +411,7 @@ static word do_imglist (byte *buf) {
 	// owner.
 
 	if (buf)
-		*((word*)buf) = MCN;
+		*((word*)buf) = MyLink;
 
 	for (pn = 0; pn < NEPages; pn++) {
 		ep = pntopa (pn);
@@ -635,8 +636,10 @@ static word img_cnk_snd (address packet) {
 	word pn, cn;
 
 	if (packet == NULL) {
-		if ((imsd_cch = croster_next (&imsd_ros)) == NONE)
+		if ((imsd_cch = croster_next (&imsd_ros)) == NONE) {
+			// diagg ("EOR", 0, 0);
 			return 0;
+		}
 		return CHUNKSIZE;
 	}
 
@@ -770,9 +773,11 @@ static Boolean img_stp_rcp () {
 
 	if (ctally_full (&imrd_cta)) {
 		// Reception OK
+		// diagg ("RCP OK", 0, 0);
 		ee_sync (WNONE);
 		return YES;
 	}
+	// diagg ("RCP FAILED", ctally_absent (&imrd_cta), 0);
 
 	// Release the pages back
 	for (pn = 0; pn < imrd_np; pn++) {

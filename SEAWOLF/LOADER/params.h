@@ -8,20 +8,20 @@
 // Fixed component of every packet (excluding the plugin-defined frame, i.e.,
 // Link Id and CRC). It covers the type and request number, which yield 2 bytes.
 #define	PSIZE_FRAME		2
-#define	PSIZE_NAK		(PSIZE_FRAME+2)	// Error code
-#define	PSIZE_RTS		(PSIZE_FRAME+0)	// Varies
-#define	PSIZE_GO		(PSIZE_FRAME+0)	// Varies
-#define	PSIZE_WTR		(PSIZE_FRAME+6)	// RLink + otype + oid
-#define	PSIZE_CHK		(PSIZE_FRAME+0)	// Varies
-#define	PSIZE_OSS		(PSIZE_FRAME+0)	// Varies
-#define	PSIZE_OSS_D		(PSIZE_OSS +10) // + status
-#define	PSIZE_HELLO		(PSIZE_FRAME+4)	// ESN
+#define	PSIZE_ACK		(PSIZE_FRAME+2)	 // Error code
+#define	PSIZE_RTS		(PSIZE_FRAME+0)	 // Varies
+#define	PSIZE_GO		(PSIZE_FRAME+0)	 // Varies
+#define	PSIZE_WTR		(PSIZE_FRAME+6)	 // RLink + otype + oid
+#define	PSIZE_CHK		(PSIZE_FRAME+0)	 // Varies
+#define	PSIZE_OSS		(PSIZE_FRAME+4)	 // Varies, Link + code + dummy
+#define	PSIZE_STAT		(PSIZE_FRAME+10) // + status
+#define	PSIZE_HELLO		(PSIZE_FRAME+4)	 // ESN
 
 #define	PACKET_QUEUE_LIMIT	16
 
 #define	XMIT_POWER		7			// Default
 #define	MAXPLEN			60			// Payload
-#define	MAXTRIES		12			// Retries until ack
+#define	MAXTRIES		24			// Retries until ack
 #define	MAXCHUNKLIST		56			// Bytes
 #define	MAXCHUNKS		(MAXCHUNKLIST/2)	// Actual chunks
 #define	MAXNEIGHBORS		16			// Neighbor table size
@@ -44,34 +44,33 @@
 #define	PT_WTR		4
 #define	PT_RTS		5
 #define	PT_CHUNK	6
-#define	PT_NAK		7
+#define	PT_ACK		7
+#define	PT_STAT		8
 
-// NAK codes
-#define	NAK_NF		0	// Not found
-#define	NAK_BUSY	1
-#define	NAK_REJECT	2
-#define	NAK_UNEXP	3
+// ACK codes
+#define	ACK_OK		0
+#define	ACK_FAILED	1	// Generic failure
+#define	ACK_BUSY	2
+#define	ACK_REJECT	3
+#define	ACK_NOTFOUND	4
+#define	ACK_FORMAT	5
+#define	ACK_ALREADY	6
+#define	ACK_UNIMPL	7
 
 // OSS codes (one nibble)
-#define	OSS_DONE	0
-#define	OSS_FAILED	1
-#define	OSS_BAD		2
-#define	OSS_ALREADY	3
-#define	OSS_BUSY	4
-#define	OSS_UNIMPL	5
-#define	OSS_GET		6
-#define	OSS_QUERY	7
-#define	OSS_CLEAN	8
-#define	OSS_PING	9
-#define	OSS_SHOW	10
-#define	OSS_LCDP	11
-#define	OSS_BUZZ	12
-#define	OSS_RFPARAM	13
+#define	OSS_PING	0
+#define	OSS_GET		1
+#define	OSS_QUERY	2
+#define	OSS_CLEAN	3
+#define	OSS_SHOW	4
+#define	OSS_LCDP	5
+#define	OSS_BUZZ	6
+#define	OSS_RFPARAM	7
 
 #ifdef DEBUGGING
 
-#define	OSS_DUMP	14
-#define	OSS_EE		15
+#define	OSS_DUMP	8
+#define	OSS_EE		9
 
 #endif
 
@@ -102,11 +101,11 @@
 // Randomized HELLO interval
 #define	INTV_HELLO	(8192 - 0x7f + (rnd () & 0xff))
 // Response timeout
-#define	INTV_REPLY	1024	// one second?
+#define	INTV_REPLY	(512 - 0xf + (rnd () & 0x1f))
 // Inter chunk space
-#define	INTV_CHUNK	20
+#define	INTV_CHUNK	16
 // Between multiple STOP packets
-#define	INTV_STOP	512
+#define	INTV_STOP	(512 - 0xf + (rnd () & 0x1f))
 // Number of STOPs
 #define	NSTOPS		2
 
@@ -207,6 +206,7 @@ void ctally_init (ctally_t*, word);
 word ctally_fill (ctally_t*, address);
 Boolean ctally_full (ctally_t*);
 Boolean ctally_add (ctally_t*, word);
+word ctally_absent (ctally_t*);
 
 #define	OLRData 	((old_r_t*)DHook)
 #define	olrd_cta	(OLRData->cta)
@@ -214,7 +214,7 @@ Boolean ctally_add (ctally_t*, word);
 extern const 	lword host_id;
 
 #define	ESN host_id
-#define MCN ((word)ESN)
+#define MyLink ((word)ESN)
 
 // Common data hook for current-transaction-related dynamic structures
 extern void *DHook;
@@ -234,11 +234,9 @@ Boolean objl_stp_rcp (olist_t**);
 #include "lcdg_n6100p.h"
 
 #ifdef DEBUGGING
-void diagg (const char*);
-void diagl (word);
+void diagg (const char*, word, word);
 #else
-#define	diagg(a)	CNOP
-#define	diagl(a)	CNOP
+#define	diagg(a,b,c)	CNOP
 #endif
 
 #endif

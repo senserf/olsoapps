@@ -14,13 +14,14 @@ set YourRQN		0
 set MaxLineCount	1024
 set CHUNKSIZE		54
 
-array set CCOD 		{ DBG 0 HELLO 1 OSS 2 GO 3 WTR 4 RTS 5 CHUNK 6 NAK 7 }
+array set CCOD 		{ DBG 0 HELLO 1 OSS 2 GO 3 WTR 4 RTS 5 CHUNK 6 ACK 7
+				STAT 8 }
 
-array set OSSC		{ DONE 0 FAILED 1 BAD 2 ALREADY 3 BUSY 4 UNIMPL 5
-				GET 6 QUERY 7 CLEAN 8 PING 9 SHOW 10 LCDP 11
-					BUZZ 12 RFPAR 13 DUMP 14 EE 15 }
+array set OSSC		{ PING 0 GET 1 QUERY 2 CLEAN 3 SHOW 4 LCDP 5 BUZZ 6
+				RFPAR 7 DUMP 8 EE 9 }
 
-array set NAKS		{ NOTFOUND 0 BUSY 1 REJECT 2 UNEXPECTED 3 }
+array set ACKC		{ OK 0 FAILED 1 BUSY 2 REJECT 3 NOTFOUND 4 FORMAT 5
+				ALREADY 6 UNIMPL 7 }
 
 array set INTV		{ PACKET 50 RETRY 1000 CHUNK 2048 SPACE 80 GO 4096 }
 
@@ -385,12 +386,14 @@ proc handle_debug { } {
 
 	if { $fg == 0 } {
 		# textual debug
+		set a [get2]
+		set b [get2]
 		set ix [string first $CHAR(0) $SIO(BUF)]
 		if { $ix < 0 } {
 			log "unterminated string in debug packet"
 		}
 		incr ix -1
-		log "DEBUG: [string range $SIO(BUF) 0 $ix]"
+		log "DEBUG: [string range $SIO(BUF) 0 $ix] <$a,$b>"
 		return
 	}
 
@@ -440,6 +443,10 @@ proc runit { } {
 	}
 
 	if ![info exists CMD($cmd)] {
+		if { $cmd == $CCOD(ACK) } {
+			handle_ack
+			return
+		}
 		if { $SIO(VER) > 0 } {
 			log "illegal packet type $cmd, ignored"
 		}
@@ -581,7 +588,7 @@ proc poll { } {
 
 proc abtreq { code } {
 #
-# Abort current request, e.g., on a NAK
+# Abort current request, e.g., on a negative ACK
 #
 	global SIO
 
@@ -645,6 +652,24 @@ proc retrans { intv count } {
 	vwait SIO(ADV)
 }
 
+proc inirqm { pt } {
+#
+# Initialize a request message
+#
+	global CCOD MyLink MyRQN YourLink
+
+	incr MyRQN
+	if { $MyRQN > 255 } {
+		# request number
+		set MyRQN 1
+	}
+
+	init_msg $MyLink
+	put1 $CCOD($pt)
+	put1 $MyRQN
+	put2 $YourLink
+}
+
 proc user_retrieve { par } {
 #
 # Retrieve an object from the node
@@ -665,24 +690,14 @@ proc user_retrieve { par } {
 		return
 	}
 
-	incr MyRQN
-
-	if { $MyRQN > 255 } {
-		# request number
-		set MyRQN 1
-	}
-
-	init_msg $MyLink
-	put1 $CCOD(WTR)
-	put1 $MyRQN
-	put2 $YourLink
+	inirqm WTR
 	put2 $SIO(OTP)
 	put2 $SIO(OID)
 	msg_close
 
 	# save for retransmissions
 	set_handler RTS handle_rts
-	set_handler NAK handle_wtr_nak
+	set_handler ACK handle_wtr_ack
 
 	# retransmissions: interval, how many times
 	retrans 2048 8
@@ -826,9 +841,9 @@ proc go_prompt { } {
 	return 1
 }
 
-proc handle_wtr_nak { } {
+proc handle_wtr_ack { } {
 #
-# Receive NAK
+# Handle a negative ACK to our WTR
 #
 	global SIO MyRQN MyLink
 
@@ -846,8 +861,14 @@ proc handle_wtr_nak { } {
 	# applies to my request
 	set rq [get2]
 
+	# the code must be nonzero (zero is OK)
+	if { $rq == 0 } {
+		# ignore anyway
+		return
+	}
+
 	if { $SIO(VER) > 0 } {
-		log "NAK [nak_code $rq]"
+		log "negative ACK [ack_code $rq]"
 	}
 
 	abtreq $rq
@@ -985,10 +1006,12 @@ proc user_getobject { par } {
 		set ifc 0
 	}
 
-	# create the packet
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+
 	put1 $OSSC(GET)
+	# this one will be ignored
+	put1 $OSSC(GET)
+
 	put2 $lnk
 	put2 $otp
 	put2 $oid
@@ -997,14 +1020,14 @@ proc user_getobject { par } {
 	msg_close
 
 	if { $ifc == 0 } {
-		# send it once, expect nothing
+		# send it once
 		w_serial
 		return
 	}
 
 	# sending own image
 	set_handler WTR handle_wtr
-	set_handler OSS handle_wtr_oss
+	set_handler ACK handle_get_ack
 
 	# keep retransmitting until WTR or OSS BUSY
 	retrans 2048 8
@@ -1035,7 +1058,7 @@ proc user_getobject { par } {
 	# transmit chunks
 
 	set_handler GO handle_go
-	set_handler NAK handle_rts_nak
+	set_handler ACK handle_rts_ack
 
 	retrans 2048 8
 
@@ -1104,9 +1127,9 @@ proc user_getobject { par } {
 	clear_image
 }
 
-proc handle_rts_nak { } {
+proc handle_rts_ack { } {
 #
-# NAK after RTS
+# Negative ACK after RTS
 #
 	global SIO YourRQN YourLink
 
@@ -1122,8 +1145,12 @@ proc handle_rts_nak { } {
 
 	set rq [get2]
 
+	if { $rq == 0 } {
+		return
+	}
+
 	if { $SIO(VER) > 0 } {
-		log "NAK [nak_code $rq]"
+		log "NAK [ack_code $rq]"
 	}
 
 	abtreq $rq
@@ -1192,17 +1219,31 @@ proc handle_wtr { } {
 	advreq
 }
 
-proc handle_wtr_oss { } {
+proc handle_get_ack { } {
 #
-# OSS response to our GET
+# ACK response to our GET
 #
-	global SIO
+	global SIO MyRQN
 
-	set tp [get1]
-	if { $SIO(VER) > 0 } {
-		log "received OSS $tp in response to GET"
+	set rq [get1]
+
+	if { $rq != $MyRQN } {
+		return
 	}
-	abtreq $tp
+
+	# this must be negative
+
+	set wc [get2]
+
+	if { $wc == 0 } {
+		return
+	}
+
+	if { $SIO(VER) > 0 } {
+		log "negative ACK [ack_code $wc] in response to GET"
+	}
+
+	abtreq $wc
 }
 
 proc geti1 { } {
@@ -1480,12 +1521,15 @@ proc user_ping { par } {
 		log "don't know about the node yet"
 		return
 	}
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+
+	inirqm OSS
+
 	put1 $OSSC(PING)
+	put1 $OSSC(PING)
+
 	msg_close
 
-	set_handler OSS handle_oss
+	set_handler STAT handle_status
 
 	w_serial
 }
@@ -1508,8 +1552,8 @@ proc user_clean { par } {
 		return
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(CLEAN)
 	put1 $OSSC(CLEAN)
 	put2 $otp
 
@@ -1526,7 +1570,6 @@ proc user_clean { par } {
 		}
 	}
 	msg_close
-	set_handler OSS handle_oss
 	w_serial
 }
 
@@ -1553,13 +1596,12 @@ proc user_query { par } {
 		return
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(QUERY)
 	put1 $OSSC(QUERY)
 	put2 $otp
 	put2 $oid
 	msg_close
-	set_handler OSS handle_oss
 	w_serial
 }
 
@@ -1581,13 +1623,11 @@ proc user_show { par } {
 		return
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(SHOW)
 	put1 $OSSC(SHOW)
 	put2 $img
 	msg_close
-
-	set_handler OSS handle_oss
 
 	w_serial
 }
@@ -1623,8 +1663,8 @@ proc user_lcd { par } {
 		set ac 48
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(LCDP)
 	put1 $OSSC(LCDP)
 	put1 $cmd
 	put1 $ac
@@ -1633,8 +1673,6 @@ proc user_lcd { par } {
 		put1 [lindex $arg $i]
 	}
 	msg_close
-
-	set_handler OSS handle_oss
 
 	w_serial
 }
@@ -1657,13 +1695,11 @@ proc user_buzz { par } {
 		return
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(BUZZ)
 	put1 $OSSC(BUZZ)
 	put2 $dur
 	msg_close
-
-	set_handler OSS handle_oss
 
 	w_serial
 }
@@ -1687,14 +1723,12 @@ proc user_rfparam { par } {
 		return
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(RFPAR)
 	put1 $OSSC(RFPAR)
 	put1 $cmd
 	put1 $val
 	msg_close
-
-	set_handler OSS handle_oss
 
 	w_serial
 }
@@ -1735,8 +1769,8 @@ proc user_dump { par } {
 		set count 56
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(DUMP)
 	put1 $OSSC(DUMP)
 	put1 $ep
 	put1 $count
@@ -1767,8 +1801,8 @@ proc user_erase { par } {
 		return
 	}
 
-	init_msg $YourLink
-	put1 $CCOD(OSS)
+	inirqm OSS
+	put1 $OSSC(EE)
 	put1 $OSSC(EE)
 	put4 $from
 	put4 $upto
@@ -1777,12 +1811,12 @@ proc user_erase { par } {
 	w_serial
 }
 
-proc nak_code { cd } {
+proc ack_code { cd } {
 
-	global NAKS
+	global ACKC
 
-	foreach c [array names NAKS] {
-		if { $NAKS($c) == $cd } {
+	foreach c [array names ACKC] {
+		if { $ACKC($c) == $cd } {
 			return $c
 		}
 	}
@@ -1790,56 +1824,49 @@ proc nak_code { cd } {
 	return $cd
 }
 
-proc oss_code { cd } {
+proc handle_status { } {
+#
+# Status packet
+#
+	get1
 
-	global OSSC
-
-	foreach c [array names OSSC] {
-		if { $OSSC($c) == $cd } {
-			return $c
-		}
+	log "STATUS:"
+	set flg [get1]
+	set nim [get1]
+	set fre [get2]
+	set rio [get2]
+	set nec [get2]
+	set rno [get2]
+	if { $flg != 0 } {
+		log " EEPROM inconsistency detected"
 	}
-
-	return $cd
+	log " $nim images, $fre free pages"
+	if { $rio != 0 } {
+		log " acquired image list from $rio"
+	}
+	if { $nec != 0 } {
+		log " $nec neighbors"
+	}
+	if { $rno != 0 } {
+		log " acquired neighbor list from $rno"
+	}
+	return
 }
 
-proc handle_oss { } {
+proc handle_ack { } {
 #
-# Displays OSS packets arriving from the node
+# Displays ACK packets arriving from the node in response to OSS commands
 #
-	global SIO OSSC
+	global SIO
 
 	set lnk $SIO(LID)
-	set cod [get1]
+	set rqn [get1]
+	set cod [get2]
 
-	if { $cod == $OSSC(DONE) } {
-		log "OSS DONE:"
-		set flg [get1]
-		set nim [get1]
-		set fre [get2]
-		set rio [get2]
-		set nec [get2]
-		set rno [get2]
-		if { $flg != 0 } {
-			log " EEPROM inconsistency detected"
-		}
-		log " $nim images, $fre free pages"
-		if { $rio != 0 } {
-			log " acquired image list from $rio"
-		}
-		if { $nec != 0 } {
-			log " $nec neighbors"
-		}
-		if { $rno != 0 } {
-			log " acquired neighbor list from $rno"
-		}
-		return
-	}
-
-	log "OSS [oss_code $cod]"
+	log "ACK [ack_code $cod] (rqn $rqn lnk [format %04x $lnk])"
 }
 
-proc user_quit { } {
+proc user_quit { par } {
 #
 # Terminate
 #

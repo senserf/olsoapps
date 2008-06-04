@@ -109,7 +109,7 @@ static word do_neilist (byte *buf) {
 	size = 2;	// Link Id of the owner
 
 	if (buf)
-		*((word*)buf) = MCN;
+		*((word*)buf) = MyLink;
 
 	for (i = 0; i < MAXNEIGHBORS; i++) {
 		if (NTable [i] . esn != 0) {

@@ -18,9 +18,19 @@ heapmem {100};
 
 void *DHook = NULL;	// Common data hook for transaction-related structures
 
-byte RQType,		// Request type
+byte RQType,		// Request type (for an object transaction request)
      RQFlag,		// And flags (generally object specific)
-     SFlags;		// Status flags
+     SFlags,		// Status flags
+     Retries,		// Retry counter for persistent queries
+
+     MyORqN = 0xff,	// My request number for object requests
+     MySRqN = 0xff,	// My request number for non-object queries
+
+     YrORqN,		// Request number of the other party: object
+     YrSRqN;		// non-object
+
+static word YrOLink,	// Link Id of the other party
+       	    YrSLink;
 
 // ============================================================================
 // 
@@ -47,14 +57,9 @@ const static fun_pak_t *OPLUGS [] = { &img_pak, &imgl_pak, &nei_pak };
 // processed; thus, it can be used as a busy indicator.
 static int FDRQ = WNONE;
 
-static byte Retries,		// Retry counter for persistent queries
-	    MRQN = 0xff,	// My request number, cannot be zero
-	    YRQN;		// Request number of the other party
-
-// Parameters of the outstanding request
-static word YLink,		// Link ID od the other party
-	    OType,		// Object type
+static word OType,		// Object type
 	    OID;		// Object Id
+
 static int  IIF = WNONE;	// Issuer's interface
 
 static	const fun_pak_t *FPack;	// Function package for current transaction
@@ -75,16 +80,10 @@ static void oss_in (address, int);
 
 // OSS packet size table (-request type/ordinal)
 const byte oss_psize [] = {
-	10, // DONE 	flb,nib,frw,low,ncw,low
-	 0, // FAILED
-	 0, // BAD
-	 0, // ALREADY
-	 0, // BUSY
-	 0, // UNIMPL
-	 8, // GET	ylw,otw,oiw,isb,rfb
+	 0, // PING
+	 8, // GET
 	 4, // QUERY	otw,oiw
 	 2, // CLEAN	otw, [listw]
-	 0, // PING
 	 2, // SHOW
 	 2, // LCDP	cmb,nab, [listb]
 	 2, // BUZZ
@@ -99,9 +98,9 @@ const byte oss_psize [] = {
 
 #ifdef	DEBUGGING
 
-static void send_back (byte, int);
+static void send_ack (word, word, byte, int);
 
-void diagg (const char *msg) {
+void diagg (const char *msg, word a, word b) {
 //
 // Send a debug packet
 //
@@ -114,27 +113,21 @@ void diagg (const char *msg) {
 	if ((ln & 1)) 
 		ln++;
 	
-	if ((packet = tcv_wnp (WNONE, USFD, ln + 4)) == NULL)
+	if ((packet = tcv_wnpu (WNONE, USFD, ln + 8)) == NULL)
 		return;
 
 	bc = PT_DEBUG;
 	put1 (packet, bc);
+	// This means 'text message follows'
 	bc = 0;
 	put1 (packet, bc);
-	strcpy ((char*) (packet + 2), msg);
+	put2 (packet, a);
+	put2 (packet, b);
+	strcpy ((char*) (packet + 4), msg);
 	tcv_endp (packet);
 }
 
-void diagl (word val) {
-//
-// Leds
-//
-	leds (0, (val >> 0) & 1);
-	leds (1, (val >> 1) & 1);
-	leds (2, (val >> 2) & 1);
-}
-
-void dump_mem (word ad, word n, int ifa) {
+void dump_mem (word ad, word n) {
 //
 // Dump n bytes of memory from ad
 //
@@ -147,20 +140,19 @@ void dump_mem (word ad, word n, int ifa) {
 	if (n > MAXCHUNKLIST)
 		n = MAXCHUNKLIST;
 
-	if ((packet = tcv_wnp (WNONE, ifa, n + 4)) == NULL) {
-		send_back (OSS_FAILED, ifa);
+	if ((packet = tcv_wnp (WNONE, IIF, n + 4)) == NULL)
 		return;
-	}
 
 	bc = PT_DEBUG;
 	put1 (packet, bc);
+	// This means 'memory dump'
 	bc = 1;
 	put1 (packet, bc);
 	memcpy ((char*) (packet + 2), (byte*)ad, n);
 	tcv_endp (packet);
 }
 
-void dump_eeprom (lword ad, word n, int ifa) {
+void dump_eeprom (lword ad, word n) {
 // 
 // The same with EEPROM
 //
@@ -173,13 +165,12 @@ void dump_eeprom (lword ad, word n, int ifa) {
 	if (n > MAXCHUNKLIST)
 		n = MAXCHUNKLIST;
 
-	if ((packet = tcv_wnp (WNONE, ifa, n + 4)) == NULL) {
-		send_back (OSS_FAILED, ifa);
+	if ((packet = tcv_wnp (WNONE, IIF, n + 4)) == NULL)
 		return;
-	}
 
 	bc = PT_DEBUG;
 	put1 (packet, bc);
+	// This means 'EEPROM dump'
 	bc = 2;
 	put1 (packet, bc);
 
@@ -203,52 +194,57 @@ void *alloc_dhook (word size) {
 	return DHook;
 }
 
-static void send_back (byte co, int ifa) {
+static void send_status () {
 //
-// Send an OSS response
+// Sends a status packet on the indicated interface
 //
 	address packet;
 	word status;
 	byte pt;
 
-	if ((packet = tcv_wnp (WNONE, ifa, (co == OSS_DONE) ? PSIZE_OSS_D :
-	    PSIZE_OSS)) == NULL)
+	if ((packet = tcv_wnpu (WNONE, IIF, PSIZE_STAT)) == NULL)
 		// Don't go out of your way
 		return;
 
-	packet [0] = MCN;
-	pt = PT_OSS;
+	packet [0] = YrSLink;
+	pt = PT_STAT;
 	put1 (packet, pt);
-	put1 (packet, co);
+	put1 (packet, YrSRqN);
 
-	if (co == OSS_DONE) {
-		images_status (packet);
-		neighbors_status (packet);
-	}
+	images_status (packet);
+	neighbors_status (packet);
 	tcv_endp (packet);
 }
 
-static void send_nak (word code, word lnk, byte rq, int ifa) {
+static void send_ack (word code, word lnk, byte rq, int ifa) {
 //
 // Send a NAK
 //
 	address packet;
 	byte pt;
 
-	if ((packet = tcv_wnp (WNONE, ifa, PSIZE_NAK)) == NULL)
+	// Make it an urgent packet to bump the queue size limit
+	if ((packet = tcv_wnpu (WNONE, ifa, PSIZE_ACK)) == NULL)
 		return;
 
 	packet [0] = lnk;
-	pt = PT_NAK;
+	pt = PT_ACK;
 	put1 (packet, pt);
 	put1 (packet, rq);
 	put2 (packet, code);
 	tcv_endp (packet);
 }
 
+static void send_oss_ack (word code) {
+//
+// Send an ACK to an OSS request
+//
+	send_ack (code, YrSLink, YrSRqN, IIF);
+}
+
 static void clear_request (Boolean ok) {
 //
-// Called at the end of a transaction to clear the request
+// Called at the end of a transaction to clean up after the request
 //
 	if (DHook != NULL) {
 		ufree (DHook);
@@ -258,8 +254,9 @@ static void clear_request (Boolean ok) {
 	FDRQ = WNONE;
 
 	if (IIF != WNONE) {
-		// There was an external issuer
-		send_back (ok ? OSS_DONE : OSS_FAILED, IIF);
+		// There was an external issuer: this sends an ACK (positive
+		// or negative) to an OSS request
+		send_oss_ack (ok ? ACK_OK : ACK_FAILED);
 		IIF = WNONE;
 	}
 
@@ -299,13 +296,16 @@ Boolean croster_init (croster_t *cr, address packet) {
 	if (nc > MAXCHUNKLIST)
 		// For sanity
 		nc = MAXCHUNKLIST;
-	else if (nc < 2)
+	else if (nc < 2) {
 		// No chunks
+		// diagg ("CIN DONE", 0, 0);
 		return NO;
+	}
 
 	memcpy ((byte*)(cr->list), (byte*)(packet+2), nc);
 	cr->n = (nc >> 1);
 	cr->p = 0;
+	// diagg ("CIN", cr->n, cr->list [0]);
 	return YES;
 }
 
@@ -430,6 +430,19 @@ Boolean ctally_add (ctally_t *ct, word cn) {
 	return NO;
 }
 
+word ctally_absent (ctally_t *ct) {
+//
+// Count the missing chunks (for debugging)
+//
+	word wc, cn;
+
+	for (cn = wc = 0; wc < ct->n; wc++)
+		if (ctally_missing (ct, wc))
+			cn++;
+
+	return cn;
+}
+		
 // ============================================================================
 
 typedef	struct {
@@ -479,8 +492,8 @@ strand (listener, listener_data_t)
 			FDRQ = WNONE;
 		} else {
 			// This can only be GET at present: handle it
-			if (++MRQN == 0)
-				MRQN = 1;
+			if (++MyORqN == 0)
+				MyORqN = 1;
 			proceed (LI_GET);
 		}
 	}
@@ -508,8 +521,7 @@ strand (listener, listener_data_t)
 
 	    case PT_OSS:
 
-		if (PACKET [0] == MCN)
-			oss_in (PACKET, MYFD);
+		oss_in (PACKET, MYFD);
 		break;
 
 	    case PT_WTR:
@@ -520,18 +532,18 @@ strand (listener, listener_data_t)
 			break;
 			
 		// Request number of the sender
-		get1 (PACKET, YRQN);
+		get1 (PACKET, YrORqN);
 
 		// This should be our channel number
 		get2 (PACKET, wsd);
-		if (wsd != MCN)
+		if (wsd != MyLink)
 			// It isn't - just ignore
 			break;
 
-		YLink = PACKET [0];
+		YrOLink = PACKET [0];
 
 		if (LBUSY) {
-			wsd = NAK_BUSY;
+			wsd = ACK_BUSY;
 			goto PT_wtr_nak;
 		}
 
@@ -542,10 +554,10 @@ strand (listener, listener_data_t)
 		}
 
 		// Object not found (we may add other reasons later)
-		wsd = NAK_NF;
+		wsd = ACK_NOTFOUND;
 PT_wtr_nak:
 		tcv_endp (PACKET);
-		send_nak (wsd, YLink, YRQN, MYFD);
+		send_ack (wsd, YrOLink, YrORqN, MYFD);
 		proceed (LI_IDLE);
 
 	    // ================================================================
@@ -571,7 +583,7 @@ PT_wtr_nak:
 
 	// Get here after timeout
 	if (Retries == 0) {
-
+		// diagg ("LI_SEND_PT RETRIES", 0, 0);
 BTIF:		// Back To Idle (fail)
 		clear_request (NO);
 		proceed (LI_IDLE);
@@ -582,15 +594,14 @@ BTIF:		// Back To Idle (fail)
     entry (LI_SEND_POLL)
 
 	PACKET = tcv_wnp (LI_SEND_POLL, MYFD, PSIZE_RTS + FUN_RTS_SND (NULL));
-	PACKET [0] = YLink;		// Recipient's link number
+	PACKET [0] = YrOLink;		// Recipient's link number
 	cmd = PT_RTS;
 	put1 (PACKET, cmd);		// Paket type: Ready To Send
-	put1 (PACKET, YRQN);		// Recipient's request number
+	put1 (PACKET, YrORqN);		// Recipient's request number
 
 	// Fill in object parameters; note that the RTS packet length
 	// generally depends on the object type
 	FUN_RTS_SND (PACKET);
-
 	tcv_endp (PACKET);
 
     entry (LI_SEND_WR)
@@ -600,25 +611,25 @@ BTIF:		// Back To Idle (fail)
 	delay (INTV_REPLY, LI_SEND_PT);
 
 	PACKET = tcv_rnp (LI_SEND_WR, MYFD);
+	if (PACKET [0] != YrOLink) {
+		// Ignore and keep waiting
+LI_send_wr_wait:
+		tcv_endp (PACKET);
+		proceed (LI_SEND_WR);
+	}
 
 	// Check if this is the correct reply
 	get1 (PACKET, cmd);
 	get1 (PACKET, req);
-	// The other party uses their Link Id in the reply
-	if (PACKET [0] == YLink && req == YRQN) {
-		// A packet related to this request
-		if (cmd != PT_GO) {
 
-			// End of packet + back to idle (fail)
-EPBTIF:
-			tcv_endp (PACKET);
-			goto BTIF;
-		}
+	if (req != YrORqN)
+		// Wrong session
+		goto LI_send_wr_wait;
 
+	if (cmd == PT_GO) {
 		// This is a valid GO, unpack the list of chunks to send; note
 		// the format of the list of chunks is object-type independent
 		if (FUN_CLS_SND (PACKET)) {
-
 			// End of packet + send chunks
 EPSCH:
 			tcv_endp (PACKET);
@@ -626,6 +637,7 @@ EPSCH:
 			proceed (LI_SEND_CH);
 		} else {
 			// All done
+			// diagg ("LI_SEND_WR DONE", 0, 0);
 EPBTIK:			// End of Packet + Back To Idle (OK)
 			tcv_endp (PACKET);
 BTIK:			// Back To Idle OK
@@ -633,9 +645,17 @@ BTIK:			// Back To Idle OK
 			proceed (LI_IDLE);
 		}
 	}
-	// Ignore it and keep waiting
+
+	if (cmd == PT_WTR)
+		// An old WTR
+		goto LI_send_wr_wait;
+
+	// Anything else counts as a NAK
+	// diagg ("LI_SEND_WR UNEXP", cmd, 0);
+	// End of packet + back to idle (fail)
+EPBTIF:
 	tcv_endp (PACKET);
-	proceed (LI_SEND_WR);
+	goto BTIF;
 
     entry (LI_SEND_CH)
 
@@ -643,10 +663,10 @@ BTIK:			// Back To Idle OK
 	wsc = FUN_CNK_SND (NULL);
 	if (wsc) {
 		PACKET = tcv_wnp (LI_SEND_CH, MYFD, PSIZE_CHK + 2 + wsc);
-		PACKET [0] = YLink;
+		PACKET [0] = YrOLink;
 		cmd = PT_CHUNK;
 		put1 (PACKET, cmd);
-		put1 (PACKET, YRQN);
+		put1 (PACKET, YrORqN);
 		// This one also advances to the next chunk
 		FUN_CNK_SND (PACKET);
 		tcv_endp (PACKET);
@@ -662,18 +682,20 @@ BTIK:			// Back To Idle OK
     entry (LI_SEND_CT)
 
 	// Get here after timeout
-	if (Retries == 0)
+	if (Retries == 0) {
+		// diagg ("LI_SEND_CT RETRIES", 0, 0);
 		goto BTIF;
+	}
 
 	Retries--;
 
     entry (LI_SEND_EC)
 
 	PACKET = tcv_wnp (LI_SEND_EC, MYFD, PSIZE_CHK);
-	PACKET [0] = YLink;
+	PACKET [0] = YrOLink;
 	cmd = PT_CHUNK;
 	put1 (PACKET, cmd);
-	put1 (PACKET, YRQN);
+	put1 (PACKET, YrORqN);
 	tcv_endp (PACKET);
 
     entry (LI_SEND_WA)
@@ -686,17 +708,22 @@ BTIK:			// Back To Idle OK
 	get1 (PACKET, cmd);
 	get1 (PACKET, req);
 
-	if (PACKET [0] == YLink && req == YRQN) {
+	if (PACKET [0] == YrOLink && req == YrORqN) {
 		// A packet related to this request
-		if (cmd != PT_GO)
+		if (cmd != PT_GO) {
+			// diagg ("LI_SEND_WA NO GO", 0, 0);
 			// Almost as good as a final ack
 			goto EPBTIF;
+		}
 
 		// Any more chunks to send?
-		if (FUN_CLS_SND (PACKET))
+		if (FUN_CLS_SND (PACKET)) {
+			// diagg ("LI_SEND_WA MORE", 0, 0);
 			goto EPSCH;
-		else
+		} else {
+			// diagg ("LI_SEND_WA NO MORE", 0, 0);
 			goto EPBTIK;
+		}
 	}
 	// Ignore it and keep waiting
 	tcv_endp (PACKET);
@@ -715,8 +742,10 @@ BTIK:			// Back To Idle OK
     entry (LI_GET_PT)
 
 	// Poll timeout?
-	if (Retries == 0)
+	if (Retries == 0) {
+		// diagg ("LI_GET_PT RETRIES", 0, 0);
 		goto BTIF;
+	}
 
 	Retries--;
 
@@ -724,11 +753,11 @@ BTIK:			// Back To Idle OK
 
 	PACKET = tcv_wnp (LI_GET_POLL, MYFD, PSIZE_WTR);
 	// ID of the other party
-	PACKET [0] = MCN;
+	PACKET [0] = MyLink;
 	cmd = PT_WTR;		// Want To Receive
 	put1 (PACKET, cmd);
-	put1 (PACKET, MRQN);	// Request number
-	put2 (PACKET, YLink);	// Recipient's channel Id
+	put1 (PACKET, MyORqN);	// Request number
+	put2 (PACKET, YrOLink);	// Recipient's channel Id
 	put2 (PACKET, OType);
 	put2 (PACKET, OID);	// Object coordinates
 	tcv_endp (PACKET);
@@ -742,18 +771,21 @@ BTIK:			// Back To Idle OK
 	get1 (PACKET, cmd);
 	get1 (PACKET, req);
 
-	if (PACKET [0] == MCN && req == MRQN) {
-		if (cmd != PT_RTS)
+	if (PACKET [0] == MyLink && req == MyORqN) {
+		if (cmd != PT_RTS) {
 			// Reject
+			// diagg ("LI_GET_WR NAK", cmd, 0);
 			goto EPBTIF;
+		}
 		// Extract object params and the number of chunks
 		cnd = FUN_INI_RCP (PACKET);
 		tcv_endp (PACKET);
 		if (cnd)
 			proceed (LI_GET_CH);
 		else {
+			// diagg ("LI_GET_WR REJECT", 0, 0);
 			// Don't want it after all
-			send_nak (NAK_REJECT, MCN, MRQN, MYFD);
+			send_ack (ACK_REJECT, MyLink, MyORqN, MYFD);
 			goto BTIF;
 		}
 	}
@@ -770,11 +802,15 @@ BTIK:			// Back To Idle OK
 
 	if (Retries == 0) {
 		// Cancel or stop
+		// diagg ("LI_GET_CT RETRIES", 0, 0);
 SRBTI:
-		if (FUN_STP_RCP ())
+		if (FUN_STP_RCP ()) {
+			// diagg ("LI_GET_CT OK", 0, 0);
 			goto BTIK;
-		else
+		} else { 
+			// diagg ("LI_GET_CT FAIL", 0, 0);
 			goto BTIF;
+		}
 	}
 
 	Retries--;
@@ -786,16 +822,17 @@ SRBTI:
 
 	if (wsc == 0) {
 		// All chunks received
+		// diagg ("LI_GET_SL: ALL RCVD", 0, 0);
 		FUN_STP_RCP ();
 		proceed (LI_GET_EN);
 	}
 
 	// Chunks still missing, prepare a GO packet with list of chunks
 	PACKET = tcv_wnp (LI_GET_SL, MYFD, PSIZE_GO + wsc);
-	PACKET [0] = MCN;
+	PACKET [0] = MyLink;
 	cmd = PT_GO;
 	put1 (PACKET, cmd);
-	put1 (PACKET, MRQN);
+	put1 (PACKET, MyORqN);
 	// Fill in the chunk list
 	FUN_CLS_RCP (PACKET);
 	tcv_endp (PACKET);
@@ -807,7 +844,7 @@ SRBTI:
 
 	PACKET = tcv_rnp (LI_GET_WC, MYFD);
 
-	if (PACKET [0] != MCN) {
+	if (PACKET [0] != MyLink) {
 		// Not ours: ignore and keep waiting
 LI_get_ig:
 		tcv_endp (PACKET);
@@ -816,13 +853,9 @@ LI_get_ig:
 
 	get1 (PACKET, cmd);
 	get1 (PACKET, req);
-	if (req != MRQN)
+	if (req != MyORqN || cmd != PT_CHUNK) {
+		// diagg ("LI_GET_WC IGNORED", cmd, req);
 		goto LI_get_ig;
-
-	if (cmd != PT_CHUNK) {
-		// Something wrong: abort
-		tcv_endp (PACKET);
-		goto SRBTI;
 	}
 
 	// This is an actual chunk to receive
@@ -833,11 +866,13 @@ LI_get_ig:
 	cnd = FUN_CNK_RCP (LI_GET_CK, PACKET);
 	tcv_endp (PACKET);
 
-	if (cnd)
+	if (cnd) {
 		proceed (LI_GET_WC);
-	else
+	} else {
+		// diagg ("LI_GET_CK EOR", cmd, req);
 		// End of round
 		proceed (LI_GET_SL);
+	}
 
     entry (LI_GET_EN)
 
@@ -848,10 +883,10 @@ LI_get_ig:
 
 	// Null GO packet
 	PACKET = tcv_wnp (LI_GET_CH, MYFD, PSIZE_GO);
-	PACKET [0] = MCN;
+	PACKET [0] = MyLink;
 	cmd = PT_GO;
 	put1 (PACKET, cmd);
-	put1 (PACKET, MRQN);
+	put1 (PACKET, MyORqN);
 	tcv_endp (PACKET);
 
 	if (--Retries) {
@@ -896,20 +931,38 @@ static void oss_in (address packet, int ifa) {
 #define	nb	(*(((byte*)(&ac))+2))
 #define	cv	(*(((word*)(&ac))+1))
 
-	// We are at odd boundary, so this one is always available
+	// Request number
 	get1 (packet, tp);
 
-	if (tp >= sizeof (oss_psize)) {
-Error:
-		send_back (OSS_BAD, ifa);
+	if (tcv_left (packet) < PSIZE_OSS-PSIZE_FRAME)
+		// Ignore
+		return;
+		
+	// Target link Id
+	get2 (packet, cw);
+
+	if (cw != MyLink)
+		// Not for us, ignore
+		return;
+
+	if (LBUSY) {
+		send_ack (ACK_BUSY, cw, tp, ifa);
 		return;
 	}
 
-	if (tcv_left (packet) < oss_psize [tp])
-		goto Error;
+	// Initiate processing
+	YrSRqN = tp;
+	YrSLink = cw;
+	IIF = ifa;
 
-	if (LBUSY) {
-		send_back (OSS_BUSY, ifa);
+	get1 (packet, tp);
+	// This is to even things up (ignored)
+	get1 (packet, nb);
+
+	if (tp >= sizeof (oss_psize)) {
+Error:
+		send_oss_ack (ACK_FORMAT);
+		IIF = WNONE;
 		return;
 	}
 
@@ -917,7 +970,7 @@ Error:
 
 	    case OSS_GET:
 
-		get2 (packet, YLink);
+		get2 (packet, YrOLink);
 		get2 (packet, OType);
 		get2 (packet, OID);
 
@@ -929,13 +982,12 @@ Error:
 
 		// Check if this is an image that you already have
 		if (OType == OTYPE_IMAGE && image_find (OID)) {
-			send_back (OSS_ALREADY, ifa);
+			send_oss_ack (ACK_ALREADY);
 			return;
 		}
 
 		FPack = OPLUGS [OType];
 		// Incoming interface
-		IIF = ifa;
 		RQType = RQ_GET;
 		// Function set
 
@@ -978,13 +1030,15 @@ Error:
 			break;
 		}
 
-		send_back (tp ? OSS_DONE : OSS_FAILED, ifa);
+		send_oss_ack (tp ? ACK_OK : ACK_FAILED);
+Ret:
+		IIF = WNONE;
 		return;
 
 	    case OSS_PING:
-DRet:
-		send_back (OSS_DONE, ifa);
-		return;
+
+		send_status ();
+		goto Ret;
 
 	    case OSS_CLEAN:
 
@@ -995,7 +1049,7 @@ DRet:
 
 		    case OTYPE_IMAGE:
 
-			images_clean (packet + 3, tcv_left (packet) >> 1);
+			images_clean (packet + 5, tcv_left (packet) >> 1);
 			break;
 
 		    case OTYPE_ILIST:
@@ -1005,17 +1059,19 @@ DRet:
 
 		    case OTYPE_NLIST:
 
-			neighbors_clean (packet + 3, tcv_left (packet) >> 1);
+			neighbors_clean (packet + 5, tcv_left (packet) >> 1);
 			break;
 		}
-		goto DRet;
-
+ORet:
+		send_oss_ack (ACK_OK);
+		goto Ret;
+		
 	    case OSS_SHOW:
 
 		// Display image number i
 		get2 (packet, cw);
-		send_back (image_show (cw) ? OSS_DONE : OSS_FAILED, ifa);
-		return;
+		send_oss_ack (image_show (cw) ? ACK_OK : ACK_FAILED);
+		goto Ret;
 
 	    case OSS_LCDP:
 
@@ -1025,15 +1081,15 @@ DRet:
 		if (nb > tcv_left (packet)) 
 			goto Error;
 
-		lcdg_cmd (tp, (byte*)(packet+3), nb);
-		goto DRet;
-	
+		lcdg_cmd (tp, (byte*)(packet+4), nb);
+		goto ORet;
+
  	    case OSS_BUZZ:
 
 		// To test the buzzer
 		get2 (packet, cw);
 		buzz (cw);
-		goto DRet;
+		goto ORet;
 
 	    case OSS_RFPARAM:
 
@@ -1070,13 +1126,18 @@ DRet:
 			tcv_control (RSFD, PHYSOPT_SETRATE, &cw);
 			break;
 
+		    case 4:	// Reset, argument ignored
+
+			tcv_control (RSFD, PHYSOPT_RESET, NULL);
+			break;
+
 		    default:
 
-			send_back (OSS_UNIMPL, ifa);
-			return;
+			send_oss_ack (ACK_UNIMPL);
+			goto Ret;
 		}
 
-		goto DRet;
+		goto ORet;
 
 #ifdef	DEBUGGING
 
@@ -1088,23 +1149,23 @@ DRet:
 		get4 (packet, ad);
 
 		if (tp) 
-			dump_eeprom (ad, nb, ifa);
+			dump_eeprom (ad, nb);
 		else
-			dump_mem ((word)ad, nb, ifa);
-		return;
+			dump_mem ((word)ad, nb);
+		goto Ret;
 
 	    case OSS_EE:
 
 		// EEPROM erase
 		get4 (packet, ac);
 		get4 (packet, ad);
-		
 		ee_erase (WNONE, ac, ad);
-		goto DRet;
+		goto ORet;
 #endif
 	}
 
-	send_back (OSS_UNIMPL, ifa);
+	send_oss_ack (ACK_UNIMPL);
+	goto Ret;
 
 #undef	cw
 #undef	tp
@@ -1260,18 +1321,18 @@ thread (buttons_handler)
     entry (BH_LOOP)
 
 	if (PRESSED_BUTTON0) {
-		diagg ("BUT 0");
+		// diagg ("BUT", 0, 0);
 		images_show_next ();
 	} else if (PRESSED_BUTTON1) {
-		diagg ("BUT 1");
+		// diagg ("BUT", 1, 1);
         	images_show_previous ();
 	}
 
-	if (JOYSTICK_N) diagg ("JOY N");
-	if (JOYSTICK_E) diagg ("JOY E");
-	if (JOYSTICK_S) diagg ("JOY S");
-	if (JOYSTICK_W) diagg ("JOY W");
-	if (JOYSTICK_PUSH) diagg ("JOY PUSH");
+	if (JOYSTICK_N) diagg ("JOY N", 0, 0);
+	if (JOYSTICK_E) diagg ("JOY E", 0, 0);
+	if (JOYSTICK_S) diagg ("JOY S", 0, 0);
+	if (JOYSTICK_W) diagg ("JOY W", 0, 0);
+	if (JOYSTICK_PUSH) diagg ("JOY PUSH", 0, 0);
 
 	when (BUTTON_PRESSED_EVENT, BH_LOOP);
 	release;
