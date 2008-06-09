@@ -1,0 +1,76 @@
+Warsaw board, power consumption
+===============================
+
+Vcc = 3.1V
+
+Each value taken over a 24 second period
+
+
+Note:
+
+Xmitter running means sending a 48-byte packet every 128 (PicOS) milliseconds.
+
+cap means 100uF capacitor across Vcc (my idea to smooth out rapid current
+variations to reduce the impact of AC component)
+
+-usb means USB/UART disconnected. There seems to be residual back current from the
+UART to Vcc.
+
+-jtag means JTag disconnected (it seems to drain some current, which is visible at
+lower ranges).
+
+==================================================================================
+
+The device isn't very good at measuring current varying from very low (below 500uA
+over 20mA). It has a "low" range (for current below 20mA) and medium range (below
+1A), but the medium range gives wrong (too high) results with freeze. Consequently,
+I couldn't really measure alternating freeze and, say, transmission, very precisely.
+
+But this shouldn't matter. Suppose, for example, that every 15 minutes we wake up,
+run the ADC for 1 sec, CPU for 1 sec, transmit for 1 sec, and listen for 2 sec.
+We get: (885*50uA + 1*1.5mA + 1*20mA + 2*22mA)/900 = 122uA. Make it 150uA. This
+gives us ca. 400 days on a 1Ah battery. Is this estimation sound?
+
+XMit appears to be using slightly less power than receive because transmission
+was not continuous. The numbers in parantheses are power (0-7) and rate.
+
+==================================================================================
+
+				    DC		   RMS		MEASUREMENT
+
+Idle, standard power:		322.165uA	381.263uA 	medium
+				280.803uA	374.418uA 	medium+cap
+				288.180uA	375.731uA 	medium+cap-usb
+				413.449uA	414.168uA 	low
+				369.846uA	370.756uA 	low+cap
+				373.150uA	374.075uA 	low+cap-usb
+
+Freeze:				 61.727uA	 66.628uA 	low
+				 61.693uA	 67.459uA 	low+cap
+				 64.080uA	 68.910uA 	low-usb
+				 64.042uA	 69.987uA 	low+cap-usb
+				 32.700uA	 41.063uA	low-jtag
+				 35.030uA	 43.296uA	low-jtag-usb
+				 34.868uA	 44.031uA	low-jtag-usb+cap
+
+CPU loop:			  2.310mA	  2.314ma 	medium
+				  2.407mA	  2.407mA 	low
+
+Read analog sensor:		  1.162mA	  1.442mA	medium
+
+Receiver on:			 18.973mA	 20.331mA 	medium
+				 19.197mA	 21.460mA 	high+pulse
+
+Xmitter running (7,10k):	 17.290mA	 18.490mA 	medium
+				 17.837mA	 19.677mA 	high+pulse
+				 17.336mA	 17.416mA 	medium+cap
+				 18.338mA	 18.364mA 	medium+cap-usb
+
+Xmitter running (0,10k):	 16.554mA	 18.063mA 	medium
+				 16.980mA	 19.007mA	high+pulse
+
+Xmitter running (7,200k):	 18.849mA	 20.177mA 	medium
+				 18.946mA	 21.003mA	high+pulse
+
+Xmitter running (0,200k):	 18.821mA	 20.182mA 	medium
+				 21.860mA	 21.092mA	high+pulse
