@@ -12,7 +12,8 @@ set YourLink		0
 set MyRQN		255
 set YourRQN		0
 set MaxLineCount	1024
-set CHUNKSIZE		54
+set CHUNKSIZE		56
+set ICHUNKSIZE		54
 
 array set CCOD 		{ DBG 0 HELLO 1 OSS 2 GO 3 WTR 4 RTS 5 CHUNK 6 ACK 7
 				STAT 8 }
@@ -685,6 +686,9 @@ proc user_retrieve { par } {
 	set SIO(OTP) [exnum par]
 	set SIO(OID) [exnum par]
 
+	# file name for retrieved image
+	set SIO(FIL) [string trim $par]
+
 	if { $SIO(OTP) == "" || $SIO(OID) == "" } {
 		log "illegal object parameters"
 		return
@@ -1336,7 +1340,7 @@ proc set_image { oid fn } {
 #
 # Unpack image to be sent out
 #
-	global SIO IDX IDL CHUNKS CHUNKSIZE CHAR
+	global SIO IDX IDL CHUNKS ICHUNKSIZE CHAR
 
 	if [catch { open $fn "r" } ifd] {
 		log "cannot open file $fn"
@@ -1400,7 +1404,7 @@ proc set_image { oid fn } {
 
 	set nc 0
 	while 1 {
-		set CHUNKS($nc) [getis $CHUNKSIZE]
+		set CHUNKS($nc) [getis $ICHUNKSIZE]
 		incr nc
 		if { $IDX >= $IDL } {
 			break
@@ -1431,9 +1435,84 @@ proc receive_image { chk id } {
 #
 # Received an image
 #
-	global SIO
+	global SIO CHUNKSIZE
 
-	log "image reception unimplemented, image discarded for now"
+	if { $SIO(FIL) == "" } {
+		log "no file name specified, image discarded"
+		return
+	}
+
+	# will built the image file here
+	set SIO(MSG) "olso"
+
+	set nc [lindex $SIO(RTS) 0]
+	# image number ignored
+	set xx [lindex $SIO(RTS) 2]
+	set yy [lindex $SIO(RTS) 3]
+	set ll [lindex $SIO(RTS) 4]
+
+	if { [expr $xx & 0x800] != 0 } {
+		put2 1
+	} else {
+		put2 0
+	}
+
+	put2 [expr $xx & ~0x800]
+	put2 [string length $ll]
+	append SIO(MSG) $ll
+
+	# re-order the chunks
+	for { set i 0 } { $i < $nc } { incr i } {
+		set cc($i) ""
+	}
+
+	for { set j 0 } { $j < $nc } { incr j } {
+		set fr [expr $i * $CHUNKSIZE]
+		set up [expr $fr + $CHUNKSIZE - 1]
+		set ex [string range $chk $fr $up]
+		set i [string range $ex 0 1]
+		set ex [string range $ex 2 end]
+
+		binary scan $i s i
+		set i [expr $i & 0xffff]
+		# chunk number
+		if { $i >= $nc } {
+			log "error collecting chunks 1"
+			return
+		}
+
+		if { $cc($i) != "" } {
+			log "error collecting chunks 2"
+			return
+		}
+
+		set cc($i) $ex
+	}
+
+	for { set i 0 } { $i < $nc } { incr i } {
+		if { $cc($i) == "" } {
+			log "error collecting chunks 3"
+			return
+		}
+		append SIO(MSG) $cc($i)
+	}
+
+	# write it out
+			
+	if [catch { open $SIO(FIL) "w" } fd] {
+		log "cannot open $SIO(FIL): $fd"
+		return
+	}
+
+	if [catch { puts -nonewline $fd $SIO(MSG) } err] {
+		log "cannot write to $SIO(FIL): $err"
+		catch { close $fd }
+		return
+	}
+
+	catch { close $fd }
+
+	log "image saved in $SIO(FIL)"
 }
 
 proc receive_ilist { chk oid } {

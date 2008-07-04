@@ -37,7 +37,9 @@ thread (root)
 		"Commands:\r\n"
 		"r s      -> read value of sensor s\r\n"
 		"c s d    -> read value of sensor s continually at d int\r\n"
+#if 0
 		"x        -> turn reference on\r\n"
+#endif
 		);
 
   entry (RS_RCMD)
@@ -47,7 +49,9 @@ thread (root)
 	switch (ibuf [0]) {
 		case 'r' : proceed (RS_GSEN);
 		case 'c' : proceed (RS_CSEN);
+#if 0
 		case 'x' : proceed (RS_CSET);
+#endif
 	}
 
   entry (RS_RCMD+1)
@@ -85,9 +89,11 @@ thread (root)
 	delay (p [1], RS_CSEN+1);
 	release;
 
+#if 0
   entry (RS_CSET)
 
 	EREF_ON;
 	proceed (RS_RCMD);
+#endif
 
 endthread
