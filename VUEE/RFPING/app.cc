@@ -277,7 +277,7 @@ thread (root)
 		"Commands:\r\n"
 		"s intvl  -> snd int\r\n"
 		"r        -> rcv\r\n"
-		"d i v    -> chg par i\r\n"
+		"d q v    -> physopt\r\n"
 		"x p      -> xmt pwr\r\n"
 		"y        -> get xmt pwr\r\n"
 		"o        -> stop rcv\r\n"
@@ -398,17 +398,15 @@ thread (root)
 
     entry (RS_PAR)
 
-	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 2)
+	p [1] = 0;
+	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 1)
 		proceed (RS_RCMD1);
 
-	if (p [0] > 5)
-		proceed (RS_RCMD1);
-
-	tcv_control (sfd, PHYSOPT_SETPARAM, p);
+	k = tcv_control (sfd, *(p+0), p+1);
 
     entry (RS_PAR1)
 
-	ser_outf (RS_PAR1, "Parameter %u set to %u\r\n", p [0], p [1]);
+	ser_outf (RS_PAR1, "Completed: %d %u\r\n", k, p [1]);
 	proceed (RS_RCMD);
 
     entry (RS_SSID)

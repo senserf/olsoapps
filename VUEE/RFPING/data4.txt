@@ -26,26 +26,34 @@
 		-2.0dB		5.0E-1
 		-5.0dB		9.9E-1
 	</ber>
-	<frame>9600 12 0</frame>
-	<rssi mode="log,transform">-202.0 0 53.0 255</rssi>
-	<power mode="log,interp">
-		-30.0dBm  	0
-		-15.0dBm	1
-		-10.0dBm	2
-		 -5.0dBm	3
-		  0.0dBm	4
-		  5.0dBm	5
-		  7.0dBm	6
-		 10.0dBm	7
+	<frame>12 0</frame>
+	<rssi>0 -202.0 255 53.0</rssi>
+	<power>
+		0	-30.0dBm
+		1	-15.0dBm
+		2	-10.0dBm
+		3	 -5.0dBm
+		4	  0.0dBm
+		5	  5.0dBm
+		6	  7.0dBm
+		7	 10.0dBm
 	</power>
+	<rates boost="yes">
+		0	  4800		 3dB
+		1	 10000		 0dB
+		2	 38400		-4dB
+		3       200000		-10dB
+	</rates>
+	<channels number="255">
+		Cross channel separation
+		20dB 29dB 38dB 46dB 54dB 62dB 70dB 78dB 86dB 94dB 102dB
+	</channels>
     </channel>
     <nodes>
 	<defaults start="on">
 	    <memory>2048 bytes</memory>
-	    <power>
-		transmitter power	10.0dBm
-		receiver boost		0.0dB
-	    </power>
+	    <power>7</power>
+	    <rate>1</rate>
 	    <preamble>32 bits</preamble>
 	    <lbt>
 		delay			8msec

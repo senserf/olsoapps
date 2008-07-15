@@ -31,7 +31,7 @@ process THREADNAME (pin_monitor) (Node) {
 
 	long CNT, CMP;
 	word STA;
-	char *MSG;
+	const char *MSG;
 
 	states {
 		PM_START,
@@ -49,7 +49,8 @@ process THREADNAME (root) (Node) {
 
 	char *ibuf;
 	int k, n1;
-	char *fmt, obuf [32];
+	const char *fmt;
+	char obuf [32];
 	word p [2];
 	long lp;
 
@@ -131,7 +132,7 @@ static word	packet_length;
 
 static	word STA;
 static	long CNT, CMP;
-static	char *MSG;
+static	const char *MSG;
 
 // ======================================
 
@@ -179,7 +180,8 @@ static	char *MSG;
 	
 static	char *ibuf;
 static	int k, n1;
-static	char *fmt, obuf [32];
+static	const char *fmt;
+static	char obuf [32];
 static	word p [2];
 static	long lp;
 
