@@ -199,6 +199,8 @@ __PUBLF (Node, int, snd_stop) () {
 	return 0;
 }
 
+#ifdef	PMON_NOTEVENT
+
 thread (pin_monitor)
 
     entry (PM_START)
@@ -248,6 +250,8 @@ thread (pin_monitor)
 
 endthread
 
+#endif	/* PMON_NOTEVENT */
+
 thread (root)
 
     entry (RS_INIT)
@@ -289,6 +293,7 @@ thread (root)
 		"u n v    -> set pin\r\n"
 		"a n r d  -> read ADC pin\r\n"
 		"w n v r  -> write DAC pin\r\n"
+#ifdef PMON_NOTEVENT
 		"C c e    -> start cnt\r\n"
 		"P c      -> set cmp\r\n"
 		"G        -> get cnt\r\n"
@@ -297,10 +302,10 @@ thread (root)
 		"M        -> stop ntf\r\n"
 		"X        -> start mtr\r\n"
 		"Y        -> stop mtr\r\n"
+#endif
 		"S n      -> read n-th sensor\r\n"
 		"A n v    -> set n-th actuator\r\n"
 	);
-// FIXME: interrupts must be triggered while pending to preserve semantics
 
     entry (RS_RCMDM1)
 
@@ -330,6 +335,7 @@ thread (root)
 	    case 'u': proceed (RS_SPIN);
 	    case 'a': proceed (RS_RANA);
 	    case 'w': proceed (RS_WANA);
+#ifdef PMON_NOTEVENT
 	    case 'C': proceed (RS_PSCN);
 	    case 'P': proceed (RS_PSCM);
 	    case 'G': proceed (RS_PGCN);
@@ -338,6 +344,7 @@ thread (root)
 	    case 'M': proceed (RS_PQNT);
 	    case 'X': proceed (RS_PSMT);
 	    case 'Y': proceed (RS_PQMT);
+#endif
 	    case 'S': proceed (RS_GETS);
 	    case 'A': proceed (RS_SETA);
 	}
@@ -469,6 +476,8 @@ thread (root)
 	pin_write_dac (p [0], k, p [1]);
 	proceed (RS_RCMD);
 
+#ifdef PMON_NOTEVENT
+
     entry (RS_PSCN)
 
 	k = 0;
@@ -528,6 +537,8 @@ thread (root)
 
 	killall (pin_monitor);
 	proceed (RS_RCMD);
+
+#endif /* PMON_NOTEVENT */
 
     entry (RS_SETP)
 

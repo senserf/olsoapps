@@ -64,13 +64,17 @@
 #define	OSS_CLEAN	3
 #define	OSS_SHOW	4
 #define	OSS_LCDP	5
-#define	OSS_BUZZ	6
-#define	OSS_RFPARAM	7
+#define	OSS_LCDS	6
+#define	OSS_LCDC	7
+#define	OSS_LCDT	8
+#define	OSS_BUZZ	9
+#define	OSS_RFPARAM	10
 
 #ifdef DEBUGGING
 
-#define	OSS_DUMP	8
-#define	OSS_EE		9
+#define	OSS_DUMP	11
+#define	OSS_EE		12
+#define	OSS_EW		13
 
 #endif
 

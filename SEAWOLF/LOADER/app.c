@@ -86,11 +86,15 @@ const byte oss_psize [] = {
 	 2, // CLEAN	otw, [listw]
 	 2, // SHOW
 	 2, // LCDP	cmb,nab, [listb]
+	 5, // LCDS	b,b,b,b,b
+	 2, // LCDC	b,b
+	 3, // LCDT	b,str
 	 2, // BUZZ
 	 2  // RFPARAM
 #ifdef	DEBUGGING
 ,	 6, // DUMP	tpb,nbb,adl
-	 8  // EE	frl,upl
+	 8, // EE	frl,upl
+	 6  // EW	frl,nw
 #endif
 };
 
@@ -931,6 +935,11 @@ static void oss_in (address packet, int ifa) {
 #define	nb	(*(((byte*)(&ac))+2))
 #define	cv	(*(((word*)(&ac))+1))
 
+#define	xb	(* ((byte*)(&ad))   )
+#define	yb	(*(((byte*)(&ad))+3))
+#define	xa	(*(((byte*)(&ad))+2))
+#define	ya	(*(((byte*)(&ad))+1))
+
 	// Request number
 	get1 (packet, tp);
 
@@ -959,7 +968,7 @@ static void oss_in (address packet, int ifa) {
 	// This is to even things up (ignored)
 	get1 (packet, nb);
 
-	if (tp >= sizeof (oss_psize)) {
+	if (tp >= sizeof (oss_psize) || tcv_left (packet) < oss_psize [tp]) {
 Error:
 		send_oss_ack (ACK_FORMAT);
 		IIF = WNONE;
@@ -1084,6 +1093,30 @@ ORet:
 		lcdg_cmd (tp, (byte*)(packet+4), nb);
 		goto ORet;
 
+	    case OSS_LCDS:
+
+		get1 (packet, xa);
+		get1 (packet, ya);
+		get1 (packet, xb);
+		get1 (packet, yb);
+		get1 (packet, cv);
+
+		lcdg_set (xa, ya, xb, yb, cv);
+		goto ORet;
+
+	    case OSS_LCDC:
+
+		get1 (packet, xa);
+		get1 (packet, ya);
+		lcdg_setc (xa, ya);
+		goto ORet;
+
+	    case OSS_LCDT:
+
+		get2 (packet, cw);
+		lcdg_text ((byte)cw, (const char*)(packet + 5));
+		goto ORet;
+
  	    case OSS_BUZZ:
 
 		// To test the buzzer
@@ -1161,6 +1194,18 @@ ORet:
 		get4 (packet, ad);
 		ee_erase (WNONE, ac, ad);
 		goto ORet;
+
+	    case OSS_EW:
+
+		// EEPROM write
+		get4 (packet, ad);	// 3 words
+		get2 (packet, cw);
+		if (cw == 0) {
+			ee_sync (WNONE);
+			goto ORet;
+		}
+		ee_write (WNONE, ad, (byte*)(packet+7), cw);
+		goto ORet;
 #endif
 	}
 
@@ -1168,8 +1213,14 @@ ORet:
 	goto Ret;
 
 #undef	cw
+#undef	cv
 #undef	tp
 #undef	nb
+
+#undef	xb
+#undef	yb
+#undef	xa
+#undef	ya
 
 }
 

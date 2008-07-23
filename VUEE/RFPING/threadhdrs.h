@@ -12,6 +12,8 @@ process	THREADNAME (receiver) (Node) {
 	perform;
 };
 
+#ifdef	PMON_NOTEVENT
+
 process THREADNAME (sender) (Node) {
 
 	address x_packet;
@@ -26,6 +28,8 @@ process THREADNAME (sender) (Node) {
 		data = del;
 	};
 };
+
+#endif
 
 process THREADNAME (pin_monitor) (Node) {
 

@@ -18,8 +18,9 @@ set ICHUNKSIZE		54
 array set CCOD 		{ DBG 0 HELLO 1 OSS 2 GO 3 WTR 4 RTS 5 CHUNK 6 ACK 7
 				STAT 8 }
 
-array set OSSC		{ PING 0 GET 1 QUERY 2 CLEAN 3 SHOW 4 LCDP 5 BUZZ 6
-				RFPAR 7 DUMP 8 EE 9 }
+array set OSSC		{ PING 0 GET 1 QUERY 2 CLEAN 3 SHOW 4 LCDP 5 LCDS 6
+				LCDC 7 LCDT 8 BUZZ 9 RFPAR 10 DUMP 11 EE 12
+					EW 13 }
 
 array set ACKC		{ OK 0 FAILED 1 BUSY 2 REJECT 3 NOTFOUND 4 FORMAT 5
 				ALREADY 6 UNIMPL 7 }
@@ -31,7 +32,7 @@ set CHAR(0)		\x00
 
 # user commands
 set UCMDS \
-"verbose retrieve getobject ping clean query show lcd buzz rfparam dump erase quit"
+"verbose retrieve getobject ping clean query show lcdp lcds lcdc lcdt buzz rfparam dump erase ewrite efile quit "
 
 
 set SIO(VER) 1
@@ -478,8 +479,7 @@ proc r_user { } {
 
 	if { $stat < 0 } {
 		# end of file
-		terminate
-		return
+		exit 0
 	}
 
 	set line [string trim $line]
@@ -1686,7 +1686,7 @@ proc user_query { par } {
 
 proc user_show { par } {
 #
-# Clean request
+# Show image
 #
 	global SIO CCOD OSSC YourLink
 
@@ -1711,9 +1711,9 @@ proc user_show { par } {
 	w_serial
 }
 
-proc user_lcd { par } {
+proc user_lcdp { par } {
 #
-# Issue an LCD command
+# Issue a raw LCD command
 #
 	global SIO CCOD OSSC YourLink
 
@@ -1753,6 +1753,110 @@ proc user_lcd { par } {
 	}
 	msg_close
 
+	w_serial
+}
+
+proc user_lcds { par } {
+#
+# Issue a LCD set command
+#
+	global SIO CCOD OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set arg ""
+	for { set i 0 } { $i < 5 } { incr i } {
+		set a [exnum par]
+		if { $a == "" } {
+			log "expected 5 values: xs ys xe ye f"
+			return
+		}
+		lappend arg $a
+	}
+
+	inirqm OSS
+	put1 $OSSC(LCDS)
+	put1 $OSSC(LCDS)
+
+	for { set i 0 } { $i < 5 } { incr i } {
+		put1 [lindex $arg $i]
+	}
+	msg_close
+	w_serial
+}
+
+proc user_lcdc { par } {
+#
+# Issue a LCD setc command
+#
+	global SIO CCOD OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set arg ""
+	for { set i 0 } { $i < 2 } { incr i } {
+		set a [exnum par]
+		if { $a == "" } {
+			log "expected two values: fc bc"
+			return
+		}
+		lappend arg $a
+	}
+
+	inirqm OSS
+	put1 $OSSC(LCDC)
+	put1 $OSSC(LCDC)
+
+	for { set i 0 } { $i < 2 } { incr i } {
+		put1 [lindex $arg $i]
+	}
+	msg_close
+	w_serial
+}
+
+proc user_lcdt { par } {
+#
+# Issue a LCD text command
+#
+	global SIO CCOD OSSC YourLink CHAR
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set a [exnum par]
+
+	if { $a == "" } {
+		log "expected number followed by string"
+		return
+	}
+
+	set s [string trim $par]
+	if { $s == "" } {
+		log "string missing"
+		return
+	}
+
+	if { [string length $s] > 48 } {
+		set s [string range $s 0 47]
+	}
+
+	append s $CHAR(0)
+
+	inirqm OSS
+
+	put1 $OSSC(LCDT)
+	put1 $OSSC(LCDT)
+	put2 $a
+	append SIO(MSG) $s
+	msg_close
 	w_serial
 }
 
@@ -1890,6 +1994,182 @@ proc user_erase { par } {
 	w_serial
 }
 
+proc user_ewrite { par } {
+#
+# EEPROM write
+#
+	global SIO CCOD OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set ep 0
+
+	set addr [exnum par]
+	if { $addr == "" } {
+		# sync
+		set addr 0
+		set ac 0
+	} else {
+		set arg ""
+		while 1 {
+			set a [exnum par]
+			if { $a == "" } {
+				break
+			}
+			lappend arg $a
+		}
+
+		set ac [llength $arg]
+
+		if { $ac > 46 } {
+			set ac 46
+		}
+	}
+
+	inirqm OSS
+	put1 $OSSC(EW)
+	put1 $OSSC(EW)
+	put4 $addr
+	put2 $ac
+
+	for { set i 0 } { $i < $ac } { incr i } {
+		put1 [lindex $arg $i]
+	}
+
+	msg_close
+	w_serial
+}
+
+proc user_efile { par } {
+#
+# Write a file to EEPROM
+#
+	global SIO OSSC YourLink
+
+	if { $YourLink == 0 } {
+		log "don't know about the node yet"
+		return
+	}
+
+	set addr [exnum par]
+
+	if { $addr == "" } {
+		# starting address
+		log "EEPROM address expected"
+		return
+	}
+
+	# open the file
+	set fnm [string trim $par]
+	if { $fnm == "" } {
+		log "file name expected"
+		return
+	}
+
+	# open the file and read its contents to memory
+	if [catch { open $fnm "r" } ifd] {
+		log "cannot open file $fnm: $ifd"
+		return
+	}
+
+	fconfigure $ifd -translation binary
+
+	if [catch { read $ifd } fcn] {
+		log "cannot read file $fnm: $fcn"
+		catch { close $ifd }
+		return
+	}
+
+	catch { close $ifd }
+
+	set nb [string length $fcn]
+
+	log "$nb bytes total ..."
+
+	while 1 {
+
+		inirqm OSS
+		put1 $OSSC(EW)
+		put1 $OSSC(EW)
+		put4 $addr
+
+		if { $nb > 46 } {
+			set ac 46
+		} else {
+			set ac $nb
+		}
+		put2 $ac
+
+		# how many still left
+		set nb [expr $nb - $ac]
+
+		if { $SIO(VER) > 0 } {
+			log "writing $ac bytes at $addr, $nb left"
+		}
+
+		for { set i 0 } { $i < $ac } { incr i } {
+			append SIO(MSG) [string index $fcn $i]
+		}
+
+		msg_close
+
+		# Make sure this request makes it
+		set_handler ACK handle_ewr_ack
+
+		# retransmission inteval
+		retrans 2048 8
+
+		clear_handlers
+
+		if $SIO(ADV) {
+			log "request aborted, code $SIO(ADV)"
+			return
+		}
+
+		# advance
+		if { $ac == 0 } {
+			# synced
+			break
+		}
+		incr addr $ac
+		set fcn [string range $fcn $ac end]
+	}
+
+	log "done"
+}
+
+proc handle_ewr_ack { } {
+#
+# Handle an ACK to EEPROM write request
+#
+	global SIO MyRQN YourLink
+
+	if { $SIO(LID) != $YourLink } {
+		# ignore
+		return
+	}
+
+	set rq [get1]
+	if { $rq != $MyRQN } {
+		# obsolete, irrelevant
+		return
+	}
+
+	# applies to our request
+	set rq [get2]
+
+	# the code must be nonzero (zero is OK)
+	if { $rq == 0 } {
+		advreq
+	} else {
+		log "negative ACK [ack_code $rq]"
+		abtreq $rq
+	}
+}
+	
 proc ack_code { cd } {
 
 	global ACKC

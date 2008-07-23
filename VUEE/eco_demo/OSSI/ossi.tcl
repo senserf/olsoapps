@@ -8,6 +8,8 @@ exec tclsh "$0" "$@"
 # Copyright (C) Olsonet Communications, 2008 All Rights Reserved #
 ##################################################################
 
+package require mysqltcl
+
 set	Log(MAXSIZE)		5000000
 set	Log(MAXVERS)		4
 
@@ -385,11 +387,51 @@ proc log { m } {
 }
 
 ###############################################################################
+#
+# Database storage function (by Andrew Hoyer)
+#
+proc data_out_db { cid lab val } {
+
+	global DBFlag Time DBASE
+
+	if { $DBFlag == "" } {
+		# no external database
+		return
+	}
+
+	if ![info exists DBASE(name)] {
+		log "database undefined, -x request ignored"
+		return
+	}
+
+	if [catch { mysql::connect -user $DBASE(user) -db $DBASE(name) -host\
+		$DBASE(host) -password $DBASE(password) } con] {
+
+		log "SQL connection failed: $con"
+		return
+	}
+
+	# transform sensor label to sid
+	if [catch { set sid $DBASE(=$lab) } ] {
+		# ignore if not mapped
+		log "sensor $lab not mapped in the database, ignored"
+		catch { mysql::close $con }
+		return
+	}
+
+	set timestamp [clock format $Time -format %Y%m%d%H%M%S]
+
+	if [catch { mysql::exec $con "INSERT INTO observations\
+	  (NID, SID, time, value) VALUES ($cid, $sid, $timestamp, $val)" } nr] {
+		log "SQL query failed: $nr"
+	}
+
+	catch { mysql::close $con }
+}
 
 #
 # Data storage function
 #
-
 proc data_out { cid lab nam val } {
 #
 # Write the sensor value to the data log
@@ -844,6 +886,7 @@ proc read_map { } {
 	global Converters	;# list of converter snippets
 	global Nodes		;# the array of all nodes
 	global OSSI		;# OSSI aggregator node (ID)
+	global DBASE		;# database parameters
 
 	if [catch { file mtime $Files(SMAP) } ix] {
 		smerr "cannot stat map file $Files(SMAP): $ix"
@@ -1100,6 +1143,50 @@ proc read_map { } {
 		lappend snsrs [list $sn $la $no $de]
 	}
 
+	# db parameters #######################################################
+
+	set cv [sxml_child $sm "database"]
+	if { $cv != "" } {
+
+		# database parameters are present
+
+		set dn [sxml_attr $cv "name"]
+		if { $dn == "" } {
+			smerr "name attribute missing for database"
+			return 0
+		}
+		set dbase(name) $dn
+		set dbase(user) [sxml_txt [sxml_child $cv "user"]]
+		set dbase(password) [sxml_txt [sxml_child $cv "password"]]
+		set dbase(host) [sxml_txt [sxml_child $cv "host"]]
+
+		set cv [sxml_txt [sxml_child $cv "sensormap"]]
+		while { [regexp \
+		  "(\[^ \t\n\]+)\[^ \t\n\]*=\[^ \t\n\]*(\[^ \t\n\]+)" $cv m \
+		    nm nu] } {
+			set nm [string trim $nm "\""]
+			set nu [string trim $nu "\""]
+			if { $nm == "" || $nu == "" } {
+				smerr "illegal entry in dbmap: $m"
+				return 0
+			}
+			if ![regexp "^\[0-9\]+$" $nu] {
+				smerr "db index in dbmap: $nu is not numeric"
+				return 0
+			}
+			if [info exists dbase(=$nm)] {
+				smerr "duplicate name in database sensor map:\
+					$nm"
+				return 0
+			}
+			set dbase(=$nm) $nu
+			# remove the match from the string
+			set nm [string first $m $cv]
+			set cv [string range $cv [expr $nm + [string length \
+				$m]] end]
+		}
+	}
+			
 	# hot swap the tables #################################################
 
 	set Converters $cnvts
@@ -1110,6 +1197,7 @@ proc read_map { } {
 
 	array unset SBN
 	array unset Nodes
+	array unset DBASE
 
 	foreach no [array names nodes] {
 		set Nodes($no) $nodes($no)
@@ -1117,6 +1205,10 @@ proc read_map { } {
 
 	foreach no [array names sbn] {
 		set SBN($no) $sbn($no)
+	}
+
+	foreach no [array names dbase] {
+		set DBASE($no) $dbase($no)
 	}
 
 	msg "[llength $Aggregators] aggregators,\
@@ -1139,6 +1231,11 @@ proc value_update { s v } {
 #
 	global Files Time
 
+	if { $Files(SVAL) == "" } {
+		# no values file
+		return
+	}
+
 	seek $Files(SVAL,FD) [expr $s << 5]
 	puts -nonewline $Files(SVAL,FD) [encode_sv $v $Time]
 	flush $Files(SVAL,FD)
@@ -1149,6 +1246,11 @@ proc values_init { } {
 # Initialize the values file
 #
 	global Files Time Sensors
+
+	if { $Files(SVAL) == "" } {
+		# no values file
+		return
+	}
 
 	if [info exists Files(SVAL,FD)] {
 		catch { close $Files(SVAL,FD) }
@@ -1567,7 +1669,11 @@ proc input_avrp { inp } {
 
 		# the value is ready
 		value_update $s $value
+		# database
+		data_out_db $cid $sl $value
+		# log
 		data_out $cid $sl $sn $value
+
 		incr uc
 	}
 	msg "updated $uc values from collector $cid"
@@ -1844,12 +1950,14 @@ proc bad_usage { } {
 	puts "       -l log_file_name, default is log"
 	puts "       -s sensor_map_file, default is sensors.xml"
 	puts "       -v values_file, default is values"
+	puts "       -x (send output to the DB described in sensors.xml)"
 	puts "       -c external_command_file, default is command"
 	puts ""
 	exit 99
 }
 
 set Uart(MODE) ""
+set DBFlag ""
 
 while { $argv != "" } {
 
@@ -1965,6 +2073,14 @@ while { $argv != "" } {
 		continue
 	}
 
+	if { $fg == "-x" } {
+		if { $DBFlag != "" } {
+			bad_usage
+		}
+		set DBFlag "Y"
+		continue
+	}
+
 	if { $va == "" } {
 		bad_usage
 	}
@@ -2043,7 +2159,9 @@ if ![info exists Files(SMAP)] {
 }
 
 if ![info exists Files(SVAL)] {
-	set Files(SVAL) "values"
+	set Files(SVAL) ""
+} elseif { $Files(SVAL) == "" } {
+	set FIles(SVAL) "values"
 }
 
 if ![info exists Files(ECMD)] {
