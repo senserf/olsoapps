@@ -57,7 +57,8 @@ threadhdr (root, NodePeg) {
        		 RS_SETS, RS_PROFILES, RS_HELPS, RS_LISTS, RS_Y, RS_N,
 		 RS_TARGET, RS_BIZ, RS_PRIV, RS_ALRM, RS_STOR, RS_RETR,
 		 RS_BEAC, RS_L_TAG, RS_L_IGN, RS_L_MON, RS_MLIST,
-       		 RS_S_NVM, RS_L_NVM, RS_AUTO, RS_ERA, RS_E_NVM };
+       		 RS_S_NVM, RS_L_NVM, RS_AUTO, RS_ERA, RS_E_NVM,
+       		 RS_ZLIST, RS_L_NBU, RS_Z_HELP, RS_E_HELP };
 
 	perform;
 };
@@ -128,6 +129,10 @@ static word aud_ind;
 #define RS_AUTO		25
 #define RS_ERA		26
 #define RS_E_NVM	27
+#define RS_ZLIST	28
+#define RS_L_NBU	29
+#define RS_Z_HELP	30
+#define RS_E_HELP	31
 
 static word	rt_ind, rt_id;
 

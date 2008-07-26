@@ -57,6 +57,14 @@ __PUBLF (NodePeg, void, set_master_chg) () {
 
 // ============================================================================
 
+__PUBLF (NodePeg, void, nbuVec) (char * s, byte b) {
+	int i = 7;
+	do {
+		s[7 - i] = (b & (1 << i)) ? '|' : '.';
+
+	} while (--i >= 0);
+}
+
 __PUBLF (NodePeg, int, find_tag) (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
@@ -73,6 +81,17 @@ __PUBLF (NodePeg, int, find_ign) (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (ignArray[i].id == tag) {
+			return i;
+		}
+		i++;
+	}
+	return -1;
+}
+
+__PUBLF (NodePeg, int, find_nbu) (word tag) {
+	word i = 0;
+	while (i < LI_MAX) {
+		if (nbuArray[i].id == tag) {
 			return i;
 		}
 		i++;
@@ -131,6 +150,14 @@ __PUBLF (NodePeg, void, init_ign) (word i) {
 	ignArray[i].nick[0] = '\0';
 }
 
+__PUBLF (NodePeg, void, init_nbu) (word i) {
+	nbuArray[i].id = 0;
+	nbuArray[i].what = 0;
+	nbuArray[i].dhook = 0;
+	nbuArray[i].vect = 0;
+	nbuArray[i].memo[0] = '\0';
+}
+
 __PUBLF (NodePeg, void, init_mon) (word i) {
 	monArray[i].id = 0;
 	monArray[i].nick[0] = '\0';
@@ -172,6 +199,26 @@ __PUBLF (NodePeg, int, insert_tag) (char * buf) {
 		i++;
 	}
 	app_diag (D_SERIOUS, "Failed tag (%u) insert", in_header(buf, snd));
+	return -1;
+}
+
+__PUBLF (NodePeg, int, insert_nbu) (word id, word w, word v, word h, char *s) {
+	int i = 0;
+
+	while (i < LI_MAX) {
+		if (nbuArray[i].id == 0) {
+			nbuArray[i].id = id;
+			nbuArray[i].what = w;
+			nbuArray[i].dhook = h;
+			nbuArray[i].vect = v;
+			strncpy (nbuArray[i].memo, s, NI_LEN);
+			 app_diag (D_DEBUG, "Inserted nbu %u at %u",
+					 id, i);
+			 return i;
+		}
+		i++;
+	}
+	app_diag (D_SERIOUS, "Failed nbu (%u) insert", id);
 	return -1;
 }
 

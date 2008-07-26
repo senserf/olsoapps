@@ -31,7 +31,7 @@
 #define INFO_DESC	1
 #define INFO_BIZ	2
 #define INFO_PRIV	4
-#define INFO_SPARE	8
+#define INFO_NBUZZ	8
 #define INFO_ACK	16
 #define INFO_IN		(INFO_DESC | INFO_BIZ | INFO_PRIV)
 #define LED_R	0
@@ -84,6 +84,15 @@ typedef struct tagShortStruct {
 	word	id;
 	char	nick[NI_LEN +1];
 } tagShortType;
+
+typedef struct nbComStruct {
+	word	id;
+	word	what:1;
+	word	spare:1;
+	word	dhook:6;
+	word	vect:8;
+	char	memo[NI_LEN +1];
+} nbuComType;
 
 typedef struct ledStateStruct {
 	word	color:4;

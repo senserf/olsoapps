@@ -36,6 +36,7 @@ word	tag_eventGran		= 4;  // in seconds
 tagDataType 	tagArray [LI_MAX];
 tagShortType    ignArray [LI_MAX];
 tagShortType    monArray [LI_MAX];
+nbuComType	nbuArray [LI_MAX];
 
 ledStateType	led_state	= {0, 0, 0};
 
@@ -54,7 +55,17 @@ char	d_alrm  [PEG_STR_LEN +1]	= {'\0'};
 
 // These are static const and can thus be shared
 
-static const char welcome_str[] = "***Seawolfie 0.1***\r\n"
+static const char d_event[][12] = {
+	"music", "piano", "outdoors", "cinema",
+	"bar", "pm trip", "bridge", "squash",
+	"workshop B", "workshop A", "thread 2", "thread 1",
+	"male", "female", "local", "visiting"};
+
+static const char d_nbu[][12] = {
+	"olsonet", "combat", "latin", "last year",
+       	"looks great", "blogs", "career", "night life"};
+
+static const char welcome_str[] = "***Seawolfie 0.4***\r\n"
 	"Set / show matching (s, p):\r\n"
 	"\tnickname:\tsn <nickname 7>\r\n"
 	"\tdesc:\t\tsd <description 15>\r\n"
@@ -67,6 +78,8 @@ static const char welcome_str[] = "***Seawolfie 0.1***\r\n"
 	"Help / bulk shows:\r\n"
 	"\tsHow\tsettings:\ths\r\n"
 	"\tsHow\tparams\t\thp\r\n"
+	"\tsHow\tevent desc\the [ABCD hex [ABCD hex]]\r\n"
+	"\tsHow\tnbuZZ desc\thz [AB hex {AB hex]]\r\n"
 	"\tHelp\th\r\n\r\n"
 	"Matching actions (U, X, Y, N, T, B, P, A, S, R, E, L, q, Q):\r\n"
 	"\tAUto on / off\tU [1|0]\r\n"
@@ -82,7 +95,9 @@ static const char welcome_str[] = "***Seawolfie 0.1***\r\n"
 	"\tErase\t\tE <id>\r\n"
 	"\tSave and reset\tq\r\n"
 	"\tClear and reset\tQ\r\n"
-	"\tList\r\n\t  tag/ign/mon\tL[t|i|m]\r\n"
+	"\tList\r\n\t  nbuzz/tag/ign/mon\tL[z|t|i|m]\r\n"
+	"\tnbuZZ add\tZ+ <id> <what: 0|1> <why: AB hex> <dhook> <memo>\r\n"
+	"\tnbuZZ del\tZ- <id>\r\n"
 	"\tMonitor add\tM+ <id> <nick>\r\n"
 	"\tMonitor del\tM- <id>\r\n";
 
@@ -98,7 +113,7 @@ static const char stats_str[] = "Stats for hostId - localHost (%lx - %u):\r\n"
 	" Mem free (%u, %u) min (%u, %u)\r\n";
 
 static const char profi_ascii_def[] = "\r\n%s: %s (%u) %lu sec. ago,"
-		"%sstate(%s):\r\n -Profile: %x Desc(%s): %s\r\n";
+		"%sstate(%s):\r\n -Profile: %x Desc(%s%s: %s\r\n";
 
 static const char profi_ascii_raw[] = "nick(%s) id(%u) et(%lu) lt(%lu) "
 	"intim(%u) state(%u) profi(%x) desc(%s) info(%x) pl(%u) rssi (%u)\r\n";

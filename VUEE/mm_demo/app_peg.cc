@@ -320,6 +320,7 @@ static char * descName (word info) {
 	if (info & INFO_PRIV) return "private";
 	if (info & INFO_BIZ) return "business";
 	if (info & INFO_DESC) return "intro";
+	// noombuzz is independent...
 	return "no desc";
 }
 
@@ -336,6 +337,7 @@ __PUBLF (NodePeg, void, oss_profi_out) (word ind) {
 			stateName (tagArray[ind].state),
 			tagArray[ind].profi,
 			descName (tagArray[ind].info),
+			(tagArray[ind].info & INFO_NBUZZ) ? " noombuzz)" : ")",
 			tagArray[ind].desc);
 			break;
 
@@ -425,9 +427,9 @@ __PUBLF (NodePeg, void, oss_alrm_out) (char * buf) {
 thread (root)
 
 	sint	i1;
-	word	w1, w2;
-	char	s1[NI_LEN];
+	word	w1, w2, w3, w4;
 	nvmDataType nvm_dat;
+	char	s1 [18]; // unless NI_LEN is greater
 
 	entry (RS_INIT)
 	//w1 = memfree(0, &w2);
@@ -526,6 +528,7 @@ thread (root)
 			case 'h': proceed (RS_HELPS);
 			case 'L': proceed (RS_LISTS);
 			case 'M': proceed (RS_MLIST);
+			case 'Z': proceed (RS_ZLIST);
 			case 'Y': proceed (RS_Y);
 			case 'N': proceed (RS_N);
 			case 'T': proceed (RS_TARGET);
@@ -635,7 +638,7 @@ thread (root)
 	entry (RS_HELPS)
 
 		w1 = strlen (cmd_line);
-		if (w1 < 2 || cmd_line[2] == ' ') {
+		if (w1 < 2 || cmd_line[1] == ' ') {
 			ser_out (RS_HELPS, welcome_str);
 			proceed (RS_FREE);
 		}
@@ -651,6 +654,22 @@ thread (root)
 		  case 'p':
 			stats (RS_HELPS);
 			proceed (RS_FREE);
+
+		  case 'z':
+			w2 = w3 = 0xFFFF;
+			if (w1 > 2)
+				scan (cmd_line +2, "%x %x", &w2, &w3);
+			rt_id = w2 & w3;
+			rt_ind = 7;
+			proceed (RS_Z_HELP);
+
+		  case 'e': // I know, but keep 'e' and 'z' separate
+			w2 = w3 = 0xFFFF;
+			if (w1 > 2)
+				scan (cmd_line +2, "%x %x", &w2, &w3);
+			rt_id = w2 & w3;
+			rt_ind = 15;
+			proceed (RS_E_HELP);
 
 		  default:
 			form (ui_obuf, ill_str, cmd_line);
@@ -758,6 +777,49 @@ thread (root)
 		insert_ign (tagArray[i1].id, tagArray[i1].nick);
 		proceed (RS_FREE);
 
+	entry (RS_ZLIST)
+		if (strlen(cmd_line) < 3) {
+			form (ui_obuf, bad_str, cmd_line);
+			proceed (RS_UIOUT);
+		}
+
+		switch (cmd_line[1]) {
+		  case '+':
+			if (scan (cmd_line +2, "%u %u %x %u %s",
+			    &w1, &w2, &w3, &w4, s1) != 5 || w1 == 0) {
+				form (ui_obuf, bad_str, cmd_line);
+				proceed (RS_UIOUT);
+			}
+			if ((i1 = find_nbu (w1)) < 0) {
+				insert_nbu (w1, w2, w3, w4, s1);
+				form (ui_obuf, "NBuzz add %u\r\n", w1);
+			} else {
+				nbuArray[i1].what = w2;
+				nbuArray[i1].vect = w3;
+				nbuArray[i1].dhook = w4;
+				strncpy (nbuArray[i1].memo, s1, NI_LEN);
+				form (ui_obuf, "NBuzz upd %u\r\n", w1);
+			}
+			proceed (RS_UIOUT);
+
+		  case '-':
+			if (scan (cmd_line +2, "%u", &w1) != 1 || w1 == 0) {
+				form (ui_obuf, bad_str, cmd_line);
+				proceed (RS_UIOUT);
+			}
+			if ((i1 = find_nbu (w1)) < 0) {
+				form (ui_obuf, "NBuzz no %u\r\n", w1);
+			} else {
+				init_nbu (i1);
+				form (ui_obuf, "NBuzz del %u\r\n", w1);
+			}
+			proceed (RS_UIOUT);
+
+		  default:
+			form (ui_obuf, bad_str, cmd_line);
+			proceed (RS_UIOUT);
+		}
+
 	entry (RS_MLIST)
 		if (strlen(cmd_line) < 3) {
 			form (ui_obuf, bad_str, cmd_line);
@@ -766,7 +828,8 @@ thread (root)
 
 		switch (cmd_line[1]) {
 		  case '+':
-			if (scan (cmd_line +2, "%u %s", &w1, s1) != 2) {
+			if (scan (cmd_line +2, "%u %s", &w1, s1) != 2 ||
+					w1 == 0) {
 				form (ui_obuf, bad_str, cmd_line);
 				proceed (RS_UIOUT);
 			}
@@ -780,7 +843,7 @@ thread (root)
 			proceed (RS_UIOUT);
 
 		  case '-':
-			if (scan (cmd_line +2, "%u", &w1) != 1) {
+			if (scan (cmd_line +2, "%u", &w1) != 1 || w1 == 0) {
 				form (ui_obuf, bad_str, cmd_line);
 				proceed (RS_UIOUT); 
 			}
@@ -915,6 +978,9 @@ thread (root)
 	entry (RS_LISTS)
 		rt_ind = 0;
 		switch (cmd_line[1]) {
+		  case 'z':
+			ser_out (RS_LISTS, "NBuzz imports:\r\n");
+			proceed (RS_L_NBU);
 		  case 't':
 			ser_out (RS_LISTS, "Current tags:\r\n");
 			proceed (RS_L_TAG);
@@ -932,7 +998,7 @@ thread (root)
 	entry (RS_L_NVM)
 		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
 					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
-			app_diag (D_SERIOUS, "NMV read failed");
+			app_diag (D_SERIOUS, "NVM read failed");
 			proceed (RS_FREE);
 		}
 
@@ -963,6 +1029,22 @@ thread (root)
 
 		proceed (RS_FREE);
 
+	entry (RS_L_NBU)
+		if (nbuArray[rt_ind].id != 0) {
+			nbuVec (s1, nbuArray[rt_ind].vect);
+			s1[8] = '\0';
+			ser_outf (RS_L_NBU, " %c %u dh(%u) %s %s",
+				nbuArray[rt_ind].what ? '+' : '-',
+				nbuArray[rt_ind].id,
+				nbuArray[rt_ind].dhook, s1,
+				nbuArray[rt_ind].memo);
+		}
+
+		if (++rt_ind < LI_MAX)
+			proceed (RS_L_NBU);
+
+		proceed (RS_FREE);
+
 	entry (RS_L_MON)
 		if (monArray[rt_ind].id != 0)
 			ser_outf (RS_L_MON, " %u %s\r\n", monArray[rt_ind].id,
@@ -972,6 +1054,24 @@ thread (root)
 			proceed (RS_L_MON);
 
 		proceed (RS_FREE);
+
+	entry (RS_Z_HELP)
+		if (rt_id & (1 << rt_ind))
+			ser_outf (RS_Z_HELP, " noombuzz %u\t%s\r\n", rt_ind,
+					d_nbu[rt_ind]);
+		if (rt_ind == 0)
+			proceed (RS_FREE);
+		rt_ind--;
+		proceed (RS_Z_HELP);
+
+	entry (RS_E_HELP)
+		if (rt_id & (1 << rt_ind))
+			ser_outf (RS_E_HELP, " event %u\t%s\r\n", rt_ind,
+					d_event[rt_ind]);
+		if (rt_ind == 0)
+			proceed (RS_FREE);
+		rt_ind--;
+		proceed (RS_E_HELP);
 
 	entry (RS_BEAC)
 		if (scan (cmd_line +1, "%u", &w1) > 0) {

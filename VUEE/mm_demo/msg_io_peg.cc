@@ -54,7 +54,7 @@ __PUBLF (NodePeg, void, msg_data_in) (char * buf) {
 	}
 
 	strncpy (tagArray[tagIndex].desc, in_data(buf, desc), PEG_STR_LEN);
-	tagArray[tagIndex].info = in_data(buf, info);
+	tagArray[tagIndex].info |= in_data(buf, info);
 
 	if (tagArray[tagIndex].state == confirmedTag)
 		set_tagState(tagIndex, matchedTag, YES);
@@ -108,16 +108,19 @@ __PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level, char * desc) {
 }
 
 __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
-	sint tagIndex;
+	sint tagIndex, nbu;
 	app_diag (D_DEBUG, "Profi %u", in_header(buf, snd));
 
-	if (find_ign (in_header(buf, snd)) >= 0) {
-		app_diag (D_INFO, "Ign %u", in_header(buf, snd));
+	if ((nbu = find_nbu (in_header(buf, snd))) >= 0)
+		nbu = nbuArray[nbu].what;
+
+	if (nbu == 0 || find_ign (in_header(buf, snd)) >= 0) {
+		app_diag (D_INFO, "Ign %u nbu(%d)", in_header(buf, snd), nbu);
 		return;
 	}
 
-	if ((in_profi(buf, profi) & p_exc) ||
-			!(in_profi(buf, profi) & p_inc)) {
+	if (nbu < 0 && ((in_profi(buf, profi) & p_exc) ||
+			!(in_profi(buf, profi) & p_inc))) {
 		app_diag (D_INFO, "Rejected %u (%x)", in_header(buf, snd),
 				in_profi(buf, profi));
 		return;
@@ -126,14 +129,19 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 	if ((tagIndex = find_tag (in_header(buf, snd))) < 0) { // not found
 
 		tagIndex = insert_tag (buf);
-		if (tagIndex >= 0)
+		if (tagIndex >= 0) {
 			tagArray[tagIndex].rssi = rssi; // rssi not passed in
+			if (nbu == 1)
+				tagArray[tagIndex].info |= INFO_NBUZZ;
+		}
 
 		return;
 	}
 
 	// let's refresh all data (may be not that good with larger pings)
 	tagArray[tagIndex].rssi = rssi;
+	if (nbu == 1)
+		tagArray[tagIndex].info |= INFO_NBUZZ;
 	tagArray[tagIndex].pl = in_profi(buf, pl);
 	if (in_header(buf, rcv) != 0 && tagArray[tagIndex].intim == 0)
 		tagArray[tagIndex].intim = 1;

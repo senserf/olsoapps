@@ -4,9 +4,10 @@
 __EXTERN __CONST lword _da (host_id);
 __EXTERN word _da (host_pl);
 
-__EXTERN tagDataType _da (tagArray) [LI_MAX];
+__EXTERN tagDataType  _da (tagArray) [LI_MAX];
 __EXTERN tagShortType _da (ignArray) [LI_MAX];
 __EXTERN tagShortType _da (monArray) [LI_MAX];
+__EXTERN nbuComType   _da (nbuArray) [LI_MAX];
 
 __EXTERN word _da (tag_auditFreq);
 __EXTERN word _da (tag_eventGran);
@@ -33,15 +34,19 @@ void 	_da (check_tag) (word i);
 int 	_da (find_tag) (word tag);
 int	_da (find_ign) (word tag);
 int	_da (find_mon) (word tag);
+int	_da (find_nbu) (word tag);
 char * 	_da (get_mem) (word state, int len);
 void 	_da (init_tag) (word i);
 void	_da (init_ign) (word i);
 void	_da (init_mon) (word i);
+void	_da (init_nbu) (word i);
 void 	_da (init_tags) (void);
 int 	_da (insert_tag) (char * buf);
 int	_da (insert_ign) (word tag, char * nick);
 int	_da (insert_mon) (word tag, char * nick);
+int	_da (insert_nbu) (word id, word w, word v, word h, char * s);
 void 	_da (set_tagState) (word i, tagStateType state, Boolean updEvTime);
+void	_da (nbuVec) (char *s, byte b);
 
 void 	_da (msg_profi_in) (char * buf, word rssi);
 void 	_da (msg_profi_out) (nid_t peg);

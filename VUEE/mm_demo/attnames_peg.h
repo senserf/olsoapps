@@ -11,9 +11,12 @@
 
 #define	host_id		_dac (NodePeg, host_id)
 #define	host_pl		_dac (NodePeg, host_pl)
+
 #define	tagArray	_dac (NodePeg, tagArray)
 #define ignArray	_dac (NodePeg, ignArray)
 #define monArray	_dac (NodePeg, monArray)
+#define nbuArray	_dac (NodePeg, nbuArray)
+
 #define	tag_auditFreq	_dac (NodePeg, tag_auditFreq)
 #define	tag_eventGran	_dac (NodePeg, tag_eventGran)
 #define	app_flags	_dac (NodePeg, app_flags)
@@ -38,15 +41,19 @@
 #define	find_tag		_dac (NodePeg, find_tag)
 #define find_ign		_dac (NodePeg, find_ign)
 #define find_mon		_dac (NodePeg, find_mon)
+#define find_nbu		_dac (NodePeg, find_nbu)
 #define	get_mem			_dac (NodePeg, get_mem)
 #define	init_tag		_dac (NodePeg, init_tag)
 #define init_ign		_dac (NodePeg, init_ign)
 #define init_mon		_dac (NodePeg, init_mon)
+#define init_nbu		_dac (NodePeg, init_nbu)
 #define	init_tags		_dac (NodePeg, init_tags)
 #define	insert_tag		_dac (NodePeg, insert_tag)
 #define insert_ign		_dac (NodePeg, insert_ign)
 #define insert_mon		_dac (NodePeg, insert_mon)
+#define insert_nbu		_dac (NodePeg, insert_nbu)
 #define	set_tagState		_dac (NodePeg, set_tagState)
+#define nbuVec			_dac (NodePeg, nbuVec)
 
 #define	msg_profi_in		_dac (NodePeg, msg_profi_in)
 #define	msg_profi_out		_dac (NodePeg, msg_profi_out)
