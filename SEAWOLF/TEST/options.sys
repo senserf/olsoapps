@@ -12,7 +12,6 @@
 #undef	UART_TCV
 #undef	UART_RATE
 #undef	UART_DRIVER
-#undef 	STORAGE_AT45XXX
 #undef	LCD_ST7036
 #undef	UART_INPUT_BUFFER_LENGTH
 #undef	LCD_DRIVER
