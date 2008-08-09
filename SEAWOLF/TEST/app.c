@@ -4,6 +4,7 @@
 /* ==================================================================== */
 
 #include "sysio.h"
+#include "board_pins.h"
 
 /* ================================================================== */
 /* To test boards with Nokia 6100 LCD display (and a few other things */
@@ -20,6 +21,7 @@ heapmem {100};
 #include "serf.h"
 
 #define	RS_INIT		00
+#define	RS_LOOP		05
 #define	RS_RCMD		10
 #define	RS_ERR		11
 #define	RS_LRES		30
@@ -34,7 +36,6 @@ heapmem {100};
 #define	RS_ELINES	80
 #define	RS_ALINE	85
 #define	RS_WLINES	87
-#define	RS_SHOW		90
 #define RS_MENU		95
 #define	RS_RCMN		100
 
@@ -55,8 +56,9 @@ typedef struct {
 	word NLines, MaxLL;
 	byte Width, Height;	// In characters
 	word FL,		// First line shown in menu
-	     SH;		// Shift (horizontal scroll)
-	word SE;		// Selected line
+	     SH,		// Shift (horizontal scroll)
+	     SE;		// Selected line
+	Boolean Active;		// Displayed
 
 } menu_t;
 
@@ -64,33 +66,43 @@ byte MW, MH;
 
 static menu_t MENU;
 
-void menu_reset (menu_t *m, byte w, byte h) {
-//
-// After a change in parameters
-//
-	m->FL = m->SH = m->SE = 0;
-	m->Width = w;
-	m->Height = h;
-}
-
 void menu_init (menu_t *m) {
 //
-// Initialize memory (reduntant in this case)
+// Initialize memory (redundant in this case)
 //
+	m->Active = NO;
 	m->NLines = 0;
-	menu_reset (m, 0, 0);
+	m->Width = m->Height = 0;
 }
 
-void menu_clear (menu_t *m) {
+void menu_free (menu_t *m) {
 //
 // Deallocate menu
 //
 	word i;
 
+	if (m->Active) {
+		// Clear the area
+		lcdg_el (0, m->Height);
+		m->Active = NO;
+	}
+
 	for (i = 0; i < m->NLines; i++)
 		ufree (m->Lines [i]);
 
-	menu_init (m);
+	m->NLines = 0;
+}
+
+void menu_start (menu_t *m, word w, word h) {
+//
+// After a change in parameters
+//
+	if (m->NLines)
+		menu_free (m);
+
+	m->FL = m->SH = m->SE = 0;
+	m->Width = w;
+	m->Height = h;
 }
 
 word menu_addline (menu_t *m, const char *ln) {
@@ -133,24 +145,37 @@ void menu_show (menu_t *m) {
 //
 // Show the menu in the text area
 //
-	word i;
+	word i, j;
 
 	// Make sure the area is initially empty
 	lcdg_el (0, m->Height);
-	m->SH = 0;
-	m->FL = 0;
-	m->SE = 0;
-	for (i = 0; i < m->NLines; i++) {
-		if (i == m->Height)
-			break;
-		lcdg_wl (m->Lines [i], m->SH, 1, i);
-		if (m->LLength [i] < m->Width - 1)
-			lcdg_ec (m->LLength [i] + 1, i, m->Width);
+
+	if (m->NLines == 0 || m->Width == 0 || m->Height == 0) {
+		// Ignore
+		m->Active = NO;
+		return;
 	}
 
-	// Select the first line
-	if (m->NLines)
-		lcdg_wl (CCHAR, 0, 0, 0);
+	for (i = 0; i < m->Height; i++) {
+		j = i + m->FL;
+		if (j >= m->NLines)
+			break;
+		lcdg_wl (m->Lines [j], m->SH, 1, i);
+	}
+
+	// The cursor
+	lcdg_wl (CCHAR, 0, 0, m->SE - m->FL);
+	m->Active = YES;
+}
+
+void menu_hide (menu_t *m) {
+//
+// Hide the menu
+//
+	if (m->Active) {
+		lcdg_el (0, m->Height);
+		m->Active = NO;
+	}
 }
 
 void menu_down (menu_t *m) {
@@ -160,7 +185,7 @@ void menu_down (menu_t *m) {
 	word i, j, d;
 	byte a, b;
 
-	if (m->NLines < 2)
+	if (!m->Active)
 		// Do nothing
 		return;
 
@@ -221,7 +246,7 @@ void menu_up (menu_t *m) {
 	word i, j, d;
 	byte a, b;
 
-	if (m->NLines < 2)
+	if (!m->Active)
 		// Do nothing
 		return;
 
@@ -279,7 +304,7 @@ void menu_left (menu_t *m) {
 //
 	word i, j;
 
-	if (m->SH + m->Width - 1 >= m->MaxLL)
+	if (!m->Active || m->SH + m->Width - 1 >= m->MaxLL)
 		// No need to scroll any further
 		return;
 	m->SH++;
@@ -302,7 +327,7 @@ void menu_right (menu_t *m) {
 //
 	word i, j;
 
-	if (m->SH == 0)
+	if (!m->Active || m->SH == 0)
 		return;
 	m->SH--;
 
@@ -314,6 +339,21 @@ void menu_right (menu_t *m) {
 	}
 }
 
+// ============================================================================
+
+static void buttons (word but) {
+
+	switch (but) {
+
+		case JOYSTICK_W: menu_up     (&MENU); return;
+		case JOYSTICK_E: menu_down   (&MENU); return;
+		case JOYSTICK_N: menu_left   (&MENU); return;
+		case JOYSTICK_S: menu_right  (&MENU); return;
+	}
+}
+
+// ============================================================================
+
 process (root, void)
 /* =========================================== */
 /* This is the main program of the application */
@@ -324,10 +364,12 @@ process (root, void)
 
   entry (RS_INIT)
 
-	if (ibuf == NULL)
-		ibuf = (char*) umalloc (IBUFSIZE);
+	ibuf = (char*) umalloc (IBUFSIZE);
+	buttons_action (buttons);
 
-	ser_out (RS_INIT, "\r\n"
+  entry (RS_LOOP)
+
+	ser_out (RS_LOOP, "\r\n"
 		"Commands:\r\n"
 		"  r              : reset\r\n"
 		"  R n            : LCD reset\r\n"
@@ -341,9 +383,8 @@ process (root, void)
 		"  T x y nc nl    : text area\r\n"
 		"  X              : erase line table\r\n"
 		"  A line         : add new line\r\n"
-		"  L              : show lines\r\n"
 		"  W              : display lines\r\n"
-		"  M[+-]          : selection up or down\r\n"
+		"  M[+-<>]        : menu navigation\r\n"
 	);
 
   entry (RS_RCMD)
@@ -364,7 +405,6 @@ process (root, void)
 		case 'T' : proceed (RS_TAREA);
 		case 'X' : proceed (RS_ELINES);
 		case 'A' : proceed (RS_ALINE);
-		case 'L' : proceed (RS_SHOW);
 		case 'W' : proceed (RS_WLINES);
 		case 'M' : proceed (RS_MENU);
 	}
@@ -372,7 +412,7 @@ process (root, void)
   entry (RS_ERR)
 
 	ser_out (RS_ERR, "Illegal command or parameter\r\n");
-	proceed (RS_INIT);
+	proceed (RS_LOOP);
 
   entry (RS_LRES)
 
@@ -482,7 +522,7 @@ process (root, void)
 	c [0] = 0; c [1] = 0; c [2] = 10; c [3] = 10;
 	scan (ibuf+1, "%u %u %u %u %u", c+0, c+1, c+2, c+3);
 
-	lcdg_set (0, 0, 130, 130, 0);
+	lcdg_set (0, 0, 130, 130, 1);
 	lcdg_clear (BNONE);
 
 	Status = lcdg_sett ((byte)(c[0]), (byte)(c[1]), (byte)(c[2]),
@@ -490,12 +530,12 @@ process (root, void)
 	MW = c [2];
 	MH = c [3];
 MRes:
-	menu_reset (&MENU, MW, MH);
+	menu_start (&MENU, MW, MH);
 	proceed (RS_RCMN);
 
   entry (RS_ELINES)
 
-	menu_clear (&MENU);
+	menu_free (&MENU);
 	goto MRes;
 
   entry (RS_ALINE)
@@ -522,19 +562,6 @@ MRes:
 		proceed (RS_ERR);
 
 	proceed (RS_RCMN);
-
-  entry (RS_SHOW)
-
-	Aux = 0;
-
-  entry (RS_SHOW+1)
-
-	if (Aux >= MENU.NLines)
-		proceed (RS_RCMN);
-
-	ser_outf (RS_SHOW+1, "Line %u: '%s'\r\n", Aux, MENU.Lines [Aux]);
-	Aux++;
-	proceed (RS_SHOW+1);
 
   entry (RS_RCMN)
 
