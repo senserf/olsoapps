@@ -18,9 +18,8 @@ set ICHUNKSIZE		54
 array set CCOD 		{ DBG 0 HELLO 1 OSS 2 GO 3 WTR 4 RTS 5 CHUNK 6 ACK 7
 				STAT 8 }
 
-array set OSSC		{ PING 0 GET 1 QUERY 2 CLEAN 3 SHOW 4 LCDP 5 LCDS 6
-				LCDC 7 LCDT 8 BUZZ 9 RFPAR 10 DUMP 11 EE 12
-					EW 13 }
+array set OSSC		{ PING 0 GET 1 QUERY 2 CLEAN 3 SHOW 4 LCDP 5 BUZZ 6
+				RFPAR 7 DUMP 8 EE 9 EW 10 }
 
 array set ACKC		{ OK 0 FAILED 1 BUSY 2 REJECT 3 NOTFOUND 4 FORMAT 5
 				ALREADY 6 UNIMPL 7 }
@@ -32,7 +31,7 @@ set CHAR(0)		\x00
 
 # user commands
 set UCMDS \
-"verbose retrieve getobject ping clean query show lcdp lcds lcdc lcdt buzz rfparam dump erase ewrite efile quit "
+"verbose retrieve getobject ping clean query show lcdp buzz rfparam dump erase ewrite efile quit "
 
 
 set SIO(VER) 1
@@ -1374,12 +1373,12 @@ proc set_image { oid fn } {
 	set y [geti2]
 
 	if $bpp {
-		set pxl 8
-	} else {
-		set pxl 12
+		log "8 bpp images no longer supported"
+		unset SIO(IB)
+		return 0
 	}
 
-	log "geometry: <$x,$y>, $pxl bpp"
+	log "geometry: <$x,$y>, 12 bpp"
 
 	set l  [geti2]
 	# the label
@@ -1413,10 +1412,6 @@ proc set_image { oid fn } {
 
 	log "$nc chunks total"
 	unset SIO(IB) IDX IDL
-
-	if $bpp {
-		set x [expr $x | 0x8000]
-	}
 
 	set SIO(RTS) [list $nc $oid $x $y $la]
 
@@ -1753,110 +1748,6 @@ proc user_lcdp { par } {
 	}
 	msg_close
 
-	w_serial
-}
-
-proc user_lcds { par } {
-#
-# Issue a LCD set command
-#
-	global SIO CCOD OSSC YourLink
-
-	if { $YourLink == 0 } {
-		log "don't know about the node yet"
-		return
-	}
-
-	set arg ""
-	for { set i 0 } { $i < 5 } { incr i } {
-		set a [exnum par]
-		if { $a == "" } {
-			log "expected 5 values: xs ys xe ye f"
-			return
-		}
-		lappend arg $a
-	}
-
-	inirqm OSS
-	put1 $OSSC(LCDS)
-	put1 $OSSC(LCDS)
-
-	for { set i 0 } { $i < 5 } { incr i } {
-		put1 [lindex $arg $i]
-	}
-	msg_close
-	w_serial
-}
-
-proc user_lcdc { par } {
-#
-# Issue a LCD setc command
-#
-	global SIO CCOD OSSC YourLink
-
-	if { $YourLink == 0 } {
-		log "don't know about the node yet"
-		return
-	}
-
-	set arg ""
-	for { set i 0 } { $i < 2 } { incr i } {
-		set a [exnum par]
-		if { $a == "" } {
-			log "expected two values: fc bc"
-			return
-		}
-		lappend arg $a
-	}
-
-	inirqm OSS
-	put1 $OSSC(LCDC)
-	put1 $OSSC(LCDC)
-
-	for { set i 0 } { $i < 2 } { incr i } {
-		put1 [lindex $arg $i]
-	}
-	msg_close
-	w_serial
-}
-
-proc user_lcdt { par } {
-#
-# Issue a LCD text command
-#
-	global SIO CCOD OSSC YourLink CHAR
-
-	if { $YourLink == 0 } {
-		log "don't know about the node yet"
-		return
-	}
-
-	set a [exnum par]
-
-	if { $a == "" } {
-		log "expected number followed by string"
-		return
-	}
-
-	set s [string trim $par]
-	if { $s == "" } {
-		log "string missing"
-		return
-	}
-
-	if { [string length $s] > 48 } {
-		set s [string range $s 0 47]
-	}
-
-	append s $CHAR(0)
-
-	inirqm OSS
-
-	put1 $OSSC(LCDT)
-	put1 $OSSC(LCDT)
-	put2 $a
-	append SIO(MSG) $s
-	msg_close
 	w_serial
 }
 

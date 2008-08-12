@@ -19,336 +19,98 @@ heapmem {100};
 
 #include "ser.h"
 #include "serf.h"
-
-#define	RS_INIT		00
-#define	RS_LOOP		05
-#define	RS_RCMD		10
-#define	RS_ERR		11
-#define	RS_LRES		30
-#define	RS_LOFF		35
-#define	RS_LGEN		40
-#define	RS_SETI		42
-#define	RS_SETC		43
-#define	RS_DISP		44
-#define	RS_ERASE	50
-#define	RS_FONT		60
-#define	RS_TAREA	70
-#define	RS_ELINES	80
-#define	RS_ALINE	85
-#define	RS_WLINES	87
-#define RS_MENU		95
-#define	RS_RCMN		100
+#include "dispman.h"
 
 #define	IBUFSIZE	128
 #define	MAXLINES	32
+#define	MAXOBJECTS	32
 
-static byte *PIXT = NULL;
-static word NPIX = 0;
-static word Aux, Status = 0;
+static dobject_t *objects [MAXOBJECTS];
 
-#define	MENU_MAXLINES	32
-#define	CCHAR		"*"
+// ============================================================================
 
-typedef struct {
-
-	const char *Lines [MENU_MAXLINES];
-	word LLength [MENU_MAXLINES];
-	word NLines, MaxLL;
-	byte Width, Height;	// In characters
-	word FL,		// First line shown in menu
-	     SH,		// Shift (horizontal scroll)
-	     SE;		// Selected line
-	Boolean Active;		// Displayed
-
-} menu_t;
-
-byte MW, MH;
-
-static menu_t MENU;
-
-void menu_init (menu_t *m) {
+static void free_lines (char **lines, word nl) {
 //
-// Initialize memory (redundant in this case)
-//
-	m->Active = NO;
-	m->NLines = 0;
-	m->Width = m->Height = 0;
-}
-
-void menu_free (menu_t *m) {
-//
-// Deallocate menu
+// Deallocate an array of strings
 //
 	word i;
 
-	if (m->Active) {
-		// Clear the area
-		lcdg_el (0, m->Height);
-		m->Active = NO;
-	}
-
-	for (i = 0; i < m->NLines; i++)
-		ufree (m->Lines [i]);
-
-	m->NLines = 0;
+	for (i = 0; i < nl; i++)
+		if (lines [i] != NULL)
+			ufree (lines [i]);
+	ufree (lines);
 }
 
-void menu_start (menu_t *m, word w, word h) {
+static Boolean empty_object (word ix) {
 //
-// After a change in parameters
+// Deallocate an object
 //
-	if (m->NLines)
-		menu_free (m);
+	dobject_t *co;
+	word i;
 
-	m->FL = m->SH = m->SE = 0;
-	m->Width = w;
-	m->Height = h;
-}
+#define	COI	((dimage_t*)co)
+#define	COM	((dmenu_t*) co)
+#define	COT	((dtext_t*) co)
 
-word menu_addline (menu_t *m, const char *ln) {
-//
-// Add a line to the menu
-//
-	word ll;
+	if ((co = objects [ix]) == NULL)
+		return NO;
 
-	if (m->NLines == MENU_MAXLINES)
-		return ERROR;
+	if (dm_displayed (co))
+		return YES;
 
-	ll = strlen (ln);
+	switch (co->Type) {
 
-	if ((m->Lines [m->NLines] = (const char*)umalloc (ll+1)) == NULL)
-		return ERROR;
+		case DOTYPE_MENU:
 
-	m->LLength [m->NLines] = ll;
-	if (ll > m->MaxLL)
-		m->MaxLL = ll;
-	strcpy ((char*)(m->Lines [m->NLines]), ln);
-	m->NLines++;
-}
-
-byte menu_ell (menu_t *m, word ln) {
-//
-// Return effective line length
-//
-	word r;
-
-	if (m->LLength [ln] <= m->SH)
-		return 0;
-
-	r = m->LLength [ln] - m->SH;
-	if (r > m->Width - 1)
-		r = m->Width - 1;
-	return (byte) r;
-}
-
-void menu_show (menu_t *m) {
-//
-// Show the menu in the text area
-//
-	word i, j;
-
-	// Make sure the area is initially empty
-	lcdg_el (0, m->Height);
-
-	if (m->NLines == 0 || m->Width == 0 || m->Height == 0) {
-		// Ignore
-		m->Active = NO;
-		return;
-	}
-
-	for (i = 0; i < m->Height; i++) {
-		j = i + m->FL;
-		if (j >= m->NLines)
+			// Deallocate the text
+			free_lines ((char**)(COM->Lines), COM->NL);
 			break;
-		lcdg_wl (m->Lines [j], m->SH, 1, i);
+
+		case DOTYPE_TEXT:
+
+			ufree (COT->Line);
+			break;
 	}
 
-	// The cursor
-	lcdg_wl (CCHAR, 0, 0, m->SE - m->FL);
-	m->Active = YES;
-}
+	ufree (co);
+	objects [ix] = NULL;
+	return NO;
 
-void menu_hide (menu_t *m) {
-//
-// Hide the menu
-//
-	if (m->Active) {
-		lcdg_el (0, m->Height);
-		m->Active = NO;
-	}
-}
-
-void menu_down (menu_t *m) {
-//
-// Select next item down the list
-//
-	word i, j, d;
-	byte a, b;
-
-	if (!m->Active)
-		// Do nothing
-		return;
-
-	if (m->SE >= m->NLines - 1)
-		// Cursor at the last line
-		return;
-
-	// Relative to the window
-	a = (byte) (m->SE - m->FL);
-	// Cursor must be erased whatever comes next ...
-	lcdg_ec (0, a, 1);
-	// ... and advanced
-	m->SE++;
-
-	if (a < m->Height - 1) {
-		// Just advance the cursor
-		lcdg_wl (CCHAR, 0, 0, a+1);
-		return;
-	}
-
-	// At the bottom (and there are more lines)
-
-	// Previous FL
-	d = m->FL;
-	// Advance
-	m->FL += m->Height;
-	if (m->FL + m->Height > m->NLines)
-		// Less than a window-full of lines left
-		m->FL = m->NLines - m->Height;
-
-	// The actual advancement
-	d = m->FL - d;
-
-	for (i = 0; i < m->Height; i++) {
-		// New line index
-		j = i + m->FL;
-		lcdg_wl (m->Lines [j], m->SH, 1, i);
-		// Check how much to clean after the line
-		if ((a = menu_ell (m, j)) >= m->Width - 1)
-			// No need to clear
-			continue;
-		if (a >= (b = menu_ell (m, j-d)))
-			// No need to clear
-			continue;
-		// Number of characters to clear
-		b -= a;
-		lcdg_ec (a + 1, i, b);
-	}
-
-	// Display the cursor
-	lcdg_wl (CCHAR, 0, 0, m->SE - m->FL);
-}
-
-void menu_up (menu_t *m) {
-//
-// Select next item down the list
-//
-	word i, j, d;
-	byte a, b;
-
-	if (!m->Active)
-		// Do nothing
-		return;
-
-	if (m->SE == 0)
-		// Cursor at the first line
-		return;
-
-	// Relative to the window
-	a = (byte) (m->SE - m->FL);
-	// Cursor must be erased whatever comes next ...
-	lcdg_ec (0, a, 1);
-	// ... and advanced
-	m->SE--;
-
-	if (a > 0) {
-		// Just advance the cursor
-		lcdg_wl (CCHAR, 0, 0, a-1);
-		return;
-	}
-
-	// At the top
-
-	// Previous FL
-	d = m->FL;
-	// Advance
-	if (m->FL < m->Height)
-		m->FL = 0;
-	else
-		m->FL -= m->Height;
-	d -= m->FL;
-
-	for (i = 0; i < m->Height; i++) {
-		// New line index
-		j = i + m->FL;
-		lcdg_wl (m->Lines [j], m->SH, 1, i);
-		// Check how much to clean after the line
-		if ((a = menu_ell (m, j)) >= m->Width - 1)
-			// No need to clear
-			continue;
-		if (a >= (b = menu_ell (m, j+d)))
-			// No need to clear
-			continue;
-		// Number of characters to clear
-		b -= a;
-		lcdg_ec (a + 1, i, b);
-	}
-
-	// Display the cursor
-	lcdg_wl (CCHAR, 0, 0, m->SE - m->FL);
-}
-
-void menu_left (menu_t *m) {
-//
-// Scroll right
-//
-	word i, j;
-
-	if (!m->Active || m->SH + m->Width - 1 >= m->MaxLL)
-		// No need to scroll any further
-		return;
-	m->SH++;
-
-	for (i = 0; i < m->Height; i++) {
-		j = i + m->FL;
-		if (j >= m->NLines)
-			return;
-		lcdg_wl (m->Lines [j], m->SH, 1, i);
-		// Should a character be erased
-		j = menu_ell (m, j);
-		if (j < m->Width - 1)
-			lcdg_ec (j + 1, i, 1);
-	}
-}
-
-void menu_right (menu_t *m) {
-//
-// Scroll right
-//
-	word i, j;
-
-	if (!m->Active || m->SH == 0)
-		return;
-	m->SH--;
-
-	for (i = 0; i < m->Height; i++) {
-		j = i + m->FL;
-		if (j >= m->NLines)
-			return;
-		lcdg_wl (m->Lines [j], m->SH, 1, i);
-	}
+#undef	COI
+#undef	COM
+#undef	COT
 }
 
 // ============================================================================
 
 static void buttons (word but) {
 
-	switch (but) {
+	if (IS_JOYSTICK (but)) {
+		if (DM_TOP == NULL || DM_TOP->Type != DOTYPE_MENU)
+			// Ignore the joystick, if the top object is not a menu
+			return;
 
-		case JOYSTICK_W: menu_up     (&MENU); return;
-		case JOYSTICK_E: menu_down   (&MENU); return;
-		case JOYSTICK_N: menu_left   (&MENU); return;
-		case JOYSTICK_S: menu_right  (&MENU); return;
+		switch (but) {
+		    case JOYSTICK_W:	dm_menu_u ((dmenu_t*)DM_TOP);	return;
+		    case JOYSTICK_E:	dm_menu_d ((dmenu_t*)DM_TOP);	return;
+		    case JOYSTICK_N:	dm_menu_l ((dmenu_t*)DM_TOP);	return;
+		    case JOYSTICK_S:	dm_menu_r ((dmenu_t*)DM_TOP);	return;
+		    default:
+			// Push (ignore for now)
+			return;
+		}
+	}
+
+	if (but == BUTTON_0) {
+		// Refresh
+		dm_refresh ();
+		return;
+	}
+
+	if (but == BUTTON_1) {
+		// Remove top object
+		dm_delete (NULL);
+		return;
 	}
 }
 
@@ -359,54 +121,79 @@ process (root, void)
 /* This is the main program of the application */
 /* =========================================== */
 
+#define	RS_INIT		0
+#define	RS_LOOP		1
+#define	RS_RCMD		2
+#define	RS_ERR		3
+#define	RS_PRO		4
+#define	RS_LON		10
+#define	RS_LOF		20
+#define	RS_GIM		30
+#define	RS_GME		40
+#define	RS_GTE		50
+#define RS_LIS		60
+#define	RS_REF		70
+#define	RS_ADD		80
+#define	RS_DEL		90
+
+#define	NPVALUES	12
+#define	LABSIZE		32
+
 	static char *ibuf = NULL;
-	word i, j, n, m, c [4];
+	static char **lines;
+	static word Status, c [NPVALUES];
+	static char lbl [LABSIZE];
+
+	word i;
+	char *line;
 
   entry (RS_INIT)
 
 	ibuf = (char*) umalloc (IBUFSIZE);
+	Status = 0;
+	dm_refresh ();
+	lcdg_on (0);
 	buttons_action (buttons);
 
   entry (RS_LOOP)
 
 	ser_out (RS_LOOP, "\r\n"
 		"Commands:\r\n"
-		"  r              : reset\r\n"
-		"  R n            : LCD reset\r\n"
-		"  O              : LCD off\r\n"
-		"  G m n c c c c  : generate a pix table\r\n"
-		"  S x y w h m    : set area\r\n"
-		"  C x y          : bgr/fgr colors\r\n"
-		"  D x y          : render the pix table\r\n"
-		"  E [n]          : erase [to color]\r\n"
-		"  F n            : set font\r\n"
-		"  T x y nc nl    : text area\r\n"
-		"  X              : erase line table\r\n"
-		"  A line         : add new line\r\n"
-		"  W              : display lines\r\n"
-		"  M[+-<>]        : menu navigation\r\n"
+		"  i ix lab x y             : create image object\r\n"
+		"  m ix nl fo bg fg x y w h : create a menu object\r\n"
+		"  t ix fo bg fg x y w      : create a text object\r\n"
+		"  -----\r\n"
+		"  l    : list\r\n"
+		"  r    : refresh\r\n"
+		"  a ix : add object\r\n"
+		"  d ix : delete object\r\n"
+		"  o c  : display on\r\n"
+		"  f    : display off\r\n"
 	);
 
   entry (RS_RCMD)
 
 	ser_in (RS_RCMD, ibuf, IBUFSIZE);
 
+	// Reset the parsed values
+	for (i = 0; i < NPVALUES; i++)
+		c [i] = WNONE;
+
 	switch (ibuf [0]) {
 
-		case 'r' : reset ();
-		case 'R' : proceed (RS_LRES);
-		case 'O' : proceed (RS_LOFF);
-		case 'G' : proceed (RS_LGEN);
-		case 'C' : proceed (RS_SETC);
-		case 'S' : proceed (RS_SETI);
-		case 'D' : proceed (RS_DISP);
-		case 'E' : proceed (RS_ERASE);
-		case 'F' : proceed (RS_FONT);
-		case 'T' : proceed (RS_TAREA);
-		case 'X' : proceed (RS_ELINES);
-		case 'A' : proceed (RS_ALINE);
-		case 'W' : proceed (RS_WLINES);
-		case 'M' : proceed (RS_MENU);
+		case 'o' : proceed (RS_LON);
+		case 'f' : proceed (RS_LOF);
+
+		case 'i' : proceed (RS_GIM);
+		case 'm' : proceed (RS_GME);
+		case 't' : proceed (RS_GTE);
+
+		case 'l' : proceed (RS_LIS);
+
+		case 'r' : proceed (RS_REF);
+
+		case 'a' : proceed (RS_ADD);
+		case 'd' : proceed (RS_DEL);
 	}
 
   entry (RS_ERR)
@@ -414,159 +201,294 @@ process (root, void)
 	ser_out (RS_ERR, "Illegal command or parameter\r\n");
 	proceed (RS_LOOP);
 
-  entry (RS_LRES)
+  entry (RS_PRO)
 
-	n = 0;
-	scan (ibuf+1, "%u", &n);
-	lcdg_on ((byte)n);
-	proceed (RS_RCMN);
-
-  entry (RS_LOFF)
-
-	lcdg_off ();
-	proceed (RS_RCMN);
-
-  entry (RS_LGEN)
-
-	// Generate a pix table
-	m = 0;
-	n = 16;
-	c [0] = 0; c [1] = 0; c [2] = 0xffff; c [3] = 0xffff;
-	scan (ibuf+1, "%u %u %x %x %x %x", &m, &n, c+0, c+1, c+2, c+3);
-	if (PIXT != NULL)
-		ufree (PIXT);
-
-	i = m ? n : (n + 1) * 12 / 8;
-
-	if ((PIXT = (byte*) umalloc (i)) == NULL)
-		proceed (RS_ERR);
-
-	NPIX = n;
-
-	if (m) {
-		for (i = 0; i < n; i++)
-			PIXT [i] = (byte) c [i & 0x3];
-	} else {
-		m = (n + 1) / 2;
-		i = 0;
-		j = 0;
-		while (m--) {
-			PIXT [i] = (byte)  (c [j] >> 4); i++;
-			PIXT [i] = (byte) ((c [j] & 0xf) << 4);
-			if (j == 3)
-				j = 0;
-			else
-				j++;
-			PIXT [i] |= (byte) ((c [j] >> 8) & 0xf); i++;
-			PIXT [i] = (byte) c [j]; i++;
-			if (j == 3)
-				j = 0;
-			else
-				j++;
-		}
-	}
-
-	proceed (RS_RCMN);
-
-  entry (RS_SETI)
-
-	
-	c [0] = 0; c [1] = 0; c [2] = 130; c [3] = 130;
-	scan (ibuf+1, "%u %u %u %u %u", c+0, c+1, c+2, c+3, &m);
-
-	lcdg_set (
-		(byte)(c[0]),
-		(byte)(c[1]),
-		(byte)(c[2]),
-		(byte)(c[3]), m);
-
-	proceed (RS_RCMN);
-
-  entry (RS_SETC)
-
-	c [0] = BNONE;
-	c [1] = BNONE;
-	scan (ibuf+1, "%u %u", c+0, c+1);
-
-	lcdg_setc ((byte)(c[0]), (byte)(c[1]));
-	proceed (RS_RCMN);
-	
-  entry (RS_DISP)
-
-	if (PIXT == NULL)
-		proceed (RS_ERR);
-
-	c [0] = 0;
-	c [1] = 0;
-	scan (ibuf+1, "%u %u", c+0, c+1);
-
-	lcdg_render ((byte)(c[0]), (byte)(c[1]), PIXT, NPIX);
-	proceed (RS_RCMN);
-	
-  entry (RS_ERASE)
-
-	m = 0;
-	scan (ibuf+1, "%u", &m);
-	lcdg_clear ((byte)m);
-	proceed (RS_RCMN);
-
-  entry (RS_FONT)
-
-	m = 0;
-	scan (ibuf+1, "%u", &m);
-	Status = lcdg_font ((byte)m);
-	proceed (RS_RCMN);
-
-  entry (RS_TAREA)
-
-	c [0] = 0; c [1] = 0; c [2] = 10; c [3] = 10;
-	scan (ibuf+1, "%u %u %u %u %u", c+0, c+1, c+2, c+3);
-
-	lcdg_set (0, 0, 130, 130, 1);
-	lcdg_clear (BNONE);
-
-	Status = lcdg_sett ((byte)(c[0]), (byte)(c[1]), (byte)(c[2]),
-		(byte)(c[3]));
-	MW = c [2];
-	MH = c [3];
-MRes:
-	menu_start (&MENU, MW, MH);
-	proceed (RS_RCMN);
-
-  entry (RS_ELINES)
-
-	menu_free (&MENU);
-	goto MRes;
-
-  entry (RS_ALINE)
-
-	Status = menu_addline (&MENU, ibuf + 1);
-	proceed (RS_RCMN);
-
-  entry (RS_WLINES)
-
-	menu_show (&MENU);
-	proceed (RS_RCMN);
-
-  entry (RS_MENU)
-
-	if (ibuf [1] == '+')
-		menu_down (&MENU);
-	else if (ibuf [1] == '-')
-		menu_up (&MENU);
-	else if (ibuf [1] == '<')
-		menu_left (&MENU);
-	else if (ibuf [1] == '>')
-		menu_right (&MENU);
+	if (Status)
+		ser_outf (RS_PRO, "Err: %u\r\n", Status);
 	else
-		proceed (RS_ERR);
+		ser_out (RS_PRO, "OK\r\n");
 
-	proceed (RS_RCMN);
-
-  entry (RS_RCMN)
-
-	ser_outf (RS_RCMN, "Done: %u\r\n", Status);
 	Status = 0;
 	proceed (RS_RCMD);
+
+// ============================================================================
+
+  entry (RS_LON)
+
+	scan (ibuf+1, "%u", c+0);
+	if (c [0] == WNONE)
+		c [0] = 0;
+	lcdg_on ((byte)(c[0]));
+	proceed (RS_PRO);
+
+  entry (RS_LOF)
+
+	lcdg_off ();
+	proceed (RS_PRO);
+
+// ============================================================================
+
+  entry (RS_GIM)
+
+#define	OIX	(c [0])
 	
+	lbl [0] = '\0';
+	scan (ibuf+1, "%u %s %u %u", &c+0, lbl, c+1, c+2);
+
+#define	X	((byte)(c [1]))
+#define	Y	((byte)(c [2]))
+
+	if (OIX >= MAXOBJECTS || X >= LCDG_MAXX || Y >= LCDG_MAXY)
+		proceed (RS_ERR);
+
+	if (empty_object (OIX)) {
+		Status = 101;
+		proceed (RS_PRO);
+	}
+
+	if ((objects [OIX] = (dobject_t*) dm_newimage (lbl, X, Y)) == NULL)
+		Status = DM_STATUS;
+
+	proceed (RS_PRO);
+
+#undef X
+#undef Y
+
+// ============================================================================
+
+  entry (RS_GME)
+
+	scan (ibuf+1, "%u %u %u %u %u %u %u %u %u", c+0, c+1, c+2, c+3, c+4,
+		c+5, c+6, c+7, c+8);
+
+#define	NL	       (c [ 1])
+#define	FO	((byte)(c [ 2]))
+#define	BG	((byte)(c [ 3]))
+#define	FG	((byte)(c [ 4]))
+#define	X	((byte)(c [ 5]))
+#define	Y	((byte)(c [ 6]))
+#define	W	((byte)(c [ 7]))
+#define	H	((byte)(c [ 8]))
+
+#define	CN	       (c [ 9])
+
+	if (OIX >= MAXOBJECTS || NL == 0 || H == BNONE)
+		// This is a crude check for the number of args, dm_newmenu will
+		// do the verification
+		proceed (RS_ERR);
+
+	// Create the line table
+	if ((lines = (char**) umalloc (NL * sizeof (char*))) == NULL) {
+		Status = 102;
+		proceed (RS_PRO);
+	}
+	for (i = 0; i < NL; i++)
+		lines [i] = NULL;
+
+	CN = 0;
+
+  entry (RS_GME+1)
+
+	ser_outf (RS_GME+1, "Enter %u lines\r\n", NL - CN);
+
+  entry (RS_GME+2)
+
+	ser_in (RS_GME+2, ibuf, IBUFSIZE);
+
+	for (i = 0; ibuf [i] == ' ' || ibuf [i] == '\t'; i++);
+
+	if (ibuf [i] == '\0')
+		proceed (RS_GME+1);
+
+	if ((lines [CN] = (char*) umalloc (strlen (ibuf + i) + 1)) == NULL) {
+		free_lines (lines, CN);
+		Status = 103;
+		proceed (RS_PRO);
+	}
+	strcpy (lines [CN], ibuf + i);
+
+	if (++CN < NL)
+		proceed (RS_GME+1);
+
+	// Create the menu object
+	if (empty_object (OIX)) {
+		Status = 101;
+		free_lines (lines, NL);
+		proceed (RS_PRO);
+	}
+
+	if ((objects [OIX] = (dobject_t*) dm_newmenu ((const char**)lines,
+	    NL, FO, BG, FG, X, Y, W, H)) == NULL) {
+		free_lines (lines, NL);
+		Status = DM_STATUS;
+	}
+	proceed (RS_PRO);
+	
+#undef	NL
+#undef	FO
+#undef	BG
+#undef	FG
+#undef	X
+#undef	Y
+#undef	W
+#undef	H
+
+#undef	CN
+
+// ============================================================================
+
+  entry (RS_GTE)
+
+	scan (ibuf+1, "%u %u %u %u %u %u %u", c+0, c+1, c+2, c+3, c+4, c+5,
+		c+6);
+
+#define	FO	((byte)(c [ 1]))
+#define	BG	((byte)(c [ 2]))
+#define	FG	((byte)(c [ 3]))
+#define	X	((byte)(c [ 4]))
+#define	Y	((byte)(c [ 5]))
+#define	W	((byte)(c [ 6]))
+
+	if (OIX >= MAXOBJECTS || W == BNONE)
+		proceed (RS_ERR);
+
+	// Expect a line of text
+
+  entry (RS_GTE+1)
+
+	ser_out (RS_GTE+1, "Enter a line\r\n");
+
+  entry (RS_GTE+2)
+
+	ser_in (RS_GTE+2, ibuf, IBUFSIZE);
+
+	for (i = 0; ibuf [i] == ' ' || ibuf [i] == '\t'; i++);
+
+	if (ibuf [i] == '\0')
+		proceed (RS_GTE+1);
+
+	if ((line = (char*) umalloc (strlen (ibuf + i) + 1)) == NULL) {
+		Status = 102;
+		proceed (RS_PRO);
+	}
+
+	strcpy (line, ibuf + i);
+
+	// Create the text object
+	if (empty_object (OIX)) {
+		Status = 101;
+		ufree (line);
+		proceed (RS_PRO);
+	}
+
+	if ((objects [OIX] = (dobject_t*) dm_newtext (line, FO, BG, FG, X, Y,
+	    W)) == NULL) {
+		ufree (line);
+		Status = DM_STATUS;
+	}
+	proceed (RS_PRO);
+	
+#undef	FO
+#undef	BG
+#undef	FG
+#undef	X
+#undef	Y
+#undef	W
+
+// ============================================================================
+
+  entry (RS_LIS)
+
+	OIX = 0;
+
+  entry (RS_LIS+1)
+
+	while (OIX < MAXOBJECTS) {
+		if (objects [OIX] != NULL)
+			break;
+		OIX++;
+	}
+
+	if (OIX == MAXOBJECTS)
+		proceed (RS_PRO);
+
+  entry (RS_LIS+2) 
+
+	switch (objects [OIX] -> Type) {
+
+#define	COI	((dimage_t*) (objects [OIX]))
+#define	COM	((dmenu_t*)  (objects [OIX]))
+#define	COT	((dtext_t*)  (objects [OIX]))
+
+		case DOTYPE_IMAGE:
+
+			ser_outf (RS_LIS+2,
+				"%u = IMAGE: %lx [%u,%u] [%u,%u]\r\n", OIX,
+					COI->EPointer,
+					COI->XL, COI->YL, COI->XH, COI->YH);
+			break;
+
+		case DOTYPE_MENU:
+
+			ser_outf (RS_LIS+2,
+			"%u = MENU: Fo%u, Bg%u, Fg%u, Nl%u [%u,%u] [%u,%u]\r\n",
+					OIX,
+					COM->Font, COM->BG, COM->FG, COM->NL,
+					COM->XL, COM->YL,
+					COM->Width, COM->Height);
+			break;
+
+		case DOTYPE_TEXT:
+
+			ser_outf (RS_LIS+2,
+			"%u = TEXT: Fo%u, Bg%u, Fg%u, Ll%u [%u,%u] [%u]\r\n",
+					OIX,
+					COT->Font, COT->BG, COT->FG,
+					strlen (COT->Line),
+					COT->XL, COT->YL, COT->Width);
+			break;
+
+		default:
+			ser_outf (RS_LIS+2, "%u = UNKNOWN [%u]\r\n", OIX,
+				objects [OIX] -> Type);
+	}
+
+#undef	COI
+#undef	COM
+#undef	COT
+
+	OIX++;
+	proceed (RS_LIS+1);
+
+// ============================================================================
+
+  entry (RS_REF)
+
+	Status = dm_refresh ();
+	proceed (RS_PRO);
+
+// ============================================================================
+
+  entry (RS_ADD)
+
+	scan (ibuf+1, "%u", c+0);
+
+	if (OIX >= MAXOBJECTS || objects [OIX] == NULL)
+		proceed (RS_ERR);
+
+	Status = dm_top (objects [OIX]);
+	proceed (RS_PRO);
+
+// ============================================================================
+
+  entry (RS_DEL)
+
+	scan (ibuf+1, "%u", c+0);
+
+	if (OIX >= MAXOBJECTS || objects [OIX] == NULL)
+		proceed (RS_ERR);
+
+	dm_delete (objects [OIX]);
+	proceed (RS_PRO);
+
 endprocess (1)

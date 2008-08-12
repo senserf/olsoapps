@@ -20,7 +20,6 @@
 #define	IMG_NUM_OWN	0x8001		// Own image number
 
 
-#define	PIXPERCHK8	CHUNKSIZE
 #define	PIXPERCHK12	((CHUNKSIZE*8)/12)
 
 // First chunk layout =========================================================
@@ -30,8 +29,7 @@
 //
 // Bytes 4-5:           The total number of chunks in file
 // Bytes 6-7:		The number of pages (including this one)
-// Bytes 8-11:		GEOMETRY, two words (X and Y), X is or'red with 0x8000
-//			if the image is 8bpp
+// Bytes 8-11:		GEOMETRY, two words (X and Y)
 // Bytes 12-21:		Page numbers of the remaining pages
 // Bytes 22-55: 	The label
 //

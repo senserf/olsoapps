@@ -54,7 +54,6 @@ typedef struct {
 	word		ppt [IMG_MAXPPI];	// Page numbers
 // ----------------
 	word		cp;	// Current page index
-	byte		bpp;	// bits per pixel (nonzero == 8)
 	Boolean		rdy;	// eeprom ready flag
 
 	ctally_t	cta;
@@ -68,7 +67,6 @@ typedef struct {
 #define	imrd_x		(IMRData->x)
 #define	imrd_y		(IMRData->y)
 #define	imrd_np		(IMRData->np)
-#define	imrd_bpp	(IMRData->bpp)
 #define	imrd_rdy	(IMRData->rdy)
 #define	imrd_ppt	(IMRData->ppt)
 #define	imrd_cta	(IMRData->cta)
@@ -83,7 +81,6 @@ typedef struct {
 	word		cx;			// current pixel to render
 	word		fc;			// first chunk behind the label
 	word		n;			// Number of chunks
-	byte		bpp;			// bits per pixel (nonzero == 8)
 	byte		chk [CHUNKSIZE];
 	word		pp [IMG_MAXPPI];	// page numbers
 
@@ -95,7 +92,6 @@ typedef struct {
 #define	imdd_cx		(IMDData->cx)
 #define	imdd_fc		(IMDData->fc)
 #define	imdd_n		(IMDData->n)
-#define	imdd_bpp	(IMDData->bpp)
 #define	imdd_chk	(IMDData->chk)
 #define	imdd_pp		(IMDData->pp)
 
@@ -124,7 +120,7 @@ word image_find (word num) {
 	if ((sig = (img_sig_t*) umalloc (IMG_SIGSIZE)) == NULL)
 		return WNONE;
 
-	for (pn = 0; pn < NEPages; pn++) {
+	for (pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 		if (cw == 0x7f00) {
@@ -168,7 +164,7 @@ static word image_delete (word num) {
 	if ((sig = (img_sig_t*) umalloc (IMG_SIGSIZE)) == NULL)
 		return WNONE;
 
-	for (pn = 0; pn < NEPages; pn++) {
+	for (pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 		if (cw == 0x7f00) {
@@ -211,7 +207,7 @@ void images_status (address packet) {
 
 	fr = 0;
 	ni = 0;
-	for (pn = 0; pn < NEPages; pn++) {
+	for (pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 		if (cw == 0x7f00)
@@ -242,7 +238,7 @@ void images_clean (address lst, word n) {
 	// diagg ("CLEAN", n, lst [0]);
 	if (n == 0) {
 		// Delete all images
-		for (n = 0; n < NEPages; n++) {
+		for (n = 1; n < NEPages; n++) {
 			ep = pntopa (n);
 			ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 			if (cw != errw) {
@@ -276,7 +272,6 @@ static Boolean image_display (lword ep) {
 //
 	word pn, cw, cx, cy;
 	img_sig_t *sig;
-	byte bpp;
 
 	if ((sig = (img_sig_t*) umalloc (sizeof (img_sig_t))) == NULL)
 		return NO;
@@ -288,15 +283,11 @@ static Boolean image_display (lword ep) {
 		return NO;
 	}
 
-	bpp = (sig->x & 0x8000) != 0;
-	sig->x &= ~0x8000;
-
 	lcdg_off ();
-	lcdg_set (0, 0, 0, 0, 0);
-	lcdg_clear (COLOR_BLACK);
-	lcdg_set (0, 0, (byte)(sig->x), (byte)(sig->y), bpp);
-
-	bpp = bpp ? PIXPERCHK8 : PIXPERCHK12;
+	lcdg_set (0, 0, LCDG_MAXX, LCDG_MAXY);
+	lcdg_setc (COLOR_BLACK, COLOR_WHITE);
+	lcdg_clear ();
+	lcdg_set (0, 0, (byte)(sig->x - 1), (byte)(sig->y - 1));
 
 	// Initial offset on first page
 	cw = 0;
@@ -311,10 +302,10 @@ static Boolean image_display (lword ep) {
 		ee_read (ep + cw, (byte*)(&(sig->cn)), CHUNKSIZE + 2);
 
 		// Starting pixel of the chunk
-		cx = sig->cn * bpp;
+		cx = sig->cn * PIXPERCHK12;
 		cy = cx / sig->x;
 		cx = cx % sig->x;
-		lcdg_render ((byte)cx, (byte)cy, sig->chunk, bpp);
+		lcdg_render ((byte)cx, (byte)cy, sig->chunk, PIXPERCHK12);
 		sig->nc--;
 	}
 	lcdg_on (0);
@@ -330,7 +321,7 @@ void images_show_next () {
 	lword ep;
 	word cw, cv;
 
-	for (cw = 0; cw < NEPages; cw++) {
+	for (cw = 1; cw < NEPages; cw++) {
 		CImage++;
 		if (CImage >= NEPages)
 			CImage = 0;
@@ -353,7 +344,7 @@ void images_show_previous () {
 	lword ep;
 	word cw, cv;
 
-	for (cw = 0; cw < NEPages; cw++) {
+	for (cw = 1; cw < NEPages; cw++) {
 		if (CImage == 0)
 			CImage = NEPages - 1;
 		else
@@ -378,7 +369,7 @@ Boolean image_show (word in) {
 	word pn, cw;
 
 	// Locate the first page of the image
-	for (pn = 0; pn < NEPages; pn++) {
+	for (pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 		if (cw != 0x7f00)
@@ -413,7 +404,7 @@ static word do_imglist (byte *buf) {
 	if (buf)
 		*((word*)buf) = MyLink;
 
-	for (pn = 0; pn < NEPages; pn++) {
+	for (pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&wc), 2);
 		if (wc != 0x7f00)
@@ -541,7 +532,7 @@ static Boolean img_lkp_snd (word oid) {
 	lword ep;
 	word cw, np, pn, ws;
 
-	for (np = pn = 0; pn < NEPages; pn++) {
+	for (pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 		if (cw != 0x7f00)
@@ -702,13 +693,12 @@ Drop:
 
 	// X
 	get2 (packet, imrd_x);
-	imrd_bpp = (imrd_x & 0x8000) ? LCDGF_8BPP : 0;
 
 	// Y
 	get2 (packet, imrd_y);
 
 	// Need free pages
-	for (nc = pn = 0; pn < NEPages; pn++) {
+	for (nc = 0, pn = 1; pn < NEPages; pn++) {
 		ep = pntopa (pn);
 		ee_read (ep + IMG_PO_MAGIC, (byte*)(&cw), 2);
 		if (cw == errw) {
@@ -747,15 +737,15 @@ GotThem:
 	}
 	ee_write (WNONE, imrd_cpp + IMG_PO_LABEL + cw, (byte*)(&nc), 1);
 
-	imrd_x &= 0x7fff;
 	imrd_cpp += CHUNKSIZE + 2;
 
 	if ((RQFlag & IRT_SHOW)) {
 		lcdg_on (0);
-		lcdg_set (0, 0, 0, 0, 0);
-		lcdg_clear (COLOR_BLACK);
+		lcdg_set (0, 0, LCDG_MAXX, LCDG_MAXY);
+		lcdg_setc (COLOR_BLACK, COLOR_WHITE);
+		lcdg_clear ();
 		// This will also clip (for the last chunk)
-		lcdg_set (0, 0, imrd_x, imrd_y, imrd_bpp);
+		lcdg_set (0, 0, imrd_x - 1, imrd_y - 1);
 	}
 
 	imrd_rdy = YES;
@@ -792,7 +782,7 @@ static Boolean img_cnk_rcp (word st, address packet) {
 //
 // Receive a chunk of image
 //
-	word cn, pc, cs, rc;
+	word cn, cs, rc;
 
 	if (imrd_rdy) {
 		// Starting write
@@ -817,15 +807,13 @@ static Boolean img_cnk_rcp (word st, address packet) {
 
 		if ((RQFlag & IRT_SHOW)) {
 			// Displaying while we go
-			pc = imrd_bpp ? PIXPERCHK8 : PIXPERCHK12;
-			// Starting pixel number of the chunk
-			cs = cn * pc;
+			cs = cn * PIXPERCHK12;
 			// Is there a way to avoid division? Have to calculate
 			// starting row and column
 			rc = cs / imrd_x;
 			cs = cs % imrd_x;
 			lcdg_render ((byte)cs, (byte)rc, (byte*)(packet + 3),
-				pc);
+				PIXPERCHK12);
 		}
 
 		// Prepare for possible blocking

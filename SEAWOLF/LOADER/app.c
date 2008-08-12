@@ -2,6 +2,7 @@
 #include "tcvphys.h"
 #include "tcvplug.h"
 #include "board_rf.h"
+#include "pins.h"
 
 //+++ "hostid.c"
 //+++ "images.c"
@@ -86,9 +87,6 @@ const byte oss_psize [] = {
 	 2, // CLEAN	otw, [listw]
 	 2, // SHOW
 	 2, // LCDP	cmb,nab, [listb]
-	 5, // LCDS	b,b,b,b,b
-	 2, // LCDC	b,b
-	 3, // LCDT	b,str
 	 2, // BUZZ
 	 2  // RFPARAM
 #ifdef	DEBUGGING
@@ -1093,30 +1091,6 @@ ORet:
 		lcdg_cmd (tp, (byte*)(packet+4), nb);
 		goto ORet;
 
-	    case OSS_LCDS:
-
-		get1 (packet, xa);
-		get1 (packet, ya);
-		get1 (packet, xb);
-		get1 (packet, yb);
-		get1 (packet, cv);
-
-		lcdg_set (xa, ya, xb, yb, cv);
-		goto ORet;
-
-	    case OSS_LCDC:
-
-		get1 (packet, xa);
-		get1 (packet, ya);
-		lcdg_setc (xa, ya);
-		goto ORet;
-
-	    case OSS_LCDT:
-
-		get2 (packet, cw);
-		lcdg_text ((byte)cw, (const char*)(packet + 5));
-		goto ORet;
-
  	    case OSS_BUZZ:
 
 		// To test the buzzer
@@ -1365,30 +1339,21 @@ Boolean objl_stp_rcp (olist_t **tl) {
 
 // ============================================================================
 
-thread (buttons_handler)
+static void buttons (word but) {
 
-#define	BH_LOOP		0
+	switch (but) {
 
-    entry (BH_LOOP)
+		case BUTTON_0: diagg ("BUTTON 0", 0, 0); return;
+		case BUTTON_1: diagg ("BUTTON 1", 0, 0); return;
 
-	if (PRESSED_BUTTON0) {
-		// diagg ("BUT", 0, 0);
-		images_show_next ();
-	} else if (PRESSED_BUTTON1) {
-		// diagg ("BUT", 1, 1);
-        	images_show_previous ();
+		case JOYSTICK_W: diagg ("JOY W", 0, 0); return;
+		case JOYSTICK_E: diagg ("JOY E", 0, 0); return;
+		case JOYSTICK_N: diagg ("JOY N", 0, 0); return;
+		case JOYSTICK_S: diagg ("JOY S", 0, 0); return;
+
+		case JOYSTICK_PUSH: diagg ("JOY PUSH", 0, 0); return;
 	}
-
-	if (JOYSTICK_N) diagg ("JOY N", 0, 0);
-	if (JOYSTICK_E) diagg ("JOY E", 0, 0);
-	if (JOYSTICK_S) diagg ("JOY S", 0, 0);
-	if (JOYSTICK_W) diagg ("JOY W", 0, 0);
-	if (JOYSTICK_PUSH) diagg ("JOY PUSH", 0, 0);
-
-	when (BUTTON_PRESSED_EVENT, BH_LOOP);
-	release;
-
-endthread
+}
 
 // ============================================================================
 
@@ -1402,8 +1367,9 @@ thread (root)
     entry (RS_INIT)
 
 	lcdg_on (0);
-	lcdg_set (0, 0, 0, 0, 0);
-	lcdg_clear (COLOR_WHITE);
+	lcdg_set (0, 0, LCDG_MAXX, LCDG_MAXY);
+	lcdg_setc (COLOR_BLACK, COLOR_WHITE);
+	lcdg_clear ();
 
 	phys_cc1100 (0, MAXPLEN);
 	phys_uart (1, MAXPLEN, 0);
@@ -1443,8 +1409,7 @@ thread (root)
 	runthread (nager);
 
 	// Button service
-	buttons_init ();
-	runthread (buttons_handler);
+	buttons_action (buttons);
 
 	// We are not needed any more
 	finish;

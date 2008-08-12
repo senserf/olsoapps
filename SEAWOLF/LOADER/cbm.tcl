@@ -197,6 +197,29 @@ proc init { } {
 	append SIO(OB) $SIO(LAB)
 }
 
+proc reverse_y { } {
+
+	global SIO IDX
+
+	set SIO(IB) [string range $SIO(IB) $IDX end]
+	set NEW ""
+
+	# bytes in a row - 1
+	set nused [expr $SIO(X) * 3 - 1]
+	# total number of bytes in a row
+	set ntotl [expr ($nused + 3) & ~3]
+	# start from the last row
+	set ptr [expr $ntotl * $SIO(Y)]
+
+	for { set y 0 } { $y < $SIO(Y) } { incr y } {
+		incr ptr -$ntotl
+		append NEW [string range $SIO(IB) $ptr [expr $ptr + $nused]]
+	}
+
+	set IDX 0
+	set SIO(IB) $NEW
+}
+
 proc do_pixels { } {
 
 	global SIO
@@ -216,11 +239,6 @@ proc do_pixels { } {
 
 			outpixel $r $g $b
 
-		}
-
-		while { [expr $nc & 3] } {
-			get1
-			incr nc
 		}
 	}
 
@@ -307,6 +325,8 @@ set IDX 0
 close $ifd
 
 init
+
+reverse_y
 
 do_pixels
 
