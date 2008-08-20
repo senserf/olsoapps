@@ -16,6 +16,7 @@
 #define SENSOR_HUMID	2
 #define SENSOR_PHOTO	3
 #define SENSOR_TEMPA	4
+#define	SENSOR_MOI	3
 #define SENSOR_LIST dupajas
 #endif
 
@@ -563,10 +564,11 @@ thread (sens)
 		read_sensor (SE_HUMID, SENSOR_HUMID,  &sens_data.ee.sval[2]);
 
 	entry (SE_PHOTO)
-		read_sensor (SE_PHOTO, SENSOR_PHOTO, &sens_data.ee.sval[3]);
+		read_sensor (SE_PHOTO, SENSOR_MOI, &sens_data.ee.sval[3]);
 
 	entry (SE_TEMPA)
-		read_sensor (SE_TEMPA, SENSOR_TEMPA, &sens_data.ee.sval[4]);
+		//read_sensor (SE_TEMPA, SENSOR_TEMPA, &sens_data.ee.sval[4]);
+		sens_data.ee.sval[4]++;
 #else
 		app_diag (D_WARNING, "FAKE SENSORS");
 		// sensor 0 PAR

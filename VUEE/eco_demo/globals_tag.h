@@ -34,15 +34,15 @@ extern const lword host_id;
 word		app_flags	= 0;
 
 #if 0
-pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
+pongParamsType	pong_params = {	10,	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
-				0x7777, // levels / retries
+				0x0007, // levels / retries
 				1, 	// rx_span in msec (max 63K) 1: ON
 				0,	// rx_lev: select if needed, 0: all
 				0	// pload_lev: same
 };
 #else
-pongParamsType	pong_params = {	60,	// freq_maj in sec, max 63K
+pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
 				0x7777, // levels / retries
 				2048, 	// rx_span in msec (max 63K) 1: ON
