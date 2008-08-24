@@ -31,12 +31,12 @@ char * cmd_line	= NULL;
 extern const lword host_id;
 //+++ "hostid.c"
 
-word		app_flags	= 0;
+word		app_flags	= DEF_APP_FLAGS;
 
 #if 0
-pongParamsType	pong_params = {	10,	// freq_maj in sec, max 63K
+pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
-				0x0007, // levels / retries
+				0x7777, // levels / retries
 				1, 	// rx_span in msec (max 63K) 1: ON
 				0,	// rx_lev: select if needed, 0: all
 				0	// pload_lev: same
@@ -68,6 +68,8 @@ static const char welcome_str[] = OPRE_APP_MENU_C
 	OPRE_APP_MENU_C
 	"\tDisplay data:\tD [ from [ to [ status [ limit ]]]]\r\n"
 	OPRE_APP_MENU_C
+	"\tMainenance:\tM (*** No collection until F ***)\r\n"
+	OPRE_APP_MENU_C
 	"\tEprom erase:\tE (*** deletes all collected data ***)\r\n"
 	OPRE_APP_MENU_C
 	"\tFlash erase:\tF (*** clears special conditions  ***)\r\n"
@@ -89,7 +91,9 @@ static const char stats_str[] = OPRE_APP_STATS_C
 	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
 
 static const char dump_str[] = OPRE_APP_DUMP_C OMID_CR
-	"%s slot %lu %s %u.%u:%u:%u: PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n";
+	"%s slot %lu %s %u.%u:%u:%u: " SENS0_DESC "%d, "
+	SENS1_DESC "%d, " SENS2_DESC "%d, " SENS3_DESC "%d, "
+       	SENS4_DESC "%d\r\n";
 
 static const char dumpend_str[] = OPRE_APP_DEND_C
 	"Collector %u direct dump: slots %lu -> %lu status %s upto %u #%lu\r\n";

@@ -5,7 +5,7 @@
 	_da (cmd_line)		= NULL;
 
 	_da (host_id)		= (lword) preinit ("HID");
-	_da (app_flags)		= 0;
+	_da (app_flags)		= DEF_APP_FLAGS;
 
 	_da (pong_params).freq_maj	= 30;
 	_da (pong_params).freq_min	= 5;

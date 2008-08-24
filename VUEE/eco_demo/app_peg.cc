@@ -70,7 +70,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			host_id, local_host, tag_auditFreq,
 			host_pl, seconds(), master_delta, master_host,
 			agg_data.eslot == EE_AGG_MIN &&
-			  agg_data.ee.status == AGG_FF ?
+			  agg_data.ee.s.f.status == AGG_FF ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
 			mem, mmin);
 	} else {
@@ -489,7 +489,7 @@ __PUBLF (NodePeg, word, r_a_d) () {
 		goto Finish;
 	}
 
-	if (agg_dump->ee.status == 0xFF) {
+	if (agg_dump->ee.s.f.status == AGG_FF) {
 		if (agg_dump->fr <= agg_dump->to) {
 			goto Finish;
 		} else {
@@ -688,7 +688,7 @@ thread (root)
 
 	entry (RS_INIT)
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
-			diag (OPRE_APP_MENU_A "Error mode (D, E, F, Q)"
+			diag (OPRE_APP_MENU_A "Maintenance mode (D, E, F, Q)"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
@@ -818,6 +818,15 @@ thread (root)
 
 			agg_dump->ind = agg_dump->fr;
 			proceed (RS_DUMP);
+
+		case 'M':
+			if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
+				diag (OPRE_APP_ACK "Already in maintenance");
+				reset();
+			}
+			fatal_err (ERR_MAINT, (word)(seconds() >> 16),
+					(word)(seconds()), 0);
+			// will reset
 
 		case 'E':
 			if (ee_erase (WNONE, 0, 0))

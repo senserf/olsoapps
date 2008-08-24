@@ -23,14 +23,16 @@
 
 #define NUM_SENS	5
 
-#define AGG_FF		0xFF
-// not needed? #define AGG_IN_USE	0xFC
-#define AGG_COLLECTED	0xF8
-// not needed? #define AGG_CONFIRMED	0xF0
+#define AGG_FF		0xF
+// not needed? #define AGG_IN_USE	0xC
+#define AGG_COLLECTED	0x8
+// not needed? #define AGG_CONFIRMED	0x0
 
 #define ERR_EER		0xFFFE
 #define ERR_SLOT	0xFFFC
-// not needed? #define ERR_FULL	0xFFF8
+// _FULL may be needed for important data retention
+#define ERR_FULL	0xFFF8
+#define ERR_MAINT	0xFFF0
 
 typedef enum {
 	noTag, newTag, reportedTag, confirmedTag,
@@ -48,6 +50,15 @@ typedef union {
 		word f:1;
 	} hms;
 } mclock_t;
+
+typedef union {
+	byte b;
+	struct {
+		word emptym :1;
+		word spare  :3;
+		word status :4;
+	} f;
+} statu_t;
 
 typedef struct tagDataStruct {
 	word	id;
@@ -75,9 +86,9 @@ typedef struct wroomStruct {
 
 // wasteful on demo purpose
 typedef struct aggEEDataStruct {
-	word status:8; // 1st in ee slot
-	word spare:8;
-	word sval[NUM_SENS]; // aligned
+	statu_t s; // 1st byte in ee slot
+	word spare  :8;
+	word sval [NUM_SENS]; // aligned
 	lword ts;
 	lword t_ts;
 	lword t_eslot;
@@ -102,8 +113,35 @@ typedef struct aggDataStruct {
 	lword eslot;
 } aggDataType;
 
+/* app_flags definition [default]:
+bit 0: spare [0]
+bit 1: master chganged (in TARP) [0]
+bit 2: ee write collected [1]
+bit 3: ee write confirmed [0]
+bit 4: ee overwrite (cyclic stack) [1]
+bit 5: ee marker of empty slots [1]
+*/
+#define DEF_APP_FLAGS   0x34
+
 #define clr_master_chg	(app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)
+
+#define set_eew_coll	(app_flags |= 4)
+#define clr_eew_coll	(app_flags &= ~4)
+#define is_eew_coll	(app_flags & 4)
+
+#define set_eew_conf    (app_flags |= 8)
+#define clr_eew_conf    (app_flags &= ~8)
+#define is_eew_conf     (app_flags & 8)
+
+#define set_eew_over    (app_flags |= 16)
+#define clr_eew_over    (app_flags &= ~16)
+#define is_eew_over     (app_flags & 16)
+
+#define set_eem_empty   (app_flags |= 32)
+#define clr_eem_empty   (app_flags &= ~32)
+#define is_eem_empty    (app_flags & 32)
+#define ee_emptym	((app_flags >> 5) & 1)
 
 #define tag_lim	20
 #endif

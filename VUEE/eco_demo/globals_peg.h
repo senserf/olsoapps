@@ -32,7 +32,7 @@ char	*ui_ibuf	= NULL,
 	*cmd_line	= NULL;
 
 lword	master_delta		= 0;
-word	app_flags 		= 0;
+word	app_flags 		= DEF_APP_FLAGS;
 word	tag_auditFreq 		= 13;	// in seconds
 mclock_t master_clock		= {0};
 
@@ -65,6 +65,8 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 	OPRE_APP_MENU_A 
 	"\tDisplay data:\tD [ from [ to [ col_id [ limit ]]]]\r\n"
 	OPRE_APP_MENU_A 
+	"\tMainenance:\tM (*** No collection until F ***)\r\n"
+	OPRE_APP_MENU_A
 	"\tEprom erase:\tE (*** deletes aggregated data   ***)\r\n"
 	OPRE_APP_MENU_A 
 	"\tFlash erase:\tF (*** clears special conditions ***)\r\n"
@@ -104,7 +106,8 @@ static const char clock_str[] = OPRE_APP_T
 static const char rep_str[] = OPRE_APP_REP OMID_CR
 	"  Agg %u slot: %lu, %s: %u.%u:%u:%u" OMID_CR
 	"  Col %u slot: %lu, %s: %u.%u:%u:%u%s" OMID_CR
-	"  PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n";
+	"  " SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d, "
+	SENS3_DESC "%d, " SENS4_DESC "%d\r\n";
 
 static const char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";
@@ -114,7 +117,8 @@ static const char repNo_str[] = OPRE_APP_REP_NO
 
 static const char dump_str[] = OPRE_APP_DUMP_A OMID_CR
 	"Col %u slot %lu (A: %lu) %s: %u.%u:%u:%u (A %s: %u.%u:%u:%u)"
-	OMID_CR " PAR: %d, T: %d, H: %d, PD: %d, T2: %d\r\n";
+	OMID_CR " " SENS0_DESC "%d, " SENS1_DESC "%d, "
+	SENS2_DESC "%d, " SENS3_DESC "%d, " SENS4_DESC "%d\r\n";
 
 static const char dumpend_str[] = OPRE_APP_DEND_A
 	"Did coll %u slots %lu -> %lu upto %u #%lu\r\n";

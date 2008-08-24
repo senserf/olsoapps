@@ -11,12 +11,6 @@
 #include "board_pins.h"
 #include "sensors.h"
 #else
-#define	SENSOR_PAR	0
-#define SENSOR_TEMP	1
-#define SENSOR_HUMID	2
-#define SENSOR_PHOTO	3
-#define SENSOR_TEMPA	4
-#define	SENSOR_MOI	3
 #define SENSOR_LIST dupajas
 #endif
 
@@ -64,8 +58,11 @@ __PUBLF (NodeTag, void, fatal_err) (word err, word w1, word w2, word w3) {
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
 	if_write (IFLASH_SIZE -4, w3);
-	app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
-	halt();
+	if (err != ERR_MAINT) {
+		app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
+		halt();
+	}
+	reset();
 }
 
 // will go away when we can see processes from other files
@@ -97,7 +94,9 @@ __PUBLF (NodeTag, void, sens_init) () {
 	memset (&sens_data, 0, sizeof (sensDataType));
 	if (b == 0xFF) { // normal operations (empty eeprom)
 		sens_data.eslot = EE_SENS_MIN;
-		sens_data.ee.status = SENS_FF;
+		sens_data.ee.s.f.status = SENS_FF;
+		sens_data.ee.s.f.emptym = 1;
+		sens_data.ee.s.f.spare = 7;
 		return;
 	}
 
@@ -151,13 +150,13 @@ __PUBLF (NodeTag, void, init) () {
 }
 
 // little helper
-static const char * statusName (word s) {
-	switch (s) {
+static const char * statusName (statu_t s) {
+	switch (s.f.status) {
 		case SENS_CONFIRMED: 	return "CONFIRMED";
 		case SENS_COLLECTED: 	return "COLLECTED";
 		case SENS_IN_USE: 	return "IN_USE";
 		case SENS_FF: 		return "FFED";
-		case 0: 		return "ALL";
+		case SENS_ALL: 		return "ALL";
 	}
 	app_diag (D_SERIOUS, "unexpected eeprom %x", s);
 	return				"really ffed";
@@ -175,7 +174,7 @@ __PUBLF (NodeTag, word, r_a_d) () {
 		goto Finish; 
 	}
 
-	if (sens_dump->ee.status == 0xFF) {
+	if (sens_dump->ee.s.f.status == SENS_FF) {
 		if (sens_dump->fr <= sens_dump->to) {
 			goto Finish;
 		} else {
@@ -183,10 +182,10 @@ __PUBLF (NodeTag, word, r_a_d) () {
 		}
 	}
 
-	if (sens_dump->status == 0 ||
-			sens_dump->status == sens_dump->ee.status) {
+	if (sens_dump->s.f.status == SENS_ALL ||
+			sens_dump->s.f.status == sens_dump->ee.s.f.status) {
 		lbuf = form (NULL, dump_str,
-			statusName (sens_dump->ee.status), sens_dump->ind,
+			statusName (sens_dump->ee.s), sens_dump->ind,
 			((mclock_t *)&sens_dump->ee.ts)->hms.f ?
 				"time" : "ts",
 			((mclock_t *)&sens_dump->ee.ts)->hms.d,
@@ -233,7 +232,7 @@ ThatsIt:
 	sens_dump->dfin = 0; // just in case
 	lbuf = form (NULL, dumpend_str,
 			local_host, sens_dump->fr, sens_dump->to,
-			statusName (sens_dump->status), 
+			statusName (sens_dump->s), 
 			sens_dump->upto, sens_dump->cnt);
 
 	if (runstrand (oss_out, lbuf) == 0 ) {
@@ -255,7 +254,7 @@ __PUBLF (NodeTag, void, stats) () {
 			pong_params.rx_span, pong_params.pow_levels & 0x0F,
 			seconds(),
 			sens_data.eslot == EE_SENS_MIN &&
-			  sens_data.ee.status == SENS_FF ?
+			  sens_data.ee.s.f.status == SENS_FF ?
 			0 : sens_data.eslot - EE_SENS_MIN +1,
 			mem, mmin);
 	if (runstrand (oss_out, mbuf) == 0) {
@@ -430,7 +429,7 @@ thread (pong)
 
 		level = ((pong_params.pow_levels >> png_shift) & 0x000f);
 		// pong with this power if data collected (and not confirmed)
-		if (level > 0 && sens_data.ee.status == SENS_COLLECTED) {
+		if (level > 0 && sens_data.ee.s.f.status == SENS_COLLECTED) {
 			net_opt (PHYSOPT_TXON, NULL);
 			net_diag (D_DEBUG, "Tx on %x",
 					net_opt (PHYSOPT_STATUS, NULL));
@@ -461,8 +460,8 @@ thread (pong)
 
 			if (pong_params.pload_lev == 0 ||
 					level == pong_params.pload_lev) {
-				in_pong (png_frame, status) =
-					sens_data.ee.status;
+				in_pong (png_frame, pstatus) =
+					sens_data.ee.s.f.status;
 				memcpy (in_pongPload (png_frame, sval),
 						sens_data.ee.sval,
 						NUM_SENS << 1);
@@ -484,27 +483,47 @@ thread (pong)
 		} else {
 			if (level == 0)
 				app_diag (D_DEBUG, "skip level");
-			else if (sens_data.ee.status != SENS_CONFIRMED)
+			else if (sens_data.ee.s.f.status != SENS_CONFIRMED)
 				app_diag (D_DEBUG, "sens not ready %u",
-						sens_data.ee.status);
+						sens_data.ee.s.f.status);
 		}
+		powerdown();
 		delay (pong_params.freq_min << 10, PS_SEND1);
 		release;
 
 	entry (PS_SEND1)
-
+		powerup();
 		if ((png_shift += 4) < 16)
 			proceed (PS_SEND);
 
 		// << 2 is for 4 levels
 		lh_time = pong_params.freq_maj - (pong_params.freq_min << 2) -
-			(SENS_COLL_TIME >> 10);
+			(SENS_COLL_TIME >> 10) -1;
 
 		if (lh_time <= 0)
 			proceed (PS_SENS);
+		powerdown();
 
 	entry (PS_HOLD)
+#if 0
+	that was GLACIER:
+		while (lh_time != 0) {
+			if (lh_time > MAX_UINT) {
+				lh_time -= MAX_UINT;
+				freeze (MAX_UINT);
+			} else {
+				diag ("dupa %d %d", (word)seconds(),
+						(word)lh_time);
+				freeze ((word)lh_time);
+				diag ("jas %d", (word)seconds());
+				lh_time = 0;
+			}
+		}
+#endif
 		lhold (PS_HOLD, (lword *)&lh_time);
+		powerup();
+
+		// fall through
 
 	entry (PS_SENS)
 		if (running (sens)) {
@@ -529,7 +548,7 @@ thread (sens)
 
 	entry (SE_INIT)
 		leds (0, 1);
-		if (sens_data.ee.status != SENS_FF)
+		if (sens_data.ee.s.f.status != SENS_FF)
 			sens_data.eslot++;
 
 		if (sens_data.eslot >= EE_SENS_MAX) {
@@ -539,7 +558,7 @@ thread (sens)
 			app_diag (D_SERIOUS, "EEPROM FULL");
 		}
 
-		switch (sens_data.ee.status) {
+		switch (sens_data.ee.s.f.status) {
 			case SENS_IN_USE:
 				app_diag (D_SERIOUS, "Sens in use");
 				break;
@@ -547,50 +566,41 @@ thread (sens)
 				app_diag (D_INFO, "Not confirmed");
 				// fall through
 			default:
-				sens_data.ee.status = SENS_IN_USE;
+				sens_data.ee.s.f.status = SENS_IN_USE;
 		}
 
 		mc.sec = 0;
 		wall_time (&mc);
 		sens_data.ee.ts = mc.sec;
 #ifdef SENSOR_LIST
-	entry (SE_PAR)
-		read_sensor (SE_PAR, SENSOR_PAR, &sens_data.ee.sval[0]);
+	entry (SE_0)
+		read_sensor (SE_0, 0, &sens_data.ee.sval[0]);
 
-	entry (SE_TEMP)
-		read_sensor (SE_TEMP, SENSOR_TEMP,  &sens_data.ee.sval[1]);
+	entry (SE_1)
+		read_sensor (SE_1, 1,  &sens_data.ee.sval[1]);
 
-	entry (SE_HUMID)
-		read_sensor (SE_HUMID, SENSOR_HUMID,  &sens_data.ee.sval[2]);
+	entry (SE_2)
+		read_sensor (SE_2, 2,  &sens_data.ee.sval[2]);
 
-	entry (SE_PHOTO)
-		read_sensor (SE_PHOTO, SENSOR_MOI, &sens_data.ee.sval[3]);
+	entry (SE_3)
+		read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
 
-	entry (SE_TEMPA)
-		//read_sensor (SE_TEMPA, SENSOR_TEMPA, &sens_data.ee.sval[4]);
+	entry (SE_4)
+		//read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
 		sens_data.ee.sval[4]++;
 #else
 		app_diag (D_WARNING, "FAKE SENSORS");
-		// sensor 0 PAR
 		sens_data.ee.sval[0]++;
-
-		// sensor 1 T
 		sens_data.ee.sval[1]++;
-
-		// sensor 2 H
 		sens_data.ee.sval[2]++;
-
-		// sensor 3 PD
 		sens_data.ee.sval[3]++;
-
-		// sensor 4 T2
 		sens_data.ee.sval[4]++;
 
 		delay (SENS_COLL_TIME, SE_DONE);
 		release;
 #endif
 	entry (SE_DONE)
-		sens_data.ee.status = SENS_COLLECTED;
+		sens_data.ee.s.f.status = SENS_COLLECTED;
 
 		if (sens_data.eslot >= EE_SENS_MAX) {
 			sens_data.eslot = EE_SENS_MAX -1;
@@ -656,7 +666,7 @@ thread (root)
 
 	entry (RS_INIT)
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
-			diag (OPRE_APP_MENU_C "Error mode (D, E, F, Q)"
+			diag (OPRE_APP_MENU_C "Maintenance mode (D, E, F, Q)"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
@@ -750,16 +760,16 @@ thread (root)
 					&i1, &sens_dump->upto);
 			switch (i1) {
 				case 1:
-					sens_dump->status = SENS_CONFIRMED;
+					sens_dump->s.f.status = SENS_CONFIRMED;
 					break;
 				case 2:
-					sens_dump->status = SENS_COLLECTED;
+					sens_dump->s.f.status = SENS_COLLECTED;
 					break;
 				case 3:
-					sens_dump->status = SENS_IN_USE;
+					sens_dump->s.f.status = SENS_IN_USE;
 					break;
 				default: // including 0
-					sens_dump->status = 0;
+					sens_dump->s.f.status = SENS_ALL;
 			}
 
 			if (sens_dump->fr > sens_data.eslot)
@@ -771,6 +781,16 @@ thread (root)
 			sens_dump->ind = sens_dump->fr;
 
 			proceed (RS_DUMP);
+		}
+
+		if (cmd_line[0] == 'M') {
+			if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
+				diag (OPRE_APP_ACK "Already in maintenance");
+				reset();
+			}
+			fatal_err (ERR_MAINT, (word)(seconds() >> 16),
+					(word)(seconds()), 0);
+			// will reset
 		}
 
 		if (cmd_line[0] == 'E') { 

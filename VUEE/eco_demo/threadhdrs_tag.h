@@ -15,7 +15,7 @@ threadhdr (rcv, NodeTag) {
 
 threadhdr (sens, NodeTag) {
 
-	states { SE_INIT, SE_PAR, SE_TEMP, SE_HUMID, SE_PHOTO, SE_TEMPA,
+	states { SE_INIT, SE_0, SE_1, SE_2, SE_3, SE_4,
 	 	 SE_DONE };
 
 	perform;
@@ -76,11 +76,11 @@ int pong (word, address);
 // ========================================= sens
 
 #define SE_INIT		0
-#define SE_PAR		10
-#define SE_TEMP		20
-#define SE_HUMID	30
-#define SE_PHOTO	40
-#define SE_TEMPA	50
+#define SE_0		10
+#define SE_1		20
+#define SE_2		30
+#define SE_3		40
+#define SE_4		50
 #define SE_DONE		60
 
 // ========================================= rcv

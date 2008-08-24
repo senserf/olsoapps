@@ -44,7 +44,7 @@ typedef struct msgPongStruct {
 	word		level:4;
 	word		flags:4;
 	word		alrms:4;
-	word		status:4; // this should be in pload, but...
+	word		pstatus:4; // this should be in pload, but...
 	word		freq;
 } msgPongType;
 

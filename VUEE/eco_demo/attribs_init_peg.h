@@ -4,7 +4,7 @@
 	_da (cmd_line)		= NULL;
 
 	_da (host_id)		= (lword) preinit ("HID");
-	_da (app_flags)		= 0;
+	_da (app_flags)		= DEF_APP_FLAGS;
 
 	_da (master_delta)	= 0;
 	_da (host_pl)		= 7;

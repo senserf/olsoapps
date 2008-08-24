@@ -21,22 +21,24 @@
 #include "attnames_tag.h"
 
 __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
-	byte b;
+	statu_t b;
 
 	if (in_pongAck(buf, reftime) != 0) {
 		ref_clock.sec = in_pongAck(buf, reftime);
 		ref_time = seconds();
 	}
 
-	if (sens_data.ee.status = SENS_COLLECTED &&
+	if (sens_data.ee.s.f.status = SENS_COLLECTED &&
 			sens_data.ee.ts == in_pongAck(buf, ts)) {
 		leds (0, 0);
-		b = sens_data.ee.status = SENS_CONFIRMED;
+		b.f.status = sens_data.ee.s.f.status = SENS_CONFIRMED;
+		b.f.spare = 7;
+		b.f.emptym = 1;
 
 		if (sens_data.eslot == EE_SENS_MAX -1)
 			return; // don;t update the last slot: eeprom full
 
-		if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE, &b, 1)) {
+		if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE, &b.b, 1)) {
 			app_diag (D_SERIOUS, "ee upd failed %x %x",
 					(word)(sens_data.eslot >> 16),
 					(word)sens_data.eslot);
@@ -108,7 +110,8 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	in_statsTag(out_buf, ltime) = seconds();
 
 	// in_statsTag(out_buf, slot) is really # of entries
-	if (sens_data.eslot == EE_SENS_MIN && sens_data.ee.status == SENS_FF)
+	if (sens_data.eslot == EE_SENS_MIN &&
+			sens_data.ee.s.f.status == SENS_FF)
 		in_statsTag(out_buf, slot) = 0;
 	else
 		in_statsTag(out_buf, slot) = sens_data.eslot -

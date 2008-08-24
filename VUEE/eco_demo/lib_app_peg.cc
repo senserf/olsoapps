@@ -393,10 +393,12 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 __PUBLF (NodePeg, void, write_agg) (char * buf) {
 	mclock_t mc;
 
-	if (agg_data.ee.status != AGG_FF)
+	if (agg_data.ee.s.f.status != AGG_FF)
 		agg_data.eslot++;
 
-	agg_data.ee.status = AGG_COLLECTED;
+	agg_data.ee.s.f.status = AGG_COLLECTED;
+	agg_data.ee.s.f.emptym = 1;
+	agg_data.ee.s.f.spare = 7;
 	agg_data.ee.sval[0] = in_pongPload(buf, sval[0]);
 	agg_data.ee.sval[1] = in_pongPload(buf, sval[1]);
 	agg_data.ee.sval[2] = in_pongPload(buf, sval[2]);
@@ -471,7 +473,9 @@ __PUBLF (NodePeg, void, agg_init) () {
 
 	if (b == 0xFF) { // normal operations
 		agg_data.eslot = EE_AGG_MIN;
-		agg_data.ee.status = AGG_FF;
+		agg_data.ee.s.f.status = AGG_FF;
+		agg_data.ee.s.f.emptym = 1;
+		agg_data.ee.s.f.spare = 7;
 		return;
 	}
 
@@ -523,6 +527,9 @@ __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
 	if_write (IFLASH_SIZE -4, w3);
-	app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
-	halt();
+	if (err != ERR_MAINT) {
+		app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
+		halt();
+	}
+	reset();
 }
