@@ -77,7 +77,7 @@ thread (root)
 
 	p [0] = 0;
 	p [1] = 1024;
-	scan (ibuf + 1, "%u", p+0);
+	scan (ibuf + 1, "%u %u", p+0, p+1);
 
   entry (RS_CSEN+1)
 
