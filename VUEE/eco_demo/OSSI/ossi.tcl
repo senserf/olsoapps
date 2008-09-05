@@ -3,12 +3,16 @@
 exec tclsh "$0" "$@"
 
 ##################################################################
-# A simple OSS module for ECO DEMO                               #
+# The OSS module for ECO DEMO                                    #
 #                                                                #
 # Copyright (C) Olsonet Communications, 2008 All Rights Reserved #
 ##################################################################
 
-package require mysqltcl
+if [catch { package require mysqltcl } ] {
+	set SQL_present 0
+} else {
+	set SQL_present 1
+}
 
 set	Log(MAXSIZE)		5000000
 set	Log(MAXVERS)		4
@@ -394,7 +398,7 @@ proc data_out_db { cid lab val } {
 
 	global DBFlag Time DBASE
 
-	if { $DBFlag == "" } {
+	if { $DBFlag != "Y" } {
 		# no external database
 		return
 	}
@@ -887,6 +891,7 @@ proc read_map { } {
 	global Nodes		;# the array of all nodes
 	global OSSI		;# OSSI aggregator node (ID)
 	global DBASE		;# database parameters
+	global OPERATOR
 
 	if [catch { file mtime $Files(SMAP) } ix] {
 		smerr "cannot stat map file $Files(SMAP): $ix"
@@ -966,12 +971,15 @@ proc read_map { } {
 		}
 		set fr [sxml_attr $c "frequency"]
 		if { $fr != "" } {
-			# it can be empty, in which case the node inherits
-			# the frequency of its aggregator
 			if [napin fr] {
 				smerr "illegal frequency in collector $ix"
 				return 0
 			}
+		} else {
+			# this gives us something to send if we don't know the
+			# aggregator and also tells us that we should inherit
+			# the aggregator's report frequency
+			set fr -1
 		}
 		set xs [sxml_attr $c "rxspan"]
 		if { $xs != "" } {
@@ -1186,6 +1194,13 @@ proc read_map { } {
 				$m]] end]
 		}
 	}
+
+	# the operator (more to come later) ###################################
+
+	set em ""
+	foreach cv [sxml_children [sxml_child $sm "operator"] "email"] {
+		lappend em [sxml_txt $cv]
+	}
 			
 	# hot swap the tables #################################################
 
@@ -1198,9 +1213,13 @@ proc read_map { } {
 	array unset SBN
 	array unset Nodes
 	array unset DBASE
+	array unset OPERATOR
 
 	foreach no [array names nodes] {
 		set Nodes($no) $nodes($no)
+		# Initialize report times/intervals
+		set Nodes($no,RT) $Time
+		set Nodes($no,RI) 0
 	}
 
 	foreach no [array names sbn] {
@@ -1211,9 +1230,14 @@ proc read_map { } {
 		set DBASE($no) $dbase($no)
 	}
 
-	msg "[llength $Aggregators] aggregators,\
+	set OPERATOR(email) $em
+
+	set oms "[llength $Aggregators] aggregators,\
 		[llength $Collectors] collectors, [llength $Sensors] sensors,\
 			[llength $Converters] snippets"
+	msg $oms
+
+	operator_alert "OSSI daemon reset: $oms"
 
 	return 1
 }
@@ -1364,7 +1388,71 @@ proc assoc_agg { ag co } {
 	}
 }
 
-###############################################################################
+proc get_rep_freq { no } {
+#
+# Return the target reporting frequency for the indicated node (agg or col)
+#
+	global Nodes
+
+	if ![info exists Nodes($no)] {
+		# cannot happen
+		return -1
+	}
+
+	set node $Nodes($no)
+	set fr [lindex [lindex $node 2] 1]
+	if { $fr == "" } {
+		# cannot happen
+		set fr -1
+	}
+	if { [lindex $node 0] == "a" } {
+		return $fr
+	}
+
+	# the collector case
+	if { $fr != -1 } {
+		# specifies own frequency
+		return $fr
+	}
+
+	# look at the associated aggregator
+	set no [get_assoc_agg $no]
+	if { $no == "" } {
+		# no way
+		return -1
+	}
+
+	if ![info exists Nodes($no)] {
+		return -1
+	}
+
+	set node $Nodes($no)
+	set fr [lindex [lindex $node 2] 1]
+	if { $fr == "" } {
+		set fr -1
+	}
+
+	return $fr
+}
+
+proc update_report_interval { no } {
+#
+# Updates the report time, which is used to detect dead nodes as well as their
+# compliance with the declared report frequency
+#
+	global Nodes Time
+
+	if [catch { expr $Time - $Nodes($no,RT) } delta] {
+		set delta 0
+	}
+	set Nodes($no,RI) $delta
+	set Nodes($no,RT) $Time
+	if [info exists Nodes($no,AP)] {
+		# clear pending alert flag
+		unset Nodes($no,AP)
+		operator_alert "Node $no is back"
+	}
+}
 
 proc input_line { inp } {
 #
@@ -1573,6 +1661,9 @@ proc input_avrp { inp } {
 		return
 	}
 
+	# update the aggregator's report interval
+	update_report_interval $aid
+
 	# dynamic parameters; for now, we only store the slot number
 
 	set dp [lindex $ag 3]
@@ -1600,6 +1691,9 @@ proc input_avrp { inp } {
 		roster_schedule "cmd_cpoll $cid" [iran 10] 240
 		return
 	}
+
+	# update collector report interval
+	update_report_interval $cid
 
 	# dynamic parameters
 	set dp [lindex $co 3]
@@ -1778,6 +1872,68 @@ proc external_command { } {
 	catch { file delete -force $Files(ECMD) }
 }
 
+proc report_interval_monitor { } {
+#
+# Monitors reporting intervals and alerts the operator to dead nodes
+#
+	global Nodes Aggregators Collectors Time
+
+	foreach no $Aggregators {
+		if [info exists Nodes($no,AP)] {
+			# alert already issued
+			continue
+		}
+		if [catch { expr $Time - $Nodes($no,RT) } delta] {
+			# impossible
+			set Nodes($no,RT) $Time
+			continue
+		}
+		if { $delta > 1800 } {
+			# 30 minutes
+			set Nodes($no,AP) ""
+			operator_alert \
+				"Aggregator $no hasn't reported for 30 minutes"
+		}
+	}
+	
+	foreach no $Collectors {
+		if [info exists Nodes($no,AP)] {
+			# alert already issued
+			continue
+		}
+		if [catch { expr $Time - $Nodes($no,RT) } delta] {
+			# impossible
+			set Nodes($no,RT) $Time
+			continue
+		}
+		if { $delta > 3600 } {
+			# one hour
+			set Nodes($no,AP) ""
+			operator_alert \
+				"Collector $no hasn't reported for one hour"
+		}
+	}
+}
+
+proc operator_alert { msg } {
+#
+# Sends an alert to the operator
+#
+	global OPERATOR
+
+	log "Operator alert: $msg"
+	append msg "\n"
+
+	if [info exists OPERATOR(email)] {
+		foreach em $OPERATOR(email) {
+			catch {
+				log "sending email to $em"
+				exec mail -s "EcoNet Alert" $em << "$msg"
+			}
+		}
+	}
+}
+			
 ###############################################################################
 
 #
@@ -1874,7 +2030,7 @@ proc roster_init { } {
 	# reconfiguration, so do not assume anything
 	set Roster ""
 
-	# make sure our node is the master; repeat at 10 sec intervals until
+	# make sure our node is the master; repeat at 30 sec intervals until
 	# confirmed
 	roster_schedule "cmd_master" "" 30
 
@@ -1888,6 +2044,9 @@ proc roster_init { } {
 		roster_schedule "cmd_cpoll $co" $tm 60
 		incr tm 10
 	}
+
+	# report interval monitor
+	roster_schedule "report_interval_monitor" 60 300
 }
 
 ###############################################################################
@@ -2077,7 +2236,12 @@ while { $argv != "" } {
 		if { $DBFlag != "" } {
 			bad_usage
 		}
-		set DBFlag "Y"
+		if { !$SQL_present } {
+			puts "No SQL available, -x option ignored"
+			set DBFlag "N"
+		} else {
+			set DBFlag "Y"
+		}
 		continue
 	}
 

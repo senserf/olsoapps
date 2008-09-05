@@ -58,13 +58,22 @@
 			set value 100.0
 		}
 	</snippet>
-	<snippet sensors="DIO">
-		set value [expr $value * 0.005]
+	<snippet sensors="E05">
+		set value [expr $value * 0.09246 - 40.1]
+		if { $value < 0.0 } {
+			set value 0.0
+		} elseif { $value > 100.0 } {
+			set value 100.0
+		}
 	</snippet>
-	<snippet sensors="TMB">
-		set value [expr ($value - 2048) / 16.0]
+	<snippet sensors="E20">
+		set value [expr $value * 0.0532 - 26.0]
+		if { $value < 0.0 } {
+			set value 0.0
+		} elseif { $value > 100.0 } {
+			set value 100.0
+		}
 	</snippet>
-
     </converters>
 
     <database name="econet">
@@ -74,6 +83,10 @@
 	<sensormap> T=1 H=2 PD=3 PAR=4 </sensormap>
     </database>
 
+    <operator>
+	<email>pawel@cs.ualberta.ca</email>
+    </operator>
+
     <sensors>
 
 	<!-- Values in text are for emulation -->
@@ -81,45 +94,28 @@
 	<sensor name="PAR 128" label="PAR" node="128" emu="0/0-1024"></sensor>
 	<sensor name="TMP 128" label="T" node="128" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 128" label="H" node="128" emu="2/1000-3000"></sensor>
-	<sensor name="DIO 128" label="PD" node="128" emu="3/0-2000"></sensor>
 
 	<sensor name="PAR 129" label="PAR" node="129" emu="0/0-1024"></sensor>
 	<sensor name="TMP 129" label="T" node="129" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 129" label="H" node="129" emu="2/1000-3000"></sensor>
-	<sensor name="DIO 129" label="PD" node="129" emu="3/0-2000"></sensor>
 
-
-	<!-- The rest of these nodes are the same: -->
-	<!-- 2 temperature, 1 humidity, 1 photo diode -->
-	<!--<sensor name="TMP 130" label="T" node="130" emu="1/5500-6500"></sensor>-->
-	<!--<sensor name="HUM 130" label="H" node="130" emu="2/1000-3000"></sensor>-->
-	<!--<sensor name="DIO 130" label="PD" node="130" emu="3/0-2000"></sensor>-->
-	<!--<sensor name="TMB 130" label="T2" node="130" emu="4/2300-2500"></sensor>-->
 
 	<sensor name="TMP 131" label="T" node="131" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 131" label="H" node="131" emu="2/1000-3000"></sensor>
-	<sensor name="DIO 131" label="PD" node="131" emu="3/0-2000"></sensor>
-	<sensor name="TMB 131" label="T2" node="131" emu="4/2300-2500"></sensor>
 
 	<!--<sensor name="TMP 132" label="T" node="132" emu="1/5500-6500"></sensor>-->
 	<!--<sensor name="HUM 132" label="H" node="132" emu="2/1000-3000"></sensor>-->
-	<!--<sensor name="DIO 132" label="PD" node="132" emu="3/0-2000"></sensor>-->
-	<!--<sensor name="TMB 132" label="T2" node="132" emu="4/2300-2500"></sensor>-->
 
 	<sensor name="TMP 133" label="T" node="133" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 133" label="H" node="133" emu="2/1000-3000"></sensor>
-	<sensor name="DIO 133" label="PD" node="133" emu="3/0-2000"></sensor>
-	<sensor name="TMB 133" label="T2" node="133" emu="4/2300-2500"></sensor>
 
 	<sensor name="TMP 134" label="T" node="134" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 134" label="H" node="134" emu="2/1000-3000"></sensor>
-	<sensor name="DIO 134" label="PD" node="134" emu="3/0-2000"></sensor>
-	<sensor name="TMB 134" label="T2" node="134" emu="4/2300-2500"></sensor>
+	<sensor name="E05 134" label="PD" node="134" emu="3/0-2000"></sensor>
 
 	<sensor name="TMP 135" label="T" node="135" emu="1/5500-6500"></sensor>
 	<sensor name="HUM 135" label="H" node="135" emu="2/1000-3000"></sensor>
-	<sensor name="DIO 135" label="PD" node="135" emu="3/0-2000"></sensor>
-	<sensor name="TMB 135" label="T2" node="135" emu="4/2300-2500"></sensor>
+	<sensor name="E20 135" label="PD" node="135" emu="3/0-2000"></sensor>
     </sensors>
 
 </map>

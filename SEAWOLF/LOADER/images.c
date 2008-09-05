@@ -791,6 +791,7 @@ static Boolean img_cnk_rcp (word st, address packet) {
 			if (cn != 0)
 				// Just ignore
 				return YES;
+			return NO;
 		}
 
 		// The chunk number

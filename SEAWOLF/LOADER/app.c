@@ -661,7 +661,7 @@ EPBTIF:
 
     entry (LI_SEND_CH)
 
-	// Send the requested chunks
+	// Send the requested chunks (FIXME: FUN_CNK_SND advances!!!)
 	wsc = FUN_CNK_SND (NULL);
 	if (wsc) {
 		PACKET = tcv_wnp (LI_SEND_CH, MYFD, PSIZE_CHK + 2 + wsc);
@@ -884,7 +884,7 @@ LI_get_ig:
     entry (LI_GET_EM)
 
 	// Null GO packet
-	PACKET = tcv_wnp (LI_GET_CH, MYFD, PSIZE_GO);
+	PACKET = tcv_wnp (LI_GET_EM, MYFD, PSIZE_GO);
 	PACKET [0] = MyLink;
 	cmd = PT_GO;
 	put1 (PACKET, cmd);
