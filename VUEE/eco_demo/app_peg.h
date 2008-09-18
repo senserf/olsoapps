@@ -18,8 +18,8 @@
 #include "msg_structs_peg.h"
 
 #define EE_AGG_SIZE	sizeof(aggEEDataType)
-#define EE_AGG_MAX	(ee_size (NULL, NULL) / EE_AGG_SIZE -1)
-#define EE_AGG_MIN	0
+#define EE_AGG_MAX	(lword)(ee_size (NULL, NULL) / EE_AGG_SIZE -1)
+#define EE_AGG_MIN	0L
 // test: #define EE_AGG_MIN (EE_AGG_MAX -8)
 
 #define NUM_SENS	5

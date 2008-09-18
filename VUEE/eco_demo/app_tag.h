@@ -15,8 +15,8 @@
 #include "msg_tarp.h"
 
 #define EE_SENS_SIZE	sizeof(sensEEDataType)
-#define EE_SENS_MAX	(ee_size (NULL, NULL) / EE_SENS_SIZE -1)
-#define EE_SENS_MIN	0
+#define EE_SENS_MAX	(lword)(ee_size (NULL, NULL) / EE_SENS_SIZE -1)
+#define EE_SENS_MIN	0L
 //test: #define EE_SENS_MIN (EE_SENS_MAX - 4)
 
 // check what it really is
