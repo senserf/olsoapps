@@ -52,8 +52,9 @@ void    _da (msg_setPeg_in) (char * buf);
 
 void 	_da (oss_findTag_in) (word state, nid_t tag, nid_t peg);
 void 	_da (oss_setTag_in) (word state, word tag, nid_t peg,
-		word in_maj, word in_min, word in_span, word in_pl);
-void 	_da (oss_setPeg_in) (word state, nid_t peg, word audi, word pl);
+		word maj, word min, word span, word pl, word c_fl);
+void 	_da (oss_setPeg_in) (word state, nid_t peg, word audi, word pl,
+	       	word a_fl);
 void 	_da (oss_master_in) (word state, nid_t peg);
 void 	_da (oss_report_out) (char * buf);
 
@@ -61,8 +62,9 @@ void 	_da (send_msg) (char * buf, int size);
 
 void	_da (agg_init) (void);
 void	_da (fatal_err) (word err, word w1, word w2, word w3);
-void	_da (write_agg) (char *);
+void	_da (write_agg) (word ti);
 word	_da (r_a_d) (void);
+word	_da (handle_a_flags) (word a_fl);
 void	_da (tmpcrap) (word);
 
 // Expected by NET and TARP

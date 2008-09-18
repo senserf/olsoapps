@@ -175,6 +175,9 @@ __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
 	tagArray[i].lastTime = seconds();
 	if (updEvTime)
 		tagArray[i].evTime = tagArray[i].lastTime;
+
+	if (is_eew_conf && state == confirmedTag)
+		write_agg (i);
 }
 
 __PUBLF (NodePeg, int, insert_tag) (word tag) {
@@ -390,26 +393,25 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 	return (size - expSize);
 }
 
-__PUBLF (NodePeg, void, write_agg) (char * buf) {
-	mclock_t mc;
+__PUBLF (NodePeg, void, write_agg) (word ti) {
 
 	if (agg_data.ee.s.f.status != AGG_FF)
 		agg_data.eslot++;
 
-	agg_data.ee.s.f.status = AGG_COLLECTED;
-	agg_data.ee.s.f.emptym = 1;
+	agg_data.ee.s.f.status = tagArray[ti].state == confirmedTag ?
+		AGG_CONFIRMED : AGG_COLLECTED;
+	agg_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 	agg_data.ee.s.f.spare = 7;
-	agg_data.ee.sval[0] = in_pongPload(buf, sval[0]);
-	agg_data.ee.sval[1] = in_pongPload(buf, sval[1]);
-	agg_data.ee.sval[2] = in_pongPload(buf, sval[2]);
-	agg_data.ee.sval[3] = in_pongPload(buf, sval[3]);
-	agg_data.ee.sval[4] = in_pongPload(buf, sval[4]);
-	mc.sec = 0;
-	wall_time (&mc);
-	agg_data.ee.ts = mc.sec;
-	agg_data.ee.t_ts = in_pongPload(buf, ts);
-	agg_data.ee.t_eslot = in_pongPload(buf, eslot);
-	agg_data.ee.tag = in_header(buf, snd);
+	agg_data.ee.sval[0] = tagArray[ti].rpload.ppload.sval[0];
+	agg_data.ee.sval[1] = tagArray[ti].rpload.ppload.sval[1];
+	agg_data.ee.sval[2] = tagArray[ti].rpload.ppload.sval[2];
+	agg_data.ee.sval[3] = tagArray[ti].rpload.ppload.sval[3];
+	agg_data.ee.sval[4] = tagArray[ti].rpload.ppload.sval[4];
+
+	agg_data.ee.ts = tagArray[ti].rpload.ts;
+	agg_data.ee.t_ts = tagArray[ti].rpload.ppload.ts;
+	agg_data.ee.t_eslot = tagArray[ti].rpload.ppload.eslot;
+	agg_data.ee.tag = tagArray[ti].id;
 
 	if (agg_data.eslot >= EE_AGG_MAX) {
 		agg_data.eslot = EE_AGG_MAX -1;
@@ -422,7 +424,7 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 			app_diag (D_SERIOUS, "ee_write failed %x %x",
 				(word)(agg_data.eslot >> 16),
 				(word)agg_data.eslot);
-			agg_data.eslot--;
+			agg_data.ee.s.f.status = AGG_FF;
 		}
 	}
 }
@@ -437,28 +439,34 @@ __PUBLF (NodePeg, void, write_agg) (char * buf) {
 __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 	mclock_t mc;
 
-	if (in_pong_pload(buf)) {
-		pong_ack.header.rcv = in_header(buf, snd);
-		pong_ack.header.hco = in_header(buf, hoc);
-		pong_ack.ts = in_pongPload(buf, ts);
+	mc.sec = 0;
+	if (master_delta != 0) // do NOT send down your own clock
+		wall_time (&mc);
 
-		if (master_delta == 0) { // do NOT send down your own clock
-			pong_ack.reftime = 0;
-		} else {
-			mc.sec = 0;
-			wall_time (&mc);
-			pong_ack.reftime = mc.sec;
-		}
-		
-		send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
-	}
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) ==
-		       in_header(buf, snd)) {
-		if (seconds() - msg4tag.tstamp <= 77) // do it
-			send_msg (msg4tag.buf, sizeof(msgSetTagType));
+		       in_header(buf, snd)) { // msg waiting
+
+		if (in_pong_pload(buf)) { // add ack data
+			in_setTag(msg4tag.buf, ts) = in_pongPload(buf, ts);
+			in_setTag(msg4tag.buf, reftime) = mc.sec;
+		} else {
+			in_setTag(msg4tag.buf, reftime) = 0;
+			in_setTag(msg4tag.buf, ts) = 0; 
+		}
+
+		send_msg (msg4tag.buf, sizeof(msgSetTagType));
 		ufree (msg4tag.buf);
 		msg4tag.buf = NULL;
 		msg4tag.tstamp = 0;
+
+	} else { // no msg waiting; send ack
+		if (in_pong_pload(buf)) {
+			pong_ack.header.rcv = in_header(buf, snd);
+			pong_ack.header.hco = in_header(buf, hoc);
+			pong_ack.ts = in_pongPload(buf, ts);
+			pong_ack.reftime = mc.sec;
+			send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
+		}
 	}
 }
 
@@ -474,7 +482,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 	if (b == 0xFF) { // normal operations
 		agg_data.eslot = EE_AGG_MIN;
 		agg_data.ee.s.f.status = AGG_FF;
-		agg_data.ee.s.f.emptym = 1;
+		agg_data.ee.s.f.emptym = is_eem_empty ? 1 : 0;
 		agg_data.ee.s.f.spare = 7;
 		return;
 	}
@@ -533,3 +541,27 @@ __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
 	}
 	reset();
 }
+
+__PUBLF (NodePeg, word, handle_a_flags) (word a_fl) {
+	if (a_fl != 0xFFFF) {
+		if (a_fl & A_FL_EEW_COLL) 
+			set_eew_coll;
+		else
+			clr_eew_coll;
+
+		if (a_fl & A_FL_EEW_CONF)
+			set_eew_conf;
+		else
+			clr_eew_conf;
+
+		if (a_fl & A_FL_EEW_OVER)
+			set_eew_over;
+		else
+			clr_eew_over;
+	}
+
+	return (is_eew_over ? A_FL_EEW_OVER : 0) |
+	       (is_eew_conf ? A_FL_EEW_CONF : 0) |
+	       (is_eew_coll ? A_FL_EEW_COLL : 0);
+}
+

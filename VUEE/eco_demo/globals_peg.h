@@ -55,17 +55,18 @@ aggEEDumpType	*agg_dump = NULL;
 #include "oss_fmt.h"
 
 // These are static const and can thus be shared
+static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_A 
 	"***EcoNet***" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
-	"\tAgg set / show:\ta id [ audit_freq [ p_lev ]\r\n"
+	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
 	"\tMaster Time:\tT [ h:m:s ]\r\n"
 	OPRE_APP_MENU_A 
 	"\tDisplay data:\tD [ from [ to [ col_id [ limit ]]]]\r\n"
 	OPRE_APP_MENU_A 
-	"\tMainenance:\tM (*** No collection until F ***)\r\n"
+	"\tMaintenance:\tM (*** No collection until F     ***)\r\n"
 	OPRE_APP_MENU_A
 	"\tEprom erase:\tE (*** deletes aggregated data   ***)\r\n"
 	OPRE_APP_MENU_A 
@@ -80,7 +81,7 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 	"\tSend master msg\tm [ peg ]" OMID_CR "\r\n"
 	OPRE_APP_MENU_A 
 	"\tCol set / show:\tc id agg_id [ Maj_freq [ min_freq [ rx_span "
-	"[ hex:pl ]]]]\r\n"
+	"[ hex:pl [ hex:c_fl]]]]]\r\n"
 	OPRE_APP_MENU_A 
 	"\tFind collector:\tf col_id [ agg_id ]]\r\n";
 
@@ -89,12 +90,12 @@ static const char ill_str[] =	OPRE_APP_ILL
 
 static const char stats_str[] = OPRE_APP_STATS_A 
 	"Stats for agg (%lx: %u):" OMID_CR
-	" Audit freq %u PLev %u Uptime %lu Mdelta %ld Master %u" OMID_CR
+	" Audit freq %u PLev %u a_fl %x Uptime %lu Mdelta %ld Master %u" OMID_CR
 	" Stored entries %lu Mem free %u min %u\r\n";
 
 static const char statsCol_str[] = OPRE_APP_STATS_CA
 	"Stats for coll (%lx: %u) via %u:" OMID_CR
-	" Maj_freq %u min_freq %u rx_span %u pl %u" OMID_CR
+	" Maj_freq %u min_freq %u rx_span %u pl %x c_fl %x" OMID_CR
 	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
 
 static const char bad_str[] = 	OPRE_APP_BAD 

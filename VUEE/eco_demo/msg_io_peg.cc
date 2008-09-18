@@ -185,6 +185,7 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 	in_statsPeg(out_buf, mhost) = master_host;
 	in_statsPeg(out_buf, mem) = mem;
 	in_statsPeg(out_buf, mmin) = mmin;
+	in_statsPeg(out_buf, a_fl) = handle_a_flags (in_setPeg(buf, a_fl));
 	send_msg (out_buf, sizeof(msgStatsPegType));
 	ufree (out_buf);
 }
@@ -276,9 +277,12 @@ __PUBLF (NodePeg, void, msg_master_out) (word state, char** buf_out,
 
 __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 	char * out_buf = NULL; // is static needed / better here? (state)
-	int tagIndex;
+	sint tagIndex;
+	mclock_t mc;
 
 	app_diag (D_DEBUG, "Pong %u", in_header(buf, snd));
+	mc.sec = 0;
+	wall_time (&mc);
 
 	if ((tagIndex = find_tags (in_header(buf, snd), 0)) < 0) { // not found
 
@@ -296,13 +300,13 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 		if (!in_pong_pload(buf))
 			return;
 
-		write_agg (buf);
-
 		memcpy (&tagArray[tagIndex].rpload.ppload, 
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
-		tagArray[tagIndex].rpload.ts = agg_data.ee.ts;
+		tagArray[tagIndex].rpload.ts = mc.sec;
 		tagArray[tagIndex].rpload.eslot = agg_data.eslot;
+		if (agg_data.ee.s.f.status != AGG_FF)
+			tagArray[tagIndex].rpload.eslot++;
 
 	} else {
 		if (in_pong_rxperm(buf))
@@ -316,12 +320,18 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 
 		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ts !=
 				in_pongPload(buf, ts)) {
-			write_agg (buf);
+
+			if (is_eew_coll &&
+				       	tagArray[tagIndex].state == reportedTag)
+				write_agg ((word)tagIndex);
+
 			memcpy (&tagArray[tagIndex].rpload.ppload,
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
-			tagArray[tagIndex].rpload.ts = agg_data.ee.ts;
+			tagArray[tagIndex].rpload.ts = mc.sec;
 			tagArray[tagIndex].rpload.eslot = agg_data.eslot;
+			if (agg_data.ee.s.f.status != AGG_FF)
+				tagArray[tagIndex].rpload.eslot++;
 			set_tagState (tagIndex, newTag, YES);
 		}
 	}

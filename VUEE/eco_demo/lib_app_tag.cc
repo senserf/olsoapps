@@ -146,3 +146,27 @@ __PUBLF (NodeTag, void, wall_time) (mclock_t *mc) {
 	mc->hms.f = ref_clock.hms.f;
 }
 
+__PUBLF (NodeTag, word, handle_c_flags) (word c_fl) {
+
+	if (c_fl != 0xFFFF) {
+		if (c_fl & C_FL_EEW_COLL)
+			set_eew_coll;
+		else
+			clr_eew_coll;
+
+		if (c_fl & C_FL_EEW_CONF)
+			set_eew_conf;
+		else
+			clr_eew_conf;
+
+		if (c_fl & C_FL_EEW_OVER)
+			set_eew_over;
+		else
+			clr_eew_over;
+	}
+
+	return (is_eew_over ? C_FL_EEW_OVER : 0) |
+	       (is_eew_conf ? C_FL_EEW_CONF : 0) |
+	       (is_eew_coll ? C_FL_EEW_COLL : 0);
+}
+

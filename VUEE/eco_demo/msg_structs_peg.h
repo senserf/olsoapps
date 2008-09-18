@@ -60,6 +60,7 @@ typedef struct msgSetPegStruct {
 	headerType      header;
 	word		audi;
 	word		level;
+	word		a_fl;
 } msgSetPegType;
 
 #define in_setPeg(buf, field)	(((msgSetPegType *)(buf))->field)
@@ -75,7 +76,7 @@ typedef struct msgStatsPegStruct {
 	word		mhost;
 	word		mem;
 	word		mmin;
-	word		spare;
+	word		a_fl;
 } msgStatsPegType;
 
 #define in_statsPeg(buf, field)   (((msgStatsPegType *)(buf))->field)

@@ -12,6 +12,8 @@
 #include "sensors.h"
 #else
 #define SENSOR_LIST dupajas
+#define powerdown() 	diag ("pdown");
+#define powerup()	diag ("pup");
 #endif
 
 // elsewhere may be a better place for this:
@@ -95,7 +97,7 @@ __PUBLF (NodeTag, void, sens_init) () {
 	if (b == 0xFF) { // normal operations (empty eeprom)
 		sens_data.eslot = EE_SENS_MIN;
 		sens_data.ee.s.f.status = SENS_FF;
-		sens_data.ee.s.f.emptym = 1;
+		sens_data.ee.s.f.emptym = ee_emptym ? 1 : 0;
 		sens_data.ee.s.f.spare = 7;
 		return;
 	}
@@ -133,11 +135,19 @@ __PUBLF (NodeTag, void, sens_init) () {
 		}
 	} else
 		sens_data.eslot = u;
+
+	// collectors start sensing 1st, so don't read and point at 1st empty
+	sens_data.eslot++;
+	sens_data.ee.s.f.status = SENS_FF;
+	sens_data.ee.s.f.emptym = ee_emptym ? 1 : 0;
+	sens_data.ee.s.f.spare = 7;
+#if 0
 	if (ee_read (sens_data.eslot * EE_SENS_SIZE, (byte *)&sens_data.ee,
 			EE_SENS_SIZE))
 		fatal_err (ERR_EER,
 			(word)((sens_data.eslot * EE_SENS_SIZE) >> 16),
 			(word)(sens_data.eslot * EE_SENS_SIZE), EE_SENS_SIZE);
+#endif
 }
 
 
@@ -251,8 +261,8 @@ __PUBLF (NodeTag, void, stats) () {
 	mbuf = form (NULL, stats_str,
 			host_id, local_host, 
 			pong_params.freq_maj, pong_params.freq_min,
-			pong_params.rx_span, pong_params.pow_levels & 0x0F,
-			seconds(),
+			pong_params.rx_span, pong_params.pow_levels,
+			handle_c_flags (0xFFFF), seconds(),
 			sens_data.eslot == EE_SENS_MIN &&
 			  sens_data.ee.s.f.status == SENS_FF ?
 			0 : sens_data.eslot - EE_SENS_MIN +1,
@@ -487,22 +497,22 @@ thread (pong)
 				app_diag (D_DEBUG, "sens not ready %u",
 						sens_data.ee.s.f.status);
 		}
-		powerdown();
+		//powerdown();
 		delay (pong_params.freq_min << 10, PS_SEND1);
 		release;
 
 	entry (PS_SEND1)
-		powerup();
+		//powerup();
 		if ((png_shift += 4) < 16)
 			proceed (PS_SEND);
 
 		// << 2 is for 4 levels
-		lh_time = pong_params.freq_maj - (pong_params.freq_min << 2) -
-			(SENS_COLL_TIME >> 10) -1;
+		lh_time = (long)pong_params.freq_maj -
+	       		(pong_params.freq_min << 2) - (SENS_COLL_TIME >> 10) -1;
 
 		if (lh_time <= 0)
 			proceed (PS_SENS);
-		powerdown();
+		//powerdown();
 
 	entry (PS_HOLD)
 #if 0
@@ -521,7 +531,7 @@ thread (pong)
 		}
 #endif
 		lhold (PS_HOLD, (lword *)&lh_time);
-		powerup();
+		//powerup();
 
 		// fall through
 
@@ -547,28 +557,40 @@ thread (sens)
 	mclock_t mc;
 
 	entry (SE_INIT)
+		powerup();
 		leds (0, 1);
-		if (sens_data.ee.s.f.status != SENS_FF)
-			sens_data.eslot++;
-
-		if (sens_data.eslot >= EE_SENS_MAX) {
-			// not now, if ever
-			// fatal_err (ERR_FULL, 0, 0, 0);
-			sens_data.eslot--;
-			app_diag (D_SERIOUS, "EEPROM FULL");
-		}
 
 		switch (sens_data.ee.s.f.status) {
-			case SENS_IN_USE:
-				app_diag (D_SERIOUS, "Sens in use");
-				break;
-			case SENS_COLLECTED:
-				app_diag (D_INFO, "Not confirmed");
-				// fall through
-			default:
-				sens_data.ee.s.f.status = SENS_IN_USE;
-		}
+		  case SENS_IN_USE:
+			app_diag (D_SERIOUS, "Sens in use");
+			break;
 
+		  case SENS_COLLECTED:
+			app_diag (D_INFO, "Not confirmed");
+			if (is_eew_coll) {
+		 	  if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE,
+				  (byte *)&sens_data.ee, EE_SENS_SIZE)) {
+				  app_diag (D_SERIOUS, "ee_write failed %x %x",
+						  (word)(sens_data.eslot >> 16),
+						  (word)sens_data.eslot);
+			  } else {
+				  sens_data.eslot++;
+			  }
+			}
+			break;
+
+		  case SENS_CONFIRMED:
+			sens_data.eslot++;
+		}
+                // now we should be at the slot to write to
+
+		// there will be options on eeprom operations... later
+		 if (sens_data.eslot >= EE_SENS_MAX) {
+			 sens_data.eslot = EE_SENS_MAX -1;
+			 app_diag (D_SERIOUS, "EEPROM FULL");
+		 }
+
+		sens_data.ee.s.f.status = SENS_IN_USE;
 		mc.sec = 0;
 		wall_time (&mc);
 		sens_data.ee.ts = mc.sec;
@@ -601,22 +623,11 @@ thread (sens)
 #endif
 	entry (SE_DONE)
 		sens_data.ee.s.f.status = SENS_COLLECTED;
-
-		if (sens_data.eslot >= EE_SENS_MAX) {
-			sens_data.eslot = EE_SENS_MAX -1;
-			app_diag (D_SERIOUS, "EEPROM FULL");
-		} else {
-
-			if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE,
-					(byte *)&sens_data.ee, EE_SENS_SIZE)) {
-				app_diag (D_SERIOUS, "ee_write failed %x %x",
-					(word)(sens_data.eslot >> 16),
-					(word)sens_data.eslot);
-				sens_data.eslot--;
-			}
-		}
+		sens_data.ee.s.f.spare = 7;
+		sens_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 
 		leds (0, 2);
+		powerdown();
 		finish;
 endthread
 
@@ -662,9 +673,16 @@ endthread
 */
 
 thread (root)
-	sint i1, i2, i3, i4;
+	sint i1, i2, i3, i4, i5;
 
 	entry (RS_INIT)
+		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
+		form (ui_obuf, ee_str, EE_SENS_MIN, EE_SENS_MAX -1,
+			EE_SENS_SIZE);
+
+	entry (RS_INIT1)
+		ser_out (RS_INIT1, ui_obuf);
+
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 			diag (OPRE_APP_MENU_C "Maintenance mode (D, E, F, Q)"
 				OMID_CRB "%x %u %u %u",
@@ -672,19 +690,19 @@ thread (root)
 				if_read (IFLASH_SIZE -2),
 				if_read (IFLASH_SIZE -3),
 				if_read (IFLASH_SIZE -4));
-			ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 			if (!running (cmd_in))
 				runthread (cmd_in);
 			proceed (RS_RCMD);
 		}
 
-		ser_out (RS_INIT, welcome_str);
+	entry (RS_INIT2)
+		ser_out (RS_INIT2, welcome_str);
+
 		init();
 		local_host = (nid_t) host_id;
 		net_id = DEF_NID;
 		master_host = local_host;
 		tarp_ctrl.param &= 0xFE; // routing off
-		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 		runthread (sens);
 
 		// give sensors time & spread a bit
@@ -753,6 +771,7 @@ thread (root)
 
 			memset (sens_dump, 0, sizeof(sensEEDumpType));
 			i1 = 0;
+			sens_dump->fr = EE_SENS_MIN;
 			sens_dump->to = sens_data.eslot;
 
 			scan (cmd_line+1, "%lu %lu %u %u",
@@ -775,8 +794,14 @@ thread (root)
 			if (sens_dump->fr > sens_data.eslot)
 				sens_dump->fr = sens_data.eslot;
 
+			if (sens_dump->fr < EE_SENS_MIN)
+				sens_dump->fr = EE_SENS_MIN;
+
 			if (sens_dump->to > sens_data.eslot)
 				sens_dump->to = sens_data.eslot; // EE_SENS_MAX
+
+			if (sens_dump->to < EE_SENS_MIN)
+				sens_dump->to = EE_SENS_MIN;
 
 			sens_dump->ind = sens_dump->fr;
 
@@ -815,18 +840,20 @@ thread (root)
 		}
 
 		if (cmd_line[0] == 's') {
-			i1 = i2 = i3 = i4 = -1;
+			i1 = i2 = i3 = i4 = i5 = -1;
 
 			// Maj, min, rx_span, pow_level
-			scan (cmd_line+1, "%d %d %d %d", &i1, &i2, &i3, &i4);
-			
+			scan (cmd_line+1, "%d %d %d %x %x",
+				       	&i1, &i2, &i3, &i4, &i5);
+
 			// we follow max power, but likely rx and pload levels
 			// should be independent
 			if (i4 >= 0) {
+#if 0
 				if (i4 > 7)
 					i4 = 7;
 				i4 |= (i4 << 4) | (i4 << 8) | (i4 << 12);
-
+#endif
 				if (pong_params.rx_lev != 0) // 'all' stays
 					pong_params.rx_lev = max_pwr(i4);
 				
@@ -836,6 +863,8 @@ thread (root)
 				
 				pong_params.pow_levels = i4;
 			}
+
+			(void)handle_c_flags ((word)i5);
 
 			if (i1 >= 0) {
 				pong_params.freq_maj = i1;

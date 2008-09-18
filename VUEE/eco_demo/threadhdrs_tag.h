@@ -61,8 +61,8 @@ strandhdr (oss_out, NodeTag) {
 
 threadhdr (root, NodeTag) {
 
-	states { RS_INIT, RS_PAUSE, RS_FREE, RS_RCMD, RS_DOCMD, RS_UIOUT,
-       		RS_DUMP	};
+	states { RS_INIT, RS_INIT1, RS_INIT2, RS_PAUSE, RS_FREE, RS_RCMD,
+	       	RS_DOCMD, RS_UIOUT, RS_DUMP };
 
 	perform;
 };
@@ -122,13 +122,15 @@ static word 		png_shift;
 
 // ========================================= root
 
-#define RS_INIT		00
-#define RS_PAUSE	02
-#define RS_FREE		10
-#define RS_RCMD		20
-#define RS_DOCMD	30
-#define RS_UIOUT	40
-#define RS_DUMP		50
+#define RS_INIT		0
+#define RS_INIT1	10
+#define RS_INIT2	20
+#define RS_PAUSE	30
+#define RS_FREE		40
+#define RS_RCMD		50
+#define RS_DOCMD	60
+#define RS_UIOUT	70
+#define RS_DUMP		80
 
 #endif
 #endif

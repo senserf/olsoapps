@@ -20,13 +20,14 @@
 #define EE_AGG_SIZE	sizeof(aggEEDataType)
 #define EE_AGG_MAX	(ee_size (NULL, NULL) / EE_AGG_SIZE -1)
 #define EE_AGG_MIN	0
+// test: #define EE_AGG_MIN (EE_AGG_MAX -8)
 
 #define NUM_SENS	5
 
 #define AGG_FF		0xF
 // not needed? #define AGG_IN_USE	0xC
 #define AGG_COLLECTED	0x8
-// not needed? #define AGG_CONFIRMED	0x0
+#define AGG_CONFIRMED	0x0
 
 #define ERR_EER		0xFFFE
 #define ERR_SLOT	0xFFFC
@@ -52,12 +53,13 @@ typedef union {
 } mclock_t;
 
 typedef union {
-	byte b;
-	struct {
-		word emptym :1;
-		word spare  :3;
-		word status :4;
+		word b:8;
+		struct {
+			word emptym :1;
+			word spare  :3;
+			word status :4;
 	} f;
+	word spare :8;
 } statu_t;
 
 typedef struct tagDataStruct {
@@ -87,7 +89,6 @@ typedef struct wroomStruct {
 // wasteful on demo purpose
 typedef struct aggEEDataStruct {
 	statu_t s; // 1st byte in ee slot
-	word spare  :8;
 	word sval [NUM_SENS]; // aligned
 	lword ts;
 	lword t_ts;
@@ -112,6 +113,11 @@ typedef struct aggDataStruct {
 	aggEEDataType ee;
 	lword eslot;
 } aggDataType;
+
+// agg flags over OSS
+#define A_FL_EEW_COLL   1
+#define A_FL_EEW_CONF   2
+#define A_FL_EEW_OVER   4
 
 /* app_flags definition [default]:
 bit 0: spare [0]

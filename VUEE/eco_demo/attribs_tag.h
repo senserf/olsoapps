@@ -35,6 +35,8 @@ void	_da (sens_init) ();
 void	_da (init) ();
 word	_da (r_a_d) (void);
 void	_da (wall_time) (mclock_t *mc);
+void	_da (upd_on_ack) (lword ts, lword rt);
+word	_da (handle_c_flags) (word c_fl);
 void	_da (tmpcrap) (word);
 
 // Expected by NET and TARP

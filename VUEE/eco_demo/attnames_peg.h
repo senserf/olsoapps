@@ -66,6 +66,7 @@
 #define fatal_err		_dac (NodePeg, fatal_err)
 #define write_agg		_dac (NodePeg, write_agg)
 #define r_a_d			_dac (NodePeg, r_a_d)
+#define handle_a_flags		_dac (NodePeg, handle_a_flags)
 #define tmpcrap			_dac (NodePeg, tmpcrap)
 
 #else	/* PICOS */

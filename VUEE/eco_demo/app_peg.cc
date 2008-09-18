@@ -68,7 +68,8 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 		mem = memfree(0, &mmin);
 		mbuf = form (NULL, stats_str,
 			host_id, local_host, tag_auditFreq,
-			host_pl, seconds(), master_delta, master_host,
+			host_pl, handle_a_flags (0xFFFF), seconds(),
+		       	master_delta, master_host,
 			agg_data.eslot == EE_AGG_MIN &&
 			  agg_data.ee.s.f.status == AGG_FF ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
@@ -79,6 +80,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 		mbuf = form (NULL, stats_str,
 			in_statsPeg(buf, hostid), in_header(buf, snd),
 			in_statsPeg(buf, audi), in_statsPeg(buf, pl),
+			in_statsPeg(buf, a_fl),
 			in_statsPeg(buf, ltime), in_statsPeg(buf, mdelta),
 			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
 			in_statsPeg(buf, mem), in_statsPeg(buf, mmin));
@@ -89,7 +91,8 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			in_statsTag(buf, hostid),
 			(word)in_statsTag(buf, hostid), in_header(buf, snd),
 			in_statsTag(buf, maj), in_statsTag(buf, min),
-			in_statsTag(buf, span), in_statsTag(buf, pl) & 0x0F,
+			in_statsTag(buf, span), in_statsTag(buf, pl),
+			in_statsTag(buf, c_fl),
 			in_statsTag(buf, ltime), in_statsTag(buf, slot),
 			in_statsTag(buf, mem), in_statsTag(buf, mmin));
 		break;
@@ -116,11 +119,6 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
-#if 0
-moved to msg_pong_in() to filter out 'duplicates'
-		if (in_pong_pload(buf))
-			write_agg (buf);
-#endif
 		if (in_pong_rxon(buf)) 
 			check_msg4tag (buf);
 
@@ -626,7 +624,7 @@ __PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
 
 __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 	       	nid_t peg, word maj, word min, 
-		word span, word pl) {
+		word span, word pl, word c_fl) {
 
 	char * out_buf = NULL;
 	char * set_buf = NULL;
@@ -651,6 +649,7 @@ __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 	in_setTag(set_buf, freq_maj) = maj;
 	in_setTag(set_buf, freq_min) = min;
 	in_setTag(set_buf, rx_span) = span;
+	in_setTag(set_buf, c_fl) = c_fl;
 	if (peg == local_host || peg == 0)
 		// put it in the wroom
 		msg_fwd_in(state, out_buf, size);
@@ -660,7 +659,7 @@ __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 }
 
 __PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg, 
-					word audi, word pl) {
+				word audi, word pl, word a_fl) {
 
 	char * out_buf = get_mem (state, sizeof(msgSetPegType));
 
@@ -668,6 +667,7 @@ __PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg,
 	in_header(out_buf, rcv) = peg;
 	in_setPeg(out_buf, level) = pl;
 	in_setPeg(out_buf, audi) = audi;
+	in_setPeg(out_buf, a_fl) = a_fl;
 	send_msg (out_buf,  sizeof(msgSetPegType));
 	ufree (out_buf);
 }
@@ -684,9 +684,15 @@ __PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg,
 thread (root)
 
 	mclock_t mc;
-	sint	i1, i2, i3, i4, i5, i6;
+	sint	i1, i2, i3, i4, i5, i6, i7;
 
 	entry (RS_INIT)
+		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
+		form (ui_obuf, ee_str, EE_AGG_MIN, EE_AGG_MAX -1, EE_AGG_SIZE);
+
+	entry (RS_INIT1)
+		ser_out (RS_INIT1, ui_obuf);
+
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 			diag (OPRE_APP_MENU_A "Maintenance mode (D, E, F, Q)"
 				OMID_CRB "%x %u %u %u",
@@ -694,14 +700,14 @@ thread (root)
 				if_read (IFLASH_SIZE -2),
 				if_read (IFLASH_SIZE -3),
 				if_read (IFLASH_SIZE -4));
-			ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 			if (!running (cmd_in))
 				runthread (cmd_in);
 			proceed (RS_RCMD);
 		}
 
-		ser_out (RS_INIT, welcome_str);
-		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
+	entry (RS_INIT2)
+		ser_out (RS_INIT2, welcome_str);
+
 		local_host = (word)host_id;
 #ifndef __SMURPH__
 		net_id = DEF_NID;
@@ -803,6 +809,7 @@ thread (root)
 
 			memset (agg_dump, 0, sizeof(aggEEDumpType));
 			i1 = 0;
+			agg_dump->fr = EE_AGG_MIN;
 			agg_dump->to = agg_data.eslot;
 
 			scan (cmd_line+1, "%lu %lu %u %u",
@@ -813,8 +820,14 @@ thread (root)
 			if (agg_dump->fr > agg_data.eslot)
 				agg_dump->fr = agg_data.eslot;
 
+			if (agg_dump->fr < EE_AGG_MIN)
+				agg_dump->fr = EE_AGG_MIN;
+
 			if (agg_dump->to > agg_data.eslot)
 				agg_dump->to = agg_data.eslot; //EE_AGG_MAX;
+
+			if (agg_dump->to < EE_AGG_MIN)
+				agg_dump->to = EE_AGG_MIN;
 
 			agg_dump->ind = agg_dump->fr;
 			proceed (RS_DUMP);
@@ -866,11 +879,11 @@ thread (root)
 			proceed (RS_FREE);
 
 		case 'c':
-			i1 = i2 = i3 = i4 = i5 = i6 = -1;
+			i1 = i2 = i3 = i4 = i5 = i6 = i7 = -1;
 			
 			// tag peg fM fm span pl
-			scan (cmd_line+1, "%d %d %d %d %d %d",
-				&i1, &i2, &i3, &i4, &i5, &i6);
+			scan (cmd_line+1, "%d %d %d %d %d %x %x",
+				&i1, &i2, &i3, &i4, &i5, &i6, &i7);
 			
 			if (i1 <= 0 || i3 < -1 || i4 < -1 || i5 < -1) {
 				form (ui_obuf, bad_str, cmd_line);
@@ -880,12 +893,12 @@ thread (root)
 			if (i2 <= 0)
 				i2 = local_host;
 
-			oss_setTag_in (RS_DOCMD, i1, i2, i3, i4, i5, i6);
+			oss_setTag_in (RS_DOCMD, i1, i2, i3, i4, i5, i6, i7);
 			proceed (RS_FREE);
 		
 		case 'a':
-			i1 = i2 = i3 = -1;
-			if (scan (cmd_line+1, "%d %d %d", &i1, &i2, &i3) 
+			i1 = i2 = i3 = i4 = -1;
+			if (scan (cmd_line+1, "%d %d %d %x", &i1, &i2, &i3, &i4)
 					== 0 || i1 < 0)
 				i1 = local_host;
 			if (i2 < -1)
@@ -903,11 +916,12 @@ thread (root)
 					host_pl = i3 > 7 ? 7 : i3;
 					net_opt (PHYSOPT_SETPOWER, &host_pl);
 				}
+				(void)handle_a_flags ((word)i4);
 				stats (NULL);
 
 			}
 			if (i1 != local_host) {
-				oss_setPeg_in (RS_DOCMD, i1, i2, i3);
+				oss_setPeg_in (RS_DOCMD, i1, i2, i3, i4);
 			}
 
 			proceed (RS_FREE);

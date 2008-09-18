@@ -1,7 +1,7 @@
 #ifndef __msg_structs_tag_h__
 #define __msg_structs_tag_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -13,6 +13,10 @@ typedef struct msgSetTagStruct {
 	word		freq_maj;
 	word		freq_min;
 	word		rx_span;
+	word		c_fl;
+	word		spare;
+	lword		ts;
+	lword		reftime;
 } msgSetTagType;
 
 #define in_setTag(buf, field)   (((msgSetTagType *)(buf))->field)
@@ -28,6 +32,8 @@ typedef struct msgStatsTagStruct {
 	word		pl;
 	word		mem;
 	word		mmin;
+	word		c_fl;
+	word		spare;
 } msgStatsTagType;
 
 #define in_statsTag(buf, field)   (((msgStatsTagType *)(buf))->field)

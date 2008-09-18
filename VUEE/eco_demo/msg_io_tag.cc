@@ -20,35 +20,46 @@
 
 #include "attnames_tag.h"
 
-__PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
-	statu_t b;
 
-	if (in_pongAck(buf, reftime) != 0) {
-		ref_clock.sec = in_pongAck(buf, reftime);
+__PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
+
+	upd_on_ack (in_pongAck(buf, ts), in_pongAck(buf, reftime));
+}
+
+__PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt) {
+
+	if (rt != 0) {
+		ref_clock.sec = rt;
 		ref_time = seconds();
 	}
 
-	if (sens_data.ee.s.f.status = SENS_COLLECTED &&
-			sens_data.ee.ts == in_pongAck(buf, ts)) {
-		leds (0, 0);
-		b.f.status = sens_data.ee.s.f.status = SENS_CONFIRMED;
-		b.f.spare = 7;
-		b.f.emptym = 1;
+	if (sens_data.ee.s.f.status != SENS_COLLECTED ||
+			sens_data.ee.ts != ts)
+		return;
 
-		if (sens_data.eslot == EE_SENS_MAX -1)
-			return; // don;t update the last slot: eeprom full
+	leds (0, 0);
+	sens_data.ee.s.f.status = SENS_CONFIRMED;
 
-		if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE, &b.b, 1)) {
-			app_diag (D_SERIOUS, "ee upd failed %x %x",
-					(word)(sens_data.eslot >> 16),
-					(word)sens_data.eslot);
+	if (!is_eew_conf) {
+		if (sens_data.eslot > 0) {
+			sens_data.eslot--;
+		} else {
+			sens_data.ee.s.f.status = SENS_FF;
 		}
+		return;
+	}
 
-	} else
-		app_diag (D_DEBUG, "Redundant pongAck %x %x from %u",
+	if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE,
+		       (byte *)&sens_data.ee, EE_SENS_SIZE)) {
+		app_diag (D_SERIOUS, "ee write failed %x %x",
 				(word)(sens_data.eslot >> 16),
-				(word)sens_data.eslot,
-				in_header(buf, snd));
+				(word)sens_data.eslot);
+		if (sens_data.eslot > 0) { 
+			sens_data.eslot--;
+		} else {
+			sens_data.ee.s.f.status = SENS_FF;
+		}
+	}
 }
 
 __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
@@ -58,12 +69,16 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	if (out_buf == NULL)
 		return;
 
+	upd_on_ack (in_setTag(buf, ts), in_setTag(buf, reftime));
+
 	if (in_setTag(buf, pow_levels) != 0xFFFF) {
 		mmin = in_setTag(buf, pow_levels);
+#if 0
+		that was for just a single p.lev multiplied 4 times
 		if (mmin > 7)
 			mmin = 7;
 		mmin |= (mmin << 4) | (mmin << 8) | (mmin << 12);
-
+#endif
 		if (pong_params.rx_lev != 0) // 'all' stays
 			pong_params.rx_lev =
 				max_pwr(mmin);
@@ -108,6 +123,7 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	in_header(out_buf, rcv) = in_header(buf, snd);
 	in_statsTag(out_buf, hostid) = host_id;
 	in_statsTag(out_buf, ltime) = seconds();
+	in_statsTag(out_buf, c_fl) = handle_c_flags (in_setTag(buf, c_fl));
 
 	// in_statsTag(out_buf, slot) is really # of entries
 	if (sens_data.eslot == EE_SENS_MIN &&

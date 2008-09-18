@@ -35,6 +35,8 @@
 #define init			_dac (NodeTag, init)
 #define r_a_d			_dac (NodeTag, r_a_d)
 #define wall_time		_dac (NodeTag, wall_time)
+#define upd_on_ack		_dac (NodeTag, upd_on_ack)
+#define handle_c_flags		_dac (NodeTag, handle_c_flags)
 #define tmpcrap			_dac (NodeTag, tmpcrap)
 
 #else	/* PICOS */

@@ -33,15 +33,6 @@ extern const lword host_id;
 
 word		app_flags	= DEF_APP_FLAGS;
 
-#if 0
-pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
-				5,  	// freq_min in sec. max 63
-				0x7777, // levels / retries
-				1, 	// rx_span in msec (max 63K) 1: ON
-				0,	// rx_lev: select if needed, 0: all
-				0	// pload_lev: same
-};
-#else
 pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
 				0x7777, // levels / retries
@@ -49,7 +40,6 @@ pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
 				0,	// rx_lev: select if needed, 0: all
 				0	// pload_lev: same
 };
-#endif
 
 sensDataType	sens_data;
 long		lh_time;
@@ -60,15 +50,17 @@ sensEEDumpType	*sens_dump = NULL;
 #include "oss_fmt.h"
 
 // These are static const and can thus be shared
+static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
-static const char welcome_str[] = OPRE_APP_MENU_C
+static const char welcome_str[] = OPRE_APP_MENU_C 
 	"***EcoNet***" OMID_CRB "Collector commands\r\n"
 	OPRE_APP_MENU_C 
-	"\tSet/ show:\ts [ Maj_freq [ min_freq [ rx_span [ p_lev ]]]]\r\n"
+	"\tSet/ show:\ts [ Maj_freq [ min_freq [ rx_span [ hex:pl_vec"
+	" [ hex:c_fl ]]]]]\r\n"
 	OPRE_APP_MENU_C
 	"\tDisplay data:\tD [ from [ to [ status [ limit ]]]]\r\n"
 	OPRE_APP_MENU_C
-	"\tMainenance:\tM (*** No collection until F ***)\r\n"
+	"\tMaintenance:\tM (*** No collection until F      ***)\r\n"
 	OPRE_APP_MENU_C
 	"\tEprom erase:\tE (*** deletes all collected data ***)\r\n"
 	OPRE_APP_MENU_C
@@ -87,7 +79,7 @@ static const char bad_str[] =   OPRE_APP_BAD
 
 static const char stats_str[] = OPRE_APP_STATS_C
 	"Stats for collector (%lx: %u):" OMID_CR
-	" Maj_freq %u min_freq %u rx_span %u pl %u" OMID_CR
+	" Maj_freq %u min_freq %u rx_span %u pl %x c_fl %x" OMID_CR
 	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
 
 static const char dump_str[] = OPRE_APP_DUMP_C OMID_CR

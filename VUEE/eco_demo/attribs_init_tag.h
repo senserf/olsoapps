@@ -10,7 +10,7 @@
 	_da (pong_params).freq_maj	= 30;
 	_da (pong_params).freq_min	= 5;
 	_da (pong_params).pow_levels	= 0x7777;
-	_da (pong_params).rx_span	= 1; // in msec; 1 <-> always ON
+	_da (pong_params).rx_span	= 2048; // in msec; 1 <-> always ON
 	_da (pong_params).rx_lev	= 0;
 	_da (pong_params).pload_lev	= 0;
 

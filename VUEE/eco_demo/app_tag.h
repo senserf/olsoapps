@@ -17,6 +17,7 @@
 #define EE_SENS_SIZE	sizeof(sensEEDataType)
 #define EE_SENS_MAX	(ee_size (NULL, NULL) / EE_SENS_SIZE -1)
 #define EE_SENS_MIN	0
+//test: #define EE_SENS_MIN (EE_SENS_MAX - 4)
 
 // check what it really is
 #define SENS_COLL_TIME	3000
@@ -47,12 +48,13 @@ typedef union {
 } mclock_t;
 
 typedef union {
-	byte b;
-	struct {
-		word emptym :1;
-		word spare  :3;
-		word status :4;
+		word b :8;
+		struct {
+			word emptym :1;
+			word spare  :3;
+			word status :4;
 	} f;
+	word spare :8;
 } statu_t;
 
 typedef struct pongParamsStruct {
@@ -66,7 +68,6 @@ typedef struct pongParamsStruct {
 
 typedef struct sensEEDataStruct {
 	statu_t	s; // keep it byte 0 of the ee slot
-	word spare  :8;
 	word sval [NUM_SENS];
 	lword ts; 	// keep it aligned
 } sensEEDataType;
@@ -88,6 +89,12 @@ typedef struct sensDataStruct {
 	sensEEDataType ee;
 	lword eslot;
 } sensDataType;
+
+// collector flags over OSS
+#define C_FL_EEW_COLL	1
+#define C_FL_EEW_CONF	2
+#define C_FL_EEW_OVER	4
+
 
 /* app_flags definition [default]:
    bit 0: spare [0]
