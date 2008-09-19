@@ -45,14 +45,15 @@ word	cters[3]	= {0, 0, 0};
 
 // These are static const and can thus be shared
 
-static const char welcome_str[] = "***Site Survey 0.1***\r\n"
+static const char welcome_str[] = "***Site Survey 0.2***\r\n"
 	"Set / show attribs:\r\n"
-	"\tfrom:\tsf [pl [ra [ch]]]\r\n"
-	"\tto:\tst [pl [ra [ch]]]\r\n"
-	"\tid:\tsi x y <new x> <new y>\r\n"
-	"\tuart:\tsu [0 | 1]\r\n"
-	"\tfmt:\tsy [0 | 1]\r\n"
-	"\tstats:\ts [x y]\r\n\r\n"
+	"\tfrom:\t\tsf [pl [ra [ch]]]\r\n"
+	"\tto:\t\tst [pl [ra [ch]]]\r\n"
+	"\tid:\t\tsi x y <new x> <new y>\r\n"
+	"\tuart:\t\tsu [0 | 1]\r\n"
+	"\tfmt:\t\tsy [0 | 1]\r\n"
+	"\tall out:\tsa [0 | 1]\r\n"
+	"\tstats:\t\ts [x y]\r\n\r\n"
 	"Timeouts / intervals:\r\n"
 	"\tt [<silence> [<warmup> [<cycle>]]]\r\n\r\n"
 	"Execute Operation:\r\n"

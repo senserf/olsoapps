@@ -35,6 +35,8 @@ __PUBLF (NodePeg, void, msg_master_out) () {
 	in_header(buf_out, rcv) = 0;
 	in_header(buf_out, hco) = 1;
 	in_master(buf_out, attr).w = sattr[2].w;
+	if (is_all_out) // overload power level (0..7) with all_out
+		in_master(buf_out, attr).w |= 0x0080;
 	send_msg (buf_out, sizeof (msgMasterType));
 	ufree (buf_out);
 }
@@ -43,6 +45,12 @@ int m_cyc (word, address);
 int m_sil (word, address);
 
 __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
+
+	if (in_master(buf, attr).w & 0x80) { // all_out kludge
+		set_all_out;
+		in_master(buf, attr).w &= 0xFF7F;
+	} else
+		clr_all_out;
 
 	if (sstate == ST_WARM) {
 		if (in_master(buf, attr).w == sattr[2].w)
@@ -120,9 +128,12 @@ __PUBLF (NodePeg, void, msg_ping_in) (char * buf, word rssi) {
 			cters[2]++;
 	}
 
-	if (net_qsize (TCV_DSP_XMT) < DEF_XMT_THOLD)
-		msg_ping_out (buf, rssi);
-	else
+	if (net_qsize (TCV_DSP_XMT) < DEF_XMT_THOLD) {
+		if (is_all_out || local_host < 0x100 ||
+			       	in_header(buf, snd) < 0x100) {
+			msg_ping_out (buf, rssi);
+		}
+	} else
 		cters[1]++;
 }
 

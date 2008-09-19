@@ -16,7 +16,7 @@
 #include "sysio.h"
 #include "msg_tarp.h"
 
-// uart ON in human i/f, no master change, no autoack (unused)
+// no all out, uart ON in human i/f, no master change, no autoack (unused)
 #define DEF_APP_FLAGS 	0x0C
 
 // level 2, rec 3, slack 0, fwd off
@@ -67,6 +67,10 @@
 #define is_ping_out	(app_flags & 16)
 #define set_ping_out	(app_flags |= 16)
 
+#define clr_all_out	(app_flags &= ~32)
+#define is_all_out	(app_flags & 32)
+#define set_all_out	(app_flags |= 32)
+
 #define LED_R	0
 #define LED_G	1
 #define LED_B	2
@@ -85,9 +89,9 @@
 typedef union {
 	word	w;
 	struct {
-		word	pl:4; 
-		word	ra:4;
-		word	ch:8;
+		word	pl :4; 
+		word	ra :4;
+		word	ch :8;
 	} b;
 } sattr_t;
 

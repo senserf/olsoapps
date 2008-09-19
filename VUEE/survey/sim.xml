@@ -1,4 +1,4 @@
-<network nodes="4">
+<network nodes="6">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
     <channel>
@@ -85,15 +85,23 @@
 	    <location>1.0 1.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0101</preinit>
 	</node>
-        <node number="1" type="peg">
+	<node number="1" type="peg" start="off">
+	    <location>2.0 2.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
+	</node>
+	<node number="2" type="peg" start="off">
+	    <location>2.0 3.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0002</preinit>
+	</node>
+        <node number="3" type="peg">
             <location>1.0 6.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0106</preinit>
 	</node>
-	<node number="2" type="peg" start="off">
+	<node number="4" type="peg">
 	    <location>6.0 6.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0606</preinit>
 	</node>
-	<node number="3" type="peg" start="off">
+	<node number="5" type="peg">
 	    <location>6.0 1.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0601</preinit>
 	</node>

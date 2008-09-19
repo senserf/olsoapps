@@ -572,6 +572,12 @@ thread (root)
 				else if (i1 == 0)
 					clr_fmt_hi;
 				break;
+			case 'a':
+				if (i1 > 0)
+					set_all_out;
+				else if (i1 == 0)
+					clr_all_out;
+				break;
 			default:
 				form (ui_obuf, ill_str, cmd_line);
 				proceed (RS_UIOUT);
