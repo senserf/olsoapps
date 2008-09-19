@@ -1,0 +1,12 @@
+// Insert here applications-specific options
+#undef	RADIO_USE_LEDS
+#define	RADIO_USE_LEDS	7
+
+#undef	UART_DRIVER
+#define	UART_DRIVER	0
+
+#undef	UART_TCV
+#define	UART_TCV	1
+
+#undef	UART_RATE
+#define	UART_RATE	115200
