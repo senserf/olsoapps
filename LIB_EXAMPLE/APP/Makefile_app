@@ -9,22 +9,31 @@ CF=-mmcu=msp430x1611 -mendup-at=main -D__MSP430__ -DBOARD_WARSAW
 AF=-mmcu=msp430x1611
 OF=-O2 -g -Wundef
 TR=Image
+TD=./KTMP
+LI=-I../LIBRARY/include
+LD=-L../LIBRARY -lpicos
 # include directories
-LIB=../LIBRARY
-INC=$(LIB)/include
+# source directories
+S00=.
+S00U=.
+#
+IN=
 
 all :	$(TR)
 
 # target: ""
-BF=app.o 
+BF=$(TD)/app.o 
 
 $(TR) :	$(BF)
-	$(CC) -o $(TR) $(CF) $(BF) -L$(LIB) -lpicos
+	$(CC) -o $(TR) $(CF) $(BF) $(LD)
 	$(OC) $(TR) $(TR).a43
 	$(SI) $(TR)
 
-app.o : app.c 
-	$(CC) $(CF) $(OF) -I$(INC) -c app.c -o app.o
+$(TD)/app.o : $(S00U)/app.c
+	mkdir -p $(TD)
+	$(CC) $(CF) $(OF) $(LI) $(IN) -c $(S00)/app.c -o $(TD)/app.o
+
+
 
 clean :
-	rm -rf *.o
+	rm -rf $(TD)/*

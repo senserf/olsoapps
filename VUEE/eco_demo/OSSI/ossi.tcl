@@ -8,389 +8,79 @@ exec tclsh "$0" "$@"
 # Copyright (C) Olsonet Communications, 2008 All Rights Reserved #
 ##################################################################
 
+##################################################################
+##################################################################
+
+proc msource { f } {
+#
+# Intelligent 'source'
+#
+	if ![catch { uplevel #0 source $f } ] {
+		# found it right here
+		return
+	}
+
+	set dir "Scripts"
+	set lst ""
+
+	for { set i 0 } { $i < 10 } { incr i } {
+		set dir "../$dir"
+		set dno [file normalize $dir]
+		if { $dno == $lst } {
+			# no progress
+			break
+		}
+		if ![catch { uplevel #0 source [file join $dir $f] } ] {
+			# found it
+			return
+		}
+	}
+
+	# failed
+	puts stderr "Cannot locate file $f 'sourced' by the script."
+	exit 99
+}
+
+msource xml.tcl
+msource log.tcl
+
+###############################################################################
+
+package require xml 1.0
+package require log 1.0
+
 if [catch { package require mysqltcl } ] {
 	set SQL_present 0
 } else {
 	set SQL_present 1
 }
 
-set	Log(MAXSIZE)		5000000
-set	Log(MAXVERS)		4
+# how to locate the relevant values in OSSI input #############################
+
+set VL(AVRP)	{
+			{ "agg" d } { "slot:" d } { "ts:" s } { "col" d }
+			{ "slot:" d } { "ts:" s }
+			{ "" a }
+		}
+
+set VL(CSTS)	{
+			{ ":" d } { "via" d } { "maj_freq" d }
+			{ "min_freq" d } { "rx_span" d } { "pl" x }
+		}
+## c_fl removed for now, for compatibility with the old version
+#			{ ":" d } { "via" d } { "maj_freq" d }
+#			{ "min_freq" d } { "rx_span" d } { "pl" x }
+#			{ "c_fl" x }
+
+set VL(ASTS)	{
+			{ ":" d } { "freq" d } { "plev" x }
+		}
+## a_fl removed for now, for compatibility with the old version
+#			{ ":" d } { "freq" d } { "plev" x } { "a_fl" x }
 
 ###############################################################################
-
-#
-# Mini XML parser
-#
-
-proc sxml_string { s } {
-#
-# Extract a possibly quoted string
-#
-	upvar $s str
-
-	if { [sxml_space str] != "" } {
-		error "illegal white space"
-	}
-
-	set c [string index $str 0]
-	if { $c == "" } {
-		error "empty string illegal"
-	}
-
-	if { $c != "\"" } {
-		# no quote; this is formally illegal in XML, but let's be
-		# pragmatic
-		regexp "^\[^ \t\n\r\>\]+" $str val
-		set str [string range $str [string length $val] end]
-		return [sxml_unescape $val]
-	}
-
-	# the tricky way
-	if ![regexp "^.(\[^\"\]*)\"" $str match val] {
-		error "missing \" in string"
-	}
-	set str [string range $str [string length $match] end]
-
-	return [sxml_unescape $val]
-}
-
-proc sxml_unescape { str } {
-#
-# Remove escapes from text
-#
-	regsub -all "&amp;" $str "\\&" str
-	regsub -all "&quot;" $str "\"" str
-	regsub -all "&lt;" $str "<" str
-	regsub -all "&gt;" $str ">" str
-	regsub -all "&nbsp;" $str " " str
-
-	return $str
-}
-
-proc sxml_space { s } {
-#
-# Skip white space
-#
-	upvar $s str
-
-	if [regexp -indices "^\[ \t\r\n\]+" $str ix] {
-		set ix [lindex $ix 1]
-		set match [string range $str 0 $ix]
-		set str [string range $str [expr $ix + 1] end]
-		return $match
-	}
-
-	return ""
-}
-
-proc sxml_ftag { s } {
-#
-# Find and extract the first tag in the string
-#
-	upvar $s str
-
-	set front ""
-
-	while 1 {
-		# locate the first tag
-		set ix [string first "<" $str]
-		if { $ix < 0 } {
-			set str "$front$str"
-			return ""
-		}
-		append front [string range $str 0 [expr $ix - 1]]
-		set str [string range $str $ix end]
-		# check for a comment
-		if { [string range $str 0 3] == "<!--" } {
-			# skip it
-			set ix [string first "-->" $str]
-			if { $ix < 0 } {
-				error "unterminated comment: [string range \
-					$str 0 15]"
-			}
-			incr ix 3
-			set str [string range $str $ix end]
-			continue
-		}
-		set et ""
-		if [regexp -nocase "^<(/)?\[a-z_\]" $str ix et] {
-			# this is a tag
-			break
-		}
-		# skip the thing and keep going
-		append front "<"
-		set str [string range $str 1 end]
-	}
-
-
-	if { $et != "" } {
-		set tm 1
-	} else {
-		set tm 0
-	}
-
-	if { $et != "" } {
-		# terminator, skip the '/', so the text is positioned at the
-		# beginning of keyword
-		set ix 2
-	} else {
-		set ix 1
-	}
-
-	# starting at the keyword
-	set str [string range $str $ix end]
-
-	if ![regexp -nocase "^(\[a-z0-9_\]+)(.*)" $str ix kwd str] {
-		# error
-		error "illegal tag: [string range $str 0 15]"
-	}
-
-	set kwd [string tolower $kwd]
-
-	# decode any attributes
-	set attr ""
-	array unset atts
-
-	while 1 {
-		sxml_space str
-		if { $str == "" } {
-			error "unterminated tag: <$et$kwd"
-		}
-		set c [string index $str 0]
-		if { $c == ">" } {
-			# done
-			set str [string range $str 1 end]
-			# term preceding_text keyword attributes
-			return [list $tm $front $kwd $attr]
-		}
-		# this must be a keyword
-		if ![regexp -nocase "^(\[a-z\]\[a-z0-9_\]*)=" $str match atr] {
-			error "illegal attribute: <$et$kwd ... [string range \
-				$str 0 15]"
-		}
-		set atr [string tolower $atr]
-		if [info exists atts($attr)] {
-			error "duplicate attribute: <$et$kwd ... $atr"
-		}
-		set atts($atr) ""
-		set str [string range $str [string length $match] end]
-		if [catch { sxml_string str } val] {
-			error "illegal attribute value: \
-				<$et$kwd ... $atr=[string range $str 0 15]"
-		}
-		lappend attr [list $atr $val]
-	}
-}
-
-proc sxml_advance { s kwd } {
-#
-# Returns the text + the list of children for the current tag
-#
-	upvar $s str
-
-	set txt ""
-	set chd ""
-
-	while 1 {
-		# locate the nearest tag
-		set tag [sxml_ftag str]
-		if { $tag == "" } {
-			# no more
-			if { $kwd != "" } {
-				error "unterminated tag: <$kwd ...>"
-			}
-			return [list "$txt$str" $chd]
-		}
-
-		set md [lindex $tag 0]
-		set fr [lindex $tag 1]
-		set kw [lindex $tag 2]
-		set at [lindex $tag 3]
-
-		append txt $fr
-
-		if { $md == 0 } {
-			# opening
-			set cl [sxml_advance str $kw]
-			set tc [list $kw [lindex $cl 0] $at [lindex $cl 1]]
-			lappend chd $tc
-		} else {
-			# closing (must be ours)
-			if { $kw != $kwd } {
-				error "mismatched tag: <$kwd ...> </$kw>"
-			}
-			# we are done
-			return [list $txt $chd]
-		}
-	}
-}
-
-proc sxml_parse { s } {
-#
-# Builds the XML tree from the provided string
-#
-	upvar $s str
-
-	set v [sxml_advance str ""]
-
-	return [list root [lindex $v 0] "" [lindex $v 1]]
-}
-
-proc sxml_name { s } {
-
-	return [lindex $s 0]
-}
-
-proc sxml_txt { s } {
-
-	return [string trim [lindex $s 1]]
-}
-
-proc sxml_attr { s n } {
-
-	set al [lindex $s 2]
-	set n [string tolower $n]
-	foreach a $al {
-		if { [lindex $a 0] == $n } {
-			return [lindex $a 1]
-		}
-	}
-	return ""
-}
-
-proc sxml_children { s { n "" } } {
-
-	set cl [lindex $s 3]
-
-	if { $n == "" } {
-		return $cl
-	}
-
-	set res ""
-
-	foreach c $cl {
-		if { [lindex $c 0] == $n } {
-			lappend res $c
-		}
-	}
-
-	return $res
-}
-
-proc sxml_child { s n } {
-
-	set cl [lindex $s 3]
-
-	foreach c $cl {
-		if { [lindex $c 0] == $n } {
-			return $c
-		}
-	}
-
-	return ""
-}
-
 ###############################################################################
 
-#
-# Log functions
-#
-
-proc log_open { } {
-
-	global Files Log
-
-	if [info exists Log(FD)] {
-		# close previous log
-		catch { close $Log(FD) }
-		unset Log(FD)
-	}
-
-	if [catch { file size $Files(LOG) } fs] {
-		# not present
-		if [catch { open $Files(LOG) "w" } fd] {
-			abt "Cannot open log: $fd"
-		}
-		# empty log
-		set Log(SIZE) 0
-	} else {
-		# log file exists
-		if [catch { open $Files(LOG) "a" } fd] {
-			abt "Cannot open log: $fd"
-		}
-		set Log(SIZE) $fs
-	}
-	set Log(FD) $fd
-	set Log(CD) 0
-}
-
-proc log_rotate { } {
-
-	global Files Log
-
-	catch { close $Log(FD) }
-	unset Log(FD)
-
-	for { set i $Log(MAXVERS) } { $i > 0 } { incr i -1 } {
-		set tfn "$Files(LOG).$i"
-		set ofn $Files(LOG)
-		if { $i > 1 } {
-			append ofn ".[expr $i - 1]"
-		}
-		catch { file rename -force $ofn $tfn }
-	}
-
-	log_open
-}
-
-proc log_out { m } {
-
-	global Log
-
-	catch {
-		puts $Log(FD) $m
-		flush $Log(FD)
-	}
-
-	incr Log(SIZE) [string length $m]
-	incr Log(SIZE)
-
-	if { $Log(SIZE) >= $Log(MAXSIZE) } {
-		log_rotate
-	}
-}
-
-proc log { m } {
-
-	global Log 
-
-	if ![info exists Log(FD)] {
-		# no log filr
-		return
-	}
-
-	set sec [clock seconds]
-	set day [clock format $sec -format %d]
-	set hdr [clock format $sec -format "%H:%M:%S"]
-
-	if { $day != $Log(CD) } {
-		# day change
-		set today "Today is "
-		append today [clock format $sec -format "%h $day, %Y"]
-		if { $Log(CD) == 0 } {
-			# startup
-			log_out "$hdr #### $today ####"
-		} else {
-			log_out "00:00:00 #### BIM! BOM! $today ####"
-		}
-		set Log(CD) $day
-	}
-
-	log_out "$hdr $m"
-}
-
-###############################################################################
 #
 # Database storage function (by Andrew Hoyer)
 #
@@ -404,21 +94,21 @@ proc data_out_db { cid lab val } {
 	}
 
 	if ![info exists DBASE(name)] {
-		log "database undefined, -x request ignored"
+		msg "database undefined, -x request ignored"
 		return
 	}
 
 	if [catch { mysql::connect -user $DBASE(user) -db $DBASE(name) -host\
 		$DBASE(host) -password $DBASE(password) } con] {
 
-		log "SQL connection failed: $con"
+		msg "SQL connection failed: $con"
 		return
 	}
 
 	# transform sensor label to sid
 	if [catch { set sid $DBASE(=$lab) } ] {
 		# ignore if not mapped
-		log "sensor $lab not mapped in the database, ignored"
+		msg "sensor $lab not mapped in the database, ignored"
 		catch { mysql::close $con }
 		return
 	}
@@ -427,7 +117,7 @@ proc data_out_db { cid lab val } {
 
 	if [catch { mysql::exec $con "INSERT INTO observations\
 	  (NID, SID, time, value) VALUES ($cid, $sid, $timestamp, $val)" } nr] {
-		log "SQL query failed: $nr"
+		msg "SQL query failed: $nr"
 	}
 
 	catch { mysql::close $con }
@@ -702,7 +392,8 @@ proc uart_init { rfun } {
 	if { $Uart(MODE) == 1 } {
 
 		# VUEE: a single socket connection
-		msg "connecting to a VUEE model: node $Uart(NODE),\					host $Uart(HOST), port $Uart(PORT) ..."
+		msg "connecting to a VUEE model: node $Uart(NODE),\
+			host $Uart(HOST), port $Uart(PORT) ..."
 
 		if [catch { socket -async $Uart(HOST) $Uart(PORT) } ser] {
 			abt "connection failed: $ser"
@@ -1322,24 +1013,62 @@ proc lrep { lst ix el } {
 	return [lreplace $lst $ix $ix $el]
 }
 
-proc exnum { str n } {
+proc exnum { str pat } {
 #
-# Extracts $n nonneg numbers from the string
+# Extracts values from the string according to the specified pattern
 #
+	global VL
+
 	set res ""
 
-	while { $n } {
-		if ![regexp "\[0-9\]+" $str num] {
+	foreach p $VL($pat) {
+
+		set kwd [lindex $p 0]
+		set typ [lindex $p 1]
+
+		if { $kwd != "" } {
+			if ![regexp -nocase -indices $kwd $str ind] {
+				return ""
+			}
+
+			set str [string trimleft \
+				[string range \
+					$str [expr [lindex $ind 1] + 1] end]]
+		} else {
+			set str [string trimleft $str]
+		}
+
+		if { $typ == "a" } {
+			# everything
+			lappend res [string trimright $str]
+			return $res
+		}
+
+		if ![regexp "^\[^ \t\]+" $str num] {
 			return ""
 		}
 
-		set loc [string first $num $str]
-		set str [string range $str [expr $loc + [string length $num]] \
-			end]
-		incr n -1
-		lappend res [expr $num]
-	}
+		# remove the present component for further matching
+		set str [string range $str [string length $num] end]
 
+		if { $typ == "s" } {
+			# string
+			lappend res $num
+			continue
+		}
+
+		if { $typ == "x" || $typ == "h" } {
+			regexp -nocase "\[0-9a-f\]+" $num num
+			set num "0x$num"
+		} else {
+			regexp -nocase "\[0-9\]+" $num num
+		}
+		if [catch { expr $num } num] {
+			return ""
+		}
+
+		lappend res $num
+	}
 	return $res
 }
 
@@ -1462,7 +1191,7 @@ proc input_line { inp } {
 
 	set inp [string trim $inp]
 
-	# write the line to standard output (we may remove this later)
+	# write the line to the log (and standard output)
 	msg "<- $inp"
 
 	if ![regexp "^(\[0-9\]\[0-9\]\[0-9\]\[0-9\]) (.*)" $inp jnk tp inp] {
@@ -1527,10 +1256,13 @@ proc input_asts { inp } {
 #
 	global Nodes
 
-	if ![regexp "(\[0-9\]+)\\)(.*)" $inp m aid inp] {
-		# can't locate the aggregator number
+	set res [exnum $inp ASTS]
+	if { $res == "" } {
+		msg "erroneous aggregator statistics line: $inp"
 		return
 	}
+
+	set aid [lindex $res 0]
 
 	# locate this aggregator
 	if { [napin aid] || ![info exists Nodes($aid)] } {
@@ -1545,17 +1277,10 @@ proc input_asts { inp } {
 		return
 	}
 
-	# there are 8 values altogether, but for now we shall extract only 2,
-	# i.e., frequency and power level
-	set nl [exnum $inp 2]
+	# for now we shall only extract 2 values: frequency and power level
 
-	if { $nl == "" } {
-		# something wrong
-		return
-	}
-
-	set fr [lindex $nl 0]
-	set pl [lindex $nl 1]
+	set fr [lindex $res 1]
+	set pl [lindex $res 2]
 
 	# expected frequency and power
 	set sp [lindex $ag 2]
@@ -1582,10 +1307,13 @@ proc input_csts { inp } {
 #
 	global Nodes
 
-	if ![regexp "(\[0-9\]+)\\) +via +(\[0-9\]+)(.*)"\
-	    $inp mat cid vid inp] {
+	set res [exnum $inp CSTS]
+	if { $res == "" } {
+		msg "erroneous collector statistics line: $inp"
 		return
 	}
+
+	set cid [lindex $res 0]
 
 	# locate this collector
 	if { [napin cid] || ![info exists Nodes($cid)] } {
@@ -1603,14 +1331,8 @@ proc input_csts { inp } {
 	# FIXME: should detect when memory is filled and do something;
 	# also concerns the aggregator
 
-	# extract the first four values
-	set nl [exnum $inp 4]
-	if { $nl == "" } {
-		return
-	}
-
-	set fr [lindex $nl 0]
-	set pl [lindex $nl 3]
+	set fr [lindex $res 2]
+	set pl [lindex $res 5]
 
 	# expected frequency and power
 	set sp [lindex $co 2]
@@ -1637,16 +1359,14 @@ proc input_avrp { inp } {
 #
 	global Nodes Time SBN Sensors Converters OSSI
 
-	if ![regexp "Agg +(\[0-9\]+) +slot: +(\[0-9\]+),\
-	    +ts: +(\[^ \]+) +Col +(\[0-9\]+) +slot: +(\[0-9\]+), +ts:\
-	    +(\[^ \]+) +(.+)" \
-	    $inp mat aid asl ats cid csl cts inp] {
-	    #
-	    # agg_Id, agg_slot, agg_tstamp, col_Id, col_slot, col_tstamp
-	    #
+	set res [exnum $inp AVRP]
+
+	if { $res == "" } {
 		msg "erroneous agg report line: $inp"
 		return
 	}
+
+	set aid [lindex $res 0]
 
 	# locate this aggregator
 	if { [napin aid] || ![info exists Nodes($aid)] } {
@@ -1664,8 +1384,11 @@ proc input_avrp { inp } {
 	# update the aggregator's report interval
 	update_report_interval $aid
 
-	# dynamic parameters; for now, we only store the slot number
+	set asl [lindex $res 1]
+	set ats [lindex $res 2]
+	set cid [lindex $res 3]
 
+	# dynamic parameters; for now, we only store the slot number
 	set dp [lindex $ag 3]
 	set osc [lindex $dp 3]
 	set dp [list $Time $asl $ats $osc]
@@ -1692,8 +1415,11 @@ proc input_avrp { inp } {
 		return
 	}
 
-	# update collector report interval
-	update_report_interval $cid
+        # update collector report interval
+        update_report_interval $cid
+
+	set csl [lindex $res 4]
+	set cts [lindex $res 5]
 
 	# dynamic parameters
 	set dp [lindex $co 3]
@@ -1701,9 +1427,10 @@ proc input_avrp { inp } {
 	set oai [lindex $dp 3]
 	# last slot
 	set osl [lindex $dp 1]
+
 	if { $osl != "" && $osl == $csl } {
 		# EEPROM full on the collector
-		msg "eeprom full on collector $cid"
+		msg "eeprom status unchanged on collector $cid"
 	}
 	set dp [list $Time $csl $cts $oai]
 	set Nodes($cid) [lrep $co 3 $dp]
@@ -1712,7 +1439,9 @@ proc input_avrp { inp } {
 	assoc_agg $aid $cid
 
 	# extract sensor values
+	set inp [lindex $res 6]
 	set uc 0
+
 	while 1 {
 
 		if ![regexp -nocase "(\[a-z\]\[a-z0-9\]*): +(\[0-9\]+)"\
@@ -1921,13 +1650,13 @@ proc operator_alert { msg } {
 #
 	global OPERATOR
 
-	log "Operator alert: $msg"
+	msg "Operator alert: $msg"
 	append msg "\n"
 
 	if [info exists OPERATOR(email)] {
 		foreach em $OPERATOR(email) {
 			catch {
-				log "sending email to $em"
+				msg "sending email to $em"
 				exec mail -s "EcoNet Alert" $em << "$msg"
 			}
 		}
@@ -2343,7 +2072,7 @@ set Files(DATA,DY) ""
 set Turn 0
 set Uart(FD) ""
 	
-log_open
+log_open $Files(LOG)
 
 uart_init input_line
 

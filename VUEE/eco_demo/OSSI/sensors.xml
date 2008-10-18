@@ -1,37 +1,37 @@
 <!-- This is the network map file -->
 <map>
-    <plots>
-        <plot slice="z" min="0" max="10" units="m" src="images/above.png"
-              width="480" xdim="x" xlim="0,10" height="480" ydim="y" ylim="0,10">
-            From Above
-        </plot>
 
-        <!--<plot slice="x" min="0" max="10" units="m" src="images/side.png"-->
-        <!--      width="454" xdim="y" xlim="0,4" height="400" ydim="z" ylim="0,10">-->
-        <!--    from the east-->
-        <!--</plot>-->
-    </plots>
+    <database name="econet">
+	<user>econet_admin</user>
+	<!-- Not extremely secret, is it? -->
+	<password>2aWba#</password>
+	<host>warburg.cs.ualberta.ca</host>
+	<!-- Sensor numbers derived from labels (see below) for database operations -->
+	<sensormap> S1=1 S2=2 S3=3 S0=4 </sensormap>
+    </database>
+
+    <operator>
+	<!-- Who receives e-mail alerts -->
+	<email>pawel@cs.ualberta.ca</email>
+    </operator>
 
     <aggregators>
 	<node id="10" power="7" frequency="300"></node>
     </aggregators>
 
     <collectors>
+
 	<!-- These are the 2 light sensors -->
-	<node id="128" power="7" frequency="300" rxspan="2" x="5" y="9.7" z="0">South Wall</node>
-	<node id="129" power="7" frequency="300" rxspan="2" x="9.7" y="5" z="0">West  Wall</node>
+	<node id="128" power="7" frequency="300" rxspan="2">South Wall</node>
+	<node id="129" power="7" frequency="300" rxspan="2">West  Wall</node>
 
-	<!-- This node is not installed -->
-	<!-- <node id="130" power="7" frequency="300" rxspan="2" x="4.5" y="2.4" z="7">shelf</node> -->
+	<!--These are the regular nodes with temp and humidity -->
+	<node id="131" power="7" frequency="300" rxspan="2">Above Door</node>
+	<node id="133" power="7" frequency="300" rxspan="2">S.W. Corner</node>
 
-	<!--These are the regular nodes with 2 temp sensors, 1 humidity, 1 photo diode -->
-	<node id="131" power="7" frequency="300" rxspan="2" x="3" y="0.1" z="0">Above Door</node>
-	
-	<!--<node id="132" power="7" frequency="300" rxspan="2" x="7.3" y="7.3" z="0">Near Ground</node>-->
-
-	<node id="133" power="7" frequency="300" rxspan="2" x="9.7" y="9.7" z="0">S.W. Corner</node>
-	<node id="134" power="7" frequency="300" rxspan="2" x="5" y="4.5" z="0">Center Tree</node>
-	<node id="135" power="7" frequency="300" rxspan="2" x=".2" y="3.8" z="0">East Wall</node>
+	<!-- These two have moisture sensors -->
+	<node id="134" power="7" frequency="300" rxspan="2">Center Tree</node>
+	<node id="135" power="7" frequency="300" rxspan="2">East Wall</node>
 
     </collectors>
 
@@ -39,8 +39,6 @@
 
     <converters>
 	<snippet sensors="PAR">
-		<!-- Just a random piece of code -->
-		<!--set value [expr $value * 0.0098]-->
 		set value [expr $value * 1.47]
 	</snippet>
 	<snippet sensors="TMP">
@@ -59,6 +57,7 @@
 		}
 	</snippet>
 	<snippet sensors="E05">
+		<!-- I have calculated these based on voltage measurements and sensor manuals -->
 		set value [expr $value * 0.09246 - 40.1]
 		if { $value < 0.0 } {
 			set value 0.0
@@ -76,46 +75,30 @@
 	</snippet>
     </converters>
 
-    <database name="econet">
-	<user>econet_admin</user>
-	<password>2aWba#</password>
-	<host>warburg.cs.ualberta.ca</host>
-	<sensormap> T=1 H=2 PD=3 PAR=4 </sensormap>
-    </database>
-
-    <operator>
-	<email>pawel@cs.ualberta.ca</email>
-    </operator>
-
     <sensors>
 
-	<!-- Values in text are for emulation -->
-	<!-- These two nodes have an extra light sensor -->
-	<sensor name="PAR 128" label="PAR" node="128" emu="0/0-1024"></sensor>
-	<sensor name="TMP 128" label="T" node="128" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 128" label="H" node="128" emu="2/1000-3000"></sensor>
+	<sensor name="PAR 128" label="S0" node="128" emu="0/0-1024"></sensor>
+	<sensor name="TMP 128" label="S1" node="128" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 128" label="S2" node="128" emu="2/1000-3000"></sensor>
 
-	<sensor name="PAR 129" label="PAR" node="129" emu="0/0-1024"></sensor>
-	<sensor name="TMP 129" label="T" node="129" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 129" label="H" node="129" emu="2/1000-3000"></sensor>
+	<sensor name="PAR 129" label="S0" node="129" emu="0/0-1024"></sensor>
+	<sensor name="TMP 129" label="S1" node="129" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 129" label="S2" node="129" emu="2/1000-3000"></sensor>
 
 
-	<sensor name="TMP 131" label="T" node="131" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 131" label="H" node="131" emu="2/1000-3000"></sensor>
+	<sensor name="TMP 131" label="S1" node="131" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 131" label="S2" node="131" emu="2/1000-3000"></sensor>
 
-	<!--<sensor name="TMP 132" label="T" node="132" emu="1/5500-6500"></sensor>-->
-	<!--<sensor name="HUM 132" label="H" node="132" emu="2/1000-3000"></sensor>-->
+	<sensor name="TMP 133" label="S1" node="133" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 133" label="S2" node="133" emu="2/1000-3000"></sensor>
 
-	<sensor name="TMP 133" label="T" node="133" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 133" label="H" node="133" emu="2/1000-3000"></sensor>
+	<sensor name="TMP 134" label="S1" node="134" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 134" label="S2" node="134" emu="2/1000-3000"></sensor>
+	<sensor name="E05 134" label="S3" node="134" emu="3/0-2000"></sensor>
 
-	<sensor name="TMP 134" label="T" node="134" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 134" label="H" node="134" emu="2/1000-3000"></sensor>
-	<sensor name="E05 134" label="PD" node="134" emu="3/0-2000"></sensor>
-
-	<sensor name="TMP 135" label="T" node="135" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 135" label="H" node="135" emu="2/1000-3000"></sensor>
-	<sensor name="E20 135" label="PD" node="135" emu="3/0-2000"></sensor>
+	<sensor name="TMP 135" label="S1" node="135" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 135" label="S2" node="135" emu="2/1000-3000"></sensor>
+	<sensor name="E20 135" label="S3" node="135" emu="3/0-2000"></sensor>
     </sensors>
 
 </map>

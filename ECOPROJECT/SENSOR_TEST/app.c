@@ -20,6 +20,8 @@ heapmem {10, 90};
 #define	RS_GSEN		20
 #define	RS_CSEN		30
 #define	RS_CSET		40
+#define	RS_CTST		50
+#define	RS_CTSE		60
 
 thread (root)
 
@@ -40,6 +42,8 @@ thread (root)
 #if 0
 		"x        -> turn reference on\r\n"
 #endif
+		"t        -> test on\r\n"
+		"e        -> test off\r\n"
 		);
 
   entry (RS_RCMD)
@@ -52,6 +56,8 @@ thread (root)
 #if 0
 		case 'x' : proceed (RS_CSET);
 #endif
+		case 't' : proceed (RS_CTST);
+		case 'e' : proceed (RS_CTSE);
 	}
 
   entry (RS_RCMD+1)
@@ -95,5 +101,13 @@ thread (root)
 	EREF_ON;
 	proceed (RS_RCMD);
 #endif
+
+  entry (RS_CTST)
+	SENSOR_TEST;
+	proceed (RS_RCMD);
+
+  entry (RS_CTSE)
+	SENSOR_TEST_END;
+	proceed (RS_RCMD);
 
 endthread

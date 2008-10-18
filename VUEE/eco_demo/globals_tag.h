@@ -33,7 +33,7 @@ extern const lword host_id;
 
 word		app_flags	= DEF_APP_FLAGS;
 
-pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
+pongParamsType	pong_params = {	60,	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
 				0x7777, // levels / retries
 				2048, 	// rx_span in msec (max 63K) 1: ON

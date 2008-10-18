@@ -1,27 +1,8 @@
-#ifdef	MALLOC_STATS
-#undef	MALLOC_STATS
-#endif
-
-#define	MALLOC_STATS	1
-
-#undef	TCV_PRESENT
-#undef	CC1100
-#undef	CC1000
-#undef	CRYSTAL_RATE
-#undef	CRYSTAL2_RATE
 #undef	UART_TCV
 #undef	UART_RATE
 #undef	UART_DRIVER
-#undef	LCD_ST7036
-#undef	UART_INPUT_BUFFER_LENGTH
-#undef	LCD_DRIVER
-#undef	ETHERNET_DRIVER
 
-#undef 	DIAG_MESSAGES
-#define DIAG_MESSAGES 1
+#define	UART_TCV	1
+#define	UART_RATE	115200
 
-#define	CRYSTAL_RATE	32768
-//#define	CRYSTAL2_RATE	6000000
-#define	UART_DRIVER	1
-//#define	UART_RATE	19200
-#define	UART_INPUT_BUFFER_LENGTH	0
+#define	PID_VER_TYPE	1

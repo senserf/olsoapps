@@ -112,3 +112,4 @@
 #endif
 #define CRYSTAL2_RATE 0
 
+#define	PID_VER_TYPE	0
