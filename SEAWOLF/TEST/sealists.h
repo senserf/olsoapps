@@ -71,8 +71,9 @@
 
 typedef struct {
 //
-// Record layout, ID ignored
+// Record layout
 //
+	lword	NID;
 	word	ECats, MCats, CL, IM;
 	char	*NI, *NM, *NT;
 

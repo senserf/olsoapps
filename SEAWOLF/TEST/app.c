@@ -252,7 +252,7 @@ thread (root)
 		// or                   refresh
 		case 'o' : proceed (RS_DSP);
 
-		// ci n lab x y			create an image object
+		// ci n h x y			create an image object
 		// cm n nl fo bg fg x y w h	create a menu object
 		// ct n fo bg fg x y w		create a text object
 		case 'c' : proceed (RS_CRE);
@@ -347,11 +347,11 @@ Gim:	// ====================================================================
 
 #define	OIX	(c [0])
 	
-	lbl [0] = '\0';
-	scan (ibuf+1, "%u %s %u %u", &c+0, lbl, c+1, c+2);
+	c [2] = c [3] = 0;
+	scan (ibuf+1, "%u %u %u %u", &c+0, c+1, c+2, c+3);
 
-#define	X	((byte)(c [1]))
-#define	Y	((byte)(c [2]))
+#define	X	((byte)(c [2]))
+#define	Y	((byte)(c [3]))
 
 	if (OIX >= MAXOBJECTS || X >= LCDG_MAXX || Y >= LCDG_MAXY)
 		goto Err;
@@ -362,15 +362,7 @@ EFree:
 		goto Ret;
 	}
 
-	// Look up the image by label
-	if ((c [3] = lcdg_im_find ((const byte*)lbl, strlen (lbl), WNONE)) ==
-	    WNONE) {
-		// Not found
-		Status = 102;
-		goto Ret;
-	}
-
-	if ((objects [OIX] = (lcdg_dm_obj_t*) lcdg_dm_newimage (c [3], X, Y)) ==
+	if ((objects [OIX] = (lcdg_dm_obj_t*) lcdg_dm_newimage (c [1], X, Y)) ==
 	    NULL)
 		Status = LCDG_DM_STATUS;
 	else
@@ -808,7 +800,7 @@ ERcv:
 
     entry (RS_FME)
 
-	// Just the object number
+	c [1] = 0;
 	scan (ibuf+2, "%u %u", c+0, c+1);
 
 	if (OIX >= MAXOBJECTS)

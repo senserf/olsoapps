@@ -1,45 +1,48 @@
 <sealist>
-
-<mycategories>
-	<category ord="0">drinks</category>
-	<category ord="1">pal</category>
-	<category>smokes</category>
-	<category>smart guy</category>
-	<category>money</category>
-	<category>kills people</category>
-	<category>stinks</category>
-</mycategories>
-
 <eventcategories>
-	<category ord="0">session A</category>
-	<category ord="1">session B</category>
-	<category ord="2">keynote talk</category>
-	<category>reception</category>
-	<category>bar</category>
-	<category>restaurant</category>
+	<category>Session on chicken feeding</category>
+	<category>Session on beer brewing</category>
+	<category>Keynote talk: how to decorate a pub</category>
+	<category>Reception: wine tasting</category>
+	<category>Vodka bar</category>
+	<category>Greek restaurant</category>
 	<category>Irish pub</category>
 </eventcategories>
-
+<mycategories>
+	<category>Likes to drink</category>
+	<category>Pal</category>
+	<category>Smokes pot</category>
+	<category>Smart guy</category>
+	<category>Money: buys drinks</category>
+	<category>Teetotaler</category>
+	<category>Robs people</category>
+	<category>Blows up buildings</category>
+	<category>Smells badly</category>
+</mycategories>
 <people>
 	<record class="yes">
 		<id>0xBACA0001</id>
 		<name>Wlodek Olesinski</name>
 		<nickname>CEO</nickname>
-		<why>0,1,5;4,5,6</why>
+		<why>0,1,3;4,5,6</why>
 		<note>Prefers straight vodka with a touch of grapefruit juice</note>
 	</record>
-
+	<record class="yes">
+		<id>0xBACA0003</id>
+		<name>Gerry Sendrowicz</name>
+		<nickname>Zdzichu</nickname>
+		<why>1,2,5;3,5</why>
+		<note>Doesn't drink a lot, not as much as he used to</note>
+	</record>
 	<record class="no">
 		<id>0xBACA0002</id>
 		<name>Osama Bin Laden</name>
-		<nickname>Chuj</nickname>
-		<why>7,8;2,3</why>
-		<note>Doesn't drink (among other problems)</note>
+		<nickname>Osama</nickname>
+		<why>7,8</why>
+		<note>If I meet him there, something must be wrong</note>
 	</record>
-
 	<record class="ignore">
-		<id>0xBACA0003</id>
+		<id>0xBACA0004</id>
 	</record>
 </people>
-
 </sealist>

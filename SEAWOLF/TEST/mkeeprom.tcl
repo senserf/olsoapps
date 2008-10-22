@@ -83,7 +83,7 @@ proc abt { m } {
 
 proc bad_usage { } {
 	global argv0
-	abt "Usage: $argv0 fontfile xmldatafile outputfile"
+	abt "Usage: $argv0 \[-i imagedir\] fontfile xmldatafile outputfile"
 }
 
 proc appendbc { wh v } {
@@ -325,7 +325,12 @@ proc handle_image { id } {
 # Load image
 #
 	global MEM LCDG_IM_PIXPERCHUNK LCDG_IM_CHUNKSPP OEP_CHUNKLEN
-	global LCDG_IM_CHUNKLEN LCDG_IM_PAGESIZE EEPROM_SIZE
+	global LCDG_IM_CHUNKLEN LCDG_IM_PAGESIZE EEPROM_SIZE EIM
+	
+
+	if { $EIM(DIR) != "" } {
+		set id [file join $EIM(DIR) $id]
+	}
 
 	# for now, this is treated as a file name
 	if [catch { open $id "r" } ifd] {
@@ -580,6 +585,17 @@ proc do_people { } {
 }
 
 ###############################################################################
+
+# image directory
+set EIM(DIR) ""
+
+if { [lindex $argv 0] == "-i" } {
+	set EIM(DIR) [lindex $argv 1]
+	if { $EIM(DIR) == "" } {
+		bad_usage
+	}
+	set argv [lrange $argv 2 end]
+}
 
 set ffile [lindex $argv 0]
 set dfile [lindex $argv 1]

@@ -188,8 +188,8 @@ sea_rec_t *seal_getrec (word rn) {
 		return NULL;
 	}
 
-	// EC, MC, CL
-	ee_read ((lword)(SEA_EOFF_REC + SEA_ROFF_EC) + rn, (byte*) res, 6);
+	// NID, EC, MC, CL
+	ee_read ((lword)(SEA_EOFF_REC + SEA_ROFF_ID) + rn, (byte*) res, 10);
 
 	// IM
 	res->IM = rw [3];

@@ -38,7 +38,7 @@ msource oep.tcl
 
 package require oep 1.0
 
-set CMDS	{ eeget eeput rilist imget imput }
+set CMDS	{ eeget eeput imget imput }
 
 proc log { msg } {
 
@@ -276,7 +276,7 @@ proc eeput { par } {
 	# invoke OEP
 	set st [oep_snd $PM(LID) $ST(RQN) $chunks]
 	# reactivate AB
-	u_ab_setif uget
+	u_ab_setif uget $PM(MPL)
 
 	if $st {
 		log "OEP failure"
@@ -328,7 +328,7 @@ proc eeget { par } {
 	# invoke OEP
 	set chunks [oep_rcv $PM(LID) $ST(RQN) $nc]
 	# re-activate AB
-	u_ab_setif uget
+	u_ab_setif uget $PM(MPL)
 
 	if { $chunks == "" } {
 		log "OEP timeout"
@@ -407,14 +407,16 @@ proc stmout { } {
 	set ST(DON) 999
 }
 
-proc rilist { par } {
+proc rilist { } {
 #
 # (Re)read image list
 #
-	global ST TM
+	global ST TM PM
+
+	log "retrieving image list from board ..."
 
 	# intercept input from the board
-	u_ab_setif ilget
+	u_ab_setif ilget $PM(MPL)
 
 	set ST(ILI) ""
 	set ST(DON) -1
@@ -432,22 +434,19 @@ proc rilist { par } {
 		vwait ST(DON)
 	}
 
+	u_ab_setif uget $PM(MPL)
+
 	if $ST(DON) {
-		u_ab_setif uget
 		log "error, status = $ST(DON)"
 		return 1
 	}
 
 	if { $ST(ILI) == "" } {
-		log "no images"
-	} else {
-		foreach im $ST(ILI) {
-			puts "[lindex $im 0] ([lindex $im 1], [lindex $im 2]):\
-				\"[lindex $im 3]\""
-		}
-	}
+		log "done, no images available"
+		return 1
+	} 
 
-	u_ab_setif uget
+	puts "done, [llength $ST(ILI)] images available"
 	return 0
 }
 
@@ -472,33 +471,42 @@ proc imput { par } {
 
 	set len [string length $chunks]
 
-	set hdl [expr $PM(LBL) + 5]
+	set hdl [expr $PM(LBL) + 4]
 	if { $len < $hdl } {
 		log "image file formar error"
 		return 1
 	}
 
-	binary scan $chunks sccc mag x y ll
+	binary scan $chunks scc mag x y
 
 	set mag [expr $mag & 0xffff]
 	set x [expr $x & 0xff]
 	set y [expr $y & 0xff]
-	set ll [expr $ll & 0xff]
+
 
 	if { $mag != $PM(IMA) || $x < 4 || $x > $PM(MXX) || $y < 4 ||
-	    $y > $PM(MYY) || $ll == 0 || $ll > $PM(LBL) } {
+	    $y > $PM(MYY) } {
 		log "image file format error"
 		return 1
+	}
+
+	# assume the label is ASCII
+	set lbl ""
+	for { set nc 4 } { $nc < [expr $PM(LBL) + 4] } { incr nc } {
+		set cl [string index $chunks $nc]
+		if { $cl == "\\x00" } {
+			break
+		}
+		append lbl $cl
 	}
 
 	# calculate the number of chunks
 	set nc [expr ($x * $y + $PM(PPC) - 1)/$PM(PPC)]
 
 	# extract the proper label
-	set lbl [string range $chunks 5 [expr 4 + $ll]]
-	set chunks [string range $chunks [expr $PM(LBL) + 5] end]
+	set chunks [string range $chunks [expr $PM(LBL) + 4] end]
 	# the length of the chunk set
-	set len [expr $len - $PM(LBL) - 5]
+	set len [expr $len - $PM(LBL) - 4]
 
 	# file length rounded up to full chunks
 	set cl [expr $nc * $PM(ICSIZE)]
@@ -512,6 +520,8 @@ proc imput { par } {
 		append chunks \x00
 		incr len
 	}
+
+	log "switching to OEP"
 
 	updrqn
 
@@ -527,7 +537,7 @@ proc imput { par } {
 	# invoke OEP
 	set st [oep_snd $PM(LID) $ST(RQN) $chunks]
 	# reactivate AB
-	u_ab_setif uget
+	u_ab_setif uget $PM(MPL)
 
 	if $st {
 		log "OEP failure"
@@ -556,8 +566,7 @@ proc imget { par } {
 		return 1
 	}
 
-	if { $ST(ILI) == "" } {
-		log "image list is empty, try 'rilist'"
+	if [rilist] {
 		return 1
 	}
 
@@ -570,7 +579,7 @@ proc imget { par } {
 	}
 
 	if $nf {
-		log "not found"
+		log "no such handle"
 		return 1
 	}
 	set x [lindex $im 1]
@@ -578,6 +587,8 @@ proc imget { par } {
 
 	# calculate the number of chunks
 	set nc [expr ($x * $y + $PM(PPC) - 1)/$PM(PPC)]
+
+	log "switching to OEP"
 
 	# advance request number
 	updrqn
@@ -594,7 +605,7 @@ proc imget { par } {
 	# invoke OEP
 	set chunks [oep_rcv $PM(LID) $ST(RQN) $nc]
 	# re-activate AB
-	u_ab_setif uget
+	u_ab_setif uget $PM(MPL)
 
 	if { $chunks == "" } {
 		log "OEP timeout"
@@ -604,21 +615,14 @@ proc imget { par } {
 	# build the header
 	set hdr [binary format scc $PM(IMA) $x $y]
 	# append the label
-	set lab [lindex $im 3]
+	set lab [string range [lindex $im 3] 0 [expr $PM(LBL) - 1]]
 	set len [string length $lab]
-	# PM(LBL) is one less; the first byte is used to store the actual length
-	if { $len > $PM(LBL) } {
-		set lab [string range $lab 0 [expr $PM(LBL) - 1]]
-		set len $PM(LBL)
-	} else {
-		set lng $len
-		while { $lng < $PM(LBL) } {
-			append lab \x00
-			incr lng
-		}
+	while { $len < $PM(LBL) } {
+		append lab \x00
+		incr len
 	}
 	# this should be fixed length = 38 bytes
-	append hdr "[binary format c $len]$lab"
+	append hdr $lab
 
 	# store the thing
 	if [sfile $fil "$hdr$chunks"] {
@@ -638,11 +642,15 @@ set PM(LID)		3
 set PM(PPC)		[expr (54*8)/12]
 # image magic
 set PM(IMA)		0x77AC
-# max total label length - 1
-set PM(LBL)		[expr 38 - 1]
+# max total label length
+set PM(LBL)		38
 # max Y and Y for an image
 set PM(MXX)		130
 set PM(MYY)		130
+
+# maximum packet length (use OEP_MAXRAWPL, which will limit the line size
+# for UART to that of CC1100 - framing
+set PM(MPL)		60
 
 # connected to board's command interface
 set ST(RQN)	1
@@ -658,7 +666,7 @@ if [catch { u_start "" 115200 "" } err] {
 	exit 99
 }
 
-u_ab_setif uget
+u_ab_setif uget $PM(MPL)
 
 fconfigure stdin -buffering line -blocking 0
 fileevent stdin readable sget
