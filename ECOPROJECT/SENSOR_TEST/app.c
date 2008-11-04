@@ -41,9 +41,9 @@ thread (root)
 		"c s d    -> read value of sensor s continually at d int\r\n"
 #if 0
 		"x        -> turn reference on\r\n"
-#endif
 		"t        -> test on\r\n"
 		"e        -> test off\r\n"
+#endif
 		);
 
   entry (RS_RCMD)
@@ -55,9 +55,9 @@ thread (root)
 		case 'c' : proceed (RS_CSEN);
 #if 0
 		case 'x' : proceed (RS_CSET);
-#endif
 		case 't' : proceed (RS_CTST);
 		case 'e' : proceed (RS_CTSE);
+#endif
 	}
 
   entry (RS_RCMD+1)
@@ -100,7 +100,6 @@ thread (root)
 
 	EREF_ON;
 	proceed (RS_RCMD);
-#endif
 
   entry (RS_CTST)
 	SENSOR_TEST;
@@ -109,5 +108,7 @@ thread (root)
   entry (RS_CTSE)
 	SENSOR_TEST_END;
 	proceed (RS_RCMD);
+
+#endif
 
 endthread
