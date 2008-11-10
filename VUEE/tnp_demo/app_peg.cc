@@ -361,7 +361,7 @@ thread (cmd_in)
 
 endthread
 
-static char * stateName (unsigned state) {
+static const char * stateName (unsigned state) {
 	switch ((tagStateType)state) {
 		case noTag:
 			return "noTag";
@@ -384,7 +384,7 @@ static char * stateName (unsigned state) {
 	}
 }
 
-static char * locatName (lword id) {
+static const char * locatName (lword id) {
 	if ((word)id == 0)
 		return "total";
 	if (((id >> 16) & 0xFF) == 0)

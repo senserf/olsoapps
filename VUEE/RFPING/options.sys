@@ -29,7 +29,7 @@
 #else
 
 #undef	SPIN_WHEN_HALTED
-#define	RADIO_BITRATE	200000
+// #define	RADIO_BITRATE	200000
 
 #undef	LEDS_DRIVER
 #undef	RADIO_USE_LEDS
