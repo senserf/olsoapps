@@ -14,9 +14,13 @@ __EXTERN char *_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 __EXTERN aggDataType _da (agg_data);
 __EXTERN aggEEDumpType *_da (agg_dump);
 __EXTERN msgPongAckType _da (pong_ack);
+__EXTERN word	_da (sync_freq);
 
 // Methods/functions: need no EXTERN
 
+void	_da (show_ifla) (void);
+void	_da (read_ifla) (void);
+void	_da (save_ifla) (void);
 void	_da (stats) (char * buf);
 void	_da (app_diag) (const word, const char *, ...);
 void	_da (net_diag) (const word, const char *, ...);

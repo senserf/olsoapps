@@ -3,7 +3,7 @@
 
 #define __msg_tag_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 

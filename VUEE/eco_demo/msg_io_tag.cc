@@ -1,11 +1,12 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
 #include "diag.h"
 #include "app_tag.h"
 #include "msg_tag.h"
+#include "oss_fmt.h"
 
 #ifdef	__SMURPH__
 
@@ -23,10 +24,11 @@
 
 __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
 
-	upd_on_ack (in_pongAck(buf, ts), in_pongAck(buf, reftime));
+	upd_on_ack (in_pongAck(buf, ts), in_pongAck(buf, reftime),
+			in_pongAck(buf, syfreq), in_pongAck(buf, ackflags));
 }
 
-__PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt) {
+__PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt, word syfr, word ackf) {
 
 	if (rt != 0) {
 		ref_clock.sec = rt;
@@ -37,10 +39,24 @@ __PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt) {
 			sens_data.ee.ts != ts)
 		return;
 
-	leds (0, 0);
+	leds (LED_R, LED_OFF);
 	sens_data.ee.s.f.status = SENS_CONFIRMED;
+	trigger (ACK_IN);
 
-	if (!is_eew_conf) {
+	if (syfr != 0) {
+		set_synced;
+
+		if (pong_params.freq_maj != syfr) {
+			diag (OPRE_APP_ACK "sync freq change %u -> %u",
+				pong_params.freq_maj, syfr);
+			pong_params.freq_maj = syfr;
+		}
+
+	} else {
+		clr_synced;
+	}
+
+	if (!is_eew_conf && ackf == 0) { // != 0 nack
 		if (sens_data.eslot > 0) {
 			sens_data.eslot--;
 		} else {
@@ -69,7 +85,8 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	if (out_buf == NULL)
 		return;
 
-	upd_on_ack (in_setTag(buf, ts), in_setTag(buf, reftime));
+	upd_on_ack (in_setTag(buf, ts), in_setTag(buf, reftime),
+			in_setTag(buf, syfreq), in_setTag(buf, ackflags));
 
 	if (in_setTag(buf, pow_levels) != 0xFFFF) {
 		mmin = in_setTag(buf, pow_levels);

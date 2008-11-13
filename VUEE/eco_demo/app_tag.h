@@ -1,7 +1,7 @@
 #ifndef __app_tag_h__
 #define __app_tag_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -34,6 +34,17 @@
 #define ERR_SLOT	0xFFFC
 #define ERR_FULL	0xFFF8
 #define ERR_MAINT	0xFFF0
+
+#define LED_R   0
+#define LED_G   1
+#define LED_B   2
+
+#define LED_OFF 0
+#define LED_ON  1
+#define LED_BLINK 2
+
+// semaphore for pongAcks
+#define ACK_IN	(&ref_time)
 
 typedef union {
 	lword sec;
@@ -97,16 +108,20 @@ typedef struct sensDataStruct {
 
 
 /* app_flags definition [default]:
-   bit 0: spare [0]
-   bit 1: master chganged (in TARP) [0]
+   bit 0: synced [0]
+   bit 1: master changed (in TARP) [0]
    bit 2: ee write collected [1]
    bit 3: ee write confirmed [0]
-   bit 4: ee overwrite (cyclic stack) [1]
+   bit 4: ee overwrite (cyclic stack) [0]
    bit 5: ee marker of empty slots [1]
-   */
-#define DEF_APP_FLAGS   0x34
+*/
+#define DEF_APP_FLAGS   0x24
 
-// master_cgh not used, but needed for TARP
+#define set_synced	(app_flags |= 1)
+#define clr_synced	(app_flags &= ~1)
+#define is_synced	(app_flags & 1)
+
+// master_chg not used, but needed for TARP
 
 #define set_eew_coll    (app_flags |= 4)
 #define clr_eew_coll    (app_flags &= ~4)

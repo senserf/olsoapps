@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -246,15 +246,17 @@ __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
 		master_clock.sec = in_master(buf, mtime);
 		master_delta = seconds();
 	//}
+	sync_freq = in_master(buf, syfreq);
 
 	if (is_master_chg) {
 		clr_master_chg;
 		if (running (mbeacon)) { // I was the Master
 			killall (mbeacon);
 			tarp_ctrl.param |= 0x01; // routing ON
+			diag (OPRE_APP_ACK "Abdicating for %u", master_host);
+		} else {
+		diag (OPRE_APP_ACK "Set master to %u", master_host);
 		}
-		diag (OPRE_APP_ACK "Set master to %u at %ld", master_host,
-			master_delta);
 	}
 }
 
@@ -273,6 +275,7 @@ __PUBLF (NodePeg, void, msg_master_out) (word state, char** buf_out,
 	mc.sec = 0;
 	wall_time (&mc);
 	in_master(*buf_out, mtime) = mc.sec;
+	in_master(*buf_out, syfreq) = sync_freq;
 }
 
 __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {

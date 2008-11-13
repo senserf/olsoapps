@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -41,6 +41,7 @@
 // Semaphore for command line
 #define CMD_READER	(&cmd_line)
 #define CMD_WRITER	((&cmd_line)+1)
+#define SENS_DONE	(&lh_time)
 
 // rx switch control
 #define RX_SW_ON	(&pong_params.rx_span)
@@ -55,7 +56,7 @@ strand (oss_out, char)
 endstrand
 
 __PUBLF (NodeTag, void, fatal_err) (word err, word w1, word w2, word w3) {
-	leds (0, 2);
+	leds (LED_R, LED_BLINK);
 	if_write (IFLASH_SIZE -1, err);
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
@@ -252,6 +253,50 @@ ThatsIt:
 	return 0;
 }
 
+__PUBLF (NodeTag, void, show_ifla) () {
+	char * mbuf = NULL;
+
+	if (if_read (0) == 0xFFFF) {
+		diag (OPRE_APP_ACK "No custom sys data");
+		return;
+	}
+	mbuf = form (NULL, ifla_str, if_read (0), if_read (1), if_read (2),
+			if_read (3), if_read (4), if_read (5));
+
+	if (runstrand (oss_out, mbuf) == 0) {
+		app_diag (D_SERIOUS, "oss_out fork");
+		ufree (mbuf);
+	}
+}
+
+__PUBLF (NodeTag, void, read_ifla) () {
+	if (if_read (0) == 0xFFFF) { // usual defaults
+		local_host = (word)host_id;
+		return;
+	}
+
+	local_host = if_read (0);
+	pong_params.pow_levels = if_read (1);
+	app_flags = if_read (2);
+	pong_params.freq_maj = if_read (3);
+	pong_params.freq_min = if_read (4);
+	pong_params.rx_span = if_read (5);
+}
+
+__PUBLF (NodeTag, void, save_ifla) () {
+	if (if_read (0) != 0xFFFF) {
+		if_erase (0);
+		diag (OPRE_APP_ACK "Flash p0 overwritten");
+	}
+	// there is 'show' after 'save'... don't check if_writes here (?)
+	if_write (0, local_host);
+	if_write (1, pong_params.pow_levels);
+	if_write (2, (app_flags & 0xFFFC)); // off synced, mster chg
+	if_write (3, pong_params.freq_maj);
+	if_write (4, pong_params.freq_min);
+	if_write (5, pong_params.rx_span);
+}
+
 // Display node stats on UI
 __PUBLF (NodeTag, void, stats) () {
 	char * mbuf;
@@ -414,6 +459,14 @@ static word map_level (word l) {
   Pong process: spontaneous ping a rebours
   PS_ <-> Pong State 
   --------------------
+
+  This model descends from TNP blueprint, but is becoming more and more
+  inadequte for sensors (payload here), especially if they are controlled
+  remotely (sync, acks, nacks). Likely, the sens process should be in a constant
+  loop queuing results and calling utility routines to communicate, write
+  to eeprom, etc. EcoNet 2.0, after we have a chance to gather credible
+  requirements.
+
 */
 
 thread (pong)
@@ -434,6 +487,10 @@ thread (pong)
 			finish;
 		}
 		png_shift = 0;
+
+		// not sure this is a good idea... spread pongs:
+		delay (rnd() % 5000, PS_SEND);
+		release;
 
 	entry (PS_SEND)
 
@@ -490,12 +547,22 @@ thread (pong)
 			net_opt (PHYSOPT_TXOFF, NULL);
 			net_diag (D_DEBUG, "Tx off %x",
 					net_opt (PHYSOPT_STATUS, NULL));
+
+			when (ACK_IN, PS_SEND1);
+
 		} else {
 			if (level == 0)
 				app_diag (D_DEBUG, "skip level");
-			else if (sens_data.ee.s.f.status != SENS_CONFIRMED)
+
+			if (sens_data.ee.s.f.status != SENS_CONFIRMED) {
 				app_diag (D_DEBUG, "sens not ready %u",
 						sens_data.ee.s.f.status);
+			} else {
+				next_col_time ();
+				if (lh_time <= 0)
+					proceed (PS_SENS);
+				proceed (PS_HOLD);
+			}
 		}
 		//powerdown();
 		delay (pong_params.freq_min << 10, PS_SEND1);
@@ -506,10 +573,7 @@ thread (pong)
 		if ((png_shift += 4) < 16)
 			proceed (PS_SEND);
 
-		// << 2 is for 4 levels
-		lh_time = (long)pong_params.freq_maj -
-	       		(pong_params.freq_min << 2) - (SENS_COLL_TIME >> 10) -1;
-
+		next_col_time ();
 		if (lh_time <= 0)
 			proceed (PS_SENS);
 		//powerdown();
@@ -539,6 +603,7 @@ thread (pong)
 		if (running (sens)) {
 			app_diag (D_SERIOUS, "Reg. sens delayed");
 			delay (SENS_COLL_TIME, PS_COLL);
+			when (SENS_DONE, PS_COLL);
 			release;
 		}
 
@@ -549,6 +614,7 @@ thread (pong)
 		}
 		runthread (sens);
 		delay (SENS_COLL_TIME, PS_NEXT);
+		when (SENS_DONE, PS_NEXT);
 		release;
 
 endthread
@@ -558,7 +624,7 @@ thread (sens)
 
 	entry (SE_INIT)
 		powerup();
-		leds (0, 1);
+		leds (LED_R, LED_ON);
 
 		switch (sens_data.ee.s.f.status) {
 		  case SENS_IN_USE:
@@ -594,6 +660,7 @@ thread (sens)
 		mc.sec = 0;
 		wall_time (&mc);
 		sens_data.ee.ts = mc.sec;
+		lh_time = seconds();
 #ifdef SENSOR_LIST
 	entry (SE_0)
 		read_sensor (SE_0, 0, &sens_data.ee.sval[0]);
@@ -626,7 +693,8 @@ thread (sens)
 		sens_data.ee.s.f.spare = 7;
 		sens_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 
-		leds (0, 2);
+		leds (LED_R, LED_BLINK);
+		trigger (SENS_DONE);
 		powerdown();
 		finish;
 endthread
@@ -680,10 +748,21 @@ thread (root)
 		form (ui_obuf, ee_str, EE_SENS_MIN, EE_SENS_MAX -1,
 			EE_SENS_SIZE);
 
+		if (if_read (IFLASH_SIZE -1) != 0xFFFF)
+			leds (LED_R, LED_BLINK);
+		else
+			leds (LED_G, LED_BLINK);
+
+		delay (5000, RS_INIT1);
+		release;
+
 	entry (RS_INIT1)
 		ser_out (RS_INIT1, ui_obuf);
+		master_host = local_host;
+		read_ifla();
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
+			leds (LED_R, LED_OFF);
 			diag (OPRE_APP_MENU_C "Maintenance mode (D, E, F, Q)"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
@@ -694,14 +773,13 @@ thread (root)
 				runthread (cmd_in);
 			proceed (RS_RCMD);
 		}
+		leds (LED_G, LED_OFF);
 
 	entry (RS_INIT2)
 		ser_out (RS_INIT2, welcome_str);
 
 		init();
-		local_host = (nid_t) host_id;
 		net_id = DEF_NID;
-		master_host = local_host;
 		tarp_ctrl.param &= 0xFE; // routing off
 		runthread (sens);
 
@@ -818,24 +896,27 @@ thread (root)
 			// will reset
 		}
 
-		if (cmd_line[0] == 'E') { 
+		if (cmd_line[0] == 'E') {
+			diag (OPRE_APP_ACK "erasing eeprom...");	
 			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_SERIOUS, "ee_erase failed");
+				app_diag (D_SERIOUS, "erase failed");
 			else
-				diag (OPRE_APP_ACK "eprom erased");
+				diag (OPRE_APP_ACK "eeprom erased");
 			reset();
 		}
 
 		if (cmd_line[0] == 'F') {
-			if_erase (-1);
-			diag (OPRE_APP_ACK "flash erased");
+			if_erase (IFLASH_SIZE -1);
+			diag (OPRE_APP_ACK "flash p1 erased");
 			reset();
 		}
 
 		if (cmd_line[0] == 'Q') {
+			diag (OPRE_APP_ACK "erasing all...");
 			if (ee_erase (WNONE, 0, 0))
 				app_diag (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
+			diag (OPRE_APP_ACK "all erased");
 			reset();
 		}
 
@@ -894,6 +975,25 @@ thread (root)
 				}
 			}
 
+			stats ();
+			proceed (RS_FREE);
+		}
+
+		if (cmd_line[0] == 'S') {
+			if (cmd_line[1] == 'A')
+				save_ifla();
+			show_ifla();
+			proceed (RS_FREE); 
+		}
+
+		if (cmd_line[0] == 'I') {
+			if (cmd_line[1] == 'D') {
+				i1 = -1;
+				scan (cmd_line +2, "%d", &i1);
+				if (i1 > 0) {
+					local_host = i1;
+				}
+			}
 			stats ();
 			proceed (RS_FREE);
 		}

@@ -45,9 +45,9 @@ wroomType msg4ward 		= {NULL, 0};
 aggDataType	agg_data;
 msgPongAckType	pong_ack	= {{msg_pongAck}};
 
-aggEEDumpType	*agg_dump = NULL;
+aggEEDumpType	*agg_dump 	= NULL;
 
-
+word	sync_freq		= 0;
 
 #endif
 
@@ -58,7 +58,7 @@ aggEEDumpType	*agg_dump = NULL;
 static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_A 
-	"***EcoNet***" OMID_CRB "Aggregator commands:\r\n"
+	"*EcoNet* 1.1" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
 	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
@@ -73,6 +73,14 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 	"\tFlash erase:\tF (*** clears special conditions ***)\r\n"
 	OPRE_APP_MENU_A 
 	"\tClean reset:\tQ (*** to factory defaults (E+F) ***)\r\n"
+	OPRE_APP_MENU_A
+	"\tID set / show:\tI[D id]   (*** CAREFUL Host ID   ***)\r\n"
+	OPRE_APP_MENU_A
+	"\tID master set:\tIM id     (*** CAREFUL Master ID ***)\r\n"
+	OPRE_APP_MENU_A 
+	"\tSave(d) sys:  \tS[A]      (*** Show, SAve iFLASH ***)\r\n"
+	OPRE_APP_MENU_A
+	"\tSync coll:    \tY [freq]  (*** Sync at freq      ***)\r\n"
 	OPRE_APP_MENU_A 
 	"\tQuit (reset)\tq\r\n"
 	OPRE_APP_MENU_A 
@@ -97,6 +105,9 @@ static const char statsCol_str[] = OPRE_APP_STATS_CA
 	"Stats for coll (%lx: %u) via %u:" OMID_CR
 	" Maj_freq %u min_freq %u rx_span %u pl %x c_fl %x" OMID_CR
 	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
+
+static const char ifla_str[] = OPRE_APP_IFLA_A
+	"Flash: id %u pl %u a_fl %x au_fr %u master %u sync_fr %u\r\n";
 
 static const char bad_str[] = 	OPRE_APP_BAD 
 				"Bad or incomplete command (%s)\r\n";

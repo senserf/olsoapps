@@ -17,6 +17,10 @@ __EXTERN sensEEDumpType *_da (sens_dump);
 
 // Methods/functions: need no EXTERN
 
+void	_da (next_col_time) (void);
+void	_da (show_ifla) (void);
+void	_da (read_ifla) (void);
+void	_da (save_ifla) (void);
 void	_da (stats) (void);
 void	_da (app_diag) (const word, const char *, ...);
 void	_da (net_diag) (const word, const char *, ...);
@@ -35,7 +39,7 @@ void	_da (sens_init) ();
 void	_da (init) ();
 word	_da (r_a_d) (void);
 void	_da (wall_time) (mclock_t *mc);
-void	_da (upd_on_ack) (lword ts, lword rt);
+void	_da (upd_on_ack) (lword ts, lword rt, word syfr, word ackf);
 word	_da (handle_c_flags) (word c_fl);
 void	_da (tmpcrap) (word);
 

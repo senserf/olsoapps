@@ -18,6 +18,10 @@
 #define ref_clock	_dac (NodeTag, ref_clock)
 
 // Methods
+#define next_col_time		_dac (NodeTag, next_col_time)
+#define show_ifla		_dac (NodeTag, show_ifla)
+#define read_ifla		_dac (NodeTag, read_ifla)
+#define save_ifla		_dac (NodeTag, save_ifla)
 #define	stats			_dac (NodeTag, stats)
 #define	app_diag		_dac (NodeTag, app_diag)
 #define	net_diag		_dac (NodeTag, net_diag)

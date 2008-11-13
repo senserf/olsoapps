@@ -17,6 +17,8 @@ typedef struct msgSetTagStruct {
 	word		spare;
 	lword		ts;
 	lword		reftime;
+	word		syfreq;
+	word		ackflags;
 } msgSetTagType;
 
 #define in_setTag(buf, field)   (((msgSetTagType *)(buf))->field)
@@ -77,6 +79,8 @@ typedef struct msgPongAckStruct {
 	headerType	header;
 	lword		ts;
 	lword		reftime;
+	word		syfreq;
+	word		ackflags;
 } msgPongAckType;
 #define in_pongAck(buf, field) (((msgPongAckType *)(buf))->field)
 

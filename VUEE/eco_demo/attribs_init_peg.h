@@ -21,3 +21,4 @@
 
 	_da (master_clock).sec	= 0;
 
+	_da (sync_freq)		= 0;

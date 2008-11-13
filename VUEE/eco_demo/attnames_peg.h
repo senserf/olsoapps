@@ -21,8 +21,12 @@
 #define agg_data	_dac (NodePeg, agg_data)
 #define agg_dump	_dac (NodePeg, agg_dump)
 #define pong_ack	_dac (NodePeg, pong_ack)
+#define sync_freq	_dac (NodePeg, sync_freq)
 
 // Methods
+#define show_ifla		_dac (NodePeg, show_ifla)
+#define read_ifla		_dac (NodePeg, read_ifla)
+#define save_ifla		_dac (NodePeg, save_ifla)
 #define	stats			_dac (NodePeg, stats)
 #define	app_diag		_dac (NodePeg, app_diag)
 #define	net_diag		_dac (NodePeg, net_diag)

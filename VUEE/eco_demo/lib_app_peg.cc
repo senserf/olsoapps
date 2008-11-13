@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2006.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2008.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
@@ -168,6 +168,55 @@ __PUBLF (NodePeg, void, init_tags) () {
 		init_tag (i);
 }
 
+#if 0
+would have to be in global processes crap... is in app_peg.cc
+__PUBLF (NodePeg, void, show_ifla) () {
+	char * mbuf = NULL;
+
+	if (if_read (0) == 0xFFFF) {
+		diag (OPRE_APP_ACK "No custom sys data");
+		return;
+	}
+	mbuf = form (NULL, ifla_str, if_read (0), if_read (1), if_read (2),
+			if_read (3), if_read (4));
+
+	if (runstrand (oss_out, mbuf) == 0) {
+		app_diag (D_SERIOUS, "oss_out fork");
+		ufree (mbuf);
+	}
+}
+
+__PUBLF (NodePeg, void, read_ifla) () {
+	if (if_read (0) == 0xFFFF) { // usual defaults
+		local_host = (word)host_id;
+#ifndef __SMURPH__
+		master_host = DEF_MHOST;
+#endif
+		return;
+	}
+
+	local_host = if_read (0);
+	host_pl = if_read (1);
+	app_flags = if_read (2);
+	tag_auditFreq = if_read (3);
+	master_host = if_read (4);
+}
+
+__PUBLF (NodePeg, void, save_ifla) () {
+	if (if_read (0) != 0xFFFF) {
+		if_erase (0);
+		diag (OPRE_APP_ACK "Flash p0 overwritten");
+	}
+
+	// there is 'show' after 'save'... don't check if_writes here (?)
+	if_write (0, local_host);
+	if_write (1, host_pl);
+	if_write (2, app_flags);
+	if_write (3, tag_auditFreq);
+	if_write (4, master_host);
+}
+#endif
+
 __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
 							Boolean updEvTime) {
 	tagArray[i].state = state;
@@ -224,9 +273,24 @@ this is for mobile tags, to cut off flickering ones
 			break;
 
 		case goneTag:
-			app_diag (D_DEBUG, "Rep gone %u",
-				(word)tagArray[i].id);
-			msg_report_out (state, i, buf_out, REP_FLAG_PLOAD);
+			// stop after 4 beats
+			if (seconds() - tagArray[i].lastTime >
+					((lword)tagArray[i].freq << 2)) {
+				app_diag (D_WARNING,
+					"Stopped reporting gone %u",
+					(word)tagArray[i].id);
+				init_tag (i);
+
+			} else {
+				app_diag (D_DEBUG, "Rep gone %u",
+					(word)tagArray[i].id);
+				msg_report_out (state, i, buf_out, 
+						REP_FLAG_PLOAD);
+				// if in meantime I becane the Master:
+				if (local_host == master_host || 
+						master_host == 0)
+					init_tag (i);
+			}
 			break;
 
 		case reportedTag:
@@ -235,9 +299,29 @@ this is for mobile tags, to cut off flickering ones
 				tagArray[i].id);
 			set_tagState (i, fadingReportedTag, NO);
 #endif
-			app_diag (D_DEBUG, "Re rep %u",
-				(word)tagArray[i].id);
-			msg_report_out (state, i, buf_out, REP_FLAG_PLOAD);
+			// mark 'gone' for unconfirmed as well
+			if (seconds() - tagArray[i].lastTime >
+					((lword)tagArray[i].freq << 1)) {
+				app_diag (D_DEBUG, "Rep going %u",
+						(word)tagArray[i].id);
+				set_tagState (i, goneTag, YES);
+				msg_report_out (state, i, buf_out,
+						REP_FLAG_PLOAD);
+
+				if (local_host == master_host ||
+						master_host == 0)
+					init_tag (i);
+
+			} else {
+				app_diag (D_DEBUG, "Re rep %u",
+					(word)tagArray[i].id);
+				msg_report_out (state, i, buf_out, 
+						REP_FLAG_PLOAD);
+				// if I become the Master, this is needed:
+				if (local_host == master_host || 
+						master_host == 0)
+					set_tagState (i, confirmedTag, NO);
+			}
 			break;
 
 		case confirmedTag:
@@ -449,9 +533,14 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 		if (in_pong_pload(buf)) { // add ack data
 			in_setTag(msg4tag.buf, ts) = in_pongPload(buf, ts);
 			in_setTag(msg4tag.buf, reftime) = mc.sec;
+			in_setTag(msg4tag.buf, syfreq) = sync_freq;
+			in_setTag(msg4tag.buf, ackflags) =
+				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 		} else {
 			in_setTag(msg4tag.buf, reftime) = 0;
 			in_setTag(msg4tag.buf, ts) = 0; 
+			in_setTag(msg4tag.buf, syfreq) = 0;
+			in_setTag(msg4tag.buf, ackflags) = 0;
 		}
 
 		send_msg (msg4tag.buf, sizeof(msgSetTagType));
@@ -465,6 +554,9 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 			pong_ack.header.hco = in_header(buf, hoc);
 			pong_ack.ts = in_pongPload(buf, ts);
 			pong_ack.reftime = mc.sec;
+			pong_ack.syfreq = sync_freq;
+			pong_ack.ackflags = 
+				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 			send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
 		}
 	}
@@ -530,7 +622,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 }
 
 __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
-	leds (0, 2);
+	leds (LED_R, LED_BLINK);
 	if_write (IFLASH_SIZE -1, err);
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);

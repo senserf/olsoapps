@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2008.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
@@ -168,5 +168,19 @@ __PUBLF (NodeTag, word, handle_c_flags) (word c_fl) {
 	return (is_eew_over ? C_FL_EEW_OVER : 0) |
 	       (is_eew_conf ? C_FL_EEW_CONF : 0) |
 	       (is_eew_coll ? C_FL_EEW_COLL : 0);
+}
+
+__PUBLF (NodeTag, void, next_col_time) () {
+
+	if (is_synced) { // last coll time doesn't matter
+		lh_time = seconds() - ref_time + 3600L * ref_clock.hms.h +
+			60 * ref_clock.hms.m + ref_clock.hms.s;
+
+		lh_time %= pong_params.freq_maj;
+		lh_time = pong_params.freq_maj - lh_time;
+
+	} else {
+		lh_time = lh_time - seconds() + pong_params.freq_maj;
+	}
 }
 

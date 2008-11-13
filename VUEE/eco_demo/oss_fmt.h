@@ -60,6 +60,9 @@ OPRE_APP_DUMP_C Single output line after 'D' on the Col (dump_str)
 OPRE_APP_DEND_C Closing line after 'D' on the Col (dumpend_str)
 OPRE_APP_T	After the 'T' command.
 
+OPRE_APP_IFLA_A	Result from 'S' command: Agg EFLASH sys content (ifla_str)
+OPRE_APP_IFLA_C	Result from 'S' command: Col EFLASH sys content (ifla_str)
+
 *********************************************************************/
 
 #define FMT_MAIN	1
@@ -98,6 +101,9 @@ OPRE_APP_T	After the 'T' command.
 #define OPRE_APP_DEND_C		"2008 "
 #define OPRE_APP_T		"1009 "
 
+#define OPRE_APP_IFLA_A		"1010 "
+#define OPRE_APP_IFLA_C		"2010 "
+
 #else
 
 #if OSS_FMT == FMT_TERM
@@ -129,6 +135,9 @@ OPRE_APP_T	After the 'T' command.
 #define OPRE_APP_DEND_A		""
 #define OPRE_APP_DEND_C		""
 #define OPRE_APP_T		""
+
+#define OPRE_APP_IFLA_A		""
+#define OPRE_APP_IFLA_C		""
 
 #else
 

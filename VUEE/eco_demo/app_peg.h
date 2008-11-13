@@ -1,7 +1,7 @@
 #ifndef __app_peg_h
 #define __app_peg_h
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -34,6 +34,14 @@
 // _FULL may be needed for important data retention
 #define ERR_FULL	0xFFF8
 #define ERR_MAINT	0xFFF0
+
+#define LED_R   0
+#define LED_G   1
+#define LED_B   2
+
+#define LED_OFF 0
+#define LED_ON  1
+#define LED_BLINK 2
 
 typedef enum {
 	noTag, newTag, reportedTag, confirmedTag,
@@ -121,13 +129,13 @@ typedef struct aggDataStruct {
 
 /* app_flags definition [default]:
 bit 0: spare [0]
-bit 1: master chganged (in TARP) [0]
+bit 1: master changed (in TARP) [0]
 bit 2: ee write collected [1]
 bit 3: ee write confirmed [0]
-bit 4: ee overwrite (cyclic stack) [1]
+bit 4: ee overwrite (cyclic stack) [0]
 bit 5: ee marker of empty slots [1]
 */
-#define DEF_APP_FLAGS   0x34
+#define DEF_APP_FLAGS   0x24
 
 #define clr_master_chg	(app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)

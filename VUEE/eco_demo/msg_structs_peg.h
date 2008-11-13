@@ -10,6 +10,8 @@
 typedef struct msgMasterStruct {
 	headerType	header;
 	lword		mtime; // this is mclock_t, what a mess with types...
+	word		syfreq;
+	word		spare;
 } msgMasterType;
 
 #define in_master(buf, field)   (((msgMasterType *)(buf))->field)

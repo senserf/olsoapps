@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -58,6 +58,64 @@ thread (mbeacon)
 	proceed (MB_START);
 
 endthread
+
+__PUBLF (NodePeg, void, show_ifla) () {
+	char * mbuf = NULL;
+
+	if (if_read (0) == 0xFFFF) {
+		diag (OPRE_APP_ACK "No custom sys data");
+		return;
+	}
+	mbuf = form (NULL, ifla_str, if_read (0), if_read (1), if_read (2),
+			if_read (3), if_read (4), if_read (5));
+
+	if (runstrand (oss_out, mbuf) == 0) {
+		app_diag (D_SERIOUS, "oss_out fork");
+		ufree (mbuf);
+	}
+}
+
+__PUBLF (NodePeg, void, read_ifla) () {
+
+	if (if_read (0) == 0xFFFF) { // usual defaults
+		local_host = (word)host_id;
+#ifndef __SMURPH__
+		master_host = DEF_MHOST;
+#endif
+		return;
+	}
+
+	local_host = if_read (0);
+	host_pl = if_read (1);
+	app_flags = if_read (2);
+	tag_auditFreq = if_read (3);
+	master_host = if_read (4);
+	sync_freq = if_read (5);
+	if (sync_freq > 0) {
+		master_delta = seconds();
+		master_clock.hms.d = 0;
+		master_clock.hms.h = 0;
+		master_clock.hms.m = 0;
+		master_clock.hms.s = 0;
+		master_clock.hms.f = 1;
+		diag (OPRE_APP_ACK "Implicit T 0:0:0");
+	}
+}
+
+
+__PUBLF (NodePeg, void, save_ifla) () {
+	if (if_read (0) != 0xFFFF) {
+		if_erase (0);
+		diag (OPRE_APP_ACK "Flash p0 overwritten");
+	}
+	// there is 'show' after 'save'... don't check if_writes here (?)
+	if_write (0, local_host);
+	if_write (1, host_pl);
+	if_write (2, (app_flags & 0xFFFC)); // off spare, master chg
+	if_write (3, tag_auditFreq);
+	if_write (4, master_host);
+	if_write (5, sync_freq);
+}
 
 // Display node stats on UI
 __PUBLF (NodePeg, void, stats) (char * buf) {
@@ -609,7 +667,7 @@ __PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
 
 	if (local_host != master_host && (local_host == peg || peg == 0)) {
 		if (!running (mbeacon))
-				runthread (mbeacon);
+			runthread (mbeacon);
 		master_host = local_host;
 		master_delta = 0;
 		master_clock.sec = 0;
@@ -690,10 +748,20 @@ thread (root)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 		form (ui_obuf, ee_str, EE_AGG_MIN, EE_AGG_MAX -1, EE_AGG_SIZE);
 
+		if (if_read (IFLASH_SIZE -1) != 0xFFFF)
+			leds (LED_R, LED_BLINK);
+		else
+			leds (LED_G, LED_BLINK);
+
+		delay (5000, RS_INIT1);
+		release;
+
 	entry (RS_INIT1)
 		ser_out (RS_INIT1, ui_obuf);
+		read_ifla();
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
+			leds (LED_R, LED_OFF);
 			diag (OPRE_APP_MENU_A "Maintenance mode (D, E, F, Q)"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
@@ -704,14 +772,13 @@ thread (root)
 				runthread (cmd_in);
 			proceed (RS_RCMD);
 		}
+		leds (LED_G, LED_OFF);
 
 	entry (RS_INIT2)
 		ser_out (RS_INIT2, welcome_str);
 
-		local_host = (word)host_id;
 #ifndef __SMURPH__
 		net_id = DEF_NID;
-		master_host = DEF_MHOST;
 #endif
 		tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
 
@@ -842,21 +909,24 @@ thread (root)
 			// will reset
 
 		case 'E':
+			diag (OPRE_APP_ACK "erasing eeprom...");
 			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_SERIOUS, "ee_erase failed");
+				app_diag (D_SERIOUS, "erase failed");
 			else
-				diag (OPRE_APP_ACK "eprom erased");
+				diag (OPRE_APP_ACK "eeprom erased");
 			reset();
 
 		case 'F':
-			if_erase (-1);
-			diag (OPRE_APP_ACK "flash erased");
+			if_erase (IFLASH_SIZE -1);
+			diag (OPRE_APP_ACK "flash p1 erased");
 			reset();
 
 		case 'Q':
+			diag (OPRE_APP_ACK "erasing all...");
 			if (ee_erase (WNONE, 0, 0))
 				app_diag (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
+			diag (OPRE_APP_ACK "all erased");
 			reset();
 
 		case 'm':
@@ -924,6 +994,45 @@ thread (root)
 				oss_setPeg_in (RS_DOCMD, i1, i2, i3, i4);
 			}
 
+			proceed (RS_FREE);
+
+		case 'S':
+			if (cmd_line[1] == 'A')
+				save_ifla();
+			show_ifla();
+			proceed (RS_FREE);
+
+		case 'I':
+			if (cmd_line[1] == 'D' || cmd_line[1] == 'M') {
+				i1 = -1;
+				scan (cmd_line +2, "%d", &i1);
+				if (i1 > 0) {
+				       if (cmd_line[1] == 'D') {
+					       local_host = i1;
+				       } else {
+					       master_host = i1;
+				       }
+				}
+			}
+			stats(NULL);
+			proceed (RS_FREE);
+
+		case 'Y':
+			i1 = -1;
+			scan (cmd_line +1, "%u", &i1);
+			if (i1 >= 0 && sync_freq != i1) {
+				sync_freq = i1;
+				if (sync_freq > 0 && master_clock.hms.f == 0) {
+					master_delta = seconds();
+					master_clock.hms.d = 0;
+					master_clock.hms.h = 0;
+					master_clock.hms.m = 0;
+					master_clock.hms.s = 0;
+					master_clock.hms.f = 1;
+					diag (OPRE_APP_ACK "Implicit T 0:0:0");
+				}
+			}
+			diag (OPRE_APP_ACK "Synced to %u", sync_freq);
 			proceed (RS_FREE);
 
 		default:
