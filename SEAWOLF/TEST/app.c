@@ -99,9 +99,52 @@ static void display_rec (word rh) {
 
 // ============================================================================
 
+static void preset_menus () {
+
+	word i;
+
+	for (i = 0; i < 4; i++)
+		if (objects [i] != NULL)
+			return;
+
+	if ((objects [0] = seal_mkcmenu (NO)) != NULL)
+		lcdg_dm_newtop (objects [0]);
+	if ((objects [1] = seal_mkcmenu (YES)) != NULL)
+		lcdg_dm_newtop (objects [1]);
+	if ((objects [2] = seal_mkrmenu (2)) != NULL)
+		lcdg_dm_newtop (objects [2]);
+	if ((objects [3] = seal_mkrmenu (1)) != NULL)
+		lcdg_dm_newtop (objects [3]);
+}
+
+static void top_switch () {
+//
+// Rotate the top object
+//
+	lcdg_dm_obj_t *c;
+
+	if (LCDG_DM_HEAD == NULL) {
+		lcdg_dm_dtop ();
+		preset_menus ();
+		lcdg_on (0);
+		return;
+	}
+
+	if (LCDG_DM_HEAD != LCDG_DM_TOP)
+		// More than one item
+		lcdg_dm_newtop (LCDG_DM_HEAD);
+}
+
+// ============================================================================
+
 static void buttons (word but) {
 
 	if (IS_JOYSTICK (but)) {
+
+		if (but == JOYSTICK_PUSH) {
+			top_switch ();
+			return;
+		}
 
 		if (LCDG_DM_TOP == NULL ||
 		    LCDG_DM_TOP->Type != LCDG_DMTYPE_MENU)
@@ -131,7 +174,7 @@ static void buttons (word but) {
 			return;
 
 		    default:
-			// Push (ignore for now)
+			// Impossible
 			return;
 		}
 	}

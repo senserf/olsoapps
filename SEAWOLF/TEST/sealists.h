@@ -46,7 +46,7 @@
 // Menu parameters ============================================================
 
 #define	SEA_MENU_CAT_FONT	1
-#define	SEA_MENU_CAT_BG		COLOR_BLACK
+#define	SEA_MENU_CAT_BG		COLOR_MAGENTA
 #define	SEA_MENU_CAT_FG		COLOR_GREEN
 #define	SEA_MENU_CAT_X		14
 #define	SEA_MENU_CAT_Y		14

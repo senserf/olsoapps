@@ -22,7 +22,7 @@ proc u_start { udev speed dfun } {
 
 	if { $udev == "" } {
 		set devlist ""
-		for { set udev 0 } { $udev < 8 } { incr udev } {
+		for { set udev 0 } { $udev < 32 } { incr udev } {
 			lappend devlist "COM${udev}:"
 			lappend devlist "/dev/ttyUSB$udev"
 			lappend devlist "/dev/tty$udev"
@@ -63,7 +63,8 @@ proc u_rdline { } {
 	global ST
 
 	if [catch { gets $ST(SFD) line } nc] {
-		error "device has been closed"
+		puts "device has been re-opened"
+		return
 	}
 
 	set line [string trim $line]
@@ -208,7 +209,7 @@ proc dump_sensors { col slo ts vl } {
 
 	catch { puts $ST(DUM) $ln }
 	if !$ST(ECH) {
-		puts -nonewline " $slo"
+		puts -nonewline "\r$slo"
 		flush stdout
 	}
 }
@@ -230,6 +231,9 @@ proc issue { cmd pat ret del } {
 	set ST(LLI) "+"
 
 	while { $ret > 0 } {
+		if $ST(ECH) {
+			puts "<- $cmd"
+		}
 		catch { puts $ST(SFD) $cmd }
 		set tm [after [expr $del * 1000] itmout]
 		vwait ST(LLI)
@@ -258,7 +262,7 @@ proc doit_start { arg } {
 	}
 
 	if { [catch { expr $intv } intv] || $intv < 30 || $intv > 32767 } {
-		puts "illegel interval, should be between 30 and 32767 seconds"
+		puts "illegal interval, should be between 30 and 32767 seconds"
 		return
 	}
 
@@ -266,9 +270,9 @@ proc doit_start { arg } {
 	set cont [regexp -nocase "cont" $arg]
 
 	if $cont {
-		puts "Continuing previous collection every $intv seconds ..."
+		puts "continuing previous collection every $intv seconds ..."
 	} else {
-		puts "Starting new collection every $intv seconds ..."
+		puts "starting new collection every $intv seconds ..."
 	}
 
 	if $cont {
@@ -301,7 +305,7 @@ proc doit_start { arg } {
 	}
 
 	# obtain the number of stored entries
-	if [issue "a -1" "^1005 Stats.*tored entries \[0-9\]" 6 10] {
+	if [issue "a -1 -1 -1 3" "^1005 Stats.*tored entries \[0-9\]" 6 10] {
 		return
 	}
 
@@ -321,6 +325,7 @@ proc doit_stop { arg } {
 #
 	puts "resetting node ..."
 	issue "q" "^1001.*Find collector:" 4 30
+	issue "a -1 -1 -1 0" "^1005" 4 5
 	puts "done"
 }
 
@@ -404,6 +409,11 @@ proc doit_extract { arg } {
 	set ST(DUM) ""
 }
 
+proc doit_quit { arg } {
+
+	exit
+}
+
 proc sget { } {
 #
 # STDIN becomes readable
@@ -441,8 +451,19 @@ proc sget { } {
 	set kwd [string tolower $kwd]
 
 	if [catch { doit_$kwd $args } ] {
-		puts "illegal command"
+		show_usage
 	}
+}
+
+proc show_usage { } {
+
+	puts "Commands:"
+	puts "  start sec \[continue\]      - start sampling at sec intervals"
+	puts "  stop                      - stop sampling"
+	puts "  show off|on               - show received values while sampling"
+	puts "  echo off|on               - show dialogue with the master"
+	puts "  extract filename          - extract stored samples to file"
+	puts "  quit                      - exit the script"
 }
 
 ######### Init ################################################################
@@ -468,9 +489,33 @@ if [catch { expr $spd } spd] {
 	set spd 9600
 }
 
-if [catch { u_start $prt $spd "" } err] {
-	puts $err
-	exit 99
+if { $prt != "" } {
+
+	# use the argument
+
+	if [catch { u_start $prt $spd "" } err] {
+		puts $err
+		exit 99
+	}
+
+} else {
+
+	while 1 {
+
+		puts -nonewline "Enter COM port number: "
+		flush stdout
+
+		set prt [string trim [gets stdin]]
+
+		if [catch { expr $prt } prt] {
+			continue
+		}
+
+		if ![catch { u_start $prt $spd "" } err] {
+			break
+		}
+		puts $err
+	}
 }
 
 fconfigure stdin -buffering line -blocking 0
