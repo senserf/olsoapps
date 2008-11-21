@@ -5,6 +5,7 @@
 
 #include "globals_tag.h"
 #include "threadhdrs_tag.h"
+#include "flash_stamps.h"
 
 #ifndef __SMURPH__
 #include "lhold.h"
@@ -56,7 +57,7 @@ strand (oss_out, char)
 endstrand
 
 __PUBLF (NodeTag, void, fatal_err) (word err, word w1, word w2, word w3) {
-	leds (LED_R, LED_BLINK);
+	//leds (LED_R, LED_BLINK);
 	if_write (IFLASH_SIZE -1, err);
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
@@ -624,7 +625,7 @@ thread (sens)
 
 	entry (SE_INIT)
 		powerup();
-		leds (LED_R, LED_ON);
+		//leds (LED_R, LED_ON);
 
 		switch (sens_data.ee.s.f.status) {
 		  case SENS_IN_USE:
@@ -693,7 +694,7 @@ thread (sens)
 		sens_data.ee.s.f.spare = 7;
 		sens_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 
-		leds (LED_R, LED_BLINK);
+		//leds (LED_R, LED_BLINK);
 		trigger (SENS_DONE);
 		powerdown();
 		finish;
@@ -753,17 +754,25 @@ thread (root)
 		else
 			leds (LED_G, LED_BLINK);
 
-		delay (5000, RS_INIT1);
-		release;
+		if (is_flash_new) {
+			diag (OPRE_APP_ACK "Init eprom erase");
+			if (ee_erase (WNONE, 0, 0))
+				app_diag (D_SERIOUS, "erase failed");
+			break_flash;
+		} else {
+			delay (5000, RS_INIT1);
+			release;
+		}
 
 	entry (RS_INIT1)
 		ser_out (RS_INIT1, ui_obuf);
 		master_host = local_host;
 		read_ifla();
+		init();
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 			leds (LED_R, LED_OFF);
-			diag (OPRE_APP_MENU_C "Maintenance mode (D, E, F, Q)"
+			diag (OPRE_APP_MENU_C "***Maintenance mode***"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
@@ -771,6 +780,7 @@ thread (root)
 				if_read (IFLASH_SIZE -4));
 			if (!running (cmd_in))
 				runthread (cmd_in);
+			stats();
 			proceed (RS_RCMD);
 		}
 		leds (LED_G, LED_OFF);
@@ -778,7 +788,6 @@ thread (root)
 	entry (RS_INIT2)
 		ser_out (RS_INIT2, welcome_str);
 
-		init();
 		net_id = DEF_NID;
 		tarp_ctrl.param &= 0xFE; // routing off
 		runthread (sens);
@@ -907,6 +916,7 @@ thread (root)
 
 		if (cmd_line[0] == 'F') {
 			if_erase (IFLASH_SIZE -1);
+			break_flash;
 			diag (OPRE_APP_ACK "flash p1 erased");
 			reset();
 		}
@@ -916,6 +926,7 @@ thread (root)
 			if (ee_erase (WNONE, 0, 0))
 				app_diag (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
+			break_flash;
 			diag (OPRE_APP_ACK "all erased");
 			reset();
 		}

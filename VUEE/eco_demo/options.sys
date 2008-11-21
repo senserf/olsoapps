@@ -6,7 +6,9 @@
 #define	UART_DRIVER			1
 
 #define CC1100 1
-#define RADIO_USE_LEDS 6
+#define RADIO_USE_LEDS 0
+#define LEDS_DRIVER	1
+#define LEDS_BLINKING	1
 
 #define	dbg_0(c)	do { } while (0)
 #define	dbg_1(c)	do { } while (0)
@@ -72,7 +74,17 @@
 #ifdef RADIO_USE_LEDS
 #undef RADIO_USE_LEDS
 #endif
-#define RADIO_USE_LEDS 6
+#define RADIO_USE_LEDS 0
+
+#ifdef LEDS_DRIVER
+#undef LEDS_DRIVER
+#endif
+#define LEDS_DRIVER     1
+
+#ifdef LEDS_BLINKING
+#undef LEDS_BLINKING
+#endif
+#define LEDS_BLINKING   1
 
 #define INFO_FLASH	1
 
@@ -113,3 +125,8 @@
 #define CRYSTAL2_RATE 0
 
 #define	PID_VER_TYPE	0
+
+#define EE_NO_ERASE_BEFORE_WRITE 1
+
+#define EE_ERASE_ON_NEW_FLASH	1
+

@@ -534,7 +534,7 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 			in_setTag(msg4tag.buf, ts) = in_pongPload(buf, ts);
 			in_setTag(msg4tag.buf, reftime) = mc.sec;
 			in_setTag(msg4tag.buf, syfreq) = sync_freq;
-			in_setTag(msg4tag.buf, ackflags) =
+			in_setTag(msg4tag.buf, ackflags) = is_eew_conf &&
 				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 		} else {
 			in_setTag(msg4tag.buf, reftime) = 0;
@@ -555,7 +555,7 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 			pong_ack.ts = in_pongPload(buf, ts);
 			pong_ack.reftime = mc.sec;
 			pong_ack.syfreq = sync_freq;
-			pong_ack.ackflags = 
+			pong_ack.ackflags = is_eew_conf &&
 				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 			send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
 		}
@@ -622,7 +622,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 }
 
 __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
-	leds (LED_R, LED_BLINK);
+	//leds (LED_R, LED_BLINK);
 	if_write (IFLASH_SIZE -1, err);
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);

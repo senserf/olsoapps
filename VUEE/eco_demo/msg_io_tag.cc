@@ -39,7 +39,7 @@ __PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt, word syfr, word ackf) {
 			sens_data.ee.ts != ts)
 		return;
 
-	leds (LED_R, LED_OFF);
+	//leds (LED_R, LED_OFF);
 	sens_data.ee.s.f.status = SENS_CONFIRMED;
 	trigger (ACK_IN);
 

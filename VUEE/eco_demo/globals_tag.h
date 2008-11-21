@@ -53,7 +53,7 @@ sensEEDumpType	*sens_dump = NULL;
 static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_C 
-	"*EcoNet* 1.1" OMID_CRB "Collector commands\r\n"
+	"*EcoNet* 1.1.1" OMID_CRB "Collector commands\r\n"
 	OPRE_APP_MENU_C 
 	"\tSet/ show:\ts [ Maj_freq [ min_freq [ rx_span [ hex:pl_vec"
 	" [ hex:c_fl ]]]]]\r\n"
@@ -68,9 +68,9 @@ static const char welcome_str[] = OPRE_APP_MENU_C
 	OPRE_APP_MENU_C
 	"\tClean reset:\tQ (*** to factory defaults (E+F)  ***)\r\n"
 	OPRE_APP_MENU_C
-	"\tID set / show:\tI[D id]   (*** CAREFUL Host ID   ***)\r\n"
+	"\tID set / show:\tI[D id]    (*** CAREFUL Host ID   ***)\r\n"
 	OPRE_APP_MENU_C
-	"\tSave(d) sys:  \tS[A]      (*** Show, SAve iFLASH ***)\r\n"
+	"\tSave(d) sys:  \tS[A]       (*** Show, SAve iFLASH ***)\r\n"
 	OPRE_APP_MENU_C
 	"\tQuit (reset)\tq\r\n"
 	OPRE_APP_MENU_C

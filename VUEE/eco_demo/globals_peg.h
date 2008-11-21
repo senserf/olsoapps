@@ -33,7 +33,7 @@ char	*ui_ibuf	= NULL,
 
 lword	master_delta		= 0;
 word	app_flags 		= DEF_APP_FLAGS;
-word	tag_auditFreq 		= 13;	// in seconds
+word	tag_auditFreq 		= 59;	// in seconds
 mclock_t master_clock		= {0};
 
 // if we can get away with it, it's better to have it in IRAM (?)
@@ -58,7 +58,7 @@ word	sync_freq		= 0;
 static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_A 
-	"*EcoNet* 1.1" OMID_CRB "Aggregator commands:\r\n"
+	"*EcoNet* 1.1.1" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
 	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
@@ -95,6 +95,10 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 
 static const char ill_str[] =	OPRE_APP_ILL 
 				"Illegal command (%s)\r\n";
+
+static const char not_in_maint_str[] = OPRE_APP_ILL "Not in Maintenance\r\n";
+
+static const char only_master_str[] = OPRE_APP_ILL "Only at the Master\r\n";
 
 static const char stats_str[] = OPRE_APP_STATS_A 
 	"Stats for agg (%lx: %u):" OMID_CR

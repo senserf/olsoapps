@@ -9,7 +9,7 @@
 	_da (master_delta)	= 0;
 	_da (host_pl)		= 7;
 
-	_da (tag_auditFreq)	= 13;	// in seconds
+	_da (tag_auditFreq)	= 59;	// in seconds
 
 	_da (msg4tag).buf	= NULL;
 	_da (msg4tag).tstamp	= 0;

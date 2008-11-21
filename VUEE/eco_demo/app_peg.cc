@@ -5,6 +5,7 @@
 
 #include "globals_peg.h"
 #include "threadhdrs_peg.h"
+#include "flash_stamps.h"
 
 #ifndef __SMURPH__
 #include "lhold.h"
@@ -177,6 +178,10 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
+
+		if (in_header(buf, snd) / 1000 != local_host / 1000)
+			return;
+
 		if (in_pong_rxon(buf)) 
 			check_msg4tag (buf);
 
@@ -753,16 +758,24 @@ thread (root)
 		else
 			leds (LED_G, LED_BLINK);
 
-		delay (5000, RS_INIT1);
-		release;
+		if (is_flash_new) {
+			diag (OPRE_APP_ACK "Init eprom erase");
+			if (ee_erase (WNONE, 0, 0))
+				app_diag (D_SERIOUS, "erase failed");
+			break_flash;
+		} else {
+			delay (5000, RS_INIT1);
+			release;
+		}
 
 	entry (RS_INIT1)
 		ser_out (RS_INIT1, ui_obuf);
 		read_ifla();
+		agg_init();
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 			leds (LED_R, LED_OFF);
-			diag (OPRE_APP_MENU_A "Maintenance mode (D, E, F, Q)"
+			diag (OPRE_APP_MENU_A "***Maintenance mode***"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
@@ -770,6 +783,7 @@ thread (root)
 				if_read (IFLASH_SIZE -4));
 			if (!running (cmd_in))
 				runthread (cmd_in);
+			stats(NULL);
 			proceed (RS_RCMD);
 		}
 		leds (LED_G, LED_OFF);
@@ -783,7 +797,6 @@ thread (root)
 		tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
 
 		init_tags();
-		agg_init();
 
 		// spread a bit in case of a sync reset
 		delay (rnd() % 1000, RS_PAUSE);
@@ -823,8 +836,15 @@ thread (root)
 		if (master_host != local_host &&
 				(cmd_line[0] == 'T' || cmd_line[0] == 'c' ||
 				 cmd_line[0] == 'f')) {
-			diag (OPRE_APP_ILL "Only at the Master");
-			proceed (RS_FREE);
+			strcpy (ui_obuf, only_master_str);
+			proceed (RS_UIOUT);
+		}
+
+		if (if_read (IFLASH_SIZE -1) != 0xFFFF &&
+				(cmd_line[0] == 'm' || cmd_line[0] == 'c' ||
+				cmd_line[0] == 'f')) {
+			strcpy (ui_obuf, not_in_maint_str);
+			proceed (RS_UIOUT);
 		}
 
 	  switch (cmd_line[0]) {
@@ -918,6 +938,7 @@ thread (root)
 
 		case 'F':
 			if_erase (IFLASH_SIZE -1);
+			break_flash;
 			diag (OPRE_APP_ACK "flash p1 erased");
 			reset();
 
@@ -926,6 +947,7 @@ thread (root)
 			if (ee_erase (WNONE, 0, 0))
 				app_diag (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
+			break_flash;
 			diag (OPRE_APP_ACK "all erased");
 			reset();
 
@@ -971,6 +993,13 @@ thread (root)
 			if (scan (cmd_line+1, "%d %d %d %x", &i1, &i2, &i3, &i4)
 					== 0 || i1 < 0)
 				i1 = local_host;
+
+			if (if_read (IFLASH_SIZE -1) != 0xFFFF &&
+				i1 !=local_host) {
+				strcpy (ui_obuf, not_in_maint_str);
+				proceed (RS_UIOUT);
+			}
+
 			if (i2 < -1)
 				i2 = -1;
 			if (i3 < -1)
