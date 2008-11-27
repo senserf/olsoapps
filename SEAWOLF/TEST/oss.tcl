@@ -210,6 +210,78 @@ proc updrqn { } {
 	}
 }
 
+proc eeput_chunked { chunks } {
+#
+# Write to EEPROM (chunked version)
+#
+	global PM ST TM
+
+	set NC 0
+	while { $chunks != "" } {
+		if { [binary scan $chunks iii mag fwa len] != 3 } {
+			log "illegal file format"
+			break
+		}
+		set mag [format %08x $mag]
+		if { $mag != "caca1112" } {
+			log "illegal magic code $mag"
+			break
+		}
+		if { $fwa < 0 || $fwa >= $PM(EESIZE) } {
+			log "origin our of range: $fwa"
+			break
+		}
+		set lim [expr $fwa + $len]
+		if { $lim < $fwa || $lim > $PM(EESIZE) } {
+			log "chunks extends beyond EEPROM's length: $fwa, $len"
+			break
+		}
+		set chunk [string range $chunks 12 [expr $len + 11]]
+
+		if { [string length $chunk] != $len } {
+			log "file ends prematurely"
+			break
+		}
+
+		log "Sending chunk [format %03d $NC]: [format %08x $fwa]\
+			\[[format %08x $len]\]"
+
+		# everything's kosher so far; remove the chunk from the file
+		set chunks [string range $chunks [expr $len + 12] end]
+
+		# one OEP request per chunk
+		updrqn
+
+		# issue a request to the board
+		u_ab_write "re $PM(LID) $ST(RQN) $fwa $len"
+		if [u_ab_wait $TM(OUT)] {
+			log "request timeout"
+			break
+		}
+
+		# deactivate AB
+		u_ab_setif
+		# invoke OEP
+		set st [oep_snd $PM(LID) $ST(RQN) $chunk]
+		# reactivate AB
+		u_ab_setif uget $PM(MPL)
+
+		if $st {
+			log "OEP failure $st"
+			break
+		}
+		incr NC
+	}
+
+	log "$NC chunks written"
+
+	if { $chunks == "" } {
+		return 0
+	}
+
+	return 1
+}
+
 proc eeput { par } {
 #
 # Write to EEPROM
@@ -219,18 +291,18 @@ proc eeput { par } {
 	# starting address
 	set fwa [exnum par]
 	if { $fwa == "" } {
-		log "illegal FWA"
-		return 1
+		set cnt ""
+	} else {
+		if { $fwa < 0 || $fwa >= $PM(EESIZE) } {
+			log "FWA out of range"
+			return 1
+		}
+		# check fr count
+		set cnt [exnum par]
 	}
 
-	if { $fwa < 0 || $fwa >= $PM(EESIZE) } {
-		log "FWA out of range"
-		return 1
-	}
-
-	set val [exnum par]
-	if { $val == "" } {
-		# try a filename
+	if { $cnt == "" } {
+		# need a filename
 		set fil [string trim $par]
 		if { $fil == "" } {
 			log "filename missing"
@@ -243,14 +315,19 @@ proc eeput { par } {
 		}
 	} else {
 		# input string
-		set chunks [binary format c $val]
+		set chunks [binary format c $cnt]
 		while 1 {
-			set val [exnum par]
-			if { $val == "" } {
+			set cnt [exnum par]
+			if { $cnt == "" } {
 				break
 			}
-			append chunks [binary format c $val]
+			append chunks [binary format c $cnt]
 		}
+	}
+
+	if { $fwa == "" } {
+		# handle the chunked format
+		return [eeput_chunked $chunks]
 	}
 
 	# note that this cannot be zero

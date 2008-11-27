@@ -39,7 +39,6 @@ static Boolean free_object (word ix) {
 // Deallocate an object
 //
 	lcdg_dm_obj_t *co;
-	word i;
 
 #define	COI	((lcdg_dm_img_t*)co)
 #define	COM	((lcdg_dm_men_t*) co)
@@ -121,8 +120,6 @@ static void top_switch () {
 //
 // Rotate the top object
 //
-	lcdg_dm_obj_t *c;
-
 	if (LCDG_DM_HEAD == NULL) {
 		lcdg_dm_dtop ();
 		preset_menus ();
@@ -239,7 +236,7 @@ thread (root)
     char *line;
     lword ef, el;
 
-    static c [NPVALUES];
+    static word c [NPVALUES];
     static byte Status;
     static char lbl [LABSIZE];
     static char **lines;

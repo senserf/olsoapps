@@ -2,7 +2,7 @@
 #undef	UART_RATE
 #undef	UART_DRIVER
 
-#define	UART_TCV	1
-#define	UART_RATE	115200
-
-#define	PID_VER_TYPE	1
+#define	UART_TCV		1
+#define	UART_RATE		115200
+	
+#define	PID_VER_TYPE		1

@@ -1,4 +1,0 @@
-// Insert here applications-specific options
-#undef	RADIO_USE_LEDS
-#define	RADIO_USE_LEDS	7
-#define	DEBUGGING	1

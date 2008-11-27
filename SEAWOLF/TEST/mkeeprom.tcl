@@ -190,6 +190,8 @@ proc output_block { org data } {
 
 	append out $data
 
+	puts "Chunk: [format %08x $org] \[[format %08x $len]\]"
+
 	if [catch { puts -nonewline $OFD $out } err] {
 		global ifile
 		abt "cannot write to output file $ifile: $err"
@@ -362,7 +364,7 @@ proc handle_image { id } {
 
 	# more sanity checks
 	if { $w != [expr 0x77ac] ||
-	    $x < 32 || $x > 130 || $y < 32 || $y > 130 } {
+	    $x < 8 || $x > 130 || $y < 8 || $y > 130 } {
 		abt "bad image file header: $id"
 	}
 
@@ -671,6 +673,10 @@ set MEM(IMP) $SEA_FIMPAGE
 set MEM(IML) ""
 
 do_categories
+
+# this must be the first image, if exists at all
+handle_image "wallpaper.nok"
+
 do_people
 
 # check for text overflow

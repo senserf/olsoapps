@@ -317,15 +317,28 @@ if [regexp "^-l(n)?$" [lindex $argv 0] junk nl] {
 	if { $nl != "" } {
 		set SIO(LAB) [numlab $SIO(LAB)]
 	}
-	set ll [string length $SIO(LAB)]
-	if { $ll == 0 } {
+	if { [string length $SIO(LAB)] == 0 } {
 		usage
 	}
 } else {
 	set SIO(LAB) ""
-	set ll 0
+}
+	
+if { [llength $argv] < 2 } {
+	usage
 }
 
+set ifile [lindex $argv 0]
+set ofile [lindex $argv 1]
+
+if { $SIO(LAB) == "" } {
+	# use the file name (sans suffix) as the default label
+	set SIO(LAB) [string tolower [file rootname [file tail $ofile]]]
+}
+puts "LABEL '$SIO(LAB)'"
+
+set ll [string length $SIO(LAB)]
+	
 if { $ll > 38 } {
 	set SIO(LAB) [string range $SIO(LAB) 0 37]
 } else {
@@ -334,13 +347,6 @@ if { $ll > 38 } {
 		incr ll
 	}
 }
-		
-if { [llength $argv] < 2 } {
-	usage
-}
-
-set ifile [lindex $argv 0]
-set ofile [lindex $argv 1]
 
 if [catch { open $ifile "r" } ifd] {
 	abt "cannot open input file $ifile: $ifd"
