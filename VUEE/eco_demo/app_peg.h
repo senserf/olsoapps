@@ -135,7 +135,7 @@ bit 3: ee write confirmed [0]
 bit 4: ee overwrite (cyclic stack) [0]
 bit 5: ee marker of empty slots [1]
 */
-#define DEF_APP_FLAGS   0x24
+#define DEF_APP_FLAGS   0x2C
 
 #define clr_master_chg	(app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)

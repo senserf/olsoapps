@@ -105,7 +105,16 @@ proc u_rdline { } {
 		}
 	}
 
-	if { $ST(DUM) != "" } {
+	if { $ST(DUM) == "" } {
+		return
+	}
+
+	#######################################################################
+	### sample extraction #################################################
+	#######################################################################
+
+	if { $ST(DUN) != 1 } {
+		# aggregator
 		if { [regexp \
 		  "^1007 Col (\[0-9\]+).*A: (\[0-9\]+).*time: (\[^ \]+).*S0:" \
 		    $line j col slo tst] && ![catch { expr $col } col] &&
@@ -126,6 +135,30 @@ proc u_rdline { } {
 			dump_sensors $col $slo $tst $sv
 			set ST(LLI) "."
 		} elseif [regexp "^1008 Did" $line] {
+			# end signal
+			set ST(LLI) "="
+		}
+	} else {
+		# collector
+		if { [regexp \
+		  "^2007 COLLECTED slot (\[0-9\]+).*time (\[^ \]+).*S0:" \
+		    $line j slo tst] && ![catch { expr $slo } slo] } {
+			set sv ""
+			set sn 0
+			while 1 {
+				if ![regexp " S${sn}: (\[0-9\]+)" $line j v] {
+					break
+				}
+				if [catch { expr $v } v] {
+					break
+				}
+				lappend sv $v
+				incr sn
+
+			}
+			dump_sensors "" $slo $tst $sv
+			set ST(LLI) "."
+		} elseif [regexp "^2008 Col" $line] {
 			# end signal
 			set ST(LLI) "="
 		}
@@ -198,16 +231,21 @@ proc dump_sensors { col slo ts vl } {
 
 	global ST
 
-	set ln "TM: [tstamp $ts], COL: [format %4d $col] --"
+	set ln "[tstamp $ts]"
+
+	if { $col != "" } {
+		append ln "    [format %4d $col]"
+	}
 
 	set sn 0
 	foreach v $vl {
 		set cv [sconvert $sn $v]
-		append ln "  S${sn} = <[format {%4d, %7.2f} $v $cv]>"
+		append ln "    [format {%4d %7.2f} $v $cv]"
 		incr sn
 	}
 
 	catch { puts $ST(DUM) $ln }
+
 	if !$ST(ECH) {
 		puts -nonewline "\r$slo"
 		flush stdout
@@ -256,6 +294,16 @@ proc doit_start { arg } {
 #
 	global ST PM
 
+	set nt [ntype]
+	if { $nt == 0 } {
+		return
+	}
+
+	if { $nt == 1 } {
+		puts "can't do this to a collector"
+		return
+	}
+
 	if ![regexp "\[0-9\]+" $arg intv] {
 		puts "sampling interval required"
 		return
@@ -282,7 +330,7 @@ proc doit_start { arg } {
 		}
 	} else {
 		puts "resetting the master and erasing EEPROM (be patient) ..."
-		if [issue "Q" "^1001.*Find collector:" 4 60] {
+		if [issue "E" "^1001.*Find collector:" 4 60] {
 			return
 		}
 	}
@@ -323,10 +371,32 @@ proc doit_start { arg } {
 proc doit_stop { arg } {
 #
 #
+	set nt [ntype]
+	if { $nt == 0 } {
+		puts "node doesn't respond"
+		return
+	}
+
 	puts "resetting node ..."
-	issue "q" "^1001.*Find collector:" 4 30
-	issue "a -1 -1 -1 0" "^1005" 4 5
-	puts "done"
+
+	if { $nt == 1 } {
+		# collector
+		if [issue "q" "^CC1100" 4 30] {
+			return
+		}
+		if [issue "s -1 -1 -1 -1 0" "^2005" 4 5] {
+			return
+		}
+	} else {
+		# aggregator
+		if [issue "q" "^1001.*Find collector:" 4 30] {
+			return
+		}
+		if [issue "a -1 -1 -1 0" "^1005" 4 5] {
+			return
+		}
+		puts "done"
+	}
 }
 
 proc doit_echo { arg } {
@@ -345,12 +415,94 @@ proc doit_show { arg } {
 
 	global ST
 
+	set nt [ntype]
+	if { $nt == 0 } {
+		return
+	}
+
+	if { $nt == 1 } {
+		puts "can't do this to a collector"
+		return
+	}
+
 	if [regexp -nocase "off" $arg] {
 		set ST(SSE) 0
 	} else {
 		set ST(SSE) 1
 	}
 	puts "OK"
+}
+
+proc doit_virgin { arg } {
+#
+# Zero out the node
+#
+	global ST
+
+	set nt [ntype]
+
+	if { $nt == 0 } {
+		return
+	}
+
+	if [regexp "\[0-9\]+" $arg intv] {
+		# interval specified, validate
+		if { [catch { expr $intv } intv] || $intv < 30 || \
+		    $intv > 32767 } {
+			puts "illegal interval, should be between 30 and 32767\
+				seconds"
+			return
+		}
+	} else {
+		set intv 0
+	}
+
+	if { $nt == 1 } {
+		# collector
+		puts "returning the collector to factory state (be patient) ..."
+		if [issue "Q" "^PicOS" 3 60] {
+			return
+		}
+		if $intv {
+			# make it store all samples
+			if [issue "s $intv -1 -1 -1 3" "^2005 Stats" 6 5] {
+				return
+			}
+			if [issue "SA" "^2010 Flash" 6 5] {
+				return
+			}
+			puts "node set for stand-alone operation"
+		}
+
+		puts "done, disconnect the node ASAP from the USB dongle to\
+			prevent sampling!"
+		return
+	}
+
+	# aggregator
+	puts "returning the aggregator to factory state (be patient) ..."
+	if [issue "Q" "^1001.*Find collector:" 4 60] {
+		return
+	}
+
+	if { $intv == 0 } {
+		set intv 60
+	}
+
+	if [issue "Y $intv" "^0003 Synced to" 6 4] {
+		return
+	}
+	if [issue "m" "^0003 (Became|Sent) Master" 6 4] {
+		return
+	}
+	if [issue "SA" "^1010 Flash" 4 6] {
+		return
+	}
+	if [issue "a -1 -1 -1 0" "^1005" 4 5] {
+		# do not collect any samples unless told so
+		return
+	}
+	puts "done, node is in the stopped state"
 }
 
 proc doit_extract { arg } {
@@ -376,39 +528,140 @@ proc doit_extract { arg } {
 		return
 	}
 
+	# collector or aggregator?
+	set ST(DUN) [ntype]
+	if { $ST(DUN) == 0 } {
+		# no response
+		return
+	}
+
+	if { $ST(DUN) == 1 } {
+		# collector
+		set lim $PM(ESC)
+	} else {
+		set lim $PM(ESI)
+	}
+
 	set ST(DUM) $fd
-	set cmd "D 0 $PM(ESI)"
-	if { $col != "" } {
+
+	set cmd "D 0 $lim"
+
+	if { $col != "" && $ST(DUN) != 1 } {
 		append cmd " $col"
 	}
 
 	puts "dumping samples to file ..."
 
-	if [issue $cmd "^1007" 4 10] {
+	if [issue $cmd "^\[12\]00\[78\]" 4 10] {
 		catch { close $fd }
 		set ST(DUM) ""
 		return
 	}
 
-	while 1 {
-		set tm [after 30000 itmout]
-		vwait ST(LLI)
-		catch { after cancel $tm }
-		if { $ST(LLI) == "=" } {
-			# done
-			puts "\ndone"
-			break
-		}
-		if { $ST(LLI) == "" } {
-			puts "\ntimeout, operation aborted"
-			break
+	if { $ST(LLI) == "=" } {
+		puts "there are no samples to dump"
+	} else {
+		while 1 {
+			set tm [after 30000 itmout]
+			vwait ST(LLI)
+			catch { after cancel $tm }
+			if { $ST(LLI) == "=" } {
+				# done
+				puts "\ndone"
+				break
+			}
+			if { $ST(LLI) == "" } {
+				puts "\ntimeout, operation aborted"
+				break
+			}
 		}
 	}
-
 	catch { close $fd }
 	set ST(DUM) ""
 }
 
+proc fltos { fl } {
+
+	switch [expr $fl & 0x3] {
+
+	0 { return "nothing" }
+	1 { return "not confirmed" }
+	2 { return "confirmed" }
+
+	}
+
+	return "all"
+}
+
+proc doit_status { arg } {
+
+	global ST PM
+
+	set nt [ntype]
+
+	if { $nt == 0 } {
+		return
+	}
+
+	set d "(\[0-9\]+)"
+	set h "(\[0-9a-f\]+)"
+
+	if { $nt == 1 } {
+		# collector
+		if [issue "s" "^2005 Stats" 6 5] {
+			return
+		}
+		if ![regexp -nocase \
+		  "$d.: Maj_freq $d.*c_fl $h Uptime $d.*reads $d" $ST(LLI) \
+		    j col fre fla upt sam] {
+			puts "bad response from collector"
+			return
+		}
+
+		if [catch { expr 0x$fla } fla] {
+			set fla 0
+		}
+
+		puts "Collector $col:"
+		puts "    Sampling interval: ${fre}s"
+		puts "    Uptime:            ${upt}s"
+		puts "    Stored samples:    $sam / $PM(ESC)"
+		puts "    Writing to EEPROM: [fltos $fla]"
+
+		return
+
+	}
+
+	# aggregator
+	if [issue "a" "^1005 Stats" 6 5] {
+		return
+	}
+
+	if ![regexp\
+	  "$d.: Audit freq $d.*a_fl $h Uptime $d.*Master $d.*entries $d" \
+	    $ST(LLI) j agg fre fla upt mas sam] {
+		puts "nad response from aggregator"
+		return
+	}
+
+	if [catch { expr 0x$fla } fla] {
+		set fla 0
+	}
+
+	puts "Aggregator $agg:"
+	puts "    Audit interval:    ${fre}s"
+	puts "    Uptime:            ${upt}s"
+	if { $mas > 0 } {
+		if { $mas == $agg } {
+			puts "    Master:            this node"
+		} else {
+			puts "    Master:            $mas"
+		}
+	}
+	puts "    Stored samples:    $sam / $PM(ESI)"
+	puts "    Writing to EEPROM: [fltos $fla]"
+}
+	
 proc doit_quit { arg } {
 
 	exit
@@ -463,6 +716,8 @@ proc show_usage { } {
 	puts "  show off|on               - show received values while sampling"
 	puts "  echo off|on               - show dialogue with the master"
 	puts "  extract filename          - extract stored samples to file"
+	puts "  virgin \[sec\]              - reset to factory state"
+	puts "  status                    - node status"
 	puts "  quit                      - exit the script"
 }
 
@@ -479,6 +734,8 @@ set ST(DUM)	""
 
 # EEPROM size at aggregator
 set PM(ESI)	16382
+# EEPROM size at the collector
+set PM(ESC)	32766
 
 ######### COM port ############################################################
 
@@ -516,6 +773,26 @@ if { $prt != "" } {
 		}
 		puts $err
 	}
+}
+
+proc ntype { } {
+#
+# Determine the node type we are talking to
+#
+	global ST
+
+	if [issue "a" "^\[01\]00\[15\]" 4 3] {
+		# failure
+		return 0
+	}
+
+	if { [string index $ST(LLI) 3] == 1 } {
+		# collector
+		return 1
+	}
+
+	# aggregator
+	return 2
 }
 
 fconfigure stdin -buffering line -blocking 0
