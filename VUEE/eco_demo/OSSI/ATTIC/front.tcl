@@ -8,7 +8,7 @@ exec tclsh "$0" "$@"
 
 ###############################################################################
 
-proc u_start { udev speed dfun } {
+proc u_start { udev speed } {
 #
 # Initialize UART
 #
@@ -495,6 +495,10 @@ proc doit_virgin { arg } {
 	if [issue "m" "^0003 (Became|Sent) Master" 6 4] {
 		return
 	}
+	if [issue "a -1 -1 -1 3" "^1005" 4 5] {
+		# collect all
+		return
+	}
 	if [issue "SA" "^1010 Flash" 4 6] {
 		return
 	}
@@ -714,7 +718,7 @@ proc show_usage { } {
 	puts "  start sec \[continue\]      - start sampling at sec intervals"
 	puts "  stop                      - stop sampling"
 	puts "  show off|on               - show received values while sampling"
-	puts "  echo off|on               - show dialogue with the master"
+	puts "  echo off|on               - show dialogue with the node"
 	puts "  extract filename          - extract stored samples to file"
 	puts "  virgin \[sec\]              - reset to factory state"
 	puts "  status                    - node status"
@@ -750,7 +754,7 @@ if { $prt != "" } {
 
 	# use the argument
 
-	if [catch { u_start $prt $spd "" } err] {
+	if [catch { u_start $prt $spd } err] {
 		puts $err
 		exit 99
 	}
@@ -768,7 +772,7 @@ if { $prt != "" } {
 			continue
 		}
 
-		if ![catch { u_start $prt $spd "" } err] {
+		if ![catch { u_start $prt $spd } err] {
 			break
 		}
 		puts $err

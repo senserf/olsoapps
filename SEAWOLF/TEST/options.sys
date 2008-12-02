@@ -6,3 +6,6 @@
 #define	UART_RATE		115200
 	
 #define	PID_VER_TYPE		1
+
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES		2
