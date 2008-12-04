@@ -477,7 +477,7 @@ Men:	// ====================================================================
 	}
 
 	if ((objects [OIX] =
-	  (lcdg_dm_obj_t*) lcdg_dm_newmenu ((const char**)lines,
+	  (lcdg_dm_obj_t*) lcdg_dm_newmenu (lines,
 	    NL, FO, BG, FG, X, Y, W, H)) == NULL) {
 		lcdg_dm_csa (lines, NL);
 		Status = LCDG_DM_STATUS;

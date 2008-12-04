@@ -72,7 +72,7 @@ NoMem:
 
 	// Everything ready
 
-	if ((res = lcdg_dm_newmenu ((const char**) lines, nc,
+	if ((res = lcdg_dm_newmenu (lines, nc,
 						SEA_MENU_CAT_FONT,
 						SEA_MENU_CAT_BG,
 						SEA_MENU_CAT_FG,
@@ -149,7 +149,7 @@ NoMem:
 		i++;
 	}
 
-	if ((res = lcdg_dm_newmenu ((const char**) lines, nc,
+	if ((res = lcdg_dm_newmenu (lines, nc,
 						SEA_MENU_REC_FONT,
 						SEA_MENU_REC_BG,
 						SEA_MENU_REC_FG,
