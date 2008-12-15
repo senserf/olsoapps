@@ -1,0 +1,11 @@
+#undef	UART_TCV
+#undef	UART_RATE
+#undef	UART_DRIVER
+#undef	DIAG_MESSAGES
+
+#define	UART_TCV	1
+#define	UART_RATE	115200
+#define	PID_VER_TYPE	1
+#define DIAG_MESSAGES	1
+
+//DIAG_MESSAGES 1 saves 1152B

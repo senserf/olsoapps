@@ -1,0 +1,74 @@
+<sealist>
+<eventcategories>
+	<category>E0.Session on feeding while drinking</category>
+	<category>E1.Session on beer brewing</category>
+	<category>E2.Keynote talk: how to decorate a pub</category>
+	<category>E3.Reception: wine tasting</category>
+	<category>E4.Vodka bar</category>
+	<category>E5.Greek restaurant</category>
+	<category>E6.Irish pub</category>
+</eventcategories>
+<mycategories>
+	<category>M0.Likes to drink</category>
+	<category>M1.Pal</category>
+	<category>M2.Smokes pot</category>
+	<category>M3.Smart</category>
+	<category>M4.Money: buys drinks</category>
+	<category>M5.Teetotaler</category>
+	<category>M6.Boring</category>
+	<category>M7.Money: doesn't apy for drinks</category>
+	<category>M8.Smells badly</category>
+</mycategories>
+<people>
+	<record class="yes">
+		<id>0xBACA0002</id>
+		<name>Pawel Gburzynski</name>
+		<nickname>.. Mistrz</nickname>
+		<why>0,1,3;4,5,6</why>
+		<note>Liver is a touchy    subject</note>
+	</record>
+	<record class="no">
+		<id>0xBACA0001</id>
+		<name>Wlodek Olesinski</name>
+		<nickname>.. CEO</nickname>
+		<why>0,1,3;4,5,6</why>
+		<note>Prefers straight     vodka with a touch ofgrapefruit juice</note>
+	</record>
+	<record class="yes">
+		<id>0xBACA0006</id>
+		<name>Rob Finnucan</name>
+		<nickname>.. Green Rob</nickname>
+		<why>2,3,4;6</why>
+		<note>Likes Nortel Sunset: pure spirit on the   rocks</note>
+	</record>
+	<record class="yes">
+		<id>0xBACA0003</id>
+		<name>Gerry Sendrowicz</name>
+		<nickname>.. Zdzichu</nickname>
+		<why>1,2,5;3,5</why>
+		<note>Getting older; does  not drink as much as he used to</note>
+	</record>
+	<record class="yes">
+		<id>0xBACA0007</id>
+		<name>Kitty Ha</name>
+		<nickname>.. Kitty</nickname>
+		<why>3,5</why>
+		<note>Likes cooking while  drinking</note>
+	</record>
+	<record class="yes">
+		<id>0xBABA0004</id>
+		<name>Olsonet Comms</name>
+		<nickname>.. Olsonet</nickname>
+		<why>1;1,3</why>
+		<note>Expert group: Visit  events on safe beer  and vodka mixing</note>
+	</record>
+	<record class="yes">
+		<id>0xBABA0005</id>
+		<name>Combat Networks</name>
+		<nickname>.. Combat</nickname>
+		<why>0,3;3,4</why>
+		<note>Pros league: Listen  to fascinating Tales From Two Irish Pubs</note>
+	</record> 
+
+</people>
+</sealist>
