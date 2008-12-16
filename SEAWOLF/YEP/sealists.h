@@ -45,23 +45,23 @@
 
 // Menu parameters ============================================================
 
-#define	SEA_MENU_CATY_FONT	0
-#define	SEA_MENU_CATY_BG	COLOR_GREEN
-#define	SEA_MENU_CATY_FG	COLOR_BLACK
-#define	SEA_MENU_CATY_X		10
-#define	SEA_MENU_CATY_Y		10
-#define	SEA_MENU_CATY_W		18
-#define	SEA_MENU_CATY_H		8
+#define	SEA_MENU_CATEV_FONT	0
+#define	SEA_MENU_CATEV_BG	COLOR_GREEN
+#define	SEA_MENU_CATEV_FG	COLOR_BLACK
+#define	SEA_MENU_CATEV_X	10
+#define	SEA_MENU_CATEV_Y	10
+#define	SEA_MENU_CATEV_W	18
+#define	SEA_MENU_CATEV_H	8
 
 // RED <-> BLUE
 
-#define SEA_MENU_CATN_FONT	0
-#define SEA_MENU_CATN_BG	COLOR_BLUE
-#define SEA_MENU_CATN_FG	COLOR_WHITE
-#define SEA_MENU_CATN_X		10
-#define SEA_MENU_CATN_Y		65
-#define SEA_MENU_CATN_W		18
-#define SEA_MENU_CATN_H		8
+#define SEA_MENU_CATMY_FONT	0
+#define SEA_MENU_CATMY_BG	COLOR_BLUE
+#define SEA_MENU_CATMY_FG	COLOR_WHITE
+#define SEA_MENU_CATMY_X	10
+#define SEA_MENU_CATMY_Y	65
+#define SEA_MENU_CATMY_W	18
+#define SEA_MENU_CATMY_H	8
 
 #define	SEA_MENU_REC_FONT	1
 #define	SEA_MENU_REC_BG		COLOR_RED
@@ -74,10 +74,10 @@
 #define	SEA_METER_FONT		3	// Special font used by the meter
 #define	SEA_METER_Y		(130-8)	// The bottom of the display
 
-#define	SEA_METER_BG0		COLOR_BLACK
-#define	SEA_METER_FG0		COLOR_RED
-#define	SEA_METER_BG1		COLOR_GREEN
-#define	SEA_METER_FG1		COLOR_RED
+#define	SEA_METER_BG0		SEA_MENU_CATMY_BG
+#define	SEA_METER_FG0		SEA_MENU_CATMY_FG
+#define	SEA_METER_BG1		SEA_MENU_CATEV_BG
+#define	SEA_METER_FG1		SEA_MENU_CATEV_FG
 
 typedef struct {
 //
@@ -94,6 +94,6 @@ lcdg_dm_obj_t *seal_mkrmenu ();
 sea_rec_t *seal_getrec (word);
 void seal_freerec (sea_rec_t*);
 word seal_findrec (lword);
-byte seal_disprec (sea_rec_t*);
+byte seal_disprec ();
 
 #endif

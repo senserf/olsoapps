@@ -79,21 +79,53 @@ static Boolean free_object (word ix) {
 
 // ============================================================================
 
+// very very temporary and crappy
+static void disp_cats () {
+	int i, j;
+	j = 0;
+	lcdg_font (0);
+	lcdg_setc (SEA_MENU_CATEV_BG, SEA_MENU_CATEV_FG);
+
+	for (i = 0; i < 16; i++) {
+		if ((curr_rec->MCats >> i) & 1) {
+			lcdg_sett (0, j*8, 21, 1);
+			lcdg_wl (&((lcdg_dm_men_t*)(objects [1]))->Lines[i][3],
+				0, 0, 0);
+			if (j < 15)
+				j++;
+		}
+	}
+
+	lcdg_setc (SEA_MENU_CATMY_BG, SEA_MENU_CATMY_FG);
+	for (i = 0; i < 16; i++) {
+		if ((curr_rec->ECats >> i) & 1) {
+			lcdg_sett (0, j*8, 21, 1);
+			lcdg_wl (&((lcdg_dm_men_t*)(objects [0]))->Lines[i][3],
+				0, 0, 0);
+			if (j < 15)
+				j++;
+		}
+	}
+}
+
+// ============================================================================
+
 static void display_rec (word rh) {
 //
 // Display the record (picture + meter) represented by the handle
 //
-	sea_rec_t *rec;
-
-	if ((rec = seal_getrec (rh)) == NULL)
+	if (curr_rec != NULL) {
+		seal_freerec (curr_rec);
+		curr_rec = NULL;
+	}
+	if ((curr_rec = seal_getrec (rh)) == NULL)
 		// Failed to get the record
 		return;
 
-	if (rec->IM != WNONE)
-		lcdg_im_disp (rec->IM, 0, 0);
+	if (curr_rec->IM != WNONE)
+		lcdg_im_disp (curr_rec->IM, 0, 0);
 
-	seal_disprec (rec);
-	seal_freerec (rec);
+	seal_disprec ();
 	top_flag = TOP_DATA;
 }
 
@@ -145,6 +177,12 @@ static void buttons (word but) {
 
 			if (top_flag == TOP_AD)
 				handle_ad (AD_CANC, 0);
+
+			// kludge in disp_cats
+			if (but == JOYSTICK_E) { // east is 'down'
+				disp_cats();
+				return;
+			}
 
 			top_flag = TOP_HIER;
 			lcdg_dm_refresh ();

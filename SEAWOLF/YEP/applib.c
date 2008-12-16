@@ -13,6 +13,7 @@ nbh_menu_t	nbh_menu;
 rf_rcv_t	rf_rcv, ad_rcv;
 word		top_flag;
 char 		* ad_buf;
+sea_rec_t	* curr_rec;
 
 extern const lword host_id;
 
@@ -65,6 +66,7 @@ void init_glo () {
 	lcd_menu = NULL;
 	ad_buf = NULL;
 	top_flag = TOP_HIER;
+	curr_rec = NULL;
 }
 
 int handle_ad (word act, word which) {

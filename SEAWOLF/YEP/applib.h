@@ -2,6 +2,7 @@
 #define	__applib_h__
 
 #include "lcdg_dispman.h"
+#include "sealists.h"
 
 //+++ "applib.c"
 
@@ -93,5 +94,6 @@ extern lcdg_dm_men_t   *lcd_menu;
 extern rf_rcv_t		rf_rcv, ad_rcv;
 extern word		top_flag;
 extern char *		ad_buf;
+extern sea_rec_t *	curr_rec;
 #endif
 

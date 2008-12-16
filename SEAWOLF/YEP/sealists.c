@@ -75,23 +75,23 @@ NoMem:
 
 	if (ev) {
 	    if ((res = lcdg_dm_newmenu (lines, nc,
-					SEA_MENU_CATY_FONT,
-					SEA_MENU_CATY_BG,
-					SEA_MENU_CATY_FG,
-					SEA_MENU_CATY_X,
-					SEA_MENU_CATY_Y,
-					SEA_MENU_CATY_W,
-					SEA_MENU_CATY_H )) == NULL)
+					SEA_MENU_CATEV_FONT,
+					SEA_MENU_CATEV_BG,
+					SEA_MENU_CATEV_FG,
+					SEA_MENU_CATEV_X,
+					SEA_MENU_CATEV_Y,
+					SEA_MENU_CATEV_W,
+					SEA_MENU_CATEV_H )) == NULL)
 		goto NoMem;
 	} else {
 	    if ((res = lcdg_dm_newmenu (lines, nc,
-					    SEA_MENU_CATN_FONT,
-					    SEA_MENU_CATN_BG,
-					    SEA_MENU_CATN_FG,
-					    SEA_MENU_CATN_X,
-					    SEA_MENU_CATN_Y,
-					    SEA_MENU_CATN_W,
-					    SEA_MENU_CATN_H )) == NULL)
+					    SEA_MENU_CATMY_FONT,
+					    SEA_MENU_CATMY_BG,
+					    SEA_MENU_CATMY_FG,
+					    SEA_MENU_CATMY_X,
+					    SEA_MENU_CATMY_Y,
+					    SEA_MENU_CATMY_W,
+					    SEA_MENU_CATMY_H )) == NULL)
 		goto NoMem;
 	}
 
@@ -275,7 +275,10 @@ word seal_findrec (lword id) {
 	return WNONE;
 }
 
-byte seal_disprec (sea_rec_t * rec) {
+byte seal_disprec () {
+
+// use global curr_rec
+
 //
 // Draw a meter
 //
@@ -304,9 +307,9 @@ byte seal_disprec (sea_rec_t * rec) {
 
 	// 21 = 130 / 6 (when we know what we're doing, use
 	// lcdg_cwidth, _cheight
-	if (rec->NT != NULL && (i = strlen(rec->NT)) > 0) {
+	if (curr_rec->NT != NULL && (i = strlen(curr_rec->NT)) > 0) {
 		i =  i / 21 + 1;
-		nt = lcdg_dm_newtext (rec->NT, 0, COLOR_BLACK, COLOR_WHITE,
+		nt = lcdg_dm_newtext (curr_rec->NT, 0, COLOR_BLACK, COLOR_WHITE,
 				0, SEA_METER_Y - 8 * i, 21);
 
 		lcdg_dm_display (nt);
@@ -320,10 +323,10 @@ byte seal_disprec (sea_rec_t * rec) {
 		i = 0;
 	}
 
-	if (rec->NM != NULL && (j = strlen(rec->NM)) > 0) {
+	if (curr_rec->NM != NULL && (j = strlen(curr_rec->NM)) > 0) {
 		if (lcdg_sett (0, SEA_METER_Y - 8 * i -8, j < 21 ? j : 21, 1))
 			goto ERet;
-		lcdg_wl (rec->NM, 0, 0, 0);
+		lcdg_wl (curr_rec->NM, 0, 0, 0);
 	}
 
 	if (lcdg_font (SEA_METER_FONT)) {
@@ -339,7 +342,7 @@ ERet:
 		goto ERet;
 
 	for (i = 0; i < 16; i++)
-		line [i] = ((rec->ECats >> i) & 1) ? 'a' : 'b';
+		line [i] = ((curr_rec->ECats >> i) & 1) ? 'a' : 'b';
 
 	lcdg_wl (line, 0, 0, 0);
 
@@ -349,7 +352,7 @@ ERet:
 		goto ERet;
 
 	for (i = 0; i < 16; i++)
-		line [i] = ((rec->MCats >> i) & 1) ? 'a' : 'b';
+		line [i] = ((curr_rec->MCats >> i) & 1) ? 'a' : 'b';
 
 	lcdg_wl (line, 0, 0, 0);
 	return 0;
