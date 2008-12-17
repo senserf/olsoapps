@@ -9,3 +9,5 @@
 
 #undef	DIAG_MESSAGES
 #define	DIAG_MESSAGES		2
+
+#define	LCDG_SETTABLE_CTABLE	1

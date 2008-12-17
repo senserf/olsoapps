@@ -290,6 +290,7 @@ thread (root)
 		// off			display switched off
 		// on [u]		on + contrast set
 		// or                   refresh
+		// os n v		set color table
 		case 'o' : proceed (RS_DSP);
 
 		// ci n h x y			create an image object
@@ -368,6 +369,11 @@ Ret:
 		case 'r' :
 			// Refresh
 			Status = lcdg_dm_refresh ();
+			goto Ret;
+		case 's' :
+			// Set color table
+			scan (ibuf+2, "%u %x", c+0, c+1);
+			lcdg_setct ((byte)(c [0]), c [1]);
 			goto Ret;
 	}
 	goto Err;
