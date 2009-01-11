@@ -1,73 +1,97 @@
 <sealist>
 <eventcategories>
-	<category>E0.Session on feeding while drinking</category>
-	<category>E1.Session on beer brewing</category>
-	<category>E2.Keynote talk: how to decorate a pub</category>
-	<category>E3.Reception: wine tasting</category>
-	<category>E4.Vodka bar</category>
-	<category>E5.Greek restaurant</category>
-	<category>E6.Irish pub</category>
+	<meter>[0, 122], 3, 4, 0</meter>
+	<menu>
+		coordinates:	[10, 10]
+		font:		0
+		colors:		3, 1
+		width/height:	18, 8
+	</menu>
+	<category>Session on feeding while drinking</category>
+	<category>Session on beer brewing</category>
+	<category>Keynote talk: how to decorate a pub</category>
+	<category>Reception: wine tasting</category>
+	<category>Vodka bar</category>
+	<category>Greek restaurant</category>
+	<category>Irish pub</category>
 </eventcategories>
 <mycategories>
-	<category>M0.Likes to drink</category>
-	<category>M1.Pal</category>
-	<category>M2.Smokes pot</category>
-	<category>M3.Smart</category>
-	<category>M4.Money: buys drinks</category>
-	<category>M5.Teetotaler</category>
-	<category>M6.Boring</category>
-	<category>M7.Money: doesn't apy for drinks</category>
-	<category>M8.Smells badly</category>
+	<meter>[66, 122], 3, 3, 1</meter>
+	<menu>[10, 65] 0, 4, 0, 18, 8</menu>
+	<category>Likes to drink</category>
+	<category>Pal</category>
+	<category>Smokes pot</category>
+	<category>Smart</category>
+	<category>Money: buys drinks</category>
+	<category>Teetotaler</category>
+	<category>Boring</category>
+	<category>Money: doesn't pay for drinks</category>
+	<category>Smells badly</category>
 </mycategories>
 <people>
-	<record class="yes">
+	<note>
+		extend-up (this means that the coordinates
+		refer to the bottom line)
+						[0, 122]
+		font:				0
+		colors:				1, 0
+		width (characters):		21
+		height: (missing or zero means extendable)
+	</note>
+	<name>[0, 10], 0, 1, 5, 21, 1</name>
+	<nickname>[0, 26], 0, 2, 7, 21, 1</nickname>
+	<menu>[48, 26], 1, 2, 7, 10, 12</menu>
+
+	<record class="+">
 		<id>0xBACA0002</id>
 		<name>Pawel Gburzynski</name>
-		<nickname>.. Mistrz</nickname>
+		<!-- insert ".. " -->
+		<nickname>Mistrz</nickname>
 		<why>0,1,3;4,5,6</why>
-		<note>Liver is a touchy    subject</note>
+		<!-- format the text automatically -->
+		<note>Liver is a touchy subject</note>
 	</record>
-	<record class="no">
+	<record class="-">
 		<id>0xBACA0001</id>
 		<name>Wlodek Olesinski</name>
-		<nickname>.. CEO</nickname>
+		<nickname>CEO</nickname>
 		<why>0,1,3;4,5,6</why>
-		<note>Prefers straight     vodka with a touch ofgrapefruit juice</note>
+		<note>Prefers straight vodka with a touch of grapefruit juice</note>
 	</record>
-	<record class="yes">
+	<record class="+">
 		<id>0xBACA0006</id>
 		<name>Rob Finnucan</name>
-		<nickname>.. Green Rob</nickname>
+		<nickname>Green Rob</nickname>
 		<why>2,3,4;6</why>
-		<note>Likes Nortel Sunset: pure spirit on the   rocks</note>
+		<note>Likes Nortel Sunset: pure spirit on the rocks</note>
 	</record>
-	<record class="yes">
+	<record class="+">
 		<id>0xBACA0003</id>
 		<name>Gerry Sendrowicz</name>
-		<nickname>.. Zdzichu</nickname>
+		<nickname>Zdzichu</nickname>
 		<why>1,2,5;3,5</why>
-		<note>Getting older; does  not drink as much as he used to</note>
+		<note>Getting older; does not drink as much as he used to</note>
 	</record>
-	<record class="yes">
+	<record class="+">
 		<id>0xBACA0007</id>
 		<name>Kitty Ha</name>
-		<nickname>.. Kitty</nickname>
+		<nickname>Kitty</nickname>
 		<why>3,5</why>
-		<note>Likes cooking while  drinking</note>
+		<note>Likes cooking while drinking</note>
 	</record>
-	<record class="yes">
+	<record class="+">
 		<id>0xBABA0004</id>
 		<name>Olsonet Comms</name>
-		<nickname>.. Olsonet</nickname>
+		<nickname>Olsonet</nickname>
 		<why>1;1,3</why>
-		<note>Expert group: Visit  events on safe beer  and vodka mixing</note>
+		<note>Expert group: Visit events on safe beer and vodka mixing</note>
 	</record>
-	<record class="yes">
+	<record class="+">
 		<id>0xBABA0005</id>
 		<name>Combat Networks</name>
-		<nickname>.. Combat</nickname>
+		<nickname>Combat</nickname>
 		<why>0,3;3,4</why>
-		<note>Pros league: Listen  to fascinating Tales From Two Irish Pubs</note>
+		<note>Pros league: Listen to fascinating Tales From Two Irish Pubs</note>
 	</record> 
 
 </people>

@@ -25,7 +25,6 @@ extern lword host_id;
 static int SFD;
 
 // ============================================================================
-// ============================================================================
 
 #define	MAXLINES	32
 #define	MAXOBJECTS	32
@@ -40,47 +39,22 @@ static Boolean free_object (word ix) {
 //
 	lcdg_dm_obj_t *co;
 
-#define	COI	((lcdg_dm_img_t*)co)
-#define	COM	((lcdg_dm_men_t*) co)
-#define	COT	((lcdg_dm_tex_t*) co)
-
 	if ((co = objects [ix]) == NULL)
 		return NO;
 
 	if (lcdg_dm_shown (co))
 		return YES;
 
-	switch (co->Type) {
+	lcdg_dm_free (co);
 
-		case LCDG_DMTYPE_MENU:
-
-			// Deallocate the text
-			lcdg_dm_csa ((char**)(COM->Lines), COM->NL);
-			break;
-
-		case LCDG_DMTYPE_TEXT:
-
-			ufree (COT->Line);
-			break;
-	}
-
-	if (co->Extras != NULL)
-		ufree (co->Extras);
-
-	ufree (co);
-	objects [ix] = NULL;
 	return NO;
-
-#undef	COI
-#undef	COM
-#undef	COT
 }
 
 // ============================================================================
 
 static void display_rec (word rh) {
 //
-// Display the record (picture + meter) represented by the handle
+// Display the record (picture + meter)
 //
 	sea_rec_t *rec;
 
@@ -88,12 +62,8 @@ static void display_rec (word rh) {
 		// Failed to get the record
 		return;
 
-	if (rec->IM != WNONE)
-		lcdg_im_disp (rec->IM, 0, 0);
-
-	seal_meter (rec->ECats, rec->MCats);
-
-	seal_freerec (rec);
+	seal_disprec (rec);
+	ufree (rec);
 }
 
 // ============================================================================
@@ -102,7 +72,7 @@ static void preset_menus () {
 
 	word i;
 
-	for (i = 0; i < 4; i++)
+	for (i = 0; i < 3; i++)
 		if (objects [i] != NULL)
 			return;
 
@@ -110,10 +80,10 @@ static void preset_menus () {
 		lcdg_dm_newtop (objects [0]);
 	if ((objects [1] = seal_mkcmenu (YES)) != NULL)
 		lcdg_dm_newtop (objects [1]);
-	if ((objects [2] = seal_mkrmenu (2)) != NULL)
+	if ((objects [2] = seal_mkrmenu ()) != NULL) {
+		objects [2] -> Type |= 0x40;
 		lcdg_dm_newtop (objects [2]);
-	if ((objects [3] = seal_mkrmenu (1)) != NULL)
-		lcdg_dm_newtop (objects [3]);
+	}
 }
 
 static void top_switch () {
@@ -144,7 +114,7 @@ static void buttons (word but) {
 		}
 
 		if (LCDG_DM_TOP == NULL ||
-		    LCDG_DM_TOP->Type != LCDG_DMTYPE_MENU)
+		    (LCDG_DM_TOP->Type & LCDG_DMTYPE_MASK) != LCDG_DMTYPE_MENU)
 			// Ignore the joystick, if the top object is not a menu
 			return;
 
@@ -185,12 +155,9 @@ static void buttons (word but) {
 	if (but == BUTTON_1) {
 		// Draw picture and meter, if record menu
 		if (LCDG_DM_TOP != NULL &&
-		    LCDG_DM_TOP->Type == LCDG_DMTYPE_MENU &&
-		    LCDG_DM_TOP->Extras != NULL)
-			// A record menu (Extras != NULL only in that case)
-			display_rec (LCDG_DM_TOP->
-				Extras [lcdg_dm_menu_c (LCDG_DM_TOP)]);
-		// Used to be this: lcdg_dm_remove (NULL);
+		    (LCDG_DM_TOP->Type & LCDG_DMTYPE_MASK) == LCDG_DMTYPE_MENU
+			&& (LCDG_DM_TOP->Type & 0x40) != 0)
+			display_rec (lcdg_dm_menu_c (LCDG_DM_TOP));
 		return; // Intentionally superfluous
 	}
 }
@@ -484,7 +451,7 @@ Men:	// ====================================================================
 
 	if ((objects [OIX] =
 	  (lcdg_dm_obj_t*) lcdg_dm_newmenu (lines,
-	    NL, FO, BG, FG, X, Y, W, H)) == NULL) {
+	    NL, X, Y, FO, BG, FG, W, H)) == NULL) {
 		lcdg_dm_csa (lines, NL);
 		Status = LCDG_DM_STATUS;
 	} else {
@@ -549,8 +516,8 @@ Tex:	// ====================================================================
 		goto Ret;
 	}
 
-	if ((objects [OIX] = (lcdg_dm_obj_t*) lcdg_dm_newtext (line, FO, BG,
-	    FG, X, Y, W)) == NULL) {
+	if ((objects [OIX] = (lcdg_dm_obj_t*) lcdg_dm_newtext (line, X, Y,
+	    FO, BG, FG, W)) == NULL) {
 		ufree (line);
 		Status = LCDG_DM_STATUS;
 	} else {
@@ -593,7 +560,7 @@ Ldm: // =======================================================================
 
     entry (RS_LDM+1) 
 
-	switch (objects [OIX] -> Type) {
+	switch ((objects [OIX] -> Type) & LCDG_DMTYPE_MASK) {
 
 #define	COI	((lcdg_dm_img_t*) (objects [OIX]))
 #define	COM	((lcdg_dm_men_t*) (objects [OIX]))
@@ -875,8 +842,10 @@ FRe:	// ====================================================================
 	if (free_object (OIX))
 		goto EFree;
 
-	if ((objects [OIX] = seal_mkrmenu (c [1])) == NULL)
+	if ((objects [OIX] = seal_mkrmenu ()) == NULL)
 		Status = LCDG_DM_STATUS;
+	else
+		objects [OIX] -> Type |= 0x40;
 
 	// Extras is now being used to store record handles
 	goto Ret;

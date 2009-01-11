@@ -72,12 +72,6 @@ void update_line (word, word, word, word);
 #define MLI0_DECL	'-'
 #define MLI0_IDEC	'~'
 
-// groups
-#define GR_YE		0
-#define GR_NO		1
-#define GR_IY		2
-#define GR_IN		3
-
 // codes for the group char (menu line[1]), so far +/- with 'ignore'
 #define MLI1_YE		'+'
 #define MLI1_NO		'-'
@@ -95,5 +89,13 @@ extern rf_rcv_t		rf_rcv, ad_rcv;
 extern word		top_flag;
 extern char *		ad_buf;
 extern sea_rec_t *	curr_rec;
+
+// Menu parameters (sealists doesn't need them any more) ======================
+
+#define	SEA_MENU_CATEV_BG	COLOR_GREEN
+#define	SEA_MENU_CATEV_FG	COLOR_BLACK
+#define SEA_MENU_CATMY_BG	COLOR_BLUE
+#define SEA_MENU_CATMY_FG	COLOR_WHITE
+
 #endif
 

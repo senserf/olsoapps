@@ -18,27 +18,49 @@ set EEPROM_SIZE		[expr 512 * 1024]
 set SEA_FONTSIZE	4096
 set SEA_NRECORDS	128	;# maximum number of records stored
 set SEA_FIMPAGE		4	;# first page of the picture area
-set SEA_RECSIZE		18	;# record size
+set SEA_RECSIZE		20	;# record size
 set SEA_NCATS		16	;# number of categories (of each type)
+
+set LM(COL)		12	;# number of colors (from lcdg)
 
 set BN(PGS)	$LCDG_IM_PAGESIZE
 
 #
 # Record layout:
 #
-#	ID (4), ECats (2), MCats (2), Flags (2), Nick (2), Name (2), Note (2),
-#	Image (2)
+#	ID (4), ECats (2), MCats (2), Class (2), MeterE (2), MeterM (2),
+#	Note (2), Image (2), Name (2)
 #
-#	18 bytes total
+#	20 bytes total
 #
 
 # The starting locations of the respective chunks
 set BN(FNT)	0
-set BN(CAT)	[expr $BN(FNT) + $SEA_FONTSIZE]
-set BN(REC)	[expr $BN(CAT) + 4 * $SEA_NCATS]
-set BN(TXT)	[expr $BN(REC) + $SEA_RECSIZE * $SEA_NRECORDS]
+set BN(OFF)	[expr $BN(FNT) + $SEA_FONTSIZE]		;# offsets (6 bytes)
+set BN(REN)	[expr $BN(OFF) + 3 * 2]			;# N records
+set BN(REO)	[expr $BN(REN) + 2]			;# Org records
+set BN(TXT)	[expr $BN(REO) + $SEA_RECSIZE * $SEA_NRECORDS]
 # This is LWA+1 of the text area
 set BN(ETX)	[expr $SEA_FIMPAGE * $LCDG_IM_PAGESIZE]
+
+###############################################################################
+
+# default menu parameters; width/height of zero means max based on the
+# font size; we have: X, Y, fnt, bg, fg, w (chars), h (chars)
+set DP(EC)	{ 0 0 0 0 1 0 0 }
+set DP(MC)	$DP(EC)
+set DP(PE)	$DP(EC)
+
+# default text area parameters: X, Y, fnt, bg, fg, w (chars), h (chars, opt);
+# if Y is negative, its is 129-Y and the text extends u; if h is defined
+# (present ns nonzero), it means fixed and truncated, otherwise up to max
+# X, Y 
+set DP(ME)	{ 0 0 3 0 1 16 1}
+set DP(MM)	{ 65 0 3 0 1 16 1}
+
+set DP(NO)	{ 0 0 0 0 1 0 0}
+set DP(NA)	$DP(NO)
+set DP(NI)	$DP(NO)
 
 ###############################################################################
 
@@ -112,6 +134,46 @@ proc appendbi { wh v } {
 
 ###############################################################################
 
+proc extract_font_sizes { ff } {
+#
+# Extract font sizes
+#
+	global FST
+
+	set fl [string length $ff]
+
+	if { [binary scan $ff ss mag nf] < 2 } {
+		return "file too short"
+	}
+
+	if { [expr $mag & 0x00ffff] != [expr 0x07f01] } {
+		return "bad magic code"
+	}
+
+	if { $nf <= 0 || $nf > 14 } {
+		return "bad file header"
+	}
+
+	for { set i 0 } { $i < $nf } { incr i } {
+		set ix [expr 4 + 2 * $i]
+		binary scan [string range $ff $ix [expr $ix + 1]] s off
+		set off [expr $off & 0x00ffff]
+		if { $off + 16 > $fl } {
+			return "corrupted file"
+		}
+		set hdr [string range $ff $off [expr $off + 1]]
+		binary scan $hdr cc col row
+		set col [expr $col & 0xff]
+		set row [expr $row & 0xff]
+		puts "Font $i ($col x $row)"
+		set FST($i) [list $col $row]
+	}
+
+	puts "$nf fonts in the font file"
+}
+
+###############################################################################
+
 proc image_id { id } {
 #
 # Transforms record ID into picture file ID
@@ -119,35 +181,6 @@ proc image_id { id } {
 	set id [string tolower $id]
 	regexp "^0x(.*)" $id junk id
 	return "image_${id}.nok"
-}
-
-proc alloc_string { st } {
-#
-# Allocate memory for string
-#
-	global MEM
-
-	set len [string length $st]
-
-	if { $len > 255 } {
-		abt "string length > 255 characters: $st"
-	}
-
-	set st "[binary format c $len]$st"
-
-	set loc [string first $st $MEM(TXT)]
-
-	if { $loc >= 0 } {
-		# already present
-		return $loc
-	}
-
-	# allocate a new string
-	set loc [string length $MEM(TXT)]
-
-	append MEM(TXT) $st
-
-	return $loc
 }
 
 proc output_block { org data } {
@@ -198,55 +231,601 @@ proc output_block { org data } {
 	}
 }
 
-proc do_categories { } {
+proc do_display_params { } {
+#
+# Process display parameters: just store them to be used for constructing the
+# menus and stuff
+#
+	global DF DP BN
 
-	global BN DF SEA_NCATS
+	# menus
+	foreach tp { "eventcategories" "mycategories" "people" } \
+	    ix { "EC" "MC" "PE" } {
+		set pm [sxml_txt [sxml_child [sxml_child $DF $tp] "menu"]]
+		parse_menu_params $pm $ix $tp
+	}
 
-	set org $BN(CAT)
+	# meters
+	foreach tp { "eventcategories" "mycategories" } ix { "ME" "MM" } {
+		set pm [sxml_txt [sxml_child [sxml_child $DF $tp] "meter"]]
+		parse_text_params $pm $ix $tp \
+			[regexp -nocase "extend\[^a-z\]*up" $pm]
+	}
 
-	foreach ct { "eventcategories" "mycategories" } {
-		set ec [sxml_child $DF $ct]
-		if { $ec == "" } {
-			puts "Warning: <$ct> not found"
+	# record text attributes
+	set pe [sxml_child $DF "people"]
+	foreach tp { "note" "name" "nickname" } ix { "NO" "NA" "NI" } {
+		set pm [sxml_txt [sxml_child $pe $tp]]
+		parse_text_params $pm $ix $tp \
+			[regexp -nocase "extend\[^a-z\]*up" $pm]
+	}
+}
+
+proc numbers { str } {
+#
+# Extract the list of all (nonnegative) numbers found in the string
+#
+	set res ""
+
+	while 1 {
+		if ![regexp "\[0-9\]+" $str mat] {
+			return $res
 		}
-		set cl [sxml_children $ec "category"]
-		for { set i 0 } { $i < $SEA_NCATS } { incr i } {
-			set cc($i) ""
+		set str [string range $str [expr \
+			[string first $mat $str] + [string length $mat]] \
+				end]
+		if [catch { expr $mat } mat] {
+			error "llegal number"
 		}
-		set ni 0
-		foreach c $cl {
-			incr ni
-			# ordinal present ?
-			set od [sxml_attr $c "ord"]
-			if { $od != "" } {
-				if [catch { expr $od } ov] {
-					abt "Illegal 'ord=\"$od\"', item $ni\
-						of <$ct>"
-					set od ""
-				} else {
-					set od $ov
+
+		lappend res $mat
+	}
+	return $res
+}
+
+proc cvalue { la lb ix } {
+
+	set res [lindex $la $ix]
+	if { $res == "" } {
+		set res [lindex $lb $ix]
+	}
+	return $res
+}
+
+proc dserr { msg what } { abt "error in display parameters ($what): $msg" }
+
+proc parse_menu_params { str ix what } {
+#
+# Parse categories parameters
+#
+	global FST DP LM
+
+	if [catch { numbers $str } NL] { dserr $NL $what }
+
+	set def $DP($ix)
+
+	# font (index == 2)
+	set F [cvalue $NL $def 2]
+
+	if ![info exists FST($F)] {
+		dserr "no font number $F" $what
+	}
+
+	set fw [lindex $FST($F) 0]
+	set fh [lindex $FST($F) 1]
+
+	# X, Y (corner coordinates)
+	set X [cvalue $NL $def 0]
+	set Y [cvalue $NL $def 1]
+
+	# start the list
+	set out [list $X $Y $F]
+
+	set cb [cvalue $NL $def 3]
+	if { $cb >= $LM(COL) } {
+		dserr "bad background color $cb" $what
+	}
+	lappend out $cb
+
+	set cb [cvalue $NL $def 4]
+	if { $cb >= $LM(COL) } {
+		dserr "bad foreground color $cb" $what
+	}
+	lappend out $cb
+
+	# width and height
+	set cb [cvalue $NL $def 5]
+	# maximum width
+	set mw [expr (130 - $X) / $fw]
+	if { $mw < 2 } {
+		set X [expr 130 - 2 * $fw]
+		set mw 2
+	}
+	if { $cb == 0 || $cb > $mw } {
+		set cb $mw
+	}
+	lappend out $cb
+
+	set cb [cvalue $NL $def 6]
+	# maximum height
+	set mw [expr (130 - $Y) / $fh]
+	if { $mw < 2 } {
+		set Y [expr 130 - 2 * $fh]
+		set mw 2
+	}
+	if { $cb == 0 || $cb > $mw } {
+		set cb $mw
+	}
+	lappend out $cb
+
+	set DP($ix) $out
+}
+
+proc parse_text_params { str ix what eup } {
+
+	global DP LM FST
+
+	if [catch { numbers $str } NL] { dserr $NL $what }
+
+	set def $DP($ix)
+
+	# font (index == 2)
+	set F [cvalue $NL $def 2]
+
+	if ![info exists FST($F)] {
+		dserr "no font number $F" $what
+	}
+	
+	set fw [lindex $FST($F) 0]
+	set fh [lindex $FST($F) 1]
+
+	# X, Y
+	set X [cvalue $NL $def 0]
+	set Y [cvalue $NL $def 1]
+
+	# requested height
+	set rh [cvalue $NL $def 6]
+
+	# make sure Y is sane
+	set nh [expr 130 - $fh]
+	if { $Y > $nh } {
+		set Y $nh
+	}
+
+	# determine maximum height
+	if $eup {
+		# coordinates refer to the bottom line
+		# this is how many lines we can accommodate
+		set nh [expr ($Y / $fh) + 1]
+	} else {
+		# coordinates refer to the top line
+		set nh [expr (130 - $Y) / $fh]
+	}
+
+	if { $rh != 0 && $rh > $nh } {
+		set rh $nh
+	}
+
+	# rh == 0 -> extensible, $nh == max number of lines, eup == direction
+	#####################################################################
+
+	# the maximum width
+	set mw [expr (130 - $X) / $fw]
+	if { $mw < 2 } {
+		set X [expr 130 - 2 * $fw]
+		set mw 2
+	}
+
+	# requested width
+	set nw [cvalue $NL $def 5]
+	if { $nw < 2 || $nw > $mw } {
+		set nw $mw
+	}
+
+	set out [list $X $Y $F]
+
+	# the colors
+	set cb [cvalue $NL $def 3]
+	if { $cb >= $LM(COL) } {
+		dserr "bad background color $cb" $what
+	}
+	lappend out $cb
+
+	set cb [cvalue $NL $def 4]
+	if { $cb >= $LM(COL) } {
+		dserr "bad foreground color $cb" $what
+	}
+	lappend out $cb
+
+	lappend out $nw
+	lappend out $rh
+
+	lappend out $eup
+	lappend out $nh
+
+	# X Y F bg fg w h ext maxh (note: h can be zero -> extensible)
+
+	set DP($ix) $out
+}
+
+proc alloc_menu { att lines } {
+#
+# Builds a menu
+#
+#    XLb YLb XHb YHb BLKw BLKw TPb Fn BGb FGb LINESw NLw Wb Hb FLw SHw SEw
+#    ------- ------- ---- ---- ------ ------- ------ --- ----- --- --- ---
+#        0      1      2    3     4      5       6    7    8    9   10  11
+#
+	global FST MEM
+
+	set OFF(LI) 6
+	set OFF(LE) 12
+
+	set bk ""
+
+	set NL [llength $lines]
+
+	# coordinates
+	set X [lindex $att 0]
+	set Y [lindex $att 1]
+	appendbc bk $X
+	appendbc bk $Y
+
+	set F [lindex $att 2]
+
+	set fw [lindex $FST($F) 0]
+	set fh [lindex $FST($F) 1]
+
+	set w [lindex $att 5]
+	set h [lindex $att 6]
+
+	# bounding rectangle
+	appendbc bk [expr $X + $fw * $w - 1]
+	appendbc bk [expr $Y + $fh * $h - 1]
+
+	# next + extras
+	appendbs bk 0
+	appendbs bk 0
+
+	# type == menu
+	appendbc bk 1
+
+	# font
+	appendbc bk $F
+
+	# colors
+	appendbc bk [lindex $att 3]
+	appendbc bk [lindex $att 4]
+
+	# Lines (right behind the menu structure - to be relocated)
+	appendbs bk [expr $OFF(LE) << 1]
+
+	# number of lines
+	appendbs bk $NL
+
+	# width/height
+	appendbc bk $w
+	appendbc bk $h
+
+	# first line, shift, selection
+	appendbs bk 0
+	appendbs bk 0
+	appendbs bk 0
+
+	# OK, we have basically filled the record, now take care of the lines
+
+	# the block of UNIX-formatted lines
+	set lbk ""
+
+	# the initial offset: skip the record + the Lines array
+	set lof [expr ($OFF(LE) + $NL) << 1]
+
+	foreach ln $lines {
+		append ln "\x00"
+		set len [string length $ln]
+		appendbs bk $lof
+		append lbk $ln
+		incr lof $len
+	}
+
+	# we have the Lines array at the end; now, put everything together
+	set bk "$bk$lbk"
+
+	# turn it into a complete object
+	set len [string length $bk]
+
+	# this doesn't have to be aligned
+	set lbk ""
+	# prepend the length header
+	appendbs lbk $len
+	set bk "$lbk$bk"
+
+	# follow it by the list of relocation points
+	set lbk ""
+	# the number of relocation points == 1 + NL
+	appendbs lbk [expr $NL + 1]
+	# the Lines array: 6
+	appendbs lbk $OFF(LI)
+
+	set lof $OFF(LE)
+	for { set i 0 } { $i < $NL } { incr i } {
+		# string relocation
+		appendbs lbk [expr $lof | 0x8000]
+		incr lof
+	}
+
+	# and this is the complete chunk
+	set bk "$bk$lbk"
+
+	set loc [string length $MEM(TXT)]
+
+	append MEM(TXT) $bk
+
+	return $loc
+}
+
+proc alloc_text { att line } {
+#
+# Allocates a text structure
+#
+#    XLb YLb XHb YHb BLKw BLKw TPb Fn BGb FGb LINEw Wb Hb
+#    ------- ------- ---- ---- ------ ------- ----- -----
+#       0       1      2    3     4      5      6     7
+#
+	global FST MEM
+
+	set OFF(LI) 6
+	# in words
+	set OFF(LE) 8
+
+	set bk ""
+
+	# coordinates
+	set X [lindex $att 0]
+	set Y [lindex $att 1]
+
+	# the font
+	set F [lindex $att 2]
+
+	set fw [lindex $FST($F) 0]
+	set fh [lindex $FST($F) 1]
+
+	# extensibility and stuff:
+	#	actual width
+	#	fixed height or 0, if extensible
+	#	interpretation of the Y-coordinate (up direction if nonzero)
+	#	maximum height
+
+	set w [lindex $att 5]
+	set h [lindex $att 6]
+	set e [lindex $att 7]
+	set m [lindex $att 8]
+
+	# first, split the line based on the width, which is one known
+	# parameter, and see how it works from there
+
+	# count the total number of (broken) lines
+	set nl 1
+	# the processed string
+	set out ""
+	set t $line
+	# length of current line
+	set cl 0
+
+	while 1 {
+		set t [string trimleft $t]
+		if { $t == "" } {
+			break
+		}
+		# look at the next word to handle
+		if ![regexp "^(\[^ \t\n\]+)(.*)" $t junk wd t] {
+			# impossible
+			abt "text line '$txt' contains illegal characters"
+		}
+
+		# length of the word
+		set wl [string length $wd]
+
+		if { $cl > 0 } {
+			# some characters already present in the current line;
+			# after adding the word the length will be ...
+			set ul [expr $cl + $wl + 1]
+			if { $ul > $w } {
+				# this would exceed the bound, so must move to
+				# new line
+				while { $cl < $w } {
+					# fill the current one to the end with
+					# blanks
+					append out " "
+					incr cl
+				}
+				incr nl
+				set cl 0
+			} else {
+				# the new word fits into the present line
+				append out " $wd"
+				set cl $ul
+			}
+		}
+
+		# we will fall through this condition, if we must put the new
+		# word into a new line
+		if { $cl == 0 } {
+			# at the beginning of a new line
+			append out $wd
+			while { $wl > $w } {
+				# if the word itself is longer than w, then
+				# it must be broken, anyway; note that this
+				# happens automatically
+				set wl [expr $wl - $w]
+				incr nl
+			}
+			# and this is the final length of the last filled line
+			set cl $wl
+		}
+	}
+
+	if $h {
+		# we have a fixed height
+		if { $nl > $h } {
+			set out [string range $out 0 [expr $h * $w - 1]]
+			set nl $m
+		} elseif { $nl < $h } {
+			# fill it up with spaces (just for now - there should
+			# be a smarter way, if we ever need this option,
+			# probably not)
+			set cl [string length $out]
+			set lf [expr $cl % $w] 
+			if { $lf != 0 } {
+				while { $lf < $w } {
+					append out " "
+					incr lf
 				}
 			}
-			if { $od != "" } {
-				if ![info exists cc($od)] {
-					abt "Attribute 'ord=\"$od\"', item $ni\
-						of <$ct> out of range"
+			while 1 {
+				# force it to the next line
+				append out " "
+				incr nl
+				if { $nl == $h } {
+					break
 				}
-				if { $cc($od) != "" } {
-					abt "Duplicate ord ($od), item $ni\
-						of <$ct>"
+				for { set i 1 } { $i < $w } { incr i } {
+					append out " "
 				}
-			} else {
-				# find first free
-				for { set od 0 } { $od < $SEA_NCATS }\
-				    { incr od } {
-					if { $cc($od) == "" } {
-						break
-					}
-				}
-				if { $od == $SEA_NCATS } {
-					abt "too many items in <$ct>"
-				}
+			}
+		}
+	} elseif { $nl > $m } {
+		# more than maximum height, trim it down
+		set out [string range $out 0 [expr $m * $w - 1]]
+		set nl $m
+	}
+				
+	if $e {
+		# extend up
+		set Y [expr $Y - $nl * $fh]
+	}
+			
+	appendbc bk $X
+	appendbc bk $Y
+	appendbc bk [expr $X + $fw * $w - 1]
+	appendbc bk [expr $Y + $fh * $nl - 1]
+
+	# next + extras
+	appendbs bk 0
+	appendbs bk 0
+
+	# type == text
+	appendbc bk 2
+
+	# font
+	appendbc bk $F
+
+	# colors
+	appendbc bk [lindex $att 3]
+	appendbc bk [lindex $att 4]
+
+	# Line (right behind the text structure - to be relocated)
+	appendbs bk [expr $OFF(LE) << 1]
+
+	# width and height
+	appendbc bk $w
+	appendbc bk $nl
+
+	# the line
+	append bk $out
+	append bk "\x00"
+
+	# that's it
+	set len [string length $bk]
+
+	set lbk ""
+	appendbs lbk $len
+	set bk "$lbk$bk"
+
+	# there is a single relocation point
+	appendbs bk 1
+	appendbs bk [expr 0x8000 + $OFF(LI)]
+
+	# that's it
+	set loc [string length $MEM(TXT)]
+	append MEM(TXT) $bk
+	return $loc
+}
+
+proc alloc_image { handle x y } {
+#
+# Allocates an image structure
+#
+	global MEM
+
+	set xd [expr (130 - $x) / 2]
+	set yd [expr (130 - $x) / 2]
+
+	set bk ""
+
+	appendbc bk $xd
+	appendbc bk $yd
+
+	appendbc bk [expr $xd + $x - 1]
+	appendbc bk [expr $yd + $y - 1]
+
+	appendbs bk 0
+	appendbs bk 0
+
+	# type == 0
+	appendbc bk 0
+	# alignment
+	appendbc bk 0
+
+	appendbs bk $handle
+
+	set lw ""
+	appendbs lw [string length $bk]
+	# there is no relocation
+	appendbs bk 0
+	set loc [string length $MEM(TXT)]
+	append MEM(TXT) "$lw$bk"
+
+	return $loc
+}
+
+proc meter_string { wc } {
+#
+# Create a meter string from flags
+#
+	set out ""
+	for { set i 0 } { $i < 16 } { incr i } {
+		set bit [expr ($wc >> $i) & 1]
+		if $bit {
+			append out "a"
+		} else {
+			append out "b"
+		}
+	}
+	return $out
+}
+	
+proc do_categories { } {
+
+	global BN DF SEA_NCATS DP
+
+	# the offsets (or pointers)
+	set off ""
+
+	foreach ct { "eventcategories" "mycategories" } ix { "EC" "MC" } {
+		set ec [sxml_child $DF $ct]
+		if { $ec == "" } {
+			abt "<$ct> not found"
+		}
+		set cl [sxml_children $ec "category"]
+		# extract the texts
+		set tel ""
+		# counter
+		set ni 0
+		foreach c $cl {
+			if { $ni == $SEA_NCATS } {
+				abt "too many categories in <$ct>, $SEA_NCATS\
+					is the max"
 			}
 			# get the string
 			set st [sxml_txt $c]
@@ -254,43 +833,21 @@ proc do_categories { } {
 				abt "category string in item $ni of <$ct> is\
 					empty"
 			}
-			set cc($od) [alloc_string $st]
+			# prefix
+			set pc "[string toupper [string index $ct 0]]$ni"
+			set st "$pc.$st"
+			lappend tel $st
+			incr ni
 		}
 
-		set ch ""
-		set cs 0
-		set end 0
-		for { set i 0 } { $i < $SEA_NCATS } { incr i } {
-			if { $cc($i) == "" } {
-				# WNONE
-				appendbs ch -1
-				set end 1
-			} else {
-				if $end {
-					abt \
-					   "category list <$ct> contains a hole"
-				}
-				# note that these locations are relative to
-				# the origin of the TXT area, so zero is
-				# legit; also, WNONE (all ones) is a preferred
-				# way to indicate 'nothing', as this is the
-				# default contents of unprogrammed EEPROM
-				appendbs ch $cc($i)
-				# update chunk size
-				set cs [expr ($i + 1) * 2]
-			}
-		}
-
-		incr cs -1
-		output_block $org [string range $ch 0 $cs]
-
-		incr org [expr $SEA_NCATS * 2]
+		appendbs off [alloc_menu $DP($ix) $tel]
 	}
+	output_block $BN(OFF) $off
 }
 
 proc numlist { str } {
 #
-# Extracts a list of nonnegative numbers from string
+# Converts a list of numbers into flags
 #
 	global SEA_NCATS
 
@@ -337,7 +894,7 @@ proc handle_image { id } {
 	# for now, this is treated as a file name
 	if [catch { open $id "r" } ifd] {
 		# no image: WNONE
-		return -1
+		return ""
 	}
 
 	# read the image
@@ -460,36 +1017,41 @@ proc handle_image { id } {
 	}
 
 	output_block [expr $ih * $LCDG_IM_PAGESIZE] $res
-	return $ih
+	return [list $ih $x $y]
 }
 		
 proc do_people { } {
 
-	global DF BN SEA_NCATS SEA_RECSIZE SEA_NRECORDS
+	global DF BN SEA_NCATS SEA_NRECORDS DP
 
 	set ec [sxml_children [sxml_child $DF "people"] "record"]
 
 	set data ""
 
 	set ni 0
-	foreach rc $ec {
-		incr ni
+	set mlines ""
 
-		if { $ni > $SEA_NRECORDS } {
-			abt "too many records"
+	foreach rc $ec {
+
+		if { $ni >= $SEA_NRECORDS } {
+			abt "too many records, $SEA_NRECORDS is the max"
 		}
+
+		# class (a single character) ##################################
 		set it [string tolower [sxml_attr $rc "class"]]
-		if { $it == "" || $it == "yes" } {
-			# default == yes
-			set CL 1
-		} elseif { $it == "no" } {
-			set CL 2
-		} elseif { $it == "ignore" } {
-			set CL 0
-		} else {
-			abt "illegal class ($cl) at record $ni"
+		if { $it == "" } {
+			# the default class i "+"
+			set it "+"
+		} elseif { [string length $it] != 1 } {
+			abt "class in record $ni ($it) is not a single\
+				character"
 		}
-		# the ID element is mandatory
+		# the numerical code
+		scan $it %c CL
+		# just in case
+		set CL [expr $CL & 0x00ff]
+
+		# ID (a lword) ################################################
 		set it [sxml_child $rc "id"]
 		if { $it == "" } {
 			abt "id element missing at record $ni"
@@ -501,48 +1063,40 @@ proc do_people { } {
 		# this is supposed to produce the file name of the image
 		set II [image_id $it]
 
-		# collect other items #########################################
-
-		set it [sxml_txt [sxml_child $rc "name"]]
-		if { $it == "" } {
-			if $CL {
-				# name required if not ignore
-				abt "name missing at record $ni"
-			}
-			# wnone
-			set NM -1
-		} else {
-			set NM [alloc_string $it]
+		# name ########################################################
+		set nm [sxml_txt [sxml_child $rc "name"]]
+		if { $nm == "" } {
+			# name required
+			abt "name missing at record $ni"
 		}
 
-		###############################################################
+		set NM [alloc_text $DP(NA) $nm]
 
+		# nickname (prefix with ".. " #################################
 		set it [sxml_txt [sxml_child $rc "nickname"]]
 		if { $it == "" } {
-			# use name by default
-			set NI $NM
-		} else {
-			set NI [alloc_string $it]
+			set it $nm
 		}
+		set it ".. $it"
 
-		###############################################################
+		# used for the menu
+		lappend mlines $it
 
+		#	set NI [alloc_text $it]
+		# do we need to store it separately
+
+		# note (have to format it) ####################################
 		set it [sxml_txt [sxml_child $rc "note"]]
 		if { $it == "" } {
 			set NO -1
 		} else {
-			set NO [alloc_string $it]
+			set NO [alloc_text $DP(NO) $it]
 		}
 
-		###############################################################
-
+		# EC / MC bits ################################################
 		set it [sxml_txt [sxml_child $rc "why"]]
 		if { $it == "" } {
-			if $CL {
-				abt "no why list at record $ni"
-			}
-			set EC 0
-			set MC 0
+			abt "no <why> list at record $ni"
 		} else {
 			set p [string first ";" $it]
 			if { $p < 0 } {
@@ -561,29 +1115,49 @@ proc do_people { } {
 				abt "$MC in my categories of record $ni"
 			}
 			if { $EC == 0 && $MC == 0 } {
-				abr "the why list is empty at record $ni"
+				abt "the <why> list at record $ni is empty"
 			}
 		}
 
-		# image #######################################################
+		# build the meters
 
+		set it [meter_string $EC]
+		set ME [alloc_text $DP(ME) $it]
+		set it [meter_string $MC]
+		set MM [alloc_text $DP(MM) $it]
+
+		# image #######################################################
 		set IM [handle_image $II]
+		if { $IM != "" } {
+			set IM [alloc_image [lindex $IM 0] [lindex $IM 1] \
+				[lindex $IM 2]]
+		} else {
+			set IM -1
+		}
 
 		# append to data ##############################################
-
 		appendbi data $ID
 		appendbs data $EC
 		appendbs data $MC
 		appendbs data $CL
-		appendbs data $NI
-		appendbs data $NM
+		appendbs data $ME
+		appendbs data $MM
 		appendbs data $NO
 		appendbs data $IM
+		# appendbs data $NI
+		appendbs data $NM
+		incr ni
 	}
 
-	# check if no overflow
+	# create the menu
+	set mp [alloc_menu $DP(PE) $mlines]
+	set bk ""
+	appendbs bk $mp
+	output_block [expr $BN(OFF) + 4] $bk
 
-	output_block $BN(REC) $data
+	set it ""
+	appendbs it $ni
+	output_block $BN(REN) "$it$data"
 }
 
 ###############################################################################
@@ -644,6 +1218,8 @@ set dfd [string length $ff]
 
 if { $dfd > $SEA_FONTSIZE } {
 	abt "font file ($ffname) too long ($dfd), $SEA_FONTSIZE is the max"
+} elseif { $dfd < 128 } {
+	abt "font file too short (corrupted?)"
 }
 
 #### start the output file
@@ -659,11 +1235,22 @@ set EIM(MEM) ""
 set EIM(LEN) 0
 
 output_block $BN(FNT) $ff
+
+# we shall need these to properly pre-scale things in the script
+extract_font_sizes $ff
+
 unset ff
 
 ###############################################################################
 
-# initialize the text area, which will go last
+puts "Offsets:"
+puts "            Fonts:      [format %04x $BN(FNT)] = $BN(FNT)"
+puts "            Pointers:   [format %04x $BN(OFF)] = $BN(OFF)"
+puts "            Records:    [format %04x $BN(REN)] = $BN(REN)"
+puts "            Texts:      [format %04x $BN(TXT)] = $BN(TXT)"
+puts "            Images:     [format %04x $BN(ETX)] = $BN(ETX)"
+
+# initialize the text (menu) area, which will go last
 set MEM(TXT) ""
 
 # first free image page
@@ -672,9 +1259,12 @@ set MEM(IMP) $SEA_FIMPAGE
 # list of image blocks
 set MEM(IML) ""
 
+# display parameters
+do_display_params
+
 do_categories
 
-# this must be the first image, if exists at all
+# this must be the first image, if it exists at all
 handle_image "wallpaper.nok"
 
 do_people

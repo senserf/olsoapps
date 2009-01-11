@@ -319,9 +319,8 @@ const unsigned char FONT_meter [97][8] = {   //     4x8 special
 0x04,0x08,0x08,0x00,0x00,0x00,0x00,0x00,     //     columns, rows, BPC
 //
 //
-// ||__
+// _||_
 // ____
-// __||
 //
 // Only these two characters are used at present, corresponding to a, b
 //

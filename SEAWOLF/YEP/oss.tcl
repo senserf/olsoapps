@@ -38,7 +38,7 @@ msource oep.tcl
 
 package require oep 1.0
 
-set CMDS	{ eeget eeput imget imput }
+set CMDS	{ eeget eeput imget imput ctest }
 
 proc log { msg } {
 
@@ -504,7 +504,6 @@ proc rilist { } {
 		return 1
 	}
 
-
 	if { $ST(DON) < 0 } {
 		# ilget may finish earlier
 		set ST(CBA) [after $TM(OUT) stmout]
@@ -708,6 +707,73 @@ proc imget { par } {
 	return 0
 }
 
+proc issue { cmd } {
+#
+# Issue a simple command to the board
+#
+	global TM PM
+
+	u_ab_write $cmd
+	if [u_ab_wait $TM(LNG)] {
+		log "reply timeout '$cmd'"
+		u_ab_setif uget $PM(MPL)
+		return 1
+	}
+
+	return 0
+}
+
+proc empty { par } { }
+
+proc ctest { par } {
+#
+# Color test
+#
+	global PM
+
+	set cf [exnum par]
+
+	if { $cf == "" } {
+		log "bg color required"
+		return 1
+	}
+
+	set cb [exnum par]
+
+	u_ab_setif empty $PM(MPL)
+	# set the colors
+	if [issue "os 10 [format %04x $cf]"] {
+		return 1
+	}
+
+	if { $cb != "" } {
+		if [issue "os 9 [format %04x $cb]"] {
+			return 1
+		}
+	}
+
+	if [issue "dd 31"] {
+		return 1
+	}
+
+	if [issue "ct 31 0 10 9 10 60 10"] {
+		return 1
+	}
+
+	if [issue "THIS IS A TEST LINE"] {
+		return 1
+	}
+
+	if [issue "da 31"] {
+		return 1
+	}
+
+	u_ab_setif uget $PM(MPL)
+	log "Done"
+
+	return 0
+}
+
 ######### COM port ############################################################
 
 set PM(EESIZE)		[expr 256 * 2048]
@@ -737,6 +803,7 @@ set ST(ILI)	""
 
 # request acceptance timeout
 set TM(OUT)	2048
+set TM(LNG)	5000
 
 if [catch { u_start "" 115200 "" } err] {
 	log $err

@@ -8,4 +8,7 @@
 #define	PID_VER_TYPE	1
 #define DIAG_MESSAGES	1
 
+// Long argument lists in object creators
+#define	LCDG_DM_SOFT_CREATORS	2
+
 //DIAG_MESSAGES 1 saves 1152B

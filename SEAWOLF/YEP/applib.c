@@ -17,29 +17,97 @@ sea_rec_t	* curr_rec;
 
 extern const lword host_id;
 
+// ============================================================================
+
+// I have moved here the part that made sealists.c dependent on applib - so I
+// can test sealists.c independently; you can move it back there once things
+// work
+
+lcdg_dm_obj_t *mkrmenu () {
+
+	lword ep;
+	word nc, i;
+	word wc [SEA_ROFF_ME >> 1]; // up to Class
+
+	lcdg_dm_obj_t *res;
+
+#define	rem	((lcdg_dm_men_t*)res)
+
+	if ((res = seal_mkrmenu ()) == NULL)
+		return NULL;
+	
+	nc = rem -> NL;
+
+	ufree (nbh_menu.mm); // harmless if NULL?
+
+	// Extras not needed (I think), as no records are skipped, and thus line
+	// numbers can be trivially converted to record pointers
+
+	if ((nbh_menu.mm = (nbh_t *) umalloc (sizeof (nbh_t) * nc)) == NULL) {
+		LCDG_DM_STATUS = LCDG_DMERR_NOMEM;
+URet:
+		lcdg_dm_free (res);
+		return NULL;
+	}
+
+	nbh_menu.li = nc;
+
+	for (ep = SEA_EOFF_REC, i = 0; i < nc; ep += SEA_RECSIZE) {
+
+		if (ep >= SEA_EOFF_TXT) {
+			LCDG_DM_STATUS = LCDG_DMERR_GARBAGE;
+			goto URet;
+
+		}
+
+		// Up to and including ME
+		ee_read (ep, (byte*)(&(wc[0])), SEA_ROFF_ME);
+
+		nbh_menu.mm [i].id = wc [SEA_ROFF_ID >> 1];
+		nbh_menu.mm [i].ts = 0;
+		nbh_menu.mm [i].st = HS_SILE;
+
+		// This is now a byte - as requested by Wlodek
+		rem -> Lines [i][1] =
+			nbh_menu.mm [i] . gr = (byte) wc [SEA_ROFF_CL >> 1];
+		i++;
+	}
+
+	return res;
+#undef	rem
+}
+
+// ============================================================================
+	
 void update_line (word sel, word i, word s, word c0) {
+
     switch (sel) {
+
 	case ULSEL_C0:
+
 		nbh_menu.mm[i].st = s;
 		lcd_menu->Lines [i][0] = c0;
 		break;
 
 	case ULSEL_C1:
-	    switch (nbh_menu.mm[i].gr) {
-		case GR_YE:
-			nbh_menu.mm[i].gr = GR_IY;
+
+	    // AFAICT, the proper character is there already
+	    switch ((char)(nbh_menu.mm[i].gr)) {
+
+		case MLI1_YE:
+			nbh_menu.mm[i].gr = MLI1_IY;
 			lcd_menu->Lines [i][1] = MLI1_IY;
 			break;
-		case GR_NO:
+		case MLI1_NO:
 			 nbh_menu.mm[i].gr = MLI1_IN;
 			 lcd_menu->Lines [i][1] = MLI1_IN;
 			 break;
-		case GR_IY:
-			 nbh_menu.mm[i].gr = GR_YE;
+		case MLI1_IY:
+			 nbh_menu.mm[i].gr = MLI1_YE;
 			 lcd_menu->Lines [i][1] = MLI1_YE;
 			 break;
-		case GR_IN:
-			 nbh_menu.mm[i].gr = GR_NO;
+		case MLI1_IN:
+			 nbh_menu.mm[i].gr = MLI1_NO;
 			 lcd_menu->Lines [i][1] = MLI1_NO;
 	    }
     }
@@ -70,24 +138,33 @@ void init_glo () {
 }
 
 int handle_ad (word act, word which) {
+
     sea_rec_t *rec;
+    lcdg_dm_obj_t *im;
 
     switch (act) {
 
 	case AD_GOT:
 
 	    if (ad_rcv.buf != NULL ||
-		((rec = seal_getrec (lcd_menu->Extras [which])) == NULL)) {
+		((rec = seal_getrec (which)) == NULL)) {
 		msg_reply (HS_DECL);
 
 	    } else {
+
 		msg_reply (HS_MATC);
 		ad_rcv.buf = rf_rcv.buf;
 		ad_rcv.len = rf_rcv.len;
 		rf_rcv.buf = NULL;
 		rf_rcv.len = 0;
-		if (rec->IM != WNONE)
-			lcdg_im_disp (rec->IM, 0, 0);
+
+		if (rec->IM != WNONE && (im = lcdg_dm_newimage_e ((lword)
+		    (rec->IM + SEA_EOFF_TXT))) != NULL) {
+
+			lcdg_dm_display (im);
+			lcdg_dm_free (im);
+		}
+			
 		lcdg_font (2);
 
 		// improvise... 
@@ -109,7 +186,7 @@ int handle_ad (word act, word which) {
 				lcdg_sett (0, 66, 16, 1);
 		}
 		lcdg_wl (&ad_rcv.buf[sizeof(msgAdType)], 0, 0, 0);
-		seal_freerec (rec);
+		ufree (rec);
 		top_flag = TOP_AD;
 	    }
 	    break;
@@ -148,7 +225,7 @@ void process_incoming () {
     }
 
     // all else unwanted
-    if (i < 0 || nbh_menu.mm[i].gr != GR_YE) {
+    if (i < 0 || nbh_menu.mm[i].gr != MLI1_YE) {
 	msg_reply (HS_NOSY);
 	return;
     }
@@ -224,10 +301,10 @@ int handle_nbh (word what, word id) {
 	    case NBH_INIT:
 		    nbh_menu.mm[i].ts = 0;
 		    nbh_menu.mm[i].st = HS_SILE;
-		    if (nbh_menu.mm[i].gr == GR_IY)
-			    nbh_menu.mm[i].gr = GR_YE;
-		    if (nbh_menu.mm[i].gr == GR_IN)
-			    nbh_menu.mm[i].gr = GR_NO;
+		    if (nbh_menu.mm[i].gr == MLI1_IY)
+			    nbh_menu.mm[i].gr = MLI1_YE;
+		    if (nbh_menu.mm[i].gr == MLI1_IN)
+			    nbh_menu.mm[i].gr = MLI1_NO;
 		    lcd_menu->Lines [i][0] = MLI0_INIT;
 		    break;
 
@@ -245,5 +322,3 @@ int handle_nbh (word what, word id) {
     }
     return -1;
 }
-
-

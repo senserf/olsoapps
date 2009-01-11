@@ -41,47 +41,26 @@ static Boolean free_object (word ix) {
 //
 	lcdg_dm_obj_t *co;
 
-#define	COI	((lcdg_dm_img_t*)co)
-#define	COM	((lcdg_dm_men_t*) co)
-#define	COT	((lcdg_dm_tex_t*) co)
-
 	if ((co = objects [ix]) == NULL)
 		return NO;
 
 	if (lcdg_dm_shown (co))
 		return YES;
 
-	switch (co->Type) {
+	lcdg_dm_free (co);
 
-		case LCDG_DMTYPE_MENU:
-
-			// Deallocate the text
-			lcdg_dm_csa ((char**)(COM->Lines), COM->NL);
-			break;
-
-		case LCDG_DMTYPE_TEXT:
-
-			ufree (COT->Line);
-			break;
-	}
-
-	if (co->Extras != NULL)
-		ufree (co->Extras);
-
-	ufree (co);
-	objects [ix] = NULL;
 	return NO;
-
-#undef	COI
-#undef	COM
-#undef	COT
 }
 
 // ============================================================================
+// ============================================================================
 
 // very very temporary and crappy
+
 static void disp_cats () {
+
 	int i, j;
+
 	j = 0;
 	lcdg_font (0);
 	lcdg_setc (SEA_MENU_CATEV_BG, SEA_MENU_CATEV_FG);
@@ -112,20 +91,17 @@ static void disp_cats () {
 
 static void display_rec (word rh) {
 //
-// Display the record (picture + meter) represented by the handle
+// Display the record (picture + meter) represented by the index
 //
 	if (curr_rec != NULL) {
-		seal_freerec (curr_rec);
+		lcdg_dm_free ((lcdg_dm_obj_t*)curr_rec);
 		curr_rec = NULL;
 	}
 	if ((curr_rec = seal_getrec (rh)) == NULL)
 		// Failed to get the record
 		return;
 
-	if (curr_rec->IM != WNONE)
-		lcdg_im_disp (curr_rec->IM, 0, 0);
-
-	seal_disprec ();
+	seal_disprec (curr_rec);
 	top_flag = TOP_DATA;
 }
 
@@ -143,17 +119,15 @@ static void preset_menus () {
 		lcdg_dm_newtop (objects [0]);
 	if ((objects [1] = seal_mkcmenu (YES)) != NULL)
 		lcdg_dm_newtop (objects [1]);
-	if ((lcd_menu  = (lcdg_dm_men_t*)seal_mkrmenu ()) != NULL)
+	// Note: I am calling applib's version of mkrmenu
+	if ((lcd_menu  = (lcdg_dm_men_t*)mkrmenu ()) != NULL)
 		lcdg_dm_newtop ((lcdg_dm_obj_t*)lcd_menu);
-//	if ((objects [3] = seal_mkrmenu (1)) != NULL)
-//		lcdg_dm_newtop (objects [3]);
 }
 
 static void top_switch () {
 //
 // Rotate the top object
 //
-
 	if (LCDG_DM_HEAD == NULL) {
 		lcdg_dm_dtop ();
 		preset_menus ();
@@ -169,6 +143,7 @@ static void top_switch () {
 // ============================================================================
 
 static void buttons (word but) {
+
 	nbh_t * mm;
 
 	if (IS_JOYSTICK (but)) {
@@ -195,7 +170,7 @@ static void buttons (word but) {
 		}
 
 		if (LCDG_DM_TOP == NULL ||
-		    LCDG_DM_TOP->Type != LCDG_DMTYPE_MENU)
+		    (LCDG_DM_TOP->Type & LCDG_DMTYPE_MASK) != LCDG_DMTYPE_MENU)
 			// Ignore the joystick, if the top object is not a menu
 			return;
 
@@ -235,7 +210,7 @@ static void buttons (word but) {
 			handle_ad (AD_RPLY, 1);
 			break;
 		    case TOP_DATA:
-			if (mm->gr == GR_YE) {
+			if (mm->gr == MLI1_YE) {
 
 				if (mm->st == HS_BEAC)
 					update_line (ULSEL_C0,
@@ -271,11 +246,8 @@ static void buttons (word but) {
 	if (but == BUTTON_1) {
 		switch (top_flag) {
 			case TOP_HIER:
-				// can Extras be NULL on lcd_menu?
-				if (LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu &&
-						LCDG_DM_TOP->Extras != NULL)
-				    display_rec (LCDG_DM_TOP->
-					Extras [lcdg_dm_menu_c (LCDG_DM_TOP)]);
+				if (LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu)
+				    display_rec (lcdg_dm_menu_c (LCDG_DM_TOP));
 				else
 					top_switch();
 				return;
@@ -285,7 +257,7 @@ static void buttons (word but) {
 				break;
 
 			case TOP_DATA:
-				if (mm->gr == GR_YE && mm->st == HS_IRCV) {
+				if (mm->gr == MLI1_YE && mm->st == HS_IRCV) {
 
 					update_line (ULSEL_C0,
 						lcdg_dm_menu_c(lcd_menu),
@@ -297,17 +269,6 @@ static void buttons (word but) {
 		}
 		top_flag = TOP_HIER;
 		lcdg_dm_refresh ();
-#if 0
-		// Draw picture and meter, if record menu
-		if (LCDG_DM_TOP != NULL &&
-		    LCDG_DM_TOP->Type == LCDG_DMTYPE_MENU &&
-		    LCDG_DM_TOP->Extras != NULL)
-			// A record menu (Extras != NULL only in that case)
-			display_rec (LCDG_DM_TOP->
-				Extras [lcdg_dm_menu_c (LCDG_DM_TOP)]);
-		// Used to be this: lcdg_dm_remove (NULL);
-		return; // Intentionally superfluous
-#endif
 	}
 }
 
@@ -365,6 +326,7 @@ thread (root)
     static lcdg_im_hdr_t *isig;
 
     entry (RS_INIT)
+
 	init_glo();
 
 	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0)
@@ -617,8 +579,8 @@ Men:	// ====================================================================
 	}
 
 	if ((objects [OIX] =
-	  (lcdg_dm_obj_t*) lcdg_dm_newmenu (lines,
-	    NL, FO, BG, FG, X, Y, W, H)) == NULL) {
+	  (lcdg_dm_obj_t*) lcdg_dm_newmenu (lines, X, Y,
+	    NL, FO, BG, FG, W, H)) == NULL) {
 		lcdg_dm_csa (lines, NL);
 		Status = LCDG_DM_STATUS;
 	} else {
@@ -683,8 +645,8 @@ Tex:	// ====================================================================
 		goto Ret;
 	}
 
-	if ((objects [OIX] = (lcdg_dm_obj_t*) lcdg_dm_newtext (line, FO, BG,
-	    FG, X, Y, W)) == NULL) {
+	if ((objects [OIX] = (lcdg_dm_obj_t*) lcdg_dm_newtext (line, X, Y,
+	    FO, BG, FG, W)) == NULL) {
 		ufree (line);
 		Status = LCDG_DM_STATUS;
 	} else {
@@ -717,7 +679,7 @@ Lnb: // =======================================================================
 
     entry (RS_LNB)
 
-	ab_outf (RS_LNB, "NBH[%u] %u: %u %u %u", c[0], 
+	ab_outf (RS_LNB, "NBH[%u] %u: %u %c %u", c[0], 
 			nbh_menu.mm[c[0]].id,
 			(word)(seconds() - nbh_menu.mm[c[0]].ts),
 			nbh_menu.mm[c[0]].gr, nbh_menu.mm[c[0]].st);
@@ -744,7 +706,7 @@ Ldm: // =======================================================================
 
     entry (RS_LDM+1) 
 
-	switch (objects [OIX] -> Type) {
+	switch (objects [OIX] -> Type & LCDG_DMTYPE_MASK) {
 
 #define	COI	((lcdg_dm_img_t*) (objects [OIX]))
 #define	COM	((lcdg_dm_men_t*) (objects [OIX]))
