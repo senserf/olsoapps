@@ -1,15 +1,15 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2009.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
 #include "diag.h"
-#include "app_peg.h"
+#include "app_cus.h"
 #include "msg_peg.h"
 
 #ifdef	__SMURPH__
 
-#include "node_peg.h"
+#include "node_cus.h"
 #include "stdattr.h"
 
 #else	/* PICOS */
@@ -20,38 +20,37 @@
 
 #endif	/* SMURPH or PICOS */
 
-#include "attnames_peg.h"
-#include "sat_peg.h"
+#include "attnames_cus.h"
 
 /*
  * "Virtual" stuff needed by NET & TARP =======================================
  */
-__PUBLF (NodePeg, int, tr_offset) (headerType *h) {
+__PUBLF (NodeCus, int, tr_offset) (headerType *h) {
 	// Unused ??
 	return 0;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isBind) (msg_t m) {
+__PUBLF (NodeCus, Boolean, msg_isBind) (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isTrace) (msg_t m) {
+__PUBLF (NodeCus, Boolean, msg_isTrace) (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isMaster) (msg_t m) {
+__PUBLF (NodeCus, Boolean, msg_isMaster) (msg_t m) {
 	return (m == msg_master);
 }
 
-__PUBLF (NodePeg, Boolean, msg_isNew) (msg_t m) {
+__PUBLF (NodeCus, Boolean, msg_isNew) (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isClear) (byte o) {
+__PUBLF (NodeCus, Boolean, msg_isClear) (byte o) {
 	return YES;
 }
 
-__PUBLF (NodePeg, void, set_master_chg) () {
+__PUBLF (NodeCus, void, set_master_chg) () {
 	app_flags |= 2;
 }
 
@@ -61,7 +60,7 @@ __PUBLF (NodePeg, void, set_master_chg) () {
 //     mc->hms.f == 1 <=> go back in time mc->sec seconds
 // OUT: *mc: wall time with the input offset (usually 0)
 
-__PUBLF (NodePeg, void, wall_time) (mclock_t *mc) {
+__PUBLF (NodeCus, void, wall_time) (mclock_t *mc) {
 	word w1, w2, w3, w4;
 
 	lword lw = seconds() - master_delta +
@@ -108,7 +107,7 @@ __PUBLF (NodePeg, void, wall_time) (mclock_t *mc) {
    what == 0: find and return the index;
    what == 1: count
 */
-__PUBLF (NodePeg, int, find_tags) (word tag, word what) {
+__PUBLF (NodeCus, int, find_tags) (word tag, word what) {
 	int i = 0;
 	int count = 0;
 
@@ -135,7 +134,7 @@ __PUBLF (NodePeg, int, find_tags) (word tag, word what) {
 	return -1; // found no tag
 }
 
-__PUBLF (NodePeg, char*, get_mem) (word state, int len) {
+__PUBLF (NodeCus, char*, get_mem) (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
 		app_diag (D_SERIOUS, "No mem reset");
@@ -150,7 +149,7 @@ __PUBLF (NodePeg, char*, get_mem) (word state, int len) {
 	return buf;
 }
 
-__PUBLF (NodePeg, void, init_tag) (word i) {
+__PUBLF (NodeCus, void, init_tag) (word i) {
 	tagArray[i].id = 0;
 	tagArray[i].rssi = 0;
 	tagArray[i].pl = 0;
@@ -163,13 +162,13 @@ __PUBLF (NodePeg, void, init_tag) (word i) {
 	tagArray[i].rpload.ppload.ts = 0xFFFFFFFF;
 }
 
-__PUBLF (NodePeg, void, init_tags) () {
+__PUBLF (NodeCus, void, init_tags) () {
 	word i = tag_lim;
 	while (i-- > 0)
 		init_tag (i);
 }
 
-__PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
+__PUBLF (NodeCus, void, set_tagState) (word i, tagStateType state,
 							Boolean updEvTime) {
 	tagArray[i].state = state;
 	tagArray[i].count = 0; // always (?) reset the counter
@@ -181,7 +180,7 @@ __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
 		write_agg (i);
 }
 
-__PUBLF (NodePeg, int, insert_tag) (word tag) {
+__PUBLF (NodeCus, int, insert_tag) (word tag) {
 
 	int i = 0;
 
@@ -201,7 +200,7 @@ __PUBLF (NodePeg, int, insert_tag) (word tag) {
 // For complex osses, reporting the 2 events (new rssi in, old rssi out) may be
 // convenient, but for demonstrations 'old out' is supressed
 #define BLOCK_MOVING_GONERS 1
-__PUBLF (NodePeg, void, check_tag) (word state, word i, char** buf_out) {
+__PUBLF (NodeCus, void, check_tag) (word state, word i, char** buf_out) {
 
 	if (i >= tag_lim) {
 		app_diag (D_FATAL, "tagAr bound %u", i);
@@ -238,10 +237,7 @@ this is for mobile tags, to cut off flickering ones
 					(word)tagArray[i].id);
 				msg_report_out (state, i, buf_out, 
 						REP_FLAG_PLOAD);
-				// if in meantime I becane the Master:
-				if (local_host == master_host || 
-						master_host == 0)
-					init_tag (i);
+				init_tag (i);
 			}
 			break;
 
@@ -260,19 +256,14 @@ this is for mobile tags, to cut off flickering ones
 				msg_report_out (state, i, buf_out,
 						REP_FLAG_PLOAD);
 
-				if (local_host == master_host ||
-						master_host == 0)
-					init_tag (i);
+				init_tag (i);
 
 			} else {
 				app_diag (D_DEBUG, "Re rep %u",
 					(word)tagArray[i].id);
 				msg_report_out (state, i, buf_out, 
 						REP_FLAG_PLOAD);
-				// if I become the Master, this is needed:
-				if (local_host == master_host || 
-						master_host == 0)
-					set_tagState (i, confirmedTag, NO);
+				set_tagState (i, confirmedTag, NO);
 			}
 			break;
 
@@ -287,9 +278,7 @@ this is for mobile tags, to cut off flickering ones
 				msg_report_out (state, i, buf_out, 
 						REP_FLAG_PLOAD);
 
-				if (local_host == master_host ||
-						master_host == 0)
-					init_tag (i);
+				init_tag (i);
 			} // else do nothing
 			break;
 #if 0
@@ -310,8 +299,7 @@ this is for mobile tags, to cut off flickering ones
 #endif
 			set_tagState (i, goneTag, YES);
 			msg_report_out (state, i, buf_out, 0);
-			if (local_host == master_host || master_host == 0)
-				init_tag (i);
+			init_tag (i);
 			break;
 #endif
 		default:
@@ -321,7 +309,7 @@ this is for mobile tags, to cut off flickering ones
 }
 #undef BLOCK_MOVING_GONERS
 
-__PUBLF (NodePeg, void, copy_fwd_msg) (word state, char** buf_out, char * buf,
+__PUBLF (NodeCus, void, copy_fwd_msg) (word state, char** buf_out, char * buf,
 								word size) {
 
 	if (*buf_out == NULL)
@@ -332,7 +320,7 @@ __PUBLF (NodePeg, void, copy_fwd_msg) (word state, char** buf_out, char * buf,
 	memcpy (*buf_out, buf, size);
 }
 
-__PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
+__PUBLF (NodeCus, void, send_msg) (char * buf, int size) {
 	// it doesn't seem like a good place to filter out
 	// local host, but it's convenient, for now...
 
@@ -352,7 +340,7 @@ __PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
 			in_header(buf, msg_type));
  }
 
-__PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
+__PUBLF (NodeCus, int, check_msg_size) (char * buf, word size, word repLevel) {
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial
@@ -432,7 +420,7 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 	return (size - expSize);
 }
 
-__PUBLF (NodePeg, void, write_agg) (word ti) {
+__PUBLF (NodeCus, void, write_agg) (word ti) {
 
 	if (agg_data.ee.s.f.status != AGG_FF)
 		agg_data.eslot++;
@@ -475,9 +463,11 @@ __PUBLF (NodePeg, void, write_agg) (word ti) {
    check for a msg pending for this tag
 */
 
-__PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
+// likely not needed for Custodian
+__PUBLF (NodeCus, void, check_msg4tag) (char * buf) {
 	mclock_t mc;
-
+diag ("WHY in check_msg4tag()??");
+return;
 	mc.sec = 0;
 	if (master_delta != 0) // do NOT send down your own clock
 		wall_time (&mc);
@@ -489,11 +479,8 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 			in_setTag(msg4tag.buf, ts) = in_pongPload(buf, ts);
 			in_setTag(msg4tag.buf, reftime) = mc.sec;
 			in_setTag(msg4tag.buf, syfreq) = sync_freq;
-			in_setTag(msg4tag.buf, ackflags) =
-			       	((is_eew_conf &&
-				  agg_data.eslot >= EE_AGG_MAX -1) ||
-				sat_mod == SATMOD_UNINIT ||
-				sat_mod == SATMOD_FULL) ? 1 : 0;
+			in_setTag(msg4tag.buf, ackflags) = is_eew_conf &&
+				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 		} else {
 			in_setTag(msg4tag.buf, reftime) = 0;
 			in_setTag(msg4tag.buf, ts) = 0; 
@@ -513,17 +500,14 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 			pong_ack.ts = in_pongPload(buf, ts);
 			pong_ack.reftime = mc.sec;
 			pong_ack.syfreq = sync_freq;
-			pong_ack.ackflags =
-				((is_eew_conf &&
-				  agg_data.eslot >= EE_AGG_MAX -1) ||
-				sat_mod == SATMOD_UNINIT ||
-				sat_mod == SATMOD_FULL) ? 1 : 0;
+			pong_ack.ackflags = is_eew_conf &&
+				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 			send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
 		}
 	}
 }
 
-__PUBLF (NodePeg, void, agg_init) () {
+__PUBLF (NodeCus, void, agg_init) () {
 	lword l, u, m;
 	byte b;
 
@@ -582,7 +566,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 			(word)(agg_data.eslot * EE_AGG_SIZE), EE_AGG_SIZE);
 }
 
-__PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
+__PUBLF (NodeCus, void, fatal_err) (word err, word w1, word w2, word w3) {
 	//leds (LED_R, LED_BLINK);
 	if_write (IFLASH_SIZE -1, err);
 	if_write (IFLASH_SIZE -2, w1);
@@ -595,7 +579,7 @@ __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
 	reset();
 }
 
-__PUBLF (NodePeg, word, handle_a_flags) (word a_fl) {
+__PUBLF (NodeCus, word, handle_a_flags) (word a_fl) {
 	if (a_fl != 0xFFFF) {
 		if (a_fl & A_FL_EEW_COLL) 
 			set_eew_coll;
@@ -618,7 +602,7 @@ __PUBLF (NodePeg, word, handle_a_flags) (word a_fl) {
 	       (is_eew_coll ? A_FL_EEW_COLL : 0);
 }
 
-__PUBLF (NodePeg, int, str_cmpn) (const char * s1, const char * s2, int n) {
+__PUBLF (NodeCus, int, str_cmpn) (const char * s1, const char * s2, int n) {
 	while (n-- && (*s1 != '\0') && (*s2 != '\0'))
 		if (*s1++ != *s2++)
 			return 1;

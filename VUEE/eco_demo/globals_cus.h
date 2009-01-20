@@ -1,14 +1,14 @@
-#ifndef __globals_peg_h__
-#define __globals_peg_h__
+#ifndef __globals_cus_h__
+#define __globals_cus_h__
 
-#include "app_peg.h"
+#include "app_cus.h"
 #include "msg_peg.h"
 #include "diag.h"
 #include "oss_fmt.h"
 
 #ifdef	__SMURPH__
 
-#include "node_peg.h"
+#include "node_cus.h"
 #include "stdattr.h"
 
 #else	/* PICOS */
@@ -18,7 +18,7 @@
 #include "net.h"
 #include "tarp.h"
 
-#include "attribs_peg.h"
+#include "attribs_cus.h"
 
 heapmem {80, 20}; // how to find out a good ratio?
 
@@ -52,14 +52,14 @@ word	sync_freq		= 0;
 word	sat_mod			= 0;
 #endif
 
-#include "attnames_peg.h"
+#include "attnames_cus.h"
 #include "oss_fmt.h"
 
 // These are static const and can thus be shared
 static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_A 
-	"*EcoNet* 1.1.2" OMID_CRB "Aggregator commands:\r\n"
+	"*EcoNet* 1.1.2" OMID_CRB "Custodian commands:\r\n"
 	OPRE_APP_MENU_A 
 	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
@@ -87,14 +87,14 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 	OPRE_APP_MENU_A 
 	"\tHelp:\t\th\r\n"
 	OPRE_APP_MENU_A 
-	"\tSend master msg\tm [ peg ]" OMID_CR "\r\n"
-	OPRE_APP_MENU_A 
 	"\tCol set / show:\tc id agg_id [ Maj_freq [ min_freq [ rx_span "
 	"[ hex:pl [ hex:c_fl]]]]]\r\n"
 	OPRE_APP_MENU_A 
 	"\tFind collector:\tf col_id [ agg_id ]]\r\n"
 	OPRE_APP_MENU_A
-	"\tSat mode:\ts+++|---\r\n";
+	"\tSat mode:\ts+++|---\r\n"
+	OPRE_APP_MENU_A
+	"\tSat test:\ts[ ]<text>\r\n";
 
 static const char ill_str[] =	OPRE_APP_ILL 
 				"Illegal command (%s)\r\n";
@@ -127,9 +127,6 @@ static const char rep_str[] = OPRE_APP_REP OMID_CR
 	"  Col %u slot: %lu, %s: %u.%u:%u:%u%s" OMID_CR
 	"  " SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d, "
 	SENS3_DESC "%d, " SENS4_DESC "%d\r\n";
-
-static const char satrep_str[] = OPRE_APP_REP " %u:%u.%u:%u:%u%s"
-	SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d";
 
 static const char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";

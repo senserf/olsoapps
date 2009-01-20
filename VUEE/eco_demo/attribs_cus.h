@@ -1,5 +1,5 @@
-#ifndef	__attribs_peg_h__
-#define	__attribs_peg_h__
+#ifndef	__attribs_cus_h__
+#define	__attribs_cus_h__
 
 __EXTERN __CONST lword _da (host_id);
 __EXTERN word _da (host_pl);
@@ -14,8 +14,8 @@ __EXTERN char *_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 __EXTERN aggDataType _da (agg_data);
 __EXTERN aggEEDumpType *_da (agg_dump);
 __EXTERN msgPongAckType _da (pong_ack);
-__EXTERN word	_da (sync_freq);
-__EXTERN word	_da (sat_mod);
+__EXTERN word _da (sync_freq);
+__EXTERN word _da (sat_mod);
 
 // Methods/functions: need no EXTERN
 
@@ -42,7 +42,9 @@ void 	_da (msg_findTag_in) (word state, char * buf);
 void 	_da (msg_findTag_out) (word state, char** buf_out, nid_t tag,
 								nid_t peg);
 void 	_da (msg_master_in) (char * buf);
-void 	_da (msg_master_out) (word state, char** buf_out, nid_t peg);
+int	_da (msg_satest_out) (char * bin);
+void	_da (sat_in) (void);
+void	_da (sat_out) (char * buf);
 void 	_da (msg_pong_in) (word state, char * buf, word rssi);
 void 	_da (msg_reportAck_in) (char * buf);
 void 	_da (msg_reportAck_out) (word state, char * buf, char** buf_out);
@@ -60,7 +62,6 @@ void 	_da (oss_setTag_in) (word state, word tag, nid_t peg,
 		word maj, word min, word span, word pl, word c_fl);
 void 	_da (oss_setPeg_in) (word state, nid_t peg, word audi, word pl,
 	       	word a_fl);
-void 	_da (oss_master_in) (word state, nid_t peg);
 void 	_da (oss_report_out) (char * buf);
 
 void 	_da (send_msg) (char * buf, int size);
@@ -72,8 +73,6 @@ word	_da (r_a_d) (void);
 word	_da (handle_a_flags) (word a_fl);
 void	_da (tmpcrap) (word);
 int	_da (str_cmpn) (const char * s1, const char * s2, int n);
-void	_da (sat_in) (void);
-void	_da (sat_out) (char * buf);
 
 // Expected by NET and TARP
 

@@ -6,5 +6,6 @@
 
 void buildTagNode (data_no_t*);
 void buildPegNode (data_no_t*);
+void buildCusNode (data_no_t*);
 
 #endif

@@ -5,6 +5,10 @@
 #error "node_tag.h and node_peg.h cannot be included together"
 #endif
 
+#ifdef  __node_cus_h__
+#error "node_cus.h and node_peg.h cannot be included together"
+#endif
+
 #include "board.h"
 #include "plug_tarp.h"
 

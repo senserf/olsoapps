@@ -9,6 +9,8 @@ process Root : BoardRoot {
 			buildTagNode (nddata);
 		else if (strcmp (tp, "peg") == 0)
 			buildPegNode (nddata);
+		else if (strcmp (tp, "cus") == 0)
+			buildCusNode (nddata);
 		else
 			excptn ("Root: illegal node type: %s", tp);
 	};

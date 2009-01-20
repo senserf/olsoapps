@@ -1,17 +1,17 @@
-#ifndef __app_peg_h
-#define __app_peg_h
+#ifndef __app_cus_h
+#define __app_cus_h
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#define THREADNAME(a)   a ## _peg
+#define THREADNAME(a)   a ## _cus
 
 // Content of all LibApps
 
-//+++ "lib_app_peg.c"
-//+++ "msg_io_peg.c"
-//+++ "app_diag_peg.c"
+//+++ "lib_app_cus.c"
+//+++ "msg_io_cus.c"
+//+++ "app_diag_cus.c"
 
 #include "sysio.h"
 #include "msg_tarp.h"

@@ -3,10 +3,21 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "globals_peg.h"
-#include "threadhdrs_peg.h"
+/* ===================================================================
+    This is a placeholder for maintenance and test functionality
+    for EcoNet. Implemented:
+    - EMS sattelite i/f test
+
+    - next: eprom dumps over RF
+
+    We start with aggregator's code, but likely will branch into an
+    independent praxis or blend back into the aggregator.
+    =================================================================== */
+
+#include "globals_cus.h"
+#include "threadhdrs_cus.h"
 #include "flash_stamps.h"
-#include "sat_peg.h"
+#include "sat_cus.h"
 
 #ifndef __SMURPH__
 #include "lhold.h"
@@ -37,78 +48,48 @@
 #define CMD_READER	(&cmd_line)
 #define CMD_WRITER	((&cmd_line)+1)
 
-// FIXME SHOULD BE 0 in 'production'
-#define SATTESTING 1
-
-
 // =============
 // OSS reporting
 // =============
+/* Custodian that IS_SATGAT is a very starnge beast: it is supposed to
+   pass to the PDT only content of msg_satest. Therefore, all other calls to
+   oss_out() are voided, with all consequences.
+*/
 strand (oss_out, char)
-	char * b;
-	int len;
-
-	// OO_START is the sat patch
-	entry (OO_START)
-		if (data == NULL) {
+       entry (OO_RETRY)
+		if (data == NULL)
 			app_diag (D_SERIOUS, "NULL in oss_out");
-			finish;
-		}
-		if (IS_SATGAT) {
-			len = SATWRAPLEN + 2 + strlen (data);
-			b = get_mem (WNONE, len);
-			if (b == NULL)
-				finish;
-			strcpy (b, SATWRAP);
-			strcpy (&b[SATWRAPLEN], data);
-			b[len -2] = (char)26;
-			b[len -1] = '\0';
-			ufree (data);
-			data = b;
-			savedata (data);
-		}
-
-	entry (OO_RETRY)
-		ser_outb (OO_RETRY, data);
+		else
+			ser_outb (OO_RETRY, data);
 		finish;
 endstrand
 
-strand (satcmd_out, char)
-	entry (SCO_TRY)
-		ser_out (SCO_TRY, data);
-		finish;
-endstrand
-
-thread (mbeacon)
-
-    entry (MB_START)
-
-	// get GPS time if not set or sat. i/f uninited
-	if (IS_SATGAT && (master_clock.hms.f == 0 || sat_mod == SATMOD_UNINIT))
-		(void)runstrand (satcmd_out, SATCMD_STATUS);
-
-	delay (25 * 1024 + rnd() % 10240, MB_SEND); // 30 +/- 5s
-	release;
-
-    entry (MB_SEND)
-	oss_master_in (MB_SEND, 0);
-	proceed (MB_START);
-
-endthread
-
-__PUBLF (NodePeg, void, sat_in) () {
+// sat_in, sat_out should be together and in sat_cus.cc, however,
+// because of the crappy 'globals' runstrand() would have to be
+// called from app_cus.c anyway... forget it until we have the
+// vuee / picos stuff sorted out
+__PUBLF (NodeCus, void, sat_in) () {
 	int len;
 	char * obuf;
 
-	if ((len = strlen (ui_ibuf)) > MAX_SATLEN) {
+	// packetization is not really needed (?);
+	if ((len = strlen (cmd_line)) > MAX_SATLEN) {
+		diag ("sat_in cut %d %d", len, MAX_SATLEN);
 		len = MAX_SATLEN;
-		ui_ibuf[MAX_SATLEN] = '\0';
+		cmd_line[MAX_SATLEN] = '\0';
 	}
-	len += sizeof (headerType) +1; // + '\0'
 
+	// patch the crap back to normal mode
+	if (strlen (cmd_line) == 4 && str_cmpn (cmd_line, "s---", 4) == 0) {
+		sat_mod = SATMOD_NO;
+		stats (NULL);
+		return;
+	}
+
+	len += sizeof (headerType) +1; // + '\0'
 	if ((obuf  = get_mem (WNONE, len)) == NULL)
 		return;
-	strcpy (&obuf[sizeof(headerType)], ui_ibuf);
+	strcpy (&obuf[sizeof(headerType)], cmd_line);
 	in_header(obuf, msg_type) = msg_satest;
 	in_header(obuf, rcv) = 0; // must be bcast
 	in_header(obuf, hco) = 1; // no hopping
@@ -116,29 +97,42 @@ __PUBLF (NodePeg, void, sat_in) () {
 	ufree (obuf);
 }
 
-__PUBLF (NodePeg, void, sat_out) (char * buf) {
+__PUBLF (NodeCus, void, sat_out) (char * buf) {
 	int len = strlen (&buf[sizeof (headerType)]) +1; // + '\0'
 	char * mbuf;
+
+	if (!IS_SATGAT)
+		len += 2; // LF, CR
 
 	if ((mbuf = get_mem (WNONE, len)) == NULL)
 		return;
 
 	strcpy (mbuf, &buf[sizeof (headerType)]);
 
-	// note that there could be double-wrapping in sat. crap here
-	if (runstrand (oss_out, mbuf) == 0)
+	if (!IS_SATGAT) {
+		mbuf[len -1] = '\0';
+		mbuf[len -2] = (char)10; // LF
+		mbuf[len -3] = (char)13; // CR
+	}
+
+        if (runstrand (oss_out, mbuf) == 0) {
+		app_diag (D_SERIOUS, "oss_out fork");
 		ufree (mbuf);
+	}
 }
 
-__PUBLF (NodePeg, void, show_ifla) () {
+__PUBLF (NodeCus, void, show_ifla) () {
 	char * mbuf = NULL;
+
+	if (IS_SATGAT)
+		return;
 
 	if (if_read (0) == 0xFFFF) {
 		diag (OPRE_APP_ACK "No custom sys data");
 		return;
 	}
 	mbuf = form (NULL, ifla_str, if_read (0), if_read (1), if_read (2),
-			if_read (3), if_read (4), if_read (5), if_read (6));
+			if_read (3), if_read (4), if_read (5), if_read(6));
 
 	if (runstrand (oss_out, mbuf) == 0) {
 		app_diag (D_SERIOUS, "oss_out fork");
@@ -146,14 +140,14 @@ __PUBLF (NodePeg, void, show_ifla) () {
 	}
 }
 
-__PUBLF (NodePeg, void, read_ifla) () {
+__PUBLF (NodeCus, void, read_ifla) () {
 
 	if (if_read (0) == 0xFFFF) { // usual defaults
 		local_host = (word)host_id;
 #ifndef __SMURPH__
 		master_host = DEF_MHOST;
 #endif
-		sat_mod = IS_DEFSATGAT ? SATMOD_UNINIT : SATMOD_NO;
+		sat_mod = IS_DEFSATGAT ? SATMOD_YES : SATMOD_NO;
 		return;
 	}
 
@@ -176,7 +170,7 @@ __PUBLF (NodePeg, void, read_ifla) () {
 }
 
 
-__PUBLF (NodePeg, void, save_ifla) () {
+__PUBLF (NodeCus, void, save_ifla) () {
 	if (if_read (0) != 0xFFFF) {
 		if_erase (0);
 		diag (OPRE_APP_ACK "Flash p0 overwritten");
@@ -188,13 +182,16 @@ __PUBLF (NodePeg, void, save_ifla) () {
 	if_write (3, tag_auditFreq);
 	if_write (4, master_host);
 	if_write (5, sync_freq);
-	if_write (6, IS_SATGAT ? SATMOD_UNINIT : SATMOD_NO);
+	if_write (6, IS_SATGAT ? SATMOD_YES : SATMOD_NO);
 }
 
 // Display node stats on UI
-__PUBLF (NodePeg, void, stats) (char * buf) {
+__PUBLF (NodeCus, void, stats) (char * buf) {
 	char * mbuf = NULL;
 	word mmin, mem;
+
+	if (IS_SATGAT)
+		return;
 
 	if (buf == NULL) {
 		mem = memfree(0, &mmin);
@@ -241,7 +238,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 	}
 }
 
-__PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
+__PUBLF (NodeCus, void, process_incoming) (word state, char * buf, word size,
 								word rssi) {
   int    w_len;
 
@@ -251,13 +248,13 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
-
+#if 0
 		if (in_header(buf, snd) / 1000 != local_host / 1000)
 			return;
 
 		if (in_pong_rxon(buf)) 
 			check_msg4tag (buf);
-
+#endif
 		msg_pong_in (state, buf, rssi);
 		return;
 
@@ -290,15 +287,7 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 		return;
 
 	case msg_statsTag:
-		if (master_host != local_host) {
-			in_header(buf, rcv) = master_host;
-			in_header(buf, hco) = 0; // was 1
-			send_msg (buf, sizeof(msgStatsTagType));
-		} else {
-			//in_header(buf, snd) = local_host;
-			stats (buf);
-		}
-
+		stats (buf);
 		return;
 
 	case msg_rpc:
@@ -433,9 +422,6 @@ thread (audit)
 		aud_ind = tag_lim;
 		app_diag (D_DEBUG, "Audit starts");
 
-		if (IS_SATGAT)
-			(void)runstrand (satcmd_out, SATCMD_QUEUE);
-
 	entry (AS_TAGLOOP)
 
 		if (aud_ind-- == 0) {
@@ -449,14 +435,8 @@ thread (audit)
 		check_tag (AS_TAGLOOP1, aud_ind, &aud_buf_ptr);
 
 		if (aud_buf_ptr) {
-			if (local_host == master_host) {
-				in_header(aud_buf_ptr, snd) = local_host;
-				oss_report_out (aud_buf_ptr);
-			} else
-				send_msg (aud_buf_ptr,
-					in_report_pload(aud_buf_ptr) ?
-				sizeof(msgReportType) + sizeof(reportPloadType)
-				: sizeof(msgReportType));
+			in_header(aud_buf_ptr, snd) = local_host;
+			oss_report_out (aud_buf_ptr);
 
 			ufree (aud_buf_ptr);
 			aud_buf_ptr = NULL;
@@ -468,7 +448,7 @@ thread (audit)
 		proceed (AS_START);
 endthread
 
-__PUBLF (NodePeg, void, tmpcrap) (word what) {
+__PUBLF (NodeCus, void, tmpcrap) (word what) {
 	switch (what) {
 		case 0:
 			if (tag_auditFreq != 0 && !running (audit))
@@ -488,7 +468,7 @@ __PUBLF (NodePeg, void, tmpcrap) (word what) {
 */
 thread (cmd_in)
 
-	word u[4];
+	nodata;
 
 	entry (CS_INIT)
 
@@ -510,79 +490,11 @@ thread (cmd_in)
 			release;
 		}
 
-		if (!IS_SATGAT || sat_mod == SATMOD_WAITRX) {
-			cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
-			strcpy (cmd_line, ui_ibuf);
-			if (sat_mod == SATMOD_WAITRX)
-				sat_mod = SATMOD_YES;
-			trigger (CMD_READER);
-			proceed (CS_IN);
-		}
-		// there may be more SATWAITs
-
-		if (str_cmpn (ui_ibuf, SATATT_MSG, SAT_MSGLEN) == 0) {
-			sat_mod = SATMOD_WAITRX;
-			proceed (CS_IN);
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_RNG, SAT_RNGLEN) == 0) {
-			if (sat_mod == SATMOD_UNINIT)
-				sat_mod = SATMOD_YES;
-			(void)runstrand (satcmd_out, SATCMD_GET);
-			proceed (CS_IN);
-		}
-
-		u[0] = strlen (ui_ibuf);
-
-		if (str_cmpn (ui_ibuf, SATIN_QUE, SAT_QUELEN) == 0) {
-			if (u[0] < SAT_QUEMINLEN || scan (ui_ibuf +SAT_QUEOSET,
-					SAT_QUEFORM, &u[0], &u[1]) != 2) {
-#if SATTESTING
-				sat_in();
-#endif
-				proceed (CS_IN);
-			}
-			sat_mod = u[0] < SAT_QUEFULL ? SATMOD_YES : SATMOD_FULL;
-			proceed (CS_IN);
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_STA, SAT_STALEN) == 0) {
-
-			if (sat_mod == SATMOD_UNINIT)
-				sat_mod = SATMOD_YES;
-
-			if (u[0] < SAT_STAMINLEN || scan (ui_ibuf +SAT_STAOSET,
-					SAT_STAFORM, &u[0], &u[1], &u[2],
-						&u[3]) != 4 ||
-					u[0] < 2009) { // not from GPS
-#if SATTESTING
-				sat_in();
-#endif
-				proceed (CS_IN);
-			}
-
-			if (master_clock.hms.f == 0) { // no time yet
-				master_clock.hms.f = 1;
-				master_delta= seconds();
-				master_clock.hms.d = 0;
-#if SATTESTING
-				ui_ibuf[0] = 'D';
-#endif
-			}
-			// always adjust the rest
-			master_clock.hms.h = u[1];
-			master_clock.hms.m = u[2];
-			master_clock.hms.s = u[3];
-#if SATTESTING
-			ui_ibuf[1] = 'U';
-#endif
-		} // if anything is added below, add proceed (CS_IN) above
-
-#if SATTESTING
-		// send everything else out (to a custodian)
-		sat_in ();
-#endif
+		cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
+		strcpy (cmd_line, ui_ibuf);
+		trigger (CMD_READER);
 		proceed (CS_IN);
+
 endthread
 
 #if 0
@@ -628,25 +540,15 @@ static char * locatName (word id, word rssi) {
 }
 #endif
 
-__PUBLF (NodePeg, void, oss_report_out) (char * buf) {
+__PUBLF (NodeCus, void, oss_report_out) (char * buf) {
 
   char * lbuf = NULL;
 
+  if (IS_SATGAT)
+	  return;
+
   if (in_report_pload(buf)) {
 
-      if (IS_SATGAT) {
-        lbuf = form (NULL, satrep_str,
-		in_report(buf, tagid),
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.d,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.h,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.m,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.s,
-		in_report(buf, state) == goneTag ?
-			" ***gone***" : " ",
-		in_reportPload(buf, ppload.sval[0]),
-		in_reportPload(buf, ppload.sval[1]),
-		in_reportPload(buf, ppload.sval[2]));
-      } else {
 	lbuf = form (NULL, rep_str,
 
 		in_header(buf, snd),
@@ -677,7 +579,6 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 		in_reportPload(buf, ppload.sval[2]),
 		in_reportPload(buf, ppload.sval[3]),
 		in_reportPload(buf, ppload.sval[4])); // eoform
-      }
 
     } else if (in_report(buf, state) == sumTag) {
 		lbuf = form (NULL, repSum_str,
@@ -699,8 +600,11 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
     }
 }
 
-__PUBLF (NodePeg, word, r_a_d) () {
+__PUBLF (NodeCus, word, r_a_d) () {
 	char * lbuf = NULL;
+
+	if (IS_SATGAT)
+		return 0;
 
 	if (agg_dump->dfin) // delayed Finish
 		goto ThatsIt;
@@ -785,7 +689,7 @@ ThatsIt:
 	return 0;
 }
 
-__PUBLF (NodePeg, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
+__PUBLF (NodeCus, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
 
 	char * out_buf = NULL;
 	int tagIndex;
@@ -827,26 +731,7 @@ __PUBLF (NodePeg, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
 	ufree (out_buf);
 }
 
-__PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
-
-	char * out_buf = NULL;
-
-	if (local_host != master_host && (local_host == peg || peg == 0)) {
-		if (!running (mbeacon))
-			runthread (mbeacon);
-		master_host = local_host;
-		master_delta = 0;
-		master_clock.sec = 0;
-		tarp_ctrl.param &= 0xFE;
-		if (local_host == peg)
-			return;
-	}
-	msg_master_out (state, &out_buf, peg);
-	send_msg (out_buf, sizeof(msgMasterType));
-	ufree (out_buf);
-}
-
-__PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
+__PUBLF (NodeCus, void, oss_setTag_in) (word state, word tag,
 	       	nid_t peg, word maj, word min, 
 		word span, word pl, word c_fl) {
 
@@ -882,7 +767,7 @@ __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 	ufree (out_buf);
 }
 
-__PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg, 
+__PUBLF (NodeCus, void, oss_setPeg_in) (word state, nid_t peg, 
 				word audi, word pl, word a_fl) {
 
 	char * out_buf = get_mem (state, sizeof(msgSetPegType));
@@ -919,7 +804,6 @@ thread (root)
 		else
 			leds (LED_G, LED_BLINK);
 
-		// is_flash_new is set const (a branch compiled out)
 		if (is_flash_new) {
 			diag (OPRE_APP_ACK "Init eprom erase");
 			if (ee_erase (WNONE, 0, 0))
@@ -959,7 +843,7 @@ thread (root)
 #ifndef __SMURPH__
 		net_id = DEF_NID;
 #endif
-		tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
+		tarp_ctrl.param = 0xB0; // level 2, rec 3, slack 0, fwd off
 
 		init_tags();
 
@@ -977,10 +861,6 @@ thread (root)
 		runthread (rcv);
 		runthread (cmd_in);
 		runthread (audit);
-		if (master_host == local_host) {
-			runthread (mbeacon);
-			tarp_ctrl.param &= 0xFE;
-		}
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)
@@ -997,6 +877,10 @@ thread (root)
 		}
 
 	entry (RS_DOCMD)
+		if (IS_SATGAT) {
+			sat_in();
+			proceed (RS_FREE);
+		}
 
 		if (master_host != local_host &&
 				(cmd_line[0] == 'T' || cmd_line[0] == 'c' ||
@@ -1006,7 +890,7 @@ thread (root)
 		}
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF &&
-				(cmd_line[0] == 'm' || cmd_line[0] == 'c' ||
+				(cmd_line[0] == 'c' ||
 				cmd_line[0] == 'f')) {
 			strcpy (ui_obuf, not_in_maint_str);
 			proceed (RS_UIOUT);
@@ -1117,26 +1001,18 @@ thread (root)
 			reset();
 
 		case 's':
-			if (cmd_line[1] == '+')
+			if (strlen (cmd_line) == 4 &&
+				str_cmpn (&cmd_line[1], "+++", 3) == 0) {
+
 				sat_mod = SATMOD_YES;
-			else if (cmd_line[1] == '-')
-				sat_mod = SATMOD_NO;
-
-			stats (NULL);
+				proceed (RS_FREE);
+			}
+			if ((i1 = msg_satest_out (cmd_line)) < 0) {
+				diag (OPRE_APP_ACK "Failed %d", i1);
+				form (ui_obuf, bad_str, cmd_line);
+				proceed (RS_UIOUT);
+			}
 			proceed (RS_FREE);
-
-		case 'm':
-			 i1 = 0;
-			 scan (cmd_line+1, "%u", &i1);
-			 
-			 if (i1 != local_host && (local_host == master_host ||
-					 i1 != 0))
-				 diag (OPRE_APP_ACK "Sent Master beacon");
-			 else if (local_host != master_host)
-				 diag (OPRE_APP_ACK "Became Master");
-
-			 oss_master_in (RS_DOCMD, i1);
-			 proceed (RS_FREE);
 
 		case 'f':
 			i1 = i2 = 0;
@@ -1258,4 +1134,4 @@ thread (root)
 
 endthread
 
-praxis_starter (NodePeg);
+praxis_starter (NodeCus);

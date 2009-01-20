@@ -12,7 +12,7 @@
 #include "board_pins.h"
 #include "sensors.h"
 #else
-#define SENSOR_LIST dupajas
+#define SENSOR_LIST alamakota
 #define powerdown() 	diag ("pdown");
 #define powerup()	diag ("pup");
 #endif
@@ -587,10 +587,10 @@ thread (pong)
 				lh_time -= MAX_UINT;
 				freeze (MAX_UINT);
 			} else {
-				diag ("dupa %d %d", (word)seconds(),
+				diag ("ifreeze %d %d", (word)seconds(),
 						(word)lh_time);
 				freeze ((word)lh_time);
-				diag ("jas %d", (word)seconds());
+				diag ("ofreeze %d", (word)seconds());
 				lh_time = 0;
 			}
 		}
@@ -753,7 +753,11 @@ thread (root)
 			leds (LED_R, LED_BLINK);
 		else
 			leds (LED_G, LED_BLINK);
-
+#ifndef __SMURPH__
+#if CRYSTAL2_RATE
+#error CRYSTAL2 RATE MUST BE 0, UART_RATE 9600
+#endif
+#endif
 		if (is_flash_new) {
 			diag (OPRE_APP_ACK "Init eprom erase");
 			if (ee_erase (WNONE, 0, 0))

@@ -1,9 +1,9 @@
-#ifndef	__threadhdrs_peg_h__
-#define	__threadhdrs_peg_h__
+#ifndef	__threadhdrs_cus_h__
+#define	__threadhdrs_cus_h__
 
 #ifdef	__SMURPH__
 
-threadhdr (rcv, NodePeg) {
+threadhdr (rcv, NodeCus) {
 
 	int	rcv_packet_size;
 	char 	*rcv_buf_ptr;
@@ -14,7 +14,7 @@ threadhdr (rcv, NodePeg) {
 	perform;
 };
 
-threadhdr (audit, NodePeg) {
+threadhdr (audit, NodeCus) {
 
 	lword lh_time;
 	char *aud_buf_ptr;
@@ -26,42 +26,25 @@ threadhdr (audit, NodePeg) {
 
 };
 
-threadhdr (cmd_in, NodePeg) {
+threadhdr (cmd_in, NodeCus) {
 
 	states { CS_INIT, CS_IN, CS_WAIT };
 
 	perform;
 };
 
-threadhdr (mbeacon, NodePeg) {
-
-	states { MB_START, MB_SEND };
-
-	perform;
-};
-
-strandhdr (oss_out, NodePeg) {
+strandhdr (oss_out, NodeCus) {
 
 	char *data;
 
-	states { OO_START, OO_RETRY };
+	states { OO_RETRY };
 
 	void setup (char *d) { data = d; };
 
 	perform;
 };
 
-strandhdr (satcmd_out, NodePeg) {
-	char *data;
-
-	states { SCO_TRY };
-
-	void setup (char *d) { data = d; };
-
-	perform;
-};
-
-threadhdr (root, NodePeg) {
+threadhdr (root, NodeCus) {
 
 	states { RS_INIT, RS_INIT1, RS_INIT2, RS_PAUSE, RS_FREE, RS_RCMD,
 	       	RS_DOCMD, RS_UIOUT, RS_DUMP };
@@ -70,8 +53,6 @@ threadhdr (root, NodePeg) {
 };
 
 #else	/* PICOS */
-
-int mbeacon (word, address);
 
 // ========================================= rcv
 
@@ -101,19 +82,9 @@ static word aud_ind;
 #define	CS_IN		10
 #define	CS_WAIT		20
 
-// ========================================= mbeacon
-
-#define MB_START        00
-#define MB_SEND		10
-
 // ========================================= oss_out
 
-#define	OO_START	0
-#define OO_RETRY	10
-
-// ========================================= satcmd_out
-
-#define SCO_TRY		0
+#define	OO_RETRY	00
 
 // ========================================= root
 

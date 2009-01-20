@@ -22,6 +22,7 @@
 #define agg_dump	_dac (NodePeg, agg_dump)
 #define pong_ack	_dac (NodePeg, pong_ack)
 #define sync_freq	_dac (NodePeg, sync_freq)
+#define sat_mod		_dac (NodePeg, sat_mod)
 
 // Methods
 #define show_ifla		_dac (NodePeg, show_ifla)
@@ -72,6 +73,9 @@
 #define r_a_d			_dac (NodePeg, r_a_d)
 #define handle_a_flags		_dac (NodePeg, handle_a_flags)
 #define tmpcrap			_dac (NodePeg, tmpcrap)
+#define str_cmpn		_dac (NodePeg, str_cmpn)
+#define sat_in			_dac (NodePeg, sat_in)
+#define sat_out			_dac (NodePeg, sat_out)
 
 #else	/* PICOS */
 
