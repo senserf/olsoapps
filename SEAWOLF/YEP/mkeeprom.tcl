@@ -898,7 +898,7 @@ proc handle_image { id } {
 	}
 
 	# read the image
-	fconfigure $ifd -encoding binary -translation binary
+	fconfigure $ifd -encoding binary -translation binary -eofchar ""
 
 	if [catch { read $ifd } IMG] {
 		abt "cannot read image file $id: $IMG"
@@ -1206,7 +1206,7 @@ if [catch { open $ffile "r" } dfd] {
 	abt "cannot open font file $ffile: $dfd"
 }
 
-fconfigure $dfd -encoding binary -translation binary
+fconfigure $dfd -encoding binary -translation binary -eofchar ""
 
 if [catch { read $dfd } ff] {
 	abt "cannot read font file $ffile: $ff"
@@ -1228,7 +1228,7 @@ if [catch { open $ifile "w" } OFD] {
 	abt "cannot open output file $ifile for writing: $OFD"
 }
 
-fconfigure $OFD -encoding binary -translation binary
+fconfigure $OFD -encoding binary -translation binary -eofchar ""
 
 # memory image
 set EIM(MEM) ""

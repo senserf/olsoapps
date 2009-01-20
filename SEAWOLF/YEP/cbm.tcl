@@ -356,8 +356,8 @@ if [catch { open $ofile "w" } ofd] {
 	abt "cannot open output file $ofile: $ofd"
 }
 
-fconfigure $ifd -translation binary
-fconfigure $ofd -translation binary
+fconfigure $ifd -translation binary -eofchar ""
+fconfigure $ofd -translation binary -eofchar ""
 
 set SIO(IB) [read $ifd]
 set IDX 0

@@ -88,10 +88,6 @@
 
 #define INFO_FLASH	1
 
-#ifndef  __SMURPH__
-#define GLACIER 0
-#endif
-
 #ifndef SENS0_DESC
 #define SENS0_DESC "S0: "
 #endif

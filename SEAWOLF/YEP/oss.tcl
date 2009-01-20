@@ -160,7 +160,7 @@ proc gfile { fil } {
 		return ""
 	}
 
-	fconfigure $fd -translation binary
+	fconfigure $fd -translation binary -eofchar ""
 
 	if [catch { read $fd } res] {
 		log "cannot read $fil: $res"
@@ -186,7 +186,7 @@ proc sfile { fil stuff } {
 		return 1
 	}
 
-	fconfigure $fd -translation binary
+	fconfigure $fd -translation binary -eofchar ""
 
 	if [catch { puts -nonewline $fd $stuff } res] {
 		log "cannot wrtite to $fil: $res"
