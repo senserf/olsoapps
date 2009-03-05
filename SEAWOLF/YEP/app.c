@@ -327,6 +327,8 @@ thread (root)
 
     entry (RS_INIT)
 
+	ee_open ();
+
 	init_glo();
 
 	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0)

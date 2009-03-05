@@ -580,8 +580,11 @@ thread (pong)
 		//powerdown();
 
 	entry (PS_HOLD)
+
+		ee_close ();
 #if 0
 	that was GLACIER:
+
 		while (lh_time != 0) {
 			if (lh_time > MAX_UINT) {
 				lh_time -= MAX_UINT;
@@ -597,6 +600,8 @@ thread (pong)
 #endif
 		lhold (PS_HOLD, (lword *)&lh_time);
 		//powerup();
+
+		ee_open ();
 
 		// fall through
 
@@ -746,6 +751,7 @@ thread (root)
 
 	entry (RS_INIT)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
+		ee_open ();
 		form (ui_obuf, ee_str, EE_SENS_MIN, EE_SENS_MAX -1,
 			EE_SENS_SIZE);
 

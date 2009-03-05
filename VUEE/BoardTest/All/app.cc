@@ -123,6 +123,8 @@ thread (root)
 		halt();
 	}
 
+	ee_open ();
+
       switch (if_read (IFLASH_SIZE -1)) {
 	case TS_INIT:
 		diag ("flashed virgin");

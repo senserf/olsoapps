@@ -37,3 +37,17 @@
 #define INFO_FLASH	1
 #define LEDS_DRIVER     1
 #define RADIO_USE_LEDS  0
+
+// Wlodek put this into WARSAW board with this comment:
+//
+// This may be convenient to switch between functional node types, e.g.,
+// router / leaf, with no UI available. This here is specific for BoardTest
+// praxis.
+//
+// Now, after some refurbishing, this thing probably belongs here:
+//
+#define	board_key_reset_action \
+	do { \
+		 if (if_read (IFLASH_SIZE -1) == 0xFFFE) \
+			 if_write (IFLASH_SIZE -1, 0xFFFC); \
+	} while (0)

@@ -392,6 +392,8 @@ extern tarpCtrlType tarp_ctrl;
 static void read_eprom_and_init() {
 	word w[NVM_BOOT_LEN >> 1];
 
+	ee_open ();
+
 	ee_read (EE_NID, (byte *)w, NVM_BOOT_LEN);
 	if (w[EE_NID >> 1] == 0xFFFF)
 		net_id = 0;

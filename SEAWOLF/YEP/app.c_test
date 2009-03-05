@@ -214,6 +214,8 @@ thread (root)
 	phys_uart (0, OEP_MAXRAWPL, 0);
 	tcv_plug (0, &plug_null);
 
+	ee_open ();
+
 	// OSS link
 	SFD = tcv_open (WNONE, 0, 0);
 

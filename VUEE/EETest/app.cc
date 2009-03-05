@@ -12,6 +12,8 @@ thread (root)
 
     entry (RS_INIT)
 
+	ee_open ();
+
     entry (RS_RCMD_M)
 
 	ser_out (RS_RCMD_M,

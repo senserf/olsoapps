@@ -476,7 +476,8 @@ set Uart(PAR)	"19200,n,8,1"
 set Uart(MODE)	0
 
 set Files(LOG)		"log"
-set Log(MAXSIZE)	1000000
+set Log(MAXSIZE)	10000000
+set Log(MAXVERS)	4
 set Turn		0
 
 log_open

@@ -336,7 +336,7 @@ proc doit_start { arg } {
 	}
 
 	# sync
-	puts "setting paramaters ..."
+	puts "setting parameters ..."
 	if [issue "Y $intv" "^0003 Synced to $intv" 6 10] {
 		return
 	}

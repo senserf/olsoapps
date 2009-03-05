@@ -124,6 +124,7 @@ void memory_test () {
 
 	lcd_clear (0, 0);
 	lcd_write (0, "TESTING FLASH:");
+	ee_open ();
 
 	sbuf = (byte*) umalloc (N_FLASH_SAMPLE_SIZE);
 

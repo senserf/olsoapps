@@ -435,6 +435,8 @@ thread (root)
 	//w1 = memfree(0, &w2);
 	//diag ("dupa %u %u", w1, w2 );
 
+		ee_open ();
+
 		ser_out (RS_INIT, welcome_str);
 		local_host = (word)host_id;
 #ifndef __SMURPH__

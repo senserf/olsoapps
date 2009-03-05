@@ -1344,6 +1344,7 @@ thread (root)
 
     entry (RS_INIT)
 
+	ee_open ();
 	hrc_stop ();
 	erase_all_samples ();
 	init_storage ();
