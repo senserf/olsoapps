@@ -377,26 +377,46 @@ proc doit_stop { arg } {
 		return
 	}
 
-	puts "resetting node ..."
+	set maint [regexp -nocase "^m" $arg]
+
+	puts -nonewline "resetting node"
+
+	if $maint {
+		puts -nonewline " for maintenance"
+	}
+
+	puts " ..."
 
 	if { $nt == 1 } {
 		# collector
-		if [issue "q" "^CC1100" 4 30] {
-			return
-		}
-		if [issue "s -1 -1 -1 -1 0" "^2005" 4 5] {
-			return
+		if $maint {
+			if [issue "M" "^2001.*Maintenance" 4 30] {
+				return
+			}
+		} else {
+			if [issue "q" "^CC1100" 4 30] {
+				return
+			}
+			if [issue "s -1 -1 -1 -1 0" "^2005" 4 5] {
+				return
+			}
 		}
 	} else {
 		# aggregator
-		if [issue "q" "^1001.*Find collector:" 4 30] {
-			return
+		if $maint {
+			if [issue "M" "^1001.*Find collector:" 4 30] {
+				return
+			}
+		} else {
+			if [issue "q" "^1001.*Find collector:" 4 30] {
+				return
+			}
+			if [issue "a -1 -1 -1 0" "^1005" 4 5] {
+				return
+			}
 		}
-		if [issue "a -1 -1 -1 0" "^1005" 4 5] {
-			return
-		}
-		puts "done"
 	}
+	puts "done"
 }
 
 proc doit_echo { arg } {
@@ -707,7 +727,7 @@ proc sget { } {
 
 	set kwd [string tolower $kwd]
 
-	if [catch { doit_$kwd $args } ] {
+	if [catch { doit_$kwd [string trim $args] } ] {
 		show_usage
 	}
 }
@@ -716,7 +736,7 @@ proc show_usage { } {
 
 	puts "Commands:"
 	puts "  start sec \[continue\]      - start sampling at sec intervals"
-	puts "  stop                      - stop sampling"
+	puts "  stop \[maintenance\]        - stop sampling"
 	puts "  show off|on               - show received values while sampling"
 	puts "  echo off|on               - show dialogue with the node"
 	puts "  extract filename          - extract stored samples to file"
