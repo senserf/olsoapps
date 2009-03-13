@@ -465,9 +465,7 @@ thread (audit)
 
 	entry (AS_HOLD)
 
-		ee_close ();
 		lhold (AS_HOLD, &lh_time);
-		ee_open ();
 		proceed (AS_START);
 endthread
 
@@ -915,7 +913,8 @@ thread (root)
 
 	entry (RS_INIT)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
-		ee_open ();
+		if (ee_open ())
+			fatal_err (ERR_EER, 0, 0, 0);
 		form (ui_obuf, ee_str, EE_AGG_MIN, EE_AGG_MAX -1, EE_AGG_SIZE);
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF)

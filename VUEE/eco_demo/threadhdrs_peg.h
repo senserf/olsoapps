@@ -48,6 +48,8 @@ strandhdr (oss_out, NodePeg) {
 
 	void setup (char *d) { data = d; };
 
+	void savedata (char *d) { data = d; };
+
 	perform;
 };
 

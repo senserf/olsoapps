@@ -542,6 +542,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 
 	// only efter power down / soft reset there could be anything in eeprom
 	l = EE_AGG_MIN; u = EE_AGG_MAX;
+
 	while ((u - l) > 1) {
 		m = l + ((u -l) >> 1);
 

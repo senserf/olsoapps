@@ -17,6 +17,7 @@
 #include "ser.h"
 #include "net.h"
 #include "tarp.h"
+#include "storage.h"
 
 #include "attribs_cus.h"
 

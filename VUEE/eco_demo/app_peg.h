@@ -16,6 +16,7 @@
 #include "sysio.h"
 #include "msg_tarp.h"
 #include "msg_structs_peg.h"
+#include "storage.h"
 
 #define EE_AGG_SIZE	sizeof(aggEEDataType)
 #define EE_AGG_MAX	(lword)(ee_size (NULL, NULL) / EE_AGG_SIZE -1)

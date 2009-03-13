@@ -581,7 +581,6 @@ thread (pong)
 
 	entry (PS_HOLD)
 
-		ee_close ();
 #if 0
 	that was GLACIER:
 
@@ -600,8 +599,6 @@ thread (pong)
 #endif
 		lhold (PS_HOLD, (lword *)&lh_time);
 		//powerup();
-
-		ee_open ();
 
 		// fall through
 

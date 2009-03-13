@@ -13,6 +13,7 @@
 
 #include "sysio.h"
 #include "msg_tarp.h"
+#include "storage.h"
 
 #define EE_SENS_SIZE	sizeof(sensEEDataType)
 #define EE_SENS_MAX	(lword)(ee_size (NULL, NULL) / EE_SENS_SIZE -1)

@@ -444,9 +444,7 @@ thread (audit)
 		proceed (AS_TAGLOOP);
 
 	entry (AS_HOLD)
-		ee_close ();
 		lhold (AS_HOLD, &lh_time);
-		ee_open ();
 		proceed (AS_START);
 endthread
 
