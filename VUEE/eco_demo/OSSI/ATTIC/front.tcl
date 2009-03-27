@@ -86,8 +86,8 @@ proc u_rdline { } {
 
 	if $ST(SSE) {
 		# show sensor values
-		if { [regexp "^1002 .* Col (\[0-9\]+).*time: (\[^ \]+) *S0:" \
-		    $line j col tst] && ![catch { expr $col } col] } {
+		if { [regexp "^1002 .* Col (\[0-9\]+).*t(ime|s): (\[^ \]+) *S0:" \
+		    $line j0 col j1 tst] && ![catch { expr $col } col] } {
 			set sv ""
 			set sn 0
 			while 1 {
@@ -116,8 +116,8 @@ proc u_rdline { } {
 	if { $ST(DUN) != 1 } {
 		# aggregator
 		if { [regexp \
-		  "^1007 Col (\[0-9\]+).*A: (\[0-9\]+).*time: (\[^ \]+).*S0:" \
-		    $line j col slo tst] && ![catch { expr $col } col] &&
+		  "^1007 Col (\[0-9\]+).*A: (\[0-9\]+).*t(ime|s): (\[^ \]+).*S0:" \
+		    $line j0 col slo j1 tst] && ![catch { expr $col } col] &&
 		      ![catch { expr $slo } slo] } {
 			set sv ""
 			set sn 0
@@ -141,8 +141,8 @@ proc u_rdline { } {
 	} else {
 		# collector
 		if { [regexp \
-		  "^2007 COLLECTED slot (\[0-9\]+).*time (\[^ \]+).*S0:" \
-		    $line j slo tst] && ![catch { expr $slo } slo] } {
+		  "^2007 \[^ \]+ slot (\[0-9\]+).*t(ime|s) (\[^ \]+).*S0:" \
+		    $line j0 slo j1 tst] && ![catch { expr $slo } slo] } {
 			set sv ""
 			set sn 0
 			while 1 {
@@ -169,7 +169,7 @@ proc tstamp { ts } {
 #
 # Re-format the time stamp
 #
-	if ![regexp "^(\[0-9\])+\\.(\[0-9\]+):(\[0-9\]+):(\[0-9\]+)" \
+	if ![regexp "^(\[0-9\]+)\\.(\[0-9\]+):(\[0-9\]+):(\[0-9\]+)" \
 	    $ts j d h m s] {
 		return "00.00:00:00"
 	}
