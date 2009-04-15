@@ -21,6 +21,7 @@
 #else	/* PICOS */
 
 #include "net.h"
+#include "form.h"
 
 #endif
 
@@ -31,12 +32,11 @@
 // this kludgy crap whould be rewritten anyway.
 __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 					char** out_buf, word flags) {
-	mclock_t mc;
 	word w = sizeof(msgReportType);
 
 	// we'll see about selective reporting...
 	if ((flags & REP_FLAG_PLOAD) &&
-			tagArray[tIndex].rpload.ppload.ts != 0xFFFFFFFF)
+			tagArray[tIndex].rpload.ppload.ds != 0x80000000)
 		w += sizeof(reportPloadType);
 
 	// FIXME this is crap, I think: find tag goes through here, and
@@ -54,13 +54,12 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 	in_header(*out_buf, msg_type) = msg_report;
 	in_header(*out_buf, rcv) = master_host;
 	in_report(*out_buf, flags) = flags;
+
 	if (tIndex & 0x8000) {
 		in_report(*out_buf, tagid) = 0;
 		in_report(*out_buf, rssi) = 0;
 		in_report(*out_buf, pl) = 0;
-		mc.sec = 0;
-		wall_time (&mc);
-		in_report(*out_buf, tStamp) = mc.sec;
+		in_report(*out_buf, tStamp) = wall_date (0);
 		in_report(*out_buf, state) = sumTag;
 		in_report(*out_buf, count) = tIndex & 0x7FFF;;
 		return;
@@ -68,20 +67,18 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 	in_report(*out_buf, tagid) = tagArray[tIndex].id;
 	in_report(*out_buf, rssi) = tagArray[tIndex].rssi;
 	in_report(*out_buf, pl) = tagArray[tIndex].pl;
-	mc.sec = seconds() - tagArray[tIndex].evTime;
-	mc.hms.f = 1;
-	wall_time (&mc);
-	in_report(*out_buf, tStamp) = mc.sec;
+	in_report(*out_buf, tStamp) = wall_date (seconds() -
+			tagArray[tIndex].evTime);
 	in_report(*out_buf, state) = tagArray[tIndex].state;
 	in_report(*out_buf, count) = ++tagArray[tIndex].count;
 
 	if ((flags & REP_FLAG_PLOAD) &&
-			tagArray[tIndex].rpload.ppload.ts != 0xFFFFFFFF) {
+			tagArray[tIndex].rpload.ppload.ds != 0x80000000) {
 		in_report(*out_buf, flags) |= REP_FLAG_PLOAD;
 		memcpy (&in_reportPload(*out_buf, ppload),
 				&tagArray[tIndex].rpload.ppload,
 				sizeof(pongPloadType));
-		in_reportPload(*out_buf, ts) = tagArray[tIndex].rpload.ts;
+		in_reportPload(*out_buf, ds) = tagArray[tIndex].rpload.ds;
 		in_reportPload(*out_buf, eslot) =
 			tagArray[tIndex].rpload.eslot; 
 	}
@@ -90,7 +87,7 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 __PUBLF (NodeCus, void, msg_findTag_in) (word state, char * buf) {
 
 	char * out_buf = NULL;
-	int tagIndex;
+	sint tagIndex;
 
 	if ((word)(in_findTag(buf, target)) == 0) { // summary
 		tagIndex = find_tags (in_findTag(buf, target), 1);
@@ -168,7 +165,7 @@ __PUBLF (NodeCus, void, msg_setPeg_in) (char * buf) {
 	in_header(out_buf, rcv) = in_header(buf, snd);
 	in_statsPeg(out_buf, hostid) = host_id;
 	in_statsPeg(out_buf, ltime) = seconds();
-	in_statsPeg(out_buf, mdelta) = master_delta;
+	in_statsPeg(out_buf, mts) = master_ts;
 
 	//in_statsPeg(out_buf, slot) is really # of entries
 	if (agg_data.eslot == EE_AGG_MIN && agg_data.ee.s.f.status == AGG_FF)
@@ -190,8 +187,8 @@ __PUBLF (NodeCus, void, msg_setPeg_in) (char * buf) {
 __PUBLF (NodeCus, void, msg_fwd_in) (word state, char * buf, word size) {
 
 	char * out_buf = NULL;
-	int tagIndex;
-	int w_len;
+	sint tagIndex;
+	sint w_len;
 
 	if ((tagIndex = find_tags (in_fwd(buf, target), 0)) < 0)
 		return;
@@ -234,11 +231,12 @@ __PUBLF (NodeCus, void, msg_master_in) (char * buf) {
 		set_master_chg();
 	}
 
-	// I'm not sure... let's assume the master is unconditional...
-	//if (in_master(buf, mtime) != 0) {
-		master_clock.sec = in_master(buf, mtime);
-		master_delta = seconds();
-	//}
+	if (in_master(buf, mdate) < -SID * 90 ||
+			master_date > -SID * 90) {
+		master_date = in_master(buf, mdate);
+		master_ts = seconds();
+	}
+
 	sync_freq = in_master(buf, syfreq);
 
 	if (is_master_chg) {
@@ -247,9 +245,43 @@ __PUBLF (NodeCus, void, msg_master_in) (char * buf) {
 	}
 }
 
-__PUBLF (NodeCus, int, msg_satest_out) (char * bin) {
+// FIXME kludge alert
+#define _MAX_RPC_ 30
+__PUBLF (NodeCus, sint, msg_rpc_out) (char * bin) {
+	char bout [_MAX_RPC_ + sizeof(headerType)];
+	sint host = -1;
+	char * ptr;
+
+	if (strlen (bin) > _MAX_RPC_)
+		return -1;
+
+	bout[sizeof(headerType)] = '\0';
+	scan (bin, "%d %s", &host, bout +sizeof(headerType));
+
+	if (host < 0 || host == local_host)
+		return -2;
+
+	bout[_MAX_RPC_ + sizeof(headerType) -1] = '\0'; // just in case...
+
+	ptr = bout +sizeof(headerType);
+	do {
+		if (*ptr == '_')
+			*ptr = ' ';
+	} while (*(++ptr));
+
+	in_header(bout, msg_type) = msg_rpc;
+	in_header(bout, rcv) = host;
+	in_header(bout, hco) = 1; // no hopping
+	send_msg (bout, sizeof(headerType) +
+			strlen (&bout[sizeof(headerType)]) +1);
+	// unusually, obout is on stack
+	return 0;
+}
+#undef _MAX_RPC_
+
+__PUBLF (NodeCus, sint, msg_satest_out) (char * bin) {
 	char * bout;
-	int len = strlen (bin);
+	sint len = strlen (bin);
 
 	if (len < 3 || bin[0] != 's')
 		return -1;
@@ -297,11 +329,8 @@ __PUBLF (NodeCus, int, msg_satest_out) (char * bin) {
 __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 	char * out_buf = NULL; // is static needed / better here? (state)
 	sint tagIndex;
-	mclock_t mc;
 
 	app_diag (D_DEBUG, "Pong %u", in_header(buf, snd));
-	mc.sec = 0;
-	wall_time (&mc);
 
 	if ((tagIndex = find_tags (in_header(buf, snd), 0)) < 0) { // not found
 
@@ -322,7 +351,7 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 		memcpy (&tagArray[tagIndex].rpload.ppload, 
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
-		tagArray[tagIndex].rpload.ts = mc.sec;
+		tagArray[tagIndex].rpload.ds = wall_date (0);
 		tagArray[tagIndex].rpload.eslot = agg_data.eslot;
 		if (agg_data.ee.s.f.status != AGG_FF)
 			tagArray[tagIndex].rpload.eslot++;
@@ -337,8 +366,8 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 		tagArray[tagIndex].rssi = rssi;
 		tagArray[tagIndex].pl = in_pong(buf, level);
 
-		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ts !=
-				in_pongPload(buf, ts)) {
+		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ds !=
+				in_pongPload(buf, ds)) {
 
 			if (is_eew_coll &&
 				       	tagArray[tagIndex].state == reportedTag)
@@ -347,7 +376,7 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 			memcpy (&tagArray[tagIndex].rpload.ppload,
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
-			tagArray[tagIndex].rpload.ts = mc.sec;
+			tagArray[tagIndex].rpload.ds = wall_date (0);
 			tagArray[tagIndex].rpload.eslot = agg_data.eslot;
 			if (agg_data.ee.s.f.status != AGG_FF)
 				tagArray[tagIndex].rpload.eslot++;
@@ -424,7 +453,7 @@ __PUBLF (NodeCus, void, msg_report_in) (word state, char * buf) {
 }
 
 __PUBLF (NodeCus, void, msg_reportAck_in) (char * buf) {
-	int tagIndex;
+	sint tagIndex;
 
 	if ((tagIndex = find_tags (in_reportAck(buf, tagid), 0)) < 0) {
 		app_diag (D_INFO, "Ack for a goner %u",

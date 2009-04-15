@@ -11,8 +11,8 @@
 
 #define	host_id		_dac (NodeCus, host_id)
 #define	host_pl		_dac (NodeCus, host_pl)
-#define	master_delta	_dac (NodeCus, master_delta)
-#define master_clock	_dac (NodeCus, master_clock)
+#define	master_ts	_dac (NodeCus, master_ts)
+#define master_date	_dac (NodeCus, master_date)
 #define	msg4tag		_dac (NodeCus, msg4tag)
 #define	msg4ward	_dac (NodeCus, msg4ward)
 #define	tagArray	_dac (NodeCus, tagArray)
@@ -23,6 +23,7 @@
 #define pong_ack	_dac (NodeCus, pong_ack)
 #define sync_freq	_dac (NodeCus, sync_freq)
 #define sat_mod		_dac (NodeCus, sat_mod)
+#define plot_id		_dac (NodeCus, plot_id)
 
 // Methods
 #define show_ifla		_dac (NodeCus, show_ifla)
@@ -36,7 +37,6 @@
 #define	check_msg4tag		_dac (NodeCus, check_msg4tag)
 #define	check_msg_size		_dac (NodeCus, check_msg_size)
 #define	check_tag		_dac (NodeCus, check_tag)
-#define wall_time		_dac (NodeCus, wall_time)
 #define	find_tags		_dac (NodeCus, find_tags)
 #define	get_mem			_dac (NodeCus, get_mem)
 #define	init_tag		_dac (NodeCus, init_tag)
@@ -48,6 +48,7 @@
 #define	msg_findTag_out		_dac (NodeCus, msg_findTag_out)
 #define	msg_master_in		_dac (NodeCus, msg_master_in)
 #define msg_satest_out		_dac (NodeCus, msg_satest_out)
+#define msg_rpc_out		_dac (NodeCus, msg_rpc_out)
 #define sat_in			_dac (NodeCus, sat_in)
 #define sat_out			_dac (NodeCus, sat_out)
 #define	msg_pong_in		_dac (NodeCus, msg_pong_in)
@@ -75,6 +76,7 @@
 #define handle_a_flags		_dac (NodeCus, handle_a_flags)
 #define tmpcrap			_dac (NodeCus, tmpcrap)
 #define str_cmpn		_dac (NodeCus, str_cmpn)
+#define wall_date		_dac (NodeCus, wall_date)
 
 #else	/* PICOS */
 

@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -69,7 +69,7 @@ endstrand
 // called from app_cus.c anyway... forget it until we have the
 // vuee / picos stuff sorted out
 __PUBLF (NodeCus, void, sat_in) () {
-	int len;
+	sint len;
 	char * obuf;
 
 	// packetization is not really needed (?);
@@ -98,7 +98,7 @@ __PUBLF (NodeCus, void, sat_in) () {
 }
 
 __PUBLF (NodeCus, void, sat_out) (char * buf) {
-	int len = strlen (&buf[sizeof (headerType)]) +1; // + '\0'
+	sint len = strlen (&buf[sizeof (headerType)]) +1; // + '\0'
 	char * mbuf;
 
 	if (!IS_SATGAT)
@@ -158,13 +158,9 @@ __PUBLF (NodeCus, void, read_ifla) () {
 	master_host = if_read (4);
 	sync_freq = if_read (5);
 	if (sync_freq > 0) {
-		master_delta = seconds();
-		master_clock.hms.d = 0;
-		master_clock.hms.h = 0;
-		master_clock.hms.m = 0;
-		master_clock.hms.s = 0;
-		master_clock.hms.f = 1;
-		diag (OPRE_APP_ACK "Implicit T 0:0:0");
+		master_ts = seconds();
+		master_date = -1;
+		diag (OPRE_APP_ACK "Implicit T 9-1-1 0:0:1");
 	}
 	sat_mod = if_read (6);
 }
@@ -198,7 +194,7 @@ __PUBLF (NodeCus, void, stats) (char * buf) {
 		mbuf = form (NULL, stats_str,
 			host_id, local_host, tag_auditFreq,
 			host_pl, handle_a_flags (0xFFFF), seconds(),
-		       	master_delta, master_host,
+		       	master_ts, master_host,
 			agg_data.eslot == EE_AGG_MIN &&
 			  agg_data.ee.s.f.status == AGG_FF ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
@@ -210,7 +206,7 @@ __PUBLF (NodeCus, void, stats) (char * buf) {
 			in_statsPeg(buf, hostid), in_header(buf, snd),
 			in_statsPeg(buf, audi), in_statsPeg(buf, pl),
 			in_statsPeg(buf, a_fl),
-			in_statsPeg(buf, ltime), in_statsPeg(buf, mdelta),
+			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
 			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
 			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 12345);
 		break;
@@ -240,7 +236,7 @@ __PUBLF (NodeCus, void, stats) (char * buf) {
 
 __PUBLF (NodeCus, void, process_incoming) (word state, char * buf, word size,
 								word rssi) {
-  int    w_len;
+  sint    w_len;
 
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
@@ -295,9 +291,14 @@ __PUBLF (NodeCus, void, process_incoming) (word state, char * buf, word size,
 			when (CMD_WRITER, state);
 			release;
 		}
-		w_len = size - sizeof(msgRpcType);
+		w_len = strlen (&buf[sizeof (headerType)]) +1;
+
+		// sanitize
+		if (w_len + sizeof (headerType) > size)
+			return;
+
 		cmd_line = get_mem (state, w_len);
-		memcpy (cmd_line, buf + sizeof(msgRpcType), w_len);
+		strcpy (cmd_line, buf + sizeof(headerType));
 		trigger (CMD_READER);
 		return;
 
@@ -310,6 +311,8 @@ __PUBLF (NodeCus, void, process_incoming) (word state, char * buf, word size,
 
   }
 }
+
+#include "dconv.ch"
 
 // [0, FF] -> [1, F]
 // it can't be 0, as find_tags() will mask the rssi out!
@@ -543,33 +546,31 @@ static char * locatName (word id, word rssi) {
 __PUBLF (NodeCus, void, oss_report_out) (char * buf) {
 
   char * lbuf = NULL;
+  mdate_t md, md2;
 
   if (IS_SATGAT)
 	  return;
 
   if (in_report_pload(buf)) {
 
+	  md.secs = in_reportPload(buf, ds);
+	  s2d (&md);
+	  md2.secs = in_reportPload(buf, ppload.ds);
+	  s2d (&md2);
+
 	lbuf = form (NULL, rep_str,
 
 		in_header(buf, snd),
 		in_reportPload(buf, eslot),
 
-		((mclock_t *)&in_reportPload(buf, ts))->hms.f ?
-			"time" : "ts",
-		((mclock_t *)&in_reportPload(buf, ts))->hms.d,
-		((mclock_t *)&in_reportPload(buf, ts))->hms.h,
-		((mclock_t *)&in_reportPload(buf, ts))->hms.m,
-		((mclock_t *)&in_reportPload(buf, ts))->hms.s,
+		md.dat.f ?  2009 + md.dat.yy : 1001 + md.dat.yy,
+		md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
 
 		in_report(buf, tagid),
 		in_reportPload(buf, ppload.eslot),
 
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.f ?
-			"time" : "ts",
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.d,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.h,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.m,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.s,
+		md2.dat.f ?  2009 + md2.dat.yy : 1001 + md2.dat.yy,
+		md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
 
 		in_report(buf, state) == goneTag ?
 			" ***gone***" : " ",
@@ -602,6 +603,7 @@ __PUBLF (NodeCus, void, oss_report_out) (char * buf) {
 
 __PUBLF (NodeCus, word, r_a_d) () {
 	char * lbuf = NULL;
+	mdate_t md, md2;
 
 	if (IS_SATGAT)
 		return 0;
@@ -623,22 +625,23 @@ __PUBLF (NodeCus, word, r_a_d) () {
 		}
 	}
 
-	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag) {
+	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag ||
+			agg_dump->ee.s.f.status == AGG_ALL) {
+
+		md.secs = agg_dump->ee.t_ds;
+		s2d (&md);
+		md2.secs = agg_dump->ee.ds;
+		s2d (&md2);
+
 		lbuf = form (NULL, dump_str,
 
 			agg_dump->ee.tag, agg_dump->ee.t_eslot, agg_dump->ind,
 
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.f ? "time" : "ts",
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.d,
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.h,
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.m,
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.s,
+			md.dat.f ?  2009 + md.dat.yy : 1001 + md.dat.yy,
+			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
 
-			((mclock_t *)&agg_dump->ee.ts)->hms.f ? "time" : "ts",
-			((mclock_t *)&agg_dump->ee.ts)->hms.d,
-			((mclock_t *)&agg_dump->ee.ts)->hms.h,
-			((mclock_t *)&agg_dump->ee.ts)->hms.m,
-			((mclock_t *)&agg_dump->ee.ts)->hms.s,
+			md2.dat.f ?  2009 + md2.dat.yy : 1001 + md2.dat.yy,
+			md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
 
 			agg_dump->ee.sval[0],
 			agg_dump->ee.sval[1],
@@ -692,7 +695,7 @@ ThatsIt:
 __PUBLF (NodeCus, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
 
 	char * out_buf = NULL;
-	int tagIndex;
+	sint tagIndex;
 
 	if (peg == local_host || peg == 0) {
 		if (tag == 0) { // summary
@@ -737,7 +740,7 @@ __PUBLF (NodeCus, void, oss_setTag_in) (word state, word tag,
 
 	char * out_buf = NULL;
 	char * set_buf = NULL;
-	int size = sizeof(msgFwdType) + sizeof(msgSetTagType);
+	sint size = sizeof(msgFwdType) + sizeof(msgSetTagType);
 
 #if 0
        	already checked
@@ -792,7 +795,6 @@ __PUBLF (NodeCus, void, oss_setPeg_in) (word state, nid_t peg,
 
 thread (root)
 
-	mclock_t mc;
 	sint	i1, i2, i3, i4, i5, i6, i7;
 
 	entry (RS_INIT)
@@ -884,7 +886,7 @@ thread (root)
 		}
 
 		if (master_host != local_host &&
-				(cmd_line[0] == 'T' || cmd_line[0] == 'c' ||
+				(cmd_line[0] == 'c' ||
 				 cmd_line[0] == 'f')) {
 			strcpy (ui_obuf, only_master_str);
 			proceed (RS_UIOUT);
@@ -904,36 +906,6 @@ thread (root)
                 case 'h':
 			ser_out (RS_DOCMD, welcome_str);
 			proceed (RS_FREE);
-
-		case 'T':
-			i1 = i2 = i3 = 0;
-
-			if ((i4 = scan (cmd_line+1, "%u:%u:%u", &i1,
-							&i2, &i3)) != 3 &&
-					i4 != 0) {
-				form (ui_obuf, bad_str, cmd_line);
-				proceed (RS_UIOUT);
-			}
-
-			if (i4 == 3) {
-				if (i1 > 23 || i2 > 59 || i3 > 59) {
-					form (ui_obuf, bad_str, cmd_line);
-					proceed (RS_UIOUT);
-				}
-				master_delta = seconds();
-				master_clock.hms.d = 0;
-				master_clock.hms.h = i1;
-				master_clock.hms.m = i2;
-				master_clock.hms.s = i3;
-				master_clock.hms.f = 1;
-			}
-
-			mc.sec = 0;
-			wall_time (&mc);
-			form (ui_obuf, clock_str, mc.hms.f ? "time" : "ts",
-					mc.hms.d, mc.hms.h, mc.hms.m,
-					mc.hms.s, seconds());
-			proceed (RS_UIOUT);
 
 		case 'q': reset();
 
@@ -1009,8 +981,14 @@ thread (root)
 				proceed (RS_FREE);
 			}
 			if ((i1 = msg_satest_out (cmd_line)) < 0) {
-				diag (OPRE_APP_ACK "Failed %d", i1);
-				form (ui_obuf, bad_str, cmd_line);
+				form (ui_obuf, bad_str, cmd_line, i1);
+				proceed (RS_UIOUT);
+			}
+			proceed (RS_FREE);
+
+		case 'r':
+			if ((i1 = msg_rpc_out (&cmd_line[1])) < 0) {
+				form (ui_obuf, bad_str, cmd_line, i1);
 				proceed (RS_UIOUT);
 			}
 			proceed (RS_FREE);
@@ -1029,7 +1007,7 @@ thread (root)
 				&i1, &i2, &i3, &i4, &i5, &i6, &i7);
 			
 			if (i1 <= 0 || i3 < -1 || i4 < -1 || i5 < -1) {
-				form (ui_obuf, bad_str, cmd_line);
+				form (ui_obuf, bad_str, cmd_line, 0);
 				proceed (RS_UIOUT);
 			}
 
@@ -1095,24 +1073,6 @@ thread (root)
 				}
 			}
 			stats(NULL);
-			proceed (RS_FREE);
-
-		case 'Y':
-			i1 = -1;
-			scan (cmd_line +1, "%u", &i1);
-			if (i1 >= 0 && sync_freq != i1) {
-				sync_freq = i1;
-				if (sync_freq > 0 && master_clock.hms.f == 0) {
-					master_delta = seconds();
-					master_clock.hms.d = 0;
-					master_clock.hms.h = 0;
-					master_clock.hms.m = 0;
-					master_clock.hms.s = 0;
-					master_clock.hms.f = 1;
-					diag (OPRE_APP_ACK "Implicit T 0:0:0");
-				}
-			}
-			diag (OPRE_APP_ACK "Synced to %u", sync_freq);
 			proceed (RS_FREE);
 
 		default:

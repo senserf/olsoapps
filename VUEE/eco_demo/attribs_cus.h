@@ -3,8 +3,8 @@
 
 __EXTERN __CONST lword _da (host_id);
 __EXTERN word _da (host_pl);
-__EXTERN lword _da (master_delta);
-__EXTERN mclock_t _da (master_clock);
+__EXTERN lword _da (master_ts);
+__EXTERN long _da (master_date);
 __EXTERN wroomType _da (msg4tag);
 __EXTERN wroomType _da (msg4ward);
 __EXTERN tagDataType _da (tagArray) [tag_lim];
@@ -16,6 +16,7 @@ __EXTERN aggEEDumpType *_da (agg_dump);
 __EXTERN msgPongAckType _da (pong_ack);
 __EXTERN word _da (sync_freq);
 __EXTERN word _da (sat_mod);
+__EXTERN word _da (plot_id);
 
 // Methods/functions: need no EXTERN
 
@@ -28,21 +29,21 @@ void	_da (net_diag) (const word, const char *, ...);
 
 void 	_da (process_incoming) (word state, char * buf, word size, word rssi);
 void	_da (check_msg4tag) (char * buf);
-int 	_da (check_msg_size) (char * buf, word size, word repLevel);
+sint 	_da (check_msg_size) (char * buf, word size, word repLevel);
 void 	_da (check_tag) (word state, word i, char** buf_out);
-int 	_da (find_tags) (word tag, word what);
-void	_da (wall_time) (mclock_t *mc);
-char * 	_da (get_mem) (word state, int len);
+sint 	_da (find_tags) (word tag, word what);
+char * 	_da (get_mem) (word state, sint len);
 void 	_da (init_tag) (word i);
 void 	_da (init_tags) (void);
-int 	_da (insert_tag) (word tag);
+sint 	_da (insert_tag) (word tag);
 void 	_da (set_tagState) (word i, tagStateType state, Boolean updEvTime);
 
 void 	_da (msg_findTag_in) (word state, char * buf);
 void 	_da (msg_findTag_out) (word state, char** buf_out, nid_t tag,
 								nid_t peg);
 void 	_da (msg_master_in) (char * buf);
-int	_da (msg_satest_out) (char * bin);
+sint	_da (msg_satest_out) (char * bin);
+sint	_da (msg_rpc_out) (char * bin);
 void	_da (sat_in) (void);
 void	_da (sat_out) (char * buf);
 void 	_da (msg_pong_in) (word state, char * buf, word rssi);
@@ -64,7 +65,7 @@ void 	_da (oss_setPeg_in) (word state, nid_t peg, word audi, word pl,
 	       	word a_fl);
 void 	_da (oss_report_out) (char * buf);
 
-void 	_da (send_msg) (char * buf, int size);
+void 	_da (send_msg) (char * buf, sint size);
 
 void	_da (agg_init) (void);
 void	_da (fatal_err) (word err, word w1, word w2, word w3);
@@ -72,7 +73,8 @@ void	_da (write_agg) (word ti);
 word	_da (r_a_d) (void);
 word	_da (handle_a_flags) (word a_fl);
 void	_da (tmpcrap) (word);
-int	_da (str_cmpn) (const char * s1, const char * s2, int n);
+sint	_da (str_cmpn) (const char * s1, const char * s2, sint n);
+long	_da (wall_date) (long s);
 
 // Expected by NET and TARP
 

@@ -18,6 +18,8 @@
 #include "msg_structs_peg.h"
 #include "storage.h"
 
+#include "ee2sd.h"
+
 #define EE_AGG_SIZE	sizeof(aggEEDataType)
 #define EE_AGG_MAX	(lword)(ee_size (NULL, NULL) / EE_AGG_SIZE -1)
 #define EE_AGG_MIN	0L
@@ -25,10 +27,38 @@
 
 #define NUM_SENS	5
 
-#define AGG_FF		0xF
+#if EMPTY_STORAGE_FF
+#define EMPTY_BYTE      0xFF
+#define AGG_EMPTY       0xF
+#else
+#define EMPTY_BYTE	0
+#define AGG_EMPTY	0
+#endif
+
 // not needed? #define AGG_IN_USE	0xC
 #define AGG_COLLECTED	0x8
-#define AGG_CONFIRMED	0x0
+
+#if EMPTY_STORAGE_FF
+#define AGG_CONFIRMED   0
+#else
+#define AGG_CONFIRMED	1
+#endif
+
+// plot marker
+#define AGG_ALL		0xE
+
+// mark is :3
+#if EMPTY_STORAGE_FF
+#define MARK_EMPTY      7
+#else
+#define MARK_EMPTY	0
+#endif
+
+#define MARK_BOOT	6
+#define MARK_PLOT	5
+#define MARK_SYNC	4
+#define MARK_MCHG	3
+#define MARK_DATE	2
 
 #define ERR_EER		0xFFFE
 #define ERR_SLOT	0xFFFC
@@ -44,28 +74,33 @@
 #define LED_ON  1
 #define LED_BLINK 2
 
+#define SIY     (365L * 24 * 60 * 60)
+#define SID     (24L * 60 * 60)
+#define TIME_TOLER	2
+
 typedef enum {
 	noTag, newTag, reportedTag, confirmedTag,
 	fadingReportedTag, fadingConfirmedTag, goneTag, sumTag
 } tagStateType;
 
 typedef union {
-	lword sec;
+	long secs;
 	struct {
-		word d:11;
-		word h:5;
-		word m:6;
-		word s:6;
-		word spare:3;
-		word f:1;
-	} hms;
-} mclock_t;
+		word f  :1;
+		word yy :5;
+		word dd :5;
+		word h  :5; // just in case, no word crossing
+		word mm :4;
+		word m  :6;
+		word s  :6;
+	} dat;
+} mdate_t;
 
 typedef union {
 		word b:8;
 		struct {
 			word emptym :1;
-			word spare  :3;
+			word mark   :3;
 			word status :4;
 	} f;
 	word spare :8;
@@ -99,8 +134,8 @@ typedef struct wroomStruct {
 typedef struct aggEEDataStruct {
 	statu_t s; // 1st byte in ee slot
 	word sval [NUM_SENS]; // aligned
-	lword ts;
-	lword t_ts;
+	long ds;
+	long t_ds;
 	lword t_eslot;
 	word  tag;
 	word sspare[3];
@@ -129,7 +164,7 @@ typedef struct aggDataStruct {
 #define A_FL_EEW_OVER   4
 
 /* app_flags definition [default]:
-bit 0: spare [0]
+bit 0: satest (for monitoring via RF, unique to pegs) [0]
 bit 1: master changed (in TARP) [0]
 bit 2: ee write collected [1]
 bit 3: ee write confirmed [0]
@@ -137,6 +172,10 @@ bit 4: ee overwrite (cyclic stack) [0]
 bit 5: ee marker of empty slots [1]
 */
 #define DEF_APP_FLAGS   0x2C
+
+#define set_satest	(app_flags |= 1)
+#define clr_satest	(app_flags &= ~1)
+#define is_satest	(app_flags & 1)
 
 #define clr_master_chg	(app_flags &= ~2)
 #define is_master_chg	(app_flags & 2)

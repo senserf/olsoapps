@@ -115,3 +115,11 @@
 
 #define EE_ERASE_ON_NEW_FLASH	0
 
+#ifdef STORAGE_SDCARD
+#undef STORAGE_SDCARD
+#endif
+#define STORAGE_SDCARD 		0
+
+#define SD_KEEP_IDLE 		1
+#define EMPTY_STORAGE_FF 	1
+

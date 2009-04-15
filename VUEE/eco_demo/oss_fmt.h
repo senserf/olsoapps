@@ -42,7 +42,7 @@ OPRE_APP_	OSSI Prefix Application -specific ...
 OPRE_APP_MENU_A Menu (Help) on the Aggregator (welcome_str)
 OPRE_APP_MENU_C             on the Collector (welcome_str)
 OPRE_APP_ILL	Illegal command (ill_str)
-OPRE_APP_BAD	bad or incomplete command (bad_str)
+OPRE_APP_BAD	bad or failed command (bad_str)
 OPRE_APP_ACK	Acknowledgement of requested actions with no other output,
 		e.g. 'm'. Mostly via diag()
 
@@ -58,7 +58,8 @@ OPRE_APP_DUMP_A	Single output line after 'D' on the Agg (dump_str)
 OPRE_APP_DEND_A Closing line after 'D' on the Agg (dumpend_str)
 OPRE_APP_DUMP_C Single output line after 'D' on the Col (dump_str)
 OPRE_APP_DEND_C Closing line after 'D' on the Col (dumpend_str)
-OPRE_APP_T	After the 'T' command.
+OPRE_APP_T	After the 'T' command
+OPRE_APP_P	After the 'P' command
 
 OPRE_APP_IFLA_A	Result from 'S' command: Agg EFLASH sys content (ifla_str)
 OPRE_APP_IFLA_C	Result from 'S' command: Col EFLASH sys content (ifla_str)
@@ -104,6 +105,11 @@ OPRE_APP_IFLA_C	Result from 'S' command: Col EFLASH sys content (ifla_str)
 #define OPRE_APP_IFLA_A		"1010 "
 #define OPRE_APP_IFLA_C		"2010 "
 
+#define OPRE_APP_DMARK_A	"1011 "
+#define OPRE_APP_DMARK_C	"2011 "
+
+#define OPRE_APP_PLOT		"1012 "
+#define OPRE_APP_SYNC		"1013 "
 #else
 
 #if OSS_FMT == FMT_TERM
@@ -138,6 +144,12 @@ OPRE_APP_IFLA_C	Result from 'S' command: Col EFLASH sys content (ifla_str)
 
 #define OPRE_APP_IFLA_A		""
 #define OPRE_APP_IFLA_C		""
+
+#define OPRE_APP_DMARK_A        ""
+#define OPRE_APP_DMARK_C        ""
+
+#define OPRE_APP_PLOT           "" 
+#define OPRE_APP_SYNC           "" 
 
 #else
 

@@ -6,7 +6,7 @@
 	_da (host_id)		= (lword) preinit ("HID");
 	_da (app_flags)		= DEF_APP_FLAGS;
 
-	_da (master_delta)	= 0;
+	_da (master_ts)		= 0;
 	_da (host_pl)		= 7;
 
 	_da (tag_auditFreq)	= 59;	// in seconds
@@ -19,8 +19,10 @@
 
 	_da (pong_ack).header.msg_type = msg_pongAck;
 
-	_da (master_clock).sec	= 0;
+	_da (master_date)	= 0;
 
 	_da (sync_freq)		= 0;
 
 	_da (sat_mod)		= 0;
+
+	_da (plot_id)		= 0;

@@ -28,8 +28,16 @@
 #define SENS_IN_USE	0xC
 #define SENS_COLLECTED	0x8
 #define SENS_CONFIRMED	0x0
-// this one is a wildcard for reporting only
+// plot marker or a wildcard for reporting only
 #define SENS_ALL	0xE
+
+// mark is :3 
+#define MARK_FF         7 
+#define MARK_BOOT       6
+#define MARK_PLOT       5
+#define MARK_SYNC       4
+#define MARK_FREQ       3
+#define MARK_DATE       2
 
 #define ERR_EER		0xFFFE
 #define ERR_SLOT	0xFFFC
@@ -44,26 +52,31 @@
 #define LED_ON  1
 #define LED_BLINK 2
 
+#define SIY     (365L * 24 * 60 * 60)
+#define SID     (24L * 60 * 60)
+#define TIME_TOLER	2
+
 // semaphore for pongAcks
-#define ACK_IN	(&ref_time)
+#define ACK_IN	(&ref_ts)
 
 typedef union {
-	lword sec;
-	struct {
-		word d:11;
-		word h:5;
-		word m:6;
-		word s:6;
-		word spare:3;
-		word f:1;
-	} hms;
-} mclock_t;
+        long secs;
+        struct {
+                word f  :1;
+                word yy :5;
+                word dd :5;
+                word h  :5; // just in case, no word crossing
+                word mm :4;
+                word m  :6;
+                word s  :6;
+        } dat;
+} mdate_t;
 
 typedef union {
 		word b :8;
 		struct {
 			word emptym :1;
-			word spare  :3;
+			word mark   :3;
 			word status :4;
 	} f;
 	word spare :8;
@@ -81,7 +94,7 @@ typedef struct pongParamsStruct {
 typedef struct sensEEDataStruct {
 	statu_t	s; // keep it byte 0 of the ee slot
 	word sval [NUM_SENS];
-	lword ts; 	// keep it aligned
+	long ds; 	// keep it aligned
 } sensEEDataType;
 // for now, keep it at 2^N (16), we'll see about eeprom pages, etc.
 
@@ -109,7 +122,7 @@ typedef struct sensDataStruct {
 
 
 /* app_flags definition [default]:
-   bit 0: synced [0]
+   bit 0: synced (unique to tags) [0]
    bit 1: master changed (in TARP) [0]
    bit 2: ee write collected [1]
    bit 3: ee write confirmed [0]

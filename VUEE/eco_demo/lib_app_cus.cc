@@ -54,62 +54,13 @@ __PUBLF (NodeCus, void, set_master_chg) () {
 	app_flags |= 2;
 }
 
-// ============================================================================
-
-// IN: mc->sec: # of s. from NOW, can't go back before T == 0.0:0:0
-//     mc->hms.f == 1 <=> go back in time mc->sec seconds
-// OUT: *mc: wall time with the input offset (usually 0)
-
-__PUBLF (NodeCus, void, wall_time) (mclock_t *mc) {
-	word w1, w2, w3, w4;
-
-	lword lw = seconds() - master_delta +
-		24L * 3600 * master_clock.hms.d +
-		3600L * master_clock.hms.h +
-		60 * master_clock.hms.m + master_clock.hms.s;
-
-	if (mc->hms.f &&  (mc->sec & 0x7FFFFFFF) > lw) {
-		app_diag (D_SERIOUS, "Ignoring bad offset %u",
-				(word)mc->sec);
-		mc->sec = 0;
-	}
-
-	if (mc->hms.f)
-		lw -= mc->sec;
-	else
-		lw += mc->sec;
-	mc->sec = 0;
-
-	w1 = lw / (24L * 3600);
-	lw %= 24L * 3600;
-	w2 = lw / 3600;
-	lw %= 3600;
-	w3 = lw / 60;
-	w4 = lw % 60;
-
-	if (w4 >= 60) {
-		w4 -= 60;
-		w3++;
-	}
-	if (w3 >= 60) {
-		w3 -= 60;
-		w2++;
-	}
-	if (w2 >= 24) {
-		 w2 -= 24;
-		 w1++;
-	}
-	mc->hms.d = w1; mc->hms.h = w2; mc->hms.m = w3; mc->hms.s = w4;
-	mc->hms.f = master_clock.hms.f;
-}
-
 /*
    what == 0: find and return the index;
    what == 1: count
 */
-__PUBLF (NodeCus, int, find_tags) (word tag, word what) {
-	int i = 0;
-	int count = 0;
+__PUBLF (NodeCus, sint, find_tags) (word tag, word what) {
+	sint i = 0;
+	sint count = 0;
 
 	while (i < tag_lim) {
 		if (tag == 0) { // any tag counts
@@ -134,7 +85,7 @@ __PUBLF (NodeCus, int, find_tags) (word tag, word what) {
 	return -1; // found no tag
 }
 
-__PUBLF (NodeCus, char*, get_mem) (word state, int len) {
+__PUBLF (NodeCus, char*, get_mem) (word state, sint len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
 		app_diag (D_SERIOUS, "No mem reset");
@@ -159,7 +110,7 @@ __PUBLF (NodeCus, void, init_tag) (word i) {
 	tagArray[i].count = 0;
 	tagArray[i].evTime = 0;
 	tagArray[i].lastTime = 0;
-	tagArray[i].rpload.ppload.ts = 0xFFFFFFFF;
+	tagArray[i].rpload.ppload.ds = 0x80000000;
 }
 
 __PUBLF (NodeCus, void, init_tags) () {
@@ -180,9 +131,9 @@ __PUBLF (NodeCus, void, set_tagState) (word i, tagStateType state,
 		write_agg (i);
 }
 
-__PUBLF (NodeCus, int, insert_tag) (word tag) {
+__PUBLF (NodeCus, sint, insert_tag) (word tag) {
 
-	int i = 0;
+	sint i = 0;
 
 	while (i < tag_lim) {
 		if (tagArray[i].id == 0) {
@@ -320,7 +271,7 @@ __PUBLF (NodeCus, void, copy_fwd_msg) (word state, char** buf_out, char * buf,
 	memcpy (*buf_out, buf, size);
 }
 
-__PUBLF (NodeCus, void, send_msg) (char * buf, int size) {
+__PUBLF (NodeCus, void, send_msg) (char * buf, sint size) {
 	// it doesn't seem like a good place to filter out
 	// local host, but it's convenient, for now...
 
@@ -340,7 +291,7 @@ __PUBLF (NodeCus, void, send_msg) (char * buf, int size) {
 			in_header(buf, msg_type));
  }
 
-__PUBLF (NodeCus, int, check_msg_size) (char * buf, word size, word repLevel) {
+__PUBLF (NodeCus, sint, check_msg_size) (char * buf, word size, word repLevel) {
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial
@@ -428,15 +379,15 @@ __PUBLF (NodeCus, void, write_agg) (word ti) {
 	agg_data.ee.s.f.status = tagArray[ti].state == confirmedTag ?
 		AGG_CONFIRMED : AGG_COLLECTED;
 	agg_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
-	agg_data.ee.s.f.spare = 7;
+	agg_data.ee.s.f.mark = MARK_FF;
 	agg_data.ee.sval[0] = tagArray[ti].rpload.ppload.sval[0];
 	agg_data.ee.sval[1] = tagArray[ti].rpload.ppload.sval[1];
 	agg_data.ee.sval[2] = tagArray[ti].rpload.ppload.sval[2];
 	agg_data.ee.sval[3] = tagArray[ti].rpload.ppload.sval[3];
 	agg_data.ee.sval[4] = tagArray[ti].rpload.ppload.sval[4];
 
-	agg_data.ee.ts = tagArray[ti].rpload.ts;
-	agg_data.ee.t_ts = tagArray[ti].rpload.ppload.ts;
+	agg_data.ee.ds = tagArray[ti].rpload.ds;
+	agg_data.ee.t_ds = tagArray[ti].rpload.ppload.ds;
 	agg_data.ee.t_eslot = tagArray[ti].rpload.ppload.eslot;
 	agg_data.ee.tag = tagArray[ti].id;
 
@@ -465,25 +416,24 @@ __PUBLF (NodeCus, void, write_agg) (word ti) {
 
 // likely not needed for Custodian
 __PUBLF (NodeCus, void, check_msg4tag) (char * buf) {
-	mclock_t mc;
+	long md = master_ts != 0 ? wall_date (0) : 0;
+       	// do NOT send down your own date unless you're the Master
+
 diag ("WHY in check_msg4tag()??");
 return;
-	mc.sec = 0;
-	if (master_delta != 0) // do NOT send down your own clock
-		wall_time (&mc);
 
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) ==
 		       in_header(buf, snd)) { // msg waiting
 
 		if (in_pong_pload(buf)) { // add ack data
-			in_setTag(msg4tag.buf, ts) = in_pongPload(buf, ts);
-			in_setTag(msg4tag.buf, reftime) = mc.sec;
+			in_setTag(msg4tag.buf, ds) = in_pongPload(buf, ds);
+			in_setTag(msg4tag.buf, refdate) = md;
 			in_setTag(msg4tag.buf, syfreq) = sync_freq;
 			in_setTag(msg4tag.buf, ackflags) = is_eew_conf &&
 				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
 		} else {
-			in_setTag(msg4tag.buf, reftime) = 0;
-			in_setTag(msg4tag.buf, ts) = 0; 
+			in_setTag(msg4tag.buf, refdate) = 0;
+			in_setTag(msg4tag.buf, ds) = 0; 
 			in_setTag(msg4tag.buf, syfreq) = 0;
 			in_setTag(msg4tag.buf, ackflags) = 0;
 		}
@@ -497,8 +447,8 @@ return;
 		if (in_pong_pload(buf)) {
 			pong_ack.header.rcv = in_header(buf, snd);
 			pong_ack.header.hco = in_header(buf, hoc);
-			pong_ack.ts = in_pongPload(buf, ts);
-			pong_ack.reftime = mc.sec;
+			pong_ack.ds = in_pongPload(buf, ds);
+			pong_ack.refdate = md;
 			pong_ack.syfreq = sync_freq;
 			pong_ack.ackflags = is_eew_conf &&
 				agg_data.eslot >= EE_AGG_MAX -1 ? 1 : 0;
@@ -519,8 +469,9 @@ __PUBLF (NodeCus, void, agg_init) () {
 	if (b == 0xFF) { // normal operations
 		agg_data.eslot = EE_AGG_MIN;
 		agg_data.ee.s.f.status = AGG_FF;
+		agg_data.ee.s.f.mark = MARK_FF;
 		agg_data.ee.s.f.emptym = is_eem_empty ? 1 : 0;
-		agg_data.ee.s.f.spare = 7;
+		agg_data.ee.s.f.mark = MARK_FF;
 		return;
 	}
 
@@ -602,10 +553,17 @@ __PUBLF (NodeCus, word, handle_a_flags) (word a_fl) {
 	       (is_eew_coll ? A_FL_EEW_COLL : 0);
 }
 
-__PUBLF (NodeCus, int, str_cmpn) (const char * s1, const char * s2, int n) {
+__PUBLF (NodeCus, sint, str_cmpn) (const char * s1, const char * s2, sint n) {
 	while (n-- && (*s1 != '\0') && (*s2 != '\0'))
 		if (*s1++ != *s2++)
 			return 1;
 	return (n == -1 ? 0 : -1);
+}
+
+__PUBLF (NodeCus, long, wall_date) (long s) {
+	long x = seconds() - master_ts - s;
+
+	x = master_date < 0 ? master_date - x : master_date + x;
+	return x;
 }
 

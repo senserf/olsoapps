@@ -5,7 +5,7 @@
 
 threadhdr (rcv, NodeCus) {
 
-	int	rcv_packet_size;
+	sint	rcv_packet_size;
 	char 	*rcv_buf_ptr;
 	word 	rcv_rssi;
 

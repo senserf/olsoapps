@@ -14,9 +14,9 @@ typedef struct msgSetTagStruct {
 	word		freq_min;
 	word		rx_span;
 	word		c_fl;
-	word		spare;
-	lword		ts;
-	lword		reftime;
+	word		plotid;
+	long		ds;
+	long		refdate;
 	word		syfreq;
 	word		ackflags;
 } msgSetTagType;
@@ -40,13 +40,6 @@ typedef struct msgStatsTagStruct {
 
 #define in_statsTag(buf, field)   (((msgStatsTagType *)(buf))->field)
 
-typedef struct msgRpcStruct {
-	headerType      header;
-	nid_t           target;
-} msgRpcType;
-
-#define in_rpc(buf, field)   (((msgRpcType *)(buf))->field)
-
 typedef struct msgPongStruct {
 	headerType      header;
 	word		level:4;
@@ -66,7 +59,7 @@ typedef struct msgPongStruct {
 #define in_pong_rxperm(buf)	(((msgPongType *)(buf))->flags & PONG_RXPERM)
 
 typedef struct pongPloadStruct {
-	lword 	ts; 
+	long 	ds; 
 	lword	eslot;
 	word	sval[5];	// NUM_SENS
 	word	spare;
@@ -77,10 +70,11 @@ typedef struct pongPloadStruct {
 
 typedef struct msgPongAckStruct {
 	headerType	header;
-	lword		ts;
-	lword		reftime;
+	long		ds;
+	long		refdate;
 	word		syfreq;
 	word		ackflags;
+	word		plotid;
 } msgPongAckType;
 #define in_pongAck(buf, field) (((msgPongAckType *)(buf))->field)
 

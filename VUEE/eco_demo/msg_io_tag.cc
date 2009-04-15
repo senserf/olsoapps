@@ -24,44 +24,81 @@
 
 __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
 
-	upd_on_ack (in_pongAck(buf, ts), in_pongAck(buf, reftime),
-			in_pongAck(buf, syfreq), in_pongAck(buf, ackflags));
+	upd_on_ack (in_pongAck(buf, ds), in_pongAck(buf, refdate),
+			in_pongAck(buf, syfreq), in_pongAck(buf, ackflags),
+			in_pongAck(buf, plotid));
 }
 
-__PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt, word syfr, word ackf) {
+__PUBLF (NodeTag, void, upd_on_ack) (long ds, long rd, word syfr, word ackf,
+		word pi) {
 
-	if (rt != 0) {
-		ref_clock.sec = rt;
-		ref_time = seconds();
-	}
+	long dd;
+	word what = MARK_FF;
 
 	if (sens_data.ee.s.f.status != SENS_COLLECTED ||
-			sens_data.ee.ts != ts)
+			sens_data.ee.ds != ds)
 		return;
+
+	if (rd != 0) { // set on the agg.
+		// don't change for 'worse'
+		if (rd < -SID * 90 || ref_date > -SID * 90) {
+			if ((dd = wall_date (0) - rd) > TIME_TOLER ||
+					dd < -TIME_TOLER) {
+				ref_date = rd;
+				ref_ts = seconds();
+				what = MARK_DATE;
+			}
+		}
+		// diag ...
+	}
+#if 0
+	moved up in April 2009... no idea why it was here
+	if (sens_data.ee.s.f.status != SENS_COLLECTED ||
+			sens_data.ee.ds != ds)
+		return;
+#endif
 
 	//leds (LED_R, LED_OFF);
 	sens_data.ee.s.f.status = SENS_CONFIRMED;
 	trigger (ACK_IN);
 
 	if (syfr != 0) {
-		set_synced;
+		if (!is_synced) {
+			set_synced;
+			what = MARK_SYNC;
+		}
 
 		if (pong_params.freq_maj != syfr) {
 			diag (OPRE_APP_ACK "sync freq change %u -> %u",
 				pong_params.freq_maj, syfr);
 			pong_params.freq_maj = syfr;
+			if (what != MARK_SYNC)
+				what = MARK_FREQ;
 		}
 
 	} else {
-		clr_synced;
+		if (is_synced) {
+			clr_synced;
+			what = MARK_SYNC;
+		}
 	}
 
+	if (plot_id != pi) {
+		plot_id = pi;
+		what =  MARK_PLOT;
+	}
+
+	if (what != MARK_FF)
+		write_mark (what);
+
 	if (!is_eew_conf && ackf == 0) { // != 0 nack
+
 		if (sens_data.eslot > 0) {
 			sens_data.eslot--;
 		} else {
 			sens_data.ee.s.f.status = SENS_FF;
 		}
+
 		return;
 	}
 
@@ -70,11 +107,10 @@ __PUBLF (NodeTag, void, upd_on_ack) (lword ts, lword rt, word syfr, word ackf) {
 		app_diag (D_SERIOUS, "ee write failed %x %x",
 				(word)(sens_data.eslot >> 16),
 				(word)sens_data.eslot);
-		if (sens_data.eslot > 0) { 
+		if (sens_data.eslot > 0)
 			sens_data.eslot--;
-		} else {
+		else
 			sens_data.ee.s.f.status = SENS_FF;
-		}
 	}
 }
 
@@ -85,8 +121,9 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	if (out_buf == NULL)
 		return;
 
-	upd_on_ack (in_setTag(buf, ts), in_setTag(buf, reftime),
-			in_setTag(buf, syfreq), in_setTag(buf, ackflags));
+	upd_on_ack (in_setTag(buf, ds), in_setTag(buf, refdate),
+			in_setTag(buf, syfreq), in_setTag(buf, ackflags),
+			in_setTag(buf, plotid));
 
 	if (in_setTag(buf, pow_levels) != 0xFFFF) {
 		mmin = in_setTag(buf, pow_levels);
@@ -107,7 +144,11 @@ __PUBLF (NodeTag, void, msg_setTag_in) (char * buf) {
 	}
 
 	if (in_setTag(buf, freq_maj) != 0xFFFF) {
-		pong_params.freq_maj = in_setTag(buf, freq_maj);
+		if (pong_params.freq_maj != in_setTag(buf, freq_maj)) {
+			pong_params.freq_maj = in_setTag(buf, freq_maj);
+			write_mark (MARK_FREQ);
+		}
+
 		if (pong_params.freq_maj != 0)
 			tmpcrap (1);
 	}

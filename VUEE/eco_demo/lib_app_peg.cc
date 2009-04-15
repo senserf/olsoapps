@@ -55,62 +55,13 @@ __PUBLF (NodePeg, void, set_master_chg) () {
 	app_flags |= 2;
 }
 
-// ============================================================================
-
-// IN: mc->sec: # of s. from NOW, can't go back before T == 0.0:0:0
-//     mc->hms.f == 1 <=> go back in time mc->sec seconds
-// OUT: *mc: wall time with the input offset (usually 0)
-
-__PUBLF (NodePeg, void, wall_time) (mclock_t *mc) {
-	word w1, w2, w3, w4;
-
-	lword lw = seconds() - master_delta +
-		24L * 3600 * master_clock.hms.d +
-		3600L * master_clock.hms.h +
-		60 * master_clock.hms.m + master_clock.hms.s;
-
-	if (mc->hms.f &&  (mc->sec & 0x7FFFFFFF) > lw) {
-		app_diag (D_SERIOUS, "Ignoring bad offset %u",
-				(word)mc->sec);
-		mc->sec = 0;
-	}
-
-	if (mc->hms.f)
-		lw -= mc->sec;
-	else
-		lw += mc->sec;
-	mc->sec = 0;
-
-	w1 = lw / (24L * 3600);
-	lw %= 24L * 3600;
-	w2 = lw / 3600;
-	lw %= 3600;
-	w3 = lw / 60;
-	w4 = lw % 60;
-
-	if (w4 >= 60) {
-		w4 -= 60;
-		w3++;
-	}
-	if (w3 >= 60) {
-		w3 -= 60;
-		w2++;
-	}
-	if (w2 >= 24) {
-		 w2 -= 24;
-		 w1++;
-	}
-	mc->hms.d = w1; mc->hms.h = w2; mc->hms.m = w3; mc->hms.s = w4;
-	mc->hms.f = master_clock.hms.f;
-}
-
 /*
    what == 0: find and return the index;
    what == 1: count
 */
-__PUBLF (NodePeg, int, find_tags) (word tag, word what) {
-	int i = 0;
-	int count = 0;
+__PUBLF (NodePeg, sint, find_tags) (word tag, word what) {
+	sint i = 0;
+	sint count = 0;
 
 	while (i < tag_lim) {
 		if (tag == 0) { // any tag counts
@@ -135,7 +86,7 @@ __PUBLF (NodePeg, int, find_tags) (word tag, word what) {
 	return -1; // found no tag
 }
 
-__PUBLF (NodePeg, char*, get_mem) (word state, int len) {
+__PUBLF (NodePeg, char*, get_mem) (word state, sint len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
 		app_diag (D_SERIOUS, "No mem reset");
@@ -160,7 +111,7 @@ __PUBLF (NodePeg, void, init_tag) (word i) {
 	tagArray[i].count = 0;
 	tagArray[i].evTime = 0;
 	tagArray[i].lastTime = 0;
-	tagArray[i].rpload.ppload.ts = 0xFFFFFFFF;
+	tagArray[i].rpload.ppload.ds = 0x80000000;
 }
 
 __PUBLF (NodePeg, void, init_tags) () {
@@ -181,9 +132,9 @@ __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
 		write_agg (i);
 }
 
-__PUBLF (NodePeg, int, insert_tag) (word tag) {
+__PUBLF (NodePeg, sint, insert_tag) (word tag) {
 
-	int i = 0;
+	sint i = 0;
 
 	while (i < tag_lim) {
 		if (tagArray[i].id == 0) {
@@ -332,7 +283,7 @@ __PUBLF (NodePeg, void, copy_fwd_msg) (word state, char** buf_out, char * buf,
 	memcpy (*buf_out, buf, size);
 }
 
-__PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
+__PUBLF (NodePeg, void, send_msg) (char * buf, sint size) {
 	// it doesn't seem like a good place to filter out
 	// local host, but it's convenient, for now...
 
@@ -352,7 +303,7 @@ __PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
 			in_header(buf, msg_type));
  }
 
-__PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
+__PUBLF (NodePeg, sint, check_msg_size) (char * buf, word size, word repLevel) {
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial
@@ -432,23 +383,56 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 	return (size - expSize);
 }
 
+__PUBLF (NodePeg, void, write_mark) (word what) {
+	aggDataType mrk;
+
+	memset (&mrk, 0, sizeof (aggDataType));
+
+	mrk.eslot = agg_data.ee.s.f.status == AGG_EMPTY ?
+		agg_data.eslot : agg_data.eslot +1;
+
+	if (mrk.eslot >= EE_AGG_MAX) {
+		app_diag (D_SERIOUS, "MARK EEPROM FULL");
+		return;
+	}
+
+	mrk.ee.s.f.emptym = ee_emptym ? 0 : 1;
+	mrk.ee.s.f.mark = what;
+	mrk.ee.s.f.status = AGG_ALL;
+
+	mrk.ee.ds = wall_date (0);
+	mrk.ee.sval[0] = plot_id;
+	mrk.ee.sval[1] = sync_freq;
+	mrk.ee.sval[2] = master_host;
+
+	if (ee_write (WNONE, mrk.eslot * EE_AGG_SIZE,
+				(byte *)&mrk.ee, EE_AGG_SIZE)) {
+		app_diag (D_SERIOUS, "ee_write mark failed %x %x",
+				(word)(mrk.eslot >> 16), (word)mrk.eslot);
+
+	} else { // all is good; mark agg_data to write next slot
+		agg_data.ee.s.f.status = AGG_ALL;
+		agg_data.eslot = mrk.eslot;
+	}
+}
+
 __PUBLF (NodePeg, void, write_agg) (word ti) {
 
-	if (agg_data.ee.s.f.status != AGG_FF)
+	if (agg_data.ee.s.f.status != AGG_EMPTY)
 		agg_data.eslot++;
 
 	agg_data.ee.s.f.status = tagArray[ti].state == confirmedTag ?
 		AGG_CONFIRMED : AGG_COLLECTED;
 	agg_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
-	agg_data.ee.s.f.spare = 7;
+	agg_data.ee.s.f.mark = MARK_EMPTY;
 	agg_data.ee.sval[0] = tagArray[ti].rpload.ppload.sval[0];
 	agg_data.ee.sval[1] = tagArray[ti].rpload.ppload.sval[1];
 	agg_data.ee.sval[2] = tagArray[ti].rpload.ppload.sval[2];
 	agg_data.ee.sval[3] = tagArray[ti].rpload.ppload.sval[3];
 	agg_data.ee.sval[4] = tagArray[ti].rpload.ppload.sval[4];
 
-	agg_data.ee.ts = tagArray[ti].rpload.ts;
-	agg_data.ee.t_ts = tagArray[ti].rpload.ppload.ts;
+	agg_data.ee.ds = tagArray[ti].rpload.ds;
+	agg_data.ee.t_ds = tagArray[ti].rpload.ppload.ds;
 	agg_data.ee.t_eslot = tagArray[ti].rpload.ppload.eslot;
 	agg_data.ee.tag = tagArray[ti].id;
 
@@ -463,7 +447,7 @@ __PUBLF (NodePeg, void, write_agg) (word ti) {
 			app_diag (D_SERIOUS, "ee_write failed %x %x",
 				(word)(agg_data.eslot >> 16),
 				(word)agg_data.eslot);
-			agg_data.ee.s.f.status = AGG_FF;
+			agg_data.ee.s.f.status = AGG_EMPTY;
 		}
 	}
 }
@@ -476,28 +460,28 @@ __PUBLF (NodePeg, void, write_agg) (word ti) {
 */
 
 __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
-	mclock_t mc;
-
-	mc.sec = 0;
-	if (master_delta != 0) // do NOT send down your own clock
-		wall_time (&mc);
+	// do NOT send down your own date unless you're the Master
+	long md = master_ts != 0 || local_host == master_host ?
+		wall_date (0) : 0;
 
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) ==
 		       in_header(buf, snd)) { // msg waiting
 
 		if (in_pong_pload(buf)) { // add ack data
-			in_setTag(msg4tag.buf, ts) = in_pongPload(buf, ts);
-			in_setTag(msg4tag.buf, reftime) = mc.sec;
+			in_setTag(msg4tag.buf, ds) = in_pongPload(buf, ds);
+			in_setTag(msg4tag.buf, refdate) = md;
 			in_setTag(msg4tag.buf, syfreq) = sync_freq;
+			in_setTag(msg4tag.buf, plotid) = plot_id;
 			in_setTag(msg4tag.buf, ackflags) =
 			       	((is_eew_conf &&
 				  agg_data.eslot >= EE_AGG_MAX -1) ||
 				sat_mod == SATMOD_UNINIT ||
 				sat_mod == SATMOD_FULL) ? 1 : 0;
 		} else {
-			in_setTag(msg4tag.buf, reftime) = 0;
-			in_setTag(msg4tag.buf, ts) = 0; 
+			in_setTag(msg4tag.buf, refdate) = 0;
+			in_setTag(msg4tag.buf, ds) = 0; 
 			in_setTag(msg4tag.buf, syfreq) = 0;
+			in_setTag(msg4tag.buf, plotid) = 0;
 			in_setTag(msg4tag.buf, ackflags) = 0;
 		}
 
@@ -510,9 +494,10 @@ __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 		if (in_pong_pload(buf)) {
 			pong_ack.header.rcv = in_header(buf, snd);
 			pong_ack.header.hco = in_header(buf, hoc);
-			pong_ack.ts = in_pongPload(buf, ts);
-			pong_ack.reftime = mc.sec;
+			pong_ack.ds = in_pongPload(buf, ds);
+			pong_ack.refdate = md;
 			pong_ack.syfreq = sync_freq;
+			pong_ack.plotid = plot_id;
 			pong_ack.ackflags =
 				((is_eew_conf &&
 				  agg_data.eslot >= EE_AGG_MAX -1) ||
@@ -532,11 +517,11 @@ __PUBLF (NodePeg, void, agg_init) () {
 
 	memset (&agg_data, 0, sizeof(aggDataType));
 
-	if (b == 0xFF) { // normal operations
+	if (b == EMPTY_BYTE) { // normal operations
 		agg_data.eslot = EE_AGG_MIN;
-		agg_data.ee.s.f.status = AGG_FF;
 		agg_data.ee.s.f.emptym = is_eem_empty ? 1 : 0;
-		agg_data.ee.s.f.spare = 7;
+		agg_data.ee.s.f.mark = MARK_EMPTY;
+		agg_data.ee.s.f.status = AGG_EMPTY;
 		return;
 	}
 
@@ -550,7 +535,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 			fatal_err (ERR_EER, (word)((m * EE_AGG_SIZE) >> 16),
 					(word)(m * EE_AGG_SIZE), 1);
 
-		if (b == 0xFF)
+		if (b == EMPTY_BYTE)
 			u = m;
 		else
 			l = m;
@@ -560,14 +545,14 @@ __PUBLF (NodePeg, void, agg_init) () {
 		fatal_err (ERR_EER, (word)((u * EE_AGG_SIZE) >> 16),
 				(word)(u * EE_AGG_SIZE), 1);
 
-	if (b == 0xFF) {
+	if (b == EMPTY_BYTE) {
 		if (l < u) {
 			if (ee_read (l * EE_AGG_SIZE, &b, 1))
 				fatal_err (ERR_EER,
 					(word)((l * EE_AGG_SIZE) >> 16),
 					(word)(l * EE_AGG_SIZE), 1);
 
-			if (b == 0xFF)
+			if (b == EMPTY_BYTE)
 				fatal_err (ERR_SLOT, (word)(l >> 16),
 						(word)l, 0);
 
@@ -619,10 +604,17 @@ __PUBLF (NodePeg, word, handle_a_flags) (word a_fl) {
 	       (is_eew_coll ? A_FL_EEW_COLL : 0);
 }
 
-__PUBLF (NodePeg, int, str_cmpn) (const char * s1, const char * s2, int n) {
+__PUBLF (NodePeg, sint, str_cmpn) (const char * s1, const char * s2, sint n) {
 	while (n-- && (*s1 != '\0') && (*s2 != '\0'))
 		if (*s1++ != *s2++)
 			return 1;
 	return (n == -1 ? 0 : -1);
+}
+
+__PUBLF (NodePeg, long, wall_date) (long s) {
+        long x = seconds() - master_ts - s;
+
+        x = master_date < 0 ? master_date - x : master_date + x;
+        return x;
 }
 

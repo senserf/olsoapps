@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -37,16 +37,12 @@
 #define CMD_READER	(&cmd_line)
 #define CMD_WRITER	((&cmd_line)+1)
 
-// FIXME SHOULD BE 0 in 'production'
-#define SATTESTING 1
-
-
 // =============
 // OSS reporting
 // =============
 strand (oss_out, char)
 	char * b;
-	int len;
+	sint len;
 
 	// OO_START is the sat patch
 	entry (OO_START)
@@ -76,6 +72,7 @@ endstrand
 strand (satcmd_out, char)
 	entry (SCO_TRY)
 		ser_out (SCO_TRY, data);
+		sat_rep (data);
 		finish;
 endstrand
 
@@ -83,8 +80,9 @@ thread (mbeacon)
 
     entry (MB_START)
 
-	// get GPS time if not set or sat. i/f uninited
-	if (IS_SATGAT && (master_clock.hms.f == 0 || sat_mod == SATMOD_UNINIT))
+	// periodically get GPS time, or if not set or sat. i/f uninited
+	if (IS_SATGAT && (seconds() - master_ts  > SAT_TIMEADJ || 
+			master_date > -SID * 90 || sat_mod == SATMOD_UNINIT))
 		(void)runstrand (satcmd_out, SATCMD_STATUS);
 
 	delay (25 * 1024 + rnd() % 10240, MB_SEND); // 30 +/- 5s
@@ -96,19 +94,26 @@ thread (mbeacon)
 
 endthread
 
-__PUBLF (NodePeg, void, sat_in) () {
-	int len;
+__PUBLF (NodePeg, void, sat_rep) (char * b) {
+	sint len;
 	char * obuf;
 
-	if ((len = strlen (ui_ibuf)) > MAX_SATLEN) {
+	if (!is_satest)
+		return;
+
+	if (b == NULL) // came from sat into ui_ibuf
+		b = ui_ibuf;
+
+	if ((len = strlen (b)) > MAX_SATLEN) {
 		len = MAX_SATLEN;
-		ui_ibuf[MAX_SATLEN] = '\0';
+		b[MAX_SATLEN] = '\0';
 	}
 	len += sizeof (headerType) +1; // + '\0'
 
 	if ((obuf  = get_mem (WNONE, len)) == NULL)
 		return;
-	strcpy (&obuf[sizeof(headerType)], ui_ibuf);
+
+	strcpy (&obuf[sizeof(headerType)], b);
 	in_header(obuf, msg_type) = msg_satest;
 	in_header(obuf, rcv) = 0; // must be bcast
 	in_header(obuf, hco) = 1; // no hopping
@@ -117,7 +122,7 @@ __PUBLF (NodePeg, void, sat_in) () {
 }
 
 __PUBLF (NodePeg, void, sat_out) (char * buf) {
-	int len = strlen (&buf[sizeof (headerType)]) +1; // + '\0'
+	sint len = strlen (&buf[sizeof (headerType)]) +1; // + '\0'
 	char * mbuf;
 
 	if ((mbuf = get_mem (WNONE, len)) == NULL)
@@ -154,6 +159,8 @@ __PUBLF (NodePeg, void, read_ifla) () {
 		master_host = DEF_MHOST;
 #endif
 		sat_mod = IS_DEFSATGAT ? SATMOD_UNINIT : SATMOD_NO;
+		if (master_host == local_host)
+			plot_id = local_host;
 		return;
 	}
 
@@ -164,15 +171,13 @@ __PUBLF (NodePeg, void, read_ifla) () {
 	master_host = if_read (4);
 	sync_freq = if_read (5);
 	if (sync_freq > 0) {
-		master_delta = seconds();
-		master_clock.hms.d = 0;
-		master_clock.hms.h = 0;
-		master_clock.hms.m = 0;
-		master_clock.hms.s = 0;
-		master_clock.hms.f = 1;
-		diag (OPRE_APP_ACK "Implicit T 0:0:0");
+		master_ts = seconds();
+		master_date = -1;
+		diag (OPRE_APP_ACK "Implicit T 9-1-1 0:0:1");
 	}
 	sat_mod = if_read (6);
+	if (master_host == local_host)
+		plot_id = local_host;
 }
 
 
@@ -184,7 +189,7 @@ __PUBLF (NodePeg, void, save_ifla) () {
 	// there is 'show' after 'save'... don't check if_writes here (?)
 	if_write (0, local_host);
 	if_write (1, host_pl);
-	if_write (2, (app_flags & 0xFFFC)); // off spare, master chg
+	if_write (2, (app_flags & 0xFFFE)); // off master chg
 	if_write (3, tag_auditFreq);
 	if_write (4, master_host);
 	if_write (5, sync_freq);
@@ -201,9 +206,9 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 		mbuf = form (NULL, stats_str,
 			host_id, local_host, tag_auditFreq,
 			host_pl, handle_a_flags (0xFFFF), seconds(),
-		       	master_delta, master_host,
+		       	master_ts, master_host,
 			agg_data.eslot == EE_AGG_MIN &&
-			  agg_data.ee.s.f.status == AGG_FF ?
+			  agg_data.ee.s.f.status == AGG_EMPTY ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
 			mem, mmin, sat_mod);
 	} else {
@@ -213,7 +218,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			in_statsPeg(buf, hostid), in_header(buf, snd),
 			in_statsPeg(buf, audi), in_statsPeg(buf, pl),
 			in_statsPeg(buf, a_fl),
-			in_statsPeg(buf, ltime), in_statsPeg(buf, mdelta),
+			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
 			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
 			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 12345);
 		break;
@@ -243,7 +248,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 
 __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 								word rssi) {
-  int    w_len;
+  sint    w_len;
 
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
@@ -304,16 +309,36 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 	case msg_rpc:
 		if (cmd_line != NULL) { // busy with another input
 			when (CMD_WRITER, state);
+#if 0
+smells a bit...
+			when (CMD_WRITER, state);
 			release;
+#endif
+			return;
 		}
-		w_len = size - sizeof(msgRpcType);
+
+		// don't compete with sat. multilines
+		if (sat_mod == SATMOD_WAITRX)
+			return;
+
+		w_len = strlen (&buf[sizeof (headerType)]) +1;
+
+		// sanitize
+		if (w_len + sizeof (headerType) > size)
+			return;
+
 		cmd_line = get_mem (state, w_len);
-		memcpy (cmd_line, buf + sizeof(msgRpcType), w_len);
+		strcpy (cmd_line, buf + sizeof(headerType));
+
 		trigger (CMD_READER);
 		return;
 
 	case msg_satest:
+#if 0
+FIXME: if that works, clean off sat_out()
 		sat_out (buf);
+#endif
+		ser_out (state, &buf[sizeof(headerType)]);
 		return;
 
 	default:
@@ -321,6 +346,8 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 
   }
 }
+
+#include "dconv.ch"
 
 // [0, FF] -> [1, F]
 // it can't be 0, as find_tags() will mask the rssi out!
@@ -489,7 +516,8 @@ __PUBLF (NodePeg, void, tmpcrap) (word what) {
 */
 thread (cmd_in)
 
-	word u[4];
+	mdate_t md;
+	word u[6];
 
 	entry (CS_INIT)
 
@@ -517,20 +545,24 @@ thread (cmd_in)
 			if (sat_mod == SATMOD_WAITRX)
 				sat_mod = SATMOD_YES;
 			trigger (CMD_READER);
-			proceed (CS_IN);
+
+			if (IS_SATGAT)
+				goto SatRep;
+			else
+				proceed (CS_IN);
 		}
 		// there may be more SATWAITs
 
 		if (str_cmpn (ui_ibuf, SATATT_MSG, SAT_MSGLEN) == 0) {
 			sat_mod = SATMOD_WAITRX;
-			proceed (CS_IN);
+			goto SatRep;
 		}
 
 		if (str_cmpn (ui_ibuf, SATIN_RNG, SAT_RNGLEN) == 0) {
 			if (sat_mod == SATMOD_UNINIT)
 				sat_mod = SATMOD_YES;
 			(void)runstrand (satcmd_out, SATCMD_GET);
-			proceed (CS_IN);
+			goto SatRep;
 		}
 
 		u[0] = strlen (ui_ibuf);
@@ -538,13 +570,26 @@ thread (cmd_in)
 		if (str_cmpn (ui_ibuf, SATIN_QUE, SAT_QUELEN) == 0) {
 			if (u[0] < SAT_QUEMINLEN || scan (ui_ibuf +SAT_QUEOSET,
 					SAT_QUEFORM, &u[0], &u[1]) != 2) {
-#if SATTESTING
-				sat_in();
-#endif
-				proceed (CS_IN);
+
+				ui_ibuf[0] = '!';
+
+			} else {
+
+				if (u[0] < SAT_QUEFULL) {
+					if (sat_mod != SATMOD_YES) {
+						ui_ibuf[1] = '+';
+						sat_mod = SATMOD_YES;
+					}
+				} else {
+					ui_ibuf[0] = 'F';
+					if (sat_mod != SATMOD_FULL) {
+						ui_ibuf[1] = '+';
+						sat_mod = SATMOD_FULL;
+					}
+				}
 			}
-			sat_mod = u[0] < SAT_QUEFULL ? SATMOD_YES : SATMOD_FULL;
-			proceed (CS_IN);
+
+			goto SatRep;
 		}
 
 		if (str_cmpn (ui_ibuf, SATIN_STA, SAT_STALEN) == 0) {
@@ -554,35 +599,75 @@ thread (cmd_in)
 
 			if (u[0] < SAT_STAMINLEN || scan (ui_ibuf +SAT_STAOSET,
 					SAT_STAFORM, &u[0], &u[1], &u[2],
-						&u[3]) != 4 ||
-					u[0] < 2009) { // not from GPS
-#if SATTESTING
-				sat_in();
-#endif
-				proceed (CS_IN);
+						&u[3], &u[4], &u[5]) != 6 ||
+					u[2] < 2009) { // not from GPS
+				ui_ibuf[0] = '?';
+				goto SatRep;
 			}
 
-			if (master_clock.hms.f == 0) { // no time yet
-				master_clock.hms.f = 1;
-				master_delta= seconds();
-				master_clock.hms.d = 0;
-#if SATTESTING
-				ui_ibuf[0] = 'D';
-#endif
-			}
-			// always adjust the rest
-			master_clock.hms.h = u[1];
-			master_clock.hms.m = u[2];
-			master_clock.hms.s = u[3];
-#if SATTESTING
-			ui_ibuf[1] = 'U';
-#endif
-		} // if anything is added below, add proceed (CS_IN) above
+			if (master_date > -SID * 90)
+				ui_ibuf[0] = 's';
 
-#if SATTESTING
-		// send everything else out (to a custodian)
-		sat_in ();
+			md.dat.f = 1;
+			md.dat.yy = u[2] - 2008;
+			md.dat.mm = u[0];
+			md.dat.dd = u[1];
+			md.dat.h = u[3];
+			md.dat.m = u[4];
+			md.dat.s = u[5];
+			d2s (&md);
+
+			if (ui_ibuf[0] != 's') {
+			       if (md.secs !=  wall_date (0)) {
+				       ui_ibuf[0] = 'U';
+			       } else {
+				       ui_ibuf[0] = 'u';
+			       }
+			}
+			master_date = md.secs;
+			master_ts = seconds();
+			goto SatRep;
+
+#if 0
+
+			// no time yet
+			if (master_date > -SID * 90) {
+				master_ts = seconds();
+				md.dat.f = 1;
+				md.dat.yy = u[2] - 2008;
+				md.dat.mm = u[0];
+				md.dat.dd = u[1];
+				md.dat.h = u[3];
+				md.dat.m = u[4];
+				md.dat.s = u[5];
+				d2s (&md);
+				master_date = md.secs;
+				ui_ibuf[0] = 's';
+				goto SatRep;
+			}
+
+			// time to adjust time?
+			if (seconds() - master_ts  > SAT_TIMEADJ) {
+                                md.dat.f = 1;
+                                md.dat.yy = u[2] - 2008;
+                                md.dat.mm = u[0];
+                                md.dat.dd = u[1];
+                                md.dat.h = u[3];
+                                md.dat.m = u[4];
+                                md.dat.s = u[5];
+                                d2s (&md);
+				if (md.secs !=  master_date) {
+					master_date = md.secs;
+					master_ts = seconds();
+					ui_ibuf[0] = 'u';
+				}
+			}
 #endif
+
+		}
+
+		// report (via RF)  everything (to a custodian)
+SatRep:		sat_rep (NULL);
 		proceed (CS_IN);
 endthread
 
@@ -632,16 +717,22 @@ static char * locatName (word id, word rssi) {
 __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 
   char * lbuf = NULL;
+  mdate_t md, md2;
 
   if (in_report_pload(buf)) {
+
+	  md.secs = in_reportPload(buf, ds);
+	  s2d (&md);
+	  md2.secs = in_reportPload(buf, ppload.ds);
+	  s2d (&md2);
 
       if (IS_SATGAT) {
         lbuf = form (NULL, satrep_str,
 		in_report(buf, tagid),
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.d,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.h,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.m,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.s,
+
+		md2.dat.f ?  2009 + md2.dat.yy : 2001 + md2.dat.yy,
+		md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
+
 		in_report(buf, state) == goneTag ?
 			" ***gone***" : " ",
 		in_reportPload(buf, ppload.sval[0]),
@@ -653,22 +744,14 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 		in_header(buf, snd),
 		in_reportPload(buf, eslot),
 
-		((mclock_t *)&in_reportPload(buf, ts))->hms.f ?
-			"time" : "ts",
-		((mclock_t *)&in_reportPload(buf, ts))->hms.d,
-		((mclock_t *)&in_reportPload(buf, ts))->hms.h,
-		((mclock_t *)&in_reportPload(buf, ts))->hms.m,
-		((mclock_t *)&in_reportPload(buf, ts))->hms.s,
+		md.dat.f ?  2009 + md.dat.yy : 1001 + md.dat.yy,
+		md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
 
 		in_report(buf, tagid),
 		in_reportPload(buf, ppload.eslot),
 
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.f ?
-			"time" : "ts",
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.d,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.h,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.m,
-		((mclock_t *)&in_reportPload(buf, ppload.ts))->hms.s,
+		md2.dat.f ?  2009 + md2.dat.yy : 1001 + md2.dat.yy,
+		md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
 
 		in_report(buf, state) == goneTag ?
 			" ***gone***" : " ",
@@ -700,8 +783,22 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
     }
 }
 
+static const char * markName (statu_t s) {
+        switch (s.f.mark) {
+                case MARK_EMPTY:   return "NONE";
+                case MARK_BOOT: return "BOOT";
+                case MARK_PLOT: return "PLOT";
+                case MARK_SYNC: return "SYNC";
+                case MARK_MCHG: return "MCHG";
+                case MARK_DATE: return "DATE";
+        }
+        app_diag (D_SERIOUS, "unexpected eeprom %x", s);
+        return "????";
+}       
+
 __PUBLF (NodePeg, word, r_a_d) () {
 	char * lbuf = NULL;
+	mdate_t md, md2;
 
 	if (agg_dump->dfin) // delayed Finish
 		goto ThatsIt;
@@ -712,7 +809,7 @@ __PUBLF (NodePeg, word, r_a_d) () {
 		goto Finish;
 	}
 
-	if (agg_dump->ee.s.f.status == AGG_FF) {
+	if (agg_dump->ee.s.f.status == AGG_EMPTY) {
 		if (agg_dump->fr <= agg_dump->to) {
 			goto Finish;
 		} else {
@@ -720,37 +817,56 @@ __PUBLF (NodePeg, word, r_a_d) () {
 		}
 	}
 
-	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag) {
+	if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag ||
+			agg_dump->ee.s.f.status == AGG_ALL) {
+
+	    if (agg_dump->ee.s.f.status == AGG_ALL) { // mark
+
+		md.secs = agg_dump->ee.ds;
+		s2d (&md);
+
+		lbuf = form (NULL, dumpmark_str, markName (agg_dump->ee.s),
+			agg_dump->ind,
+
+			md.dat.f ?  2009 + md.dat.yy : 1001 + md.dat.yy,
+			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
+
+			agg_dump->ee.sval[0],
+			agg_dump->ee.sval[1],
+			agg_dump->ee.sval[2]);
+
+	    } else { // sens reading
+
+		md.secs = agg_dump->ee.t_ds;
+		s2d (&md);
+		md2.secs = agg_dump->ee.ds;
+		s2d (&md2);
+
 		lbuf = form (NULL, dump_str,
 
 			agg_dump->ee.tag, agg_dump->ee.t_eslot, agg_dump->ind,
 
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.f ? "time" : "ts",
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.d,
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.h,
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.m,
-			((mclock_t *)&agg_dump->ee.t_ts)->hms.s,
+			md.dat.f ?  2009 + md.dat.yy : 1001 + md.dat.yy,
+			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
 
-			((mclock_t *)&agg_dump->ee.ts)->hms.f ? "time" : "ts",
-			((mclock_t *)&agg_dump->ee.ts)->hms.d,
-			((mclock_t *)&agg_dump->ee.ts)->hms.h,
-			((mclock_t *)&agg_dump->ee.ts)->hms.m,
-			((mclock_t *)&agg_dump->ee.ts)->hms.s,
+			md2.dat.f ?  2009 + md2.dat.yy : 1001 + md2.dat.yy,
+			md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
 
 			agg_dump->ee.sval[0],
 			agg_dump->ee.sval[1],
 			agg_dump->ee.sval[2],
 			agg_dump->ee.sval[3],
 			agg_dump->ee.sval[4]);
+	    }
 
-		if (runstrand (oss_out, lbuf) == 0 ) {
+	    if (runstrand (oss_out, lbuf) == 0 ) {
 			app_diag (D_SERIOUS, "oss_out failed");
 			ufree (lbuf);
-		}
+	    }
 
-		agg_dump->cnt++;
+	    agg_dump->cnt++;
 
-		if (agg_dump->upto != 0 && agg_dump->upto <= agg_dump->cnt)
+	    if (agg_dump->upto != 0 && agg_dump->upto <= agg_dump->cnt)
 			goto Finish;
 	}
 
@@ -789,7 +905,7 @@ ThatsIt:
 __PUBLF (NodePeg, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
 
 	char * out_buf = NULL;
-	int tagIndex;
+	sint tagIndex;
 
 	if (peg == local_host || peg == 0) {
 		if (tag == 0) { // summary
@@ -836,8 +952,8 @@ __PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
 		if (!running (mbeacon))
 			runthread (mbeacon);
 		master_host = local_host;
-		master_delta = 0;
-		master_clock.sec = 0;
+		master_ts  = 0;
+		master_date = 0;
 		tarp_ctrl.param &= 0xFE;
 		if (local_host == peg)
 			return;
@@ -853,7 +969,7 @@ __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 
 	char * out_buf = NULL;
 	char * set_buf = NULL;
-	int size = sizeof(msgFwdType) + sizeof(msgSetTagType);
+	sint size = sizeof(msgFwdType) + sizeof(msgSetTagType);
 
 #if 0
        	already checked
@@ -908,7 +1024,9 @@ __PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg,
 
 thread (root)
 
-	mclock_t mc;
+	mdate_t md;
+	char * tmpb; // FIXME this crap should be clean up soon
+
 	sint	i1, i2, i3, i4, i5, i6, i7;
 
 	entry (RS_INIT)
@@ -925,8 +1043,7 @@ thread (root)
 		// is_flash_new is set const (a branch compiled out)
 		if (is_flash_new) {
 			diag (OPRE_APP_ACK "Init eprom erase");
-			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_SERIOUS, "erase failed");
+			ee_erase (WNONE, 0, 0);
 			break_flash;
 			read_ifla();
 		} else {
@@ -936,8 +1053,19 @@ thread (root)
 		}
 
 	entry (RS_INIT1)
-		if (!IS_SATGAT)
+
+#if BCAST_SATEST_MSG
+// FIXME clean it into a consistent oss / sat i/f
+		set_satest;
+#endif
+		if (!IS_SATGAT) {
 			ser_out (RS_INIT1, ui_obuf);
+		} else { 
+			tmpb = form (NULL, satframe_str, ui_obuf);
+			if (runstrand (oss_out, tmpb) == 0) {
+				ufree (tmpb);
+			}
+		}
 		agg_init();
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
@@ -956,8 +1084,14 @@ thread (root)
 		leds (LED_G, LED_OFF);
 
 	entry (RS_INIT2)
-		if (!IS_SATGAT)
+		if (!IS_SATGAT) {
 			ser_out (RS_INIT2, welcome_str);
+		} else {
+			tmpb = form (NULL, satframe_str, satstart_str);
+			if (runstrand (oss_out, tmpb) == 0) {
+				ufree (tmpb);
+			}
+		}
 
 #ifndef __SMURPH__
 		net_id = DEF_NID;
@@ -984,6 +1118,7 @@ thread (root)
 			runthread (mbeacon);
 			tarp_ctrl.param &= 0xFE;
 		}
+		write_mark (MARK_BOOT);
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)
@@ -1020,37 +1155,69 @@ thread (root)
 		case ' ': proceed (RS_FREE); // ignore if starts with blank
 
                 case 'h':
-			ser_out (RS_DOCMD, welcome_str);
+			if (!IS_SATGAT) {
+				ser_out (RS_DOCMD, welcome_str);
+			} else {
+				tmpb = form (NULL, satframe_str, satstart_str);
+				if (runstrand (oss_out, tmpb) == 0) {
+					ufree (tmpb);
+				}
+			}
 			proceed (RS_FREE);
 
 		case 'T':
-			i1 = i2 = i3 = 0;
+			i1 = i2 = i3 = i4 = i5 = i6 = 0;
 
-			if ((i4 = scan (cmd_line+1, "%u:%u:%u", &i1,
-							&i2, &i3)) != 3 &&
-					i4 != 0) {
-				form (ui_obuf, bad_str, cmd_line);
+			if ((i7 = scan (cmd_line+1, "%u-%u-%u %u:%u:%u", 
+					&i1, &i2, &i3, &i4, &i5, &i6)) != 6 &&
+					i7 != 0) {
+				form (ui_obuf, bad_str, cmd_line, i7);
 				proceed (RS_UIOUT);
 			}
 
-			if (i4 == 3) {
-				if (i1 > 23 || i2 > 59 || i3 > 59) {
-					form (ui_obuf, bad_str, cmd_line);
+			if (i7 == 6) {
+				if (i1 < 2009  || i1 > 2039 ||
+						i2 < 1 || i2 > 12 ||
+						i3 < 1 || i3 > 31 ||
+						i4 > 23 ||
+						i5 > 59 ||
+						i6 > 59) {
+					form (ui_obuf, bad_str, cmd_line, -1);
 					proceed (RS_UIOUT);
 				}
-				master_delta = seconds();
-				master_clock.hms.d = 0;
-				master_clock.hms.h = i1;
-				master_clock.hms.m = i2;
-				master_clock.hms.s = i3;
-				master_clock.hms.f = 1;
+				md.dat.f = 1;
+				md.dat.yy = i1 - 2008;
+				md.dat.mm = i2;
+				md.dat.dd = i3;
+				md.dat.h = i4;
+				md.dat.m = i5;
+				md.dat.s = i6;
+				d2s (&md);
+				master_date = md.secs;
+				master_ts = seconds();
+				write_mark (MARK_DATE);
 			}
 
-			mc.sec = 0;
-			wall_time (&mc);
-			form (ui_obuf, clock_str, mc.hms.f ? "time" : "ts",
-					mc.hms.d, mc.hms.h, mc.hms.m,
-					mc.hms.s, seconds());
+			md.secs = wall_date (0);
+			s2d (&md);
+			form (ui_obuf, clock_str,
+				md.dat.f ? 2009 + md.dat.yy : 1001 + md.dat.yy,
+				md.dat.mm, md.dat.dd,
+				md.dat.h, md.dat.m, md.dat.s, seconds());
+			proceed (RS_UIOUT);
+
+		case 'P':
+			i1 = -1;
+			scan (cmd_line+1, "%d", &i1);
+			if (i1 > 0 && plot_id != i1) {
+				if (local_host != master_host) {
+					strcpy (ui_obuf, only_master_str);
+					proceed (RS_UIOUT);
+				}
+				plot_id = i1;
+				write_mark (MARK_PLOT);
+			}
+			form (ui_obuf, plot_str, plot_id);
 			proceed (RS_UIOUT);
 
 		case 'q': reset();
@@ -1098,10 +1265,8 @@ thread (root)
 
 		case 'E':
 			diag (OPRE_APP_ACK "erasing eeprom...");
-			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_SERIOUS, "erase failed");
-			else
-				diag (OPRE_APP_ACK "eeprom erased");
+			ee_erase (WNONE, 0, 0);
+			diag (OPRE_APP_ACK "eeprom erased");
 			reset();
 
 		case 'F':
@@ -1112,18 +1277,27 @@ thread (root)
 
 		case 'Q':
 			diag (OPRE_APP_ACK "erasing all...");
-			if (ee_erase (WNONE, 0, 0))
-				app_diag (D_SERIOUS, "ee_erase failed");
+			ee_erase (WNONE, 0, 0);
 			if_erase (-1);
 			break_flash;
 			diag (OPRE_APP_ACK "all erased");
 			reset();
 
 		case 's':
-			if (cmd_line[1] == '+')
-				sat_mod = SATMOD_YES;
-			else if (cmd_line[1] == '-')
-				sat_mod = SATMOD_NO;
+			switch (cmd_line[1]) {
+				case '+':
+					sat_mod = SATMOD_YES;
+					clr_satest;
+					break;
+				case '-':
+					sat_mod = SATMOD_NO;
+					clr_satest;
+					break;
+				case '!':
+					sat_mod = SATMOD_YES;
+					set_satest;
+					break;
+			}
 
 			stats (NULL);
 			proceed (RS_FREE);
@@ -1155,7 +1329,7 @@ thread (root)
 				&i1, &i2, &i3, &i4, &i5, &i6, &i7);
 			
 			if (i1 <= 0 || i3 < -1 || i4 < -1 || i5 < -1) {
-				form (ui_obuf, bad_str, cmd_line);
+				form (ui_obuf, bad_str, cmd_line, 0);
 				proceed (RS_UIOUT);
 			}
 
@@ -1226,27 +1400,33 @@ thread (root)
 		case 'Y':
 			i1 = -1;
 			scan (cmd_line +1, "%u", &i1);
-			if (i1 >= 0 && sync_freq != i1) {
+			if ((i1 == 0 || (i1 > 59 && SID % i1 == 0)) 
+					&& sync_freq != i1) {
 				sync_freq = i1;
-				if (sync_freq > 0 && master_clock.hms.f == 0) {
-					master_delta = seconds();
-					master_clock.hms.d = 0;
-					master_clock.hms.h = 0;
-					master_clock.hms.m = 0;
-					master_clock.hms.s = 0;
-					master_clock.hms.f = 1;
-					diag (OPRE_APP_ACK "Implicit T 0:0:0");
+				if (sync_freq > 0 && master_date >= 0) {
+					master_ts = seconds();
+					master_date = -1;
+					diag (OPRE_APP_ACK 
+						"Implicit T 9-1-1 0:0:1");
 				}
+				write_mark (MARK_SYNC);
 			}
-			diag (OPRE_APP_ACK "Synced to %u", sync_freq);
-			proceed (RS_FREE);
+			form (ui_obuf, sync_str, sync_freq);
+			proceed (RS_UIOUT);
 
 		default:
 			form (ui_obuf, ill_str, cmd_line);
 	  }
 
 	entry (RS_UIOUT)
-		ser_out (RS_UIOUT, ui_obuf);
+               if (!IS_SATGAT) { 
+                        ser_out (RS_UIOUT, ui_obuf);
+                } else { 
+                        tmpb = form (NULL, satframe_str, ui_obuf);
+                        if (runstrand (oss_out, tmpb) == 0) {
+                                ufree (tmpb);
+                        }
+                }
 		proceed (RS_FREE);
 
 	entry (RS_DUMP)

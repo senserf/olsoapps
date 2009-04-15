@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -46,6 +46,8 @@
 
 // rx switch control
 #define RX_SW_ON	(&pong_params.rx_span)
+
+#include "dconv.ch"
 
 // =============
 // OSS reporting
@@ -99,8 +101,9 @@ __PUBLF (NodeTag, void, sens_init) () {
 	if (b == 0xFF) { // normal operations (empty eeprom)
 		sens_data.eslot = EE_SENS_MIN;
 		sens_data.ee.s.f.status = SENS_FF;
+		sens_data.ee.s.f.mark = MARK_FF;
 		sens_data.ee.s.f.emptym = ee_emptym ? 1 : 0;
-		sens_data.ee.s.f.spare = 7;
+		sens_data.ee.s.f.mark = MARK_FF;
 		return;
 	}
 
@@ -141,8 +144,9 @@ __PUBLF (NodeTag, void, sens_init) () {
 	// collectors start sensing 1st, so don't read and point at 1st empty
 	sens_data.eslot++;
 	sens_data.ee.s.f.status = SENS_FF;
+	sens_data.ee.s.f.mark = MARK_FF;
 	sens_data.ee.s.f.emptym = ee_emptym ? 1 : 0;
-	sens_data.ee.s.f.spare = 7;
+	sens_data.ee.s.f.mark = MARK_FF;
 #if 0
 	if (ee_read (sens_data.eslot * EE_SENS_SIZE, (byte *)&sens_data.ee,
 			EE_SENS_SIZE))
@@ -161,7 +165,20 @@ __PUBLF (NodeTag, void, init) () {
 
 }
 
-// little helper
+// little helpers
+static const char * markName (statu_t s) {
+	switch (s.f.mark) {
+		case MARK_FF:	return "NONE";
+		case MARK_BOOT: return "BOOT";
+		case MARK_PLOT: return "PLOT";
+		case MARK_SYNC: return "SYNC";
+		case MARK_FREQ: return "FREQ";
+		case MARK_DATE: return "DATE";
+	}
+	app_diag (D_SERIOUS, "unexpected eeprom %x", s);
+	return "????";
+}
+
 static const char * statusName (statu_t s) {
 	switch (s.f.status) {
 		case SENS_CONFIRMED: 	return "CONFIRMED";
@@ -171,11 +188,12 @@ static const char * statusName (statu_t s) {
 		case SENS_ALL: 		return "ALL";
 	}
 	app_diag (D_SERIOUS, "unexpected eeprom %x", s);
-	return				"really ffed";
+	return "????";
 }
 
 __PUBLF (NodeTag, word, r_a_d) () {
 	char * lbuf = NULL;
+	mdate_t md;
 
 	if (sens_dump->dfin) // delayed Finish 
 		goto ThatsIt;
@@ -195,29 +213,45 @@ __PUBLF (NodeTag, word, r_a_d) () {
 	}
 
 	if (sens_dump->s.f.status == SENS_ALL ||
-			sens_dump->s.f.status == sens_dump->ee.s.f.status) {
+			sens_dump->s.f.status == sens_dump->ee.s.f.status ||
+			sens_dump->ee.s.f.status == SENS_ALL) {
+
+	    md.secs = sens_dump->ee.ds;
+	    s2d (&md);
+
+	    if (sens_dump->ee.s.f.status == SENS_ALL) { // mark
+		lbuf = form (NULL, dumpmark_str, markName (sens_dump->ee.s),
+			sens_dump->ind,
+
+			md.dat.f ? 2009 + md.dat.yy : 1001 + md.dat.yy,
+			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
+
+			sens_dump->ee.sval[0],
+			sens_dump->ee.sval[1],
+			sens_dump->ee.sval[2]);
+	    } else { // sensors
+
 		lbuf = form (NULL, dump_str,
 			statusName (sens_dump->ee.s), sens_dump->ind,
-			((mclock_t *)&sens_dump->ee.ts)->hms.f ?
-				"time" : "ts",
-			((mclock_t *)&sens_dump->ee.ts)->hms.d,
-			((mclock_t *)&sens_dump->ee.ts)->hms.h,
-			((mclock_t *)&sens_dump->ee.ts)->hms.m,
-			((mclock_t *)&sens_dump->ee.ts)->hms.s,
+
+			md.dat.f ? 2009 + md.dat.yy : 1001 + md.dat.yy,
+			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
+
 			sens_dump->ee.sval[0],
 			sens_dump->ee.sval[1],
 			sens_dump->ee.sval[2],
 			sens_dump->ee.sval[3],
 			sens_dump->ee.sval[4]);
+	    }
 
-		if (runstrand (oss_out, lbuf) == 0 ) {
+	    if (runstrand (oss_out, lbuf) == 0 ) {
 			app_diag (D_SERIOUS, "oss_out failed");
 			ufree (lbuf);
-		}
+	   }
 
-		sens_dump->cnt++;
+	    sens_dump->cnt++;
 
-		if (sens_dump->upto != 0 && sens_dump->upto <= sens_dump->cnt)
+	    if (sens_dump->upto != 0 && sens_dump->upto <= sens_dump->cnt)
 			goto Finish;
 	}
 
@@ -321,7 +355,7 @@ __PUBLF (NodeTag, void, stats) () {
 
 __PUBLF (NodeTag, void, process_incoming) (word state, char * buf, word size) {
 
-  int    	w_len;
+  sint    	w_len;
   
   switch (in_header(buf, msg_type)) {
 
@@ -334,9 +368,14 @@ __PUBLF (NodeTag, void, process_incoming) (word state, char * buf, word size) {
 			when (CMD_WRITER, state);
 			release;
 		}
-		w_len = size - sizeof(msgRpcType);
+		w_len = strlen (&buf[sizeof (headerType)]) +1;
+
+		// sanitize
+		if (w_len + sizeof (headerType) > size)
+			return;
+
 		cmd_line = get_mem (state, w_len);
-		memcpy (cmd_line, buf + sizeof(msgRpcType), w_len);
+		strcpy (cmd_line, buf + sizeof(headerType));
 		trigger (CMD_READER);
 		return;
 
@@ -533,8 +572,8 @@ thread (pong)
 				memcpy (in_pongPload (png_frame, sval),
 						sens_data.ee.sval,
 						NUM_SENS << 1);
-				in_pongPload (png_frame, ts) =
-					sens_data.ee.ts;
+				in_pongPload (png_frame, ds) =
+					sens_data.ee.ds;
 				in_pongPload (png_frame, eslot) =
 					sens_data.eslot;
 				in_pong (png_frame, flags) |= PONG_PLOAD;
@@ -623,7 +662,6 @@ thread (pong)
 endthread
 
 thread (sens)
-	mclock_t mc;
 
 	entry (SE_INIT)
 		powerup();
@@ -660,9 +698,8 @@ thread (sens)
 		 }
 
 		sens_data.ee.s.f.status = SENS_IN_USE;
-		mc.sec = 0;
-		wall_time (&mc);
-		sens_data.ee.ts = mc.sec;
+
+		sens_data.ee.ds = wall_date (0);
 		lh_time = seconds();
 #ifdef SENSOR_LIST
 	entry (SE_0)
@@ -693,7 +730,7 @@ thread (sens)
 #endif
 	entry (SE_DONE)
 		sens_data.ee.s.f.status = SENS_COLLECTED;
-		sens_data.ee.s.f.spare = 7;
+		sens_data.ee.s.f.mark = MARK_FF;
 		sens_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 
 		//leds (LED_R, LED_BLINK);
@@ -828,6 +865,7 @@ thread (root)
 		if (local_host)
 			runthread (pong);
 
+		write_mark (MARK_BOOT);
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)

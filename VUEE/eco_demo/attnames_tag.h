@@ -13,9 +13,10 @@
 #define	app_flags	_dac (NodeTag, app_flags)
 #define sens_data	_dac (NodeTag, sens_data)
 #define lh_time		_dac (NodeTag, lh_time)
-#define ref_time	_dac (NodeTag, ref_time)
+#define ref_ts		_dac (NodeTag, ref_ts)
 #define sens_dump	_dac (NodeTag, sens_dump)
-#define ref_clock	_dac (NodeTag, ref_clock)
+#define ref_date	_dac (NodeTag, ref_date)
+#define plot_id		_dac (NodeTag, plot_id)
 
 // Methods
 #define next_col_time		_dac (NodeTag, next_col_time)
@@ -38,10 +39,11 @@
 #define sens_init		_dac (NodeTag, sens_init)
 #define init			_dac (NodeTag, init)
 #define r_a_d			_dac (NodeTag, r_a_d)
-#define wall_time		_dac (NodeTag, wall_time)
 #define upd_on_ack		_dac (NodeTag, upd_on_ack)
 #define handle_c_flags		_dac (NodeTag, handle_c_flags)
 #define tmpcrap			_dac (NodeTag, tmpcrap)
+#define wall_date		_dac (NodeTag, wall_date)
+#define write_mark		_dac (NodeTag, write_mark)
 
 #else	/* PICOS */
 

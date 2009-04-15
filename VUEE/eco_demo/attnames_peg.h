@@ -11,8 +11,8 @@
 
 #define	host_id		_dac (NodePeg, host_id)
 #define	host_pl		_dac (NodePeg, host_pl)
-#define	master_delta	_dac (NodePeg, master_delta)
-#define master_clock	_dac (NodePeg, master_clock)
+#define	master_ts	_dac (NodePeg, master_ts)
+#define master_date	_dac (NodePeg, master_date)
 #define	msg4tag		_dac (NodePeg, msg4tag)
 #define	msg4ward	_dac (NodePeg, msg4ward)
 #define	tagArray	_dac (NodePeg, tagArray)
@@ -23,6 +23,7 @@
 #define pong_ack	_dac (NodePeg, pong_ack)
 #define sync_freq	_dac (NodePeg, sync_freq)
 #define sat_mod		_dac (NodePeg, sat_mod)
+#define plot_id		_dac (NodePeg, plot_id)
 
 // Methods
 #define show_ifla		_dac (NodePeg, show_ifla)
@@ -36,7 +37,6 @@
 #define	check_msg4tag		_dac (NodePeg, check_msg4tag)
 #define	check_msg_size		_dac (NodePeg, check_msg_size)
 #define	check_tag		_dac (NodePeg, check_tag)
-#define wall_time		_dac (NodePeg, wall_time)
 #define	find_tags		_dac (NodePeg, find_tags)
 #define	get_mem			_dac (NodePeg, get_mem)
 #define	init_tag		_dac (NodePeg, init_tag)
@@ -70,12 +70,14 @@
 #define agg_init		_dac (NodePeg, agg_init)
 #define fatal_err		_dac (NodePeg, fatal_err)
 #define write_agg		_dac (NodePeg, write_agg)
+#define write_mark		_dac (NodePeg, write_mark)
 #define r_a_d			_dac (NodePeg, r_a_d)
 #define handle_a_flags		_dac (NodePeg, handle_a_flags)
 #define tmpcrap			_dac (NodePeg, tmpcrap)
 #define str_cmpn		_dac (NodePeg, str_cmpn)
-#define sat_in			_dac (NodePeg, sat_in)
+#define sat_rep			_dac (NodePeg, sat_rep)
 #define sat_out			_dac (NodePeg, sat_out)
+#define wall_date		_dac (NodePeg, wall_date)
 
 #else	/* PICOS */
 

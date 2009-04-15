@@ -9,16 +9,16 @@
 
 typedef struct msgMasterStruct {
 	headerType	header;
-	lword		mtime; // this is mclock_t, what a mess with types...
+	long		mdate;
 	word		syfreq;
-	word		spare;
+	word		plotid;
 } msgMasterType;
 
 #define in_master(buf, field)   (((msgMasterType *)(buf))->field)
 
 typedef struct msgReportStruct {
 	headerType	header;
-	lword		tStamp;
+	long		tStamp;
 
 	word		tagid;
 	word		rssi:8;
@@ -71,7 +71,7 @@ typedef struct msgStatsPegStruct {
 	headerType      header;
 	lword		hostid;
 	lword		ltime;
-	lword		mdelta;
+	long		mts;
 	lword		slot;
 	word		audi;
 	word		pl; // :4 would be enough
@@ -85,7 +85,7 @@ typedef struct msgStatsPegStruct {
 
 typedef struct reportPloadStruct {
 	pongPloadType ppload;
-	lword	ts;
+	long	ds;
 	lword	eslot;
 } reportPloadType;
 #define in_reportPload(buf, field) (((reportPloadType *)(buf + \

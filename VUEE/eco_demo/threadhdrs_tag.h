@@ -5,7 +5,7 @@
 
 threadhdr (rcv, NodeTag) {
 
-	int	rcv_packet_size;
+	sint	rcv_packet_size;
 	char 	*rcv_buf_ptr;
 
 	states 	{ RC_INIT, RC_TRY, RC_MSG };

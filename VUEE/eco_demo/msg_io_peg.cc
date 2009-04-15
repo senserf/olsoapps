@@ -30,12 +30,11 @@
 // this kludgy crap whould be rewritten anyway.
 __PUBLF (NodePeg, void, msg_report_out) (word state, word tIndex,
 					char** out_buf, word flags) {
-	mclock_t mc;
 	word w = sizeof(msgReportType);
 
 	// we'll see about selective reporting...
 	if ((flags & REP_FLAG_PLOAD) &&
-			tagArray[tIndex].rpload.ppload.ts != 0xFFFFFFFF)
+			tagArray[tIndex].rpload.ppload.ds != 0x80000000)
 		w += sizeof(reportPloadType);
 
 	if (master_host == 0) { // nobody to report to
@@ -55,9 +54,7 @@ __PUBLF (NodePeg, void, msg_report_out) (word state, word tIndex,
 		in_report(*out_buf, tagid) = 0;
 		in_report(*out_buf, rssi) = 0;
 		in_report(*out_buf, pl) = 0;
-		mc.sec = 0;
-		wall_time (&mc);
-		in_report(*out_buf, tStamp) = mc.sec;
+		in_report(*out_buf, tStamp) = wall_date (0);
 		in_report(*out_buf, state) = sumTag;
 		in_report(*out_buf, count) = tIndex & 0x7FFF;;
 		return;
@@ -65,20 +62,18 @@ __PUBLF (NodePeg, void, msg_report_out) (word state, word tIndex,
 	in_report(*out_buf, tagid) = tagArray[tIndex].id;
 	in_report(*out_buf, rssi) = tagArray[tIndex].rssi;
 	in_report(*out_buf, pl) = tagArray[tIndex].pl;
-	mc.sec = seconds() - tagArray[tIndex].evTime;
-	mc.hms.f = 1;
-	wall_time (&mc);
-	in_report(*out_buf, tStamp) = mc.sec;
+	in_report(*out_buf, tStamp) = wall_date (seconds() -
+		tagArray[tIndex].evTime);
 	in_report(*out_buf, state) = tagArray[tIndex].state;
 	in_report(*out_buf, count) = ++tagArray[tIndex].count;
 
 	if ((flags & REP_FLAG_PLOAD) &&
-			tagArray[tIndex].rpload.ppload.ts != 0xFFFFFFFF) {
+			tagArray[tIndex].rpload.ppload.ds != 0x80000000) {
 		in_report(*out_buf, flags) |= REP_FLAG_PLOAD;
 		memcpy (&in_reportPload(*out_buf, ppload),
 				&tagArray[tIndex].rpload.ppload,
 				sizeof(pongPloadType));
-		in_reportPload(*out_buf, ts) = tagArray[tIndex].rpload.ts;
+		in_reportPload(*out_buf, ds) = tagArray[tIndex].rpload.ds;
 		in_reportPload(*out_buf, eslot) =
 			tagArray[tIndex].rpload.eslot; 
 	}
@@ -87,7 +82,7 @@ __PUBLF (NodePeg, void, msg_report_out) (word state, word tIndex,
 __PUBLF (NodePeg, void, msg_findTag_in) (word state, char * buf) {
 
 	char * out_buf = NULL;
-	int tagIndex;
+	sint tagIndex;
 
 	if ((word)(in_findTag(buf, target)) == 0) { // summary
 		tagIndex = find_tags (in_findTag(buf, target), 1);
@@ -171,10 +166,10 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 	in_header(out_buf, rcv) = in_header(buf, snd);
 	in_statsPeg(out_buf, hostid) = host_id;
 	in_statsPeg(out_buf, ltime) = seconds();
-	in_statsPeg(out_buf, mdelta) = master_delta;
+	in_statsPeg(out_buf, mts) = master_ts;
 
 	//in_statsPeg(out_buf, slot) is really # of entries
-	if (agg_data.eslot == EE_AGG_MIN && agg_data.ee.s.f.status == AGG_FF)
+	if (agg_data.eslot == EE_AGG_MIN && agg_data.ee.s.f.status == AGG_EMPTY)
 		in_statsPeg(out_buf, slot) = 0;
 	else
 		in_statsPeg(out_buf, slot) = agg_data.eslot -
@@ -193,8 +188,8 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 __PUBLF (NodePeg, void, msg_fwd_in) (word state, char * buf, word size) {
 
 	char * out_buf = NULL;
-	int tagIndex;
-	int w_len;
+	sint tagIndex;
+	sint w_len;
 
 	if ((tagIndex = find_tags (in_fwd(buf, target), 0)) < 0)
 		return;
@@ -230,10 +225,13 @@ __PUBLF (NodePeg, void, msg_fwd_out) (word state, char** buf_out, word size,
 }
 
 #ifndef __SMURPH__
-int mbeacon (word, address);
+sint mbeacon (word, address);
 #endif
 
 __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
+	long dd = 0;
+	word mark = MARK_EMPTY;
+
 	if (master_host != in_header(buf, snd)) {
 		app_diag (D_SERIOUS, "master? %d %d", master_host,
 			in_header(buf, snd));
@@ -241,12 +239,28 @@ __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
 		set_master_chg();
 	}
 
-	// I'm not sure... let's assume the master is unconditional...
-	//if (in_master(buf, mtime) != 0) {
-		master_clock.sec = in_master(buf, mtime);
-		master_delta = seconds();
-	//}
-	sync_freq = in_master(buf, syfreq);
+	// do NOT react if the master doesn't have the time set
+	// and master_date is set
+	// (April 1st (90) deals with  the 'bogus set' for synchronization)
+	if (in_master(buf, mdate) < -SID * 90 ||
+			master_date > -SID * 90) {
+		if ((dd = wall_date (0) - in_master(buf, mdate)) > TIME_TOLER ||
+				dd < -TIME_TOLER) {
+			master_date = in_master(buf, mdate);
+			master_ts = seconds();
+			mark = MARK_DATE;
+		}
+	}
+
+	if (sync_freq != in_master(buf, syfreq)) {
+		sync_freq = in_master(buf, syfreq);
+		mark = MARK_SYNC;
+	}
+
+	if (plot_id != in_master(buf, plotid)) {
+		plot_id = in_master(buf, plotid);
+		mark = MARK_PLOT;
+	}
 
 	if (is_master_chg) {
 		clr_master_chg;
@@ -257,12 +271,14 @@ __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
 		} else {
 		diag (OPRE_APP_ACK "Set master to %u", master_host);
 		}
-	}
+		write_mark (MARK_MCHG);
+	} else
+		if (mark != MARK_EMPTY)
+			write_mark (mark);
 }
 
 __PUBLF (NodePeg, void, msg_master_out) (word state, char** buf_out,
-								nid_t peg) {
-	mclock_t mc;
+					nid_t peg) {
 
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, sizeof(msgMasterType));
@@ -272,20 +288,16 @@ __PUBLF (NodePeg, void, msg_master_out) (word state, char** buf_out,
 	in_header(*buf_out, msg_type) = msg_master;
 	in_header(*buf_out, rcv) = peg;
 
-	mc.sec = 0;
-	wall_time (&mc);
-	in_master(*buf_out, mtime) = mc.sec;
+	in_master(*buf_out, mdate) = wall_date (0);
 	in_master(*buf_out, syfreq) = sync_freq;
+	in_master(*buf_out, plotid) = plot_id;
 }
 
 __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 	char * out_buf = NULL; // is static needed / better here? (state)
 	sint tagIndex;
-	mclock_t mc;
 
 	app_diag (D_DEBUG, "Pong %u", in_header(buf, snd));
-	mc.sec = 0;
-	wall_time (&mc);
 
 	if ((tagIndex = find_tags (in_header(buf, snd), 0)) < 0) { // not found
 
@@ -306,9 +318,9 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 		memcpy (&tagArray[tagIndex].rpload.ppload, 
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
-		tagArray[tagIndex].rpload.ts = mc.sec;
+		tagArray[tagIndex].rpload.ds = wall_date (0);
 		tagArray[tagIndex].rpload.eslot = agg_data.eslot;
-		if (agg_data.ee.s.f.status != AGG_FF)
+		if (agg_data.ee.s.f.status != AGG_EMPTY)
 			tagArray[tagIndex].rpload.eslot++;
 
 	} else {
@@ -321,8 +333,8 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 		tagArray[tagIndex].rssi = rssi;
 		tagArray[tagIndex].pl = in_pong(buf, level);
 
-		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ts !=
-				in_pongPload(buf, ts)) {
+		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ds !=
+				in_pongPload(buf, ds)) {
 
 			if (is_eew_coll &&
 				       	tagArray[tagIndex].state == reportedTag)
@@ -331,9 +343,9 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 			memcpy (&tagArray[tagIndex].rpload.ppload,
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
-			tagArray[tagIndex].rpload.ts = mc.sec;
+			tagArray[tagIndex].rpload.ds = wall_date (0);
 			tagArray[tagIndex].rpload.eslot = agg_data.eslot;
-			if (agg_data.ee.s.f.status != AGG_FF)
+			if (agg_data.ee.s.f.status != AGG_EMPTY)
 				tagArray[tagIndex].rpload.eslot++;
 			set_tagState (tagIndex, newTag, YES);
 		}
@@ -430,7 +442,7 @@ __PUBLF (NodePeg, void, msg_report_in) (word state, char * buf) {
 }
 
 __PUBLF (NodePeg, void, msg_reportAck_in) (char * buf) {
-	int tagIndex;
+	sint tagIndex;
 
 	if ((tagIndex = find_tags (in_reportAck(buf, tagid), 0)) < 0) {
 		app_diag (D_INFO, "Ack for a goner %u",

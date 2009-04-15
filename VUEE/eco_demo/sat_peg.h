@@ -31,9 +31,11 @@
 
 #define SATIN_STA	"+CMGS: \"Sys"
 #define SAT_STALEN	10
-#define SAT_STAOSET	30
+#define SAT_STAOSET	24
 #define SAT_STAMINLEN	43
-#define SAT_STAFORM	"%u %u:%u:%u"
+#define SAT_STAFORM	"%u-%u-%u %u:%u:%u"
+#define SAT_TIMEADJ	60
+// FIXME time adj should be at least 36000 (10 hrs)
 
 #define SATMOD_NO	0
 #define SATMOD_YES	1

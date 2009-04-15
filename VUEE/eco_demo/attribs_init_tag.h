@@ -14,5 +14,7 @@
 	_da (pong_params).rx_lev	= 0;
 	_da (pong_params).pload_lev	= 0;
 
-	_da (ref_time)		= 0;
-	_da (ref_clock).sec	= 0;
+	_da (ref_ts)		= 0;
+	_da (ref_date)		= 0;
+
+	_da (plot_id)		= 0;
