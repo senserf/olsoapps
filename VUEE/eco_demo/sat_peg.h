@@ -15,12 +15,21 @@
 #define SATCMD_GET	"AT+CMGS=GetRxMsg\r"
 #define SATCMD_STATUS	"AT+CMGS=SystemStatus\rG\032"
 #define SATCMD_QUEUE	"AT+GetMsgQueueStatus\r"
+#define SATCMD_H2T	"AT+PushMsgHex=0\r"
+#define SATCMD_BOOT	"ATZ\r"
+#define SATCMD_PDC	"AT+PDC=OFF\r"
 
 #define SATATT_MSG	"+CMGS: \"Tex"
+#define SATHEX_MSG	"+CMGS: \"Hex"
 #define SAT_MSGLEN	11
 
 #define SATIN_RNG	"PDTRING"
 #define SAT_RNGLEN	7
+
+#define SATIN_SPPP	"s+++"
+#define SATIN_SMMM	"s---"
+#define SATIN_SBBB	"s!!!"
+#define SAT_SSETLEN	4
 
 #define SATIN_QUE	"+GetMsgQue"
 #define SAT_QUELEN	10
@@ -34,8 +43,7 @@
 #define SAT_STAOSET	24
 #define SAT_STAMINLEN	43
 #define SAT_STAFORM	"%u-%u-%u %u:%u:%u"
-#define SAT_TIMEADJ	60
-// FIXME time adj should be at least 36000 (10 hrs)
+#define SAT_TIMEADJ	3600
 
 #define SATMOD_NO	0
 #define SATMOD_YES	1

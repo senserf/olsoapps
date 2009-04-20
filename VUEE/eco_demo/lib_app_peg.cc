@@ -409,6 +409,9 @@ __PUBLF (NodePeg, void, write_mark) (word what) {
 				(byte *)&mrk.ee, EE_AGG_SIZE)) {
 		app_diag (D_SERIOUS, "ee_write mark failed %x %x",
 				(word)(mrk.eslot >> 16), (word)mrk.eslot);
+#if !DIAG_MESSAGES
+		reset();
+#endif
 
 	} else { // all is good; mark agg_data to write next slot
 		agg_data.ee.s.f.status = AGG_ALL;
@@ -448,6 +451,9 @@ __PUBLF (NodePeg, void, write_agg) (word ti) {
 				(word)(agg_data.eslot >> 16),
 				(word)agg_data.eslot);
 			agg_data.ee.s.f.status = AGG_EMPTY;
+#if !DIAG_MESSAGES
+			reset();
+#endif
 		}
 	}
 }
@@ -574,7 +580,7 @@ __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
 	if_write (IFLASH_SIZE -4, w3);
-	if (err != ERR_MAINT) {
+	if (err != ERR_MAINT && err != ERR_EER) {
 		app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
 		halt();
 	}

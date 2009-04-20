@@ -65,6 +65,8 @@ static const char satstart_str[] = OPRE_APP_MENU_A "EcoNet 1.2";
 // FIXME it'll change with a decent uart (sat, oss) i/f
 static const char satframe_str[] = "%s";
 
+// static const char noee_str[] = OPRE_APP_MENU_A "No NVM";
+
 static const char welcome_str[] = OPRE_APP_MENU_A 
 	"*EcoNet* 1.2" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
@@ -137,8 +139,8 @@ static const char rep_str[] = OPRE_APP_REP OMID_CR
 	"  " SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d, "
 	SENS3_DESC "%d, " SENS4_DESC "%d\r\n";
 
-static const char satrep_str[] = OPRE_APP_REP " %u:%u-%u-%u %u:%u:%u%s"
-	SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d";
+static const char satrep_str[] = OPRE_APP_REP "%lu %u:%lu %u-%u-%u %u:%u:%u%s"
+	SENS0_DESC "%d " SENS1_DESC "%d " SENS2_DESC "%d";
 
 static const char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";

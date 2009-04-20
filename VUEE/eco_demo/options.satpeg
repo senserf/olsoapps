@@ -78,23 +78,23 @@
 #endif
 
 #ifndef SENS0_DESC
-#define SENS0_DESC "S0: "
+#define SENS0_DESC ""
 #endif
 
 #ifndef SENS1_DESC
-#define SENS1_DESC "S1: "
+#define SENS1_DESC ""
 #endif
  
 #ifndef SENS2_DESC
-#define SENS2_DESC "S2: "
+#define SENS2_DESC ""
 #endif
  
 #ifndef SENS3_DESC
-#define SENS3_DESC "S3: "
+#define SENS3_DESC ""
 #endif
  
 #ifndef SENS4_DESC
-#define SENS4_DESC "S4: "
+#define SENS4_DESC ""
 #endif
  
 // #define OSS_FMT	FMT_TERM
@@ -118,7 +118,7 @@
 #ifdef STORAGE_SDCARD
 #undef STORAGE_SDCARD
 #endif
-#define STORAGE_SDCARD	 	0
+#define STORAGE_SDCARD	 	1
 #define SD_KEEP_IDLE		1
 
 #define EMPTY_STORAGE_FF 	1

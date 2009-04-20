@@ -66,7 +66,7 @@ strandhdr (satcmd_out, NodePeg) {
 threadhdr (root, NodePeg) {
 
 	states { RS_INIT, RS_INIT1, RS_INIT2, RS_PAUSE, RS_FREE, RS_RCMD,
-	       	RS_DOCMD, RS_UIOUT, RS_DUMP };
+	       	RS_DOCMD, RS_UIOUT, RS_DUMP, RS_INIEE };
 
 	perform;
 };
@@ -128,6 +128,7 @@ static word aud_ind;
 #define RS_DOCMD	60
 #define RS_UIOUT	70
 #define RS_DUMP		80
+#define RS_INIEE	90
 
 #endif
 #endif

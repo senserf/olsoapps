@@ -85,6 +85,9 @@ thread (mbeacon)
 			master_date > -SID * 90 || sat_mod == SATMOD_UNINIT))
 		(void)runstrand (satcmd_out, SATCMD_STATUS);
 
+	if (IS_SATGAT && sat_mod == SATMOD_UNINIT) // just in case
+		(void)runstrand (satcmd_out, SATCMD_PDC);
+
 	delay (25 * 1024 + rnd() % 10240, MB_SEND); // 30 +/- 5s
 	release;
 
@@ -565,6 +568,27 @@ thread (cmd_in)
 			goto SatRep;
 		}
 
+		if (str_cmpn (ui_ibuf, SATHEX_MSG, SAT_MSGLEN) == 0) {
+			(void)runstrand (satcmd_out, SATCMD_H2T);
+			goto SatRep;
+		}
+
+		if (str_cmpn (ui_ibuf, SATIN_SBBB, SAT_SSETLEN) == 0) {
+			set_satest;
+			goto SatRep;
+		}
+
+		if (str_cmpn (ui_ibuf, SATIN_SPPP, SAT_SSETLEN) == 0) {
+			clr_satest;
+			goto SatRep;
+		}
+
+		if (str_cmpn (ui_ibuf, SATIN_SMMM, SAT_SSETLEN) == 0) {
+			clr_satest;
+			sat_mod = SATMOD_NO;
+			goto SatRep;
+		}
+
 		u[0] = strlen (ui_ibuf);
 
 		if (str_cmpn (ui_ibuf, SATIN_QUE, SAT_QUELEN) == 0) {
@@ -581,11 +605,17 @@ thread (cmd_in)
 						sat_mod = SATMOD_YES;
 					}
 				} else {
+#if 0
 					ui_ibuf[0] = 'F';
 					if (sat_mod != SATMOD_FULL) {
 						ui_ibuf[1] = '+';
 						sat_mod = SATMOD_FULL;
 					}
+#endif
+					// let's try this:
+					runstrand (satcmd_out, SATCMD_BOOT);
+					sat_mod = SATMOD_UNINIT;
+					strcpy (ui_ibuf, "PDT Reboot");
 				}
 			}
 
@@ -728,8 +758,8 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 
       if (IS_SATGAT) {
         lbuf = form (NULL, satrep_str,
-		in_report(buf, tagid),
-
+		in_reportPload(buf, eslot), 
+		in_report(buf, tagid), in_reportPload(buf, ppload.eslot),
 		md2.dat.f ?  2009 + md2.dat.yy : 2001 + md2.dat.yy,
 		md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
 
@@ -1031,13 +1061,40 @@ thread (root)
 
 	entry (RS_INIT)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
-		if (ee_open ())
-			fatal_err (ERR_EER, 0, 0, 0);
+
+	entry (RS_INIEE)
+		if (ee_open ()) {
+			leds (LED_B, LED_BLINK);
+#if 0
+don't even try it: I don't know what I am, as it is in NVM, 
+plus we dont want to flood the sat link
+			if (!IS_SATGAT) { 
+				ser_out (RS_INIEE, noee_str);
+			} else {
+				tmpb = form (NULL, satframe_str, noee_str);
+				if (runstrand (oss_out, tmpb) == 0) {
+					ufree (tmpb);
+				}
+			}
+#endif
+			delay (3000, RS_INIEE);
+			release;
+		}
+
+		leds (LED_B, LED_OFF);
 		form (ui_obuf, ee_str, EE_AGG_MIN, EE_AGG_MAX -1, EE_AGG_SIZE);
 
-		if (if_read (IFLASH_SIZE -1) != 0xFFFF)
+		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
+
+			if (if_read (IFLASH_SIZE -1) == ERR_EER) {
+				if_erase (IFLASH_SIZE -1);
+				break_flash;
+				diag (OPRE_APP_ACK "flash p1 erased");
+				reset();
+			}
+
 			leds (LED_R, LED_BLINK);
-		else
+		} else
 			leds (LED_G, LED_BLINK);
 
 		// is_flash_new is set const (a branch compiled out)
@@ -1286,7 +1343,8 @@ thread (root)
 		case 's':
 			switch (cmd_line[1]) {
 				case '+':
-					sat_mod = SATMOD_YES;
+					if (sat_mod == SATMOD_NO)
+						sat_mod = SATMOD_UNINIT;
 					clr_satest;
 					break;
 				case '-':
@@ -1294,7 +1352,8 @@ thread (root)
 					clr_satest;
 					break;
 				case '!':
-					sat_mod = SATMOD_YES;
+					if (sat_mod == SATMOD_NO)
+						sat_mod = SATMOD_UNINIT;
 					set_satest;
 					break;
 			}
