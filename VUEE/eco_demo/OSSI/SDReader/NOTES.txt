@@ -1,0 +1,74 @@
+Note (PG): on my laptop, the card appears as /dev/sdc1 (note partition 1, not
+the complete raw device).
+
+===============================================================================
+
+
+This is the mail archive of the cygwin mailing list for the Cygwin project.
+Index Nav: 	[Date Index] [Subject Index] [Author Index] [Thread Index]
+Message Nav: 	[Date Prev] [Date Next] 	[Thread Prev] [Thread Next]
+Other format: 	[Raw text]
+Re: Raw device access to an SD card
+
+    * From: Corinna Vinschen <corinna-cygwin at cygwin dot com>
+    * To: cygwin at cygwin dot com
+    * Date: Thu, 5 Mar 2009 17:34:55 +0100
+    * Subject: Re: Raw device access to an SD card
+    * References: <83zlg0otp4.fsf@kalahari.s2.org>
+    * Reply-to: cygwin at cygwin dot com
+
+On Mar  5 17:49, Hannu Koivisto wrote:
+> Greetings,
+> 
+> The goal is to create a bootable Linux installation on an SD card
+> by writing an existing image using dd in Cygwin.  The card is
+> inserted to an SD card slot of a laptop and apparently appears as
+> \\.\physicaldrive2 to the OS.
+> 
+> Now, "dd if=\\\\.\\physicaldrive2" reads something (hopefully from
+> that card, hard to say for sure) but an attempt to write with "dd
+> if=image of=\\\\.\\physicaldrive2" fails with "Invalid argument"
+> error.  Should this work?
+
+Not really.
+
+Don't use Windows device names.  You can find the mappings from POSIX
+device names to Windows device names here:
+
+  http://cygwin.com/1.7/cygwin-ug-net/using-specialnames.html#pathnames-posixdevices
+
+In your case that would be /dev/sdc.  But that probably won't work.
+I don't remember the exact details, but you shoudl rather access
+the first partition on the device, rather than the entire device.
+like this:
+
+  /dev/sdc1
+
+> first?  I tried "mount -f -b //./physicaldrive2 /dev/foo" as
+> suggested by someone but according to the Cygwin user's guide that
+> is deprecated and besides, /dev/foo behaved just like
+> \\\\.\\physicaldrive2 directly.  FWIW, I tried to find if the card
+
+Yep.
+
+> device gets mapped to some /dev/sd? but that didn't seem to be the
+> case.  Only /dev/sda was available (hard drive).  Is it possible to
+> list that kind of mappings somehow?
+
+cat /proc/partitions
+
+
+Corinna
+
+-- 
+Corinna Vinschen                  Please, send mails regarding Cygwin to
+Cygwin Project Co-Leader          cygwin AT cygwin DOT com
+Red Hat
+
+--
+Unsubscribe info:      http://cygwin.com/ml/#unsubscribe-simple
+Problem reports:       http://cygwin.com/problems.html
+Documentation:         http://cygwin.com/docs.html
+FAQ:                   http://cygwin.com/faq/
+
+

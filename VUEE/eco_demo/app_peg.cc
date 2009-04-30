@@ -59,6 +59,10 @@ strand (oss_out, char)
 			strcpy (&b[SATWRAPLEN], data);
 			b[len -2] = (char)26;
 			b[len -1] = '\0';
+			// PG: the code will do
+			data [4] = '\0';
+			sat_rep (data);
+			// End PG
 			ufree (data);
 			data = b;
 			savedata (data);
@@ -1176,6 +1180,19 @@ plus we dont want to flood the sat link
 			tarp_ctrl.param &= 0xFE;
 		}
 		write_mark (MARK_BOOT);
+
+		// PG: just the OPRE code (all I need)
+		if (IS_SATGAT) {
+			ui_obuf [4] = '\0';
+			sat_rep (OPRE_APP_MENU_A);
+			// We do it three times for reliability; it would be
+			// stupid to reset the node multiple times if packets
+			// are lost.
+			sat_rep (OPRE_APP_MENU_A);
+			sat_rep (OPRE_APP_MENU_A);
+		}
+		// End PG
+
 		proceed (RS_RCMD);
 
 	entry (RS_FREE)

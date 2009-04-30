@@ -1,0 +1,49 @@
+<html>
+<body bgcolor="#c3c0a6" link="#e7651a" vlink="#e7651a">
+
+<form method="post" action="puller.cgi">
+
+<hr>
+<h3>Usage</h3>
+
+<hr>
+
+<p align="justify">
+Each of the "From/Upto" fields should include a date/time in several popular
+formats, e.g., <b>Apr 29, 2009 12:33</b>, <b>17:15:03</b> (refers to the
+current day), <b>09-04-29 14:44</b>, and so on. Both fields are mandatory.
+
+<p align="justify">
+The "Rig Id" field should (must) include the EMS device number (415, 463).
+
+<p align="justify">
+The "Collector" field may be empty (all collectors) or may include a single
+collector number. If you put the word "events" into it, you will see
+event messages (i.e., all received messages that are not samples).
+
+<br>
+
+<p>
+<hr>
+
+<table>
+
+<tr>
+<td>From</td>
+<td>Upto</td>
+<td>Rig Id</td>
+<td>Collector</td>
+</tr>
+<tr>
+<td><input type="text" name="EXF_from" size="14"></td>
+<td><input type="text" name="EXF_upto" size="14"></td>
+<td><input type="text" name="EXF_rig" size="4"></td>
+<td><input type="text" name="EXF_coll" size="4"></td>
+</tr>
+</table>
+
+<hr>
+<input type="submit" value="Extract" name="EXB_extract">
+
+</body>
+</html>
