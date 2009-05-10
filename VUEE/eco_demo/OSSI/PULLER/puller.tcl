@@ -106,28 +106,32 @@ proc make_offset_time { tp lval } {
 	}
 
 	set offset 0
-	if { $tp == "S" } {
-		if [info exists Params(TO,S)] {
-			set offset $Params(TO,S)
-		} elseif [info exists Params(TO)] {
-			set offset $Params(TO)
-		}
-	} else {
-		# collector
-		set nf 1
-		if [info exists Params(TO,D)] {
-			foreach s $Params(TO,D) {
-				set p [lindex $s 0]
-				if { [catch { regexp $p $tp } r] || !$r } {
-					continue
-				}
-				set offset [lindex $s 1]
-				set nf 0
-				break
+
+	if { $tp != "" } {
+		if { $tp == "S" } {
+			if [info exists Params(TO,S)] {
+				set offset $Params(TO,S)
+			} elseif [info exists Params(TO)] {
+				set offset $Params(TO)
 			}
-		}
-		if { $nf && [info exists Params(TO)] } {
-			set offset $Params(TO)
+		} else {
+			# collector
+			set nf 1
+			if [info exists Params(TO,D)] {
+				foreach s $Params(TO,D) {
+					set p [lindex $s 0]
+					if { [catch { regexp $p $tp } r] || \
+					    !$r } {
+						continue
+					}
+					set offset [lindex $s 1]
+					set nf 0
+					break
+				}
+			}
+			if { $nf && [info exists Params(TO)] } {
+				set offset $Params(TO)
+			}
 		}
 	}
 
@@ -335,7 +339,7 @@ proc parse_response { } {
 		set ta [lindex $smp 1]
 		set df [lindex $smp 2]
 		set me [lindex $smp 3]
-		add_sample $di "$ta $df$ts $me"
+		add_sample $di "$ta $ts $df $me"
 	}
 
 	set Samples ""
@@ -392,9 +396,7 @@ proc extract_data { block } {
 	set ts [make_offset_time "S" [list $yr $mo $dy $hh $mm $ss]]
 
 	if ![regexp $PT(SV) $mes junk asl col csl yr mo dy hh mm ss vals] {
-		# treat it as an event message
-		set di [string range $ts 0 7]
-		# make sure there are no newlines
+		# event message, make sure there are no newlines
 		regsub -all "\[\n\r\]+" $mes " " mes
 		lappend Samples [list $ts "EV$did" "N" $mes]
 		return
@@ -413,15 +415,17 @@ proc extract_data { block } {
 	if { $yr < 2009 || ($yr == 2009 && $mo == 1) } {
 		# the date is fake
 		set df "N"
-		set cs $ts
+		# no offset
+		set of ""
 	} else {
 		set df "Y"
-		set cs [make_offset_time $did [list $yr $mo $dy $hh $mm $ss]]
+		set of $did
 	}
-	set di [string range $cs 0 7]
+	set cs [make_offset_time $of [list $yr $mo $dy $hh $mm $ss]]
+
 	# create a formatted entry
 
-	set mes "$col $csl/$asl =="
+	set mes "$cs $col $csl/$asl =="
 
 	set sid 0
 
@@ -434,7 +438,8 @@ proc extract_data { block } {
 		incr sid
 	}
 
-	lappend Samples [list $cs "SS$did" $df $mes]
+	# use satellite reported time as the record index
+	lappend Samples [list $ts "SS$did" $df $mes]
 }
 
 proc svalue { v c s } {

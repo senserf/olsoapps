@@ -565,7 +565,7 @@ proc wf_getvals { } {
   }
 }
 
-proc cstime { ts } {
+proc cstime { ts { plus 0 } } {
 #
 # Converts date/time to ISO PIT
 #
@@ -573,7 +573,14 @@ proc cstime { ts } {
 		# illegal format
 		return ""
 	}
-	return [clock format $tv -format %Y%m%dT%H%M%S]
+
+	incr tv $plus
+
+	if [catch { clock format $tv -format %Y%m%dT%H%M%S } res] {
+		return ""
+	}
+
+	return $res
 }
 
 proc incrdi { di } {
@@ -588,10 +595,9 @@ proc extract { } {
 
 	global Values DBPATH
 
-	if { ![info exists Values(EXF_from)] || $Values(EXF_from) == "" ||
-	     ![info exists Values(EXF_upto)] || $Values(EXF_upto) == "" } {
-		errpage "From and Upto arguments are mandatory and at least\
-			one of them is not specified"
+	if { ![info exists Values(EXF_from)] || $Values(EXF_from) == "" } {
+		errpage "The From argument is mandatory and it has not been\
+			specified"
 	}
 
 	if { ![info exists Values(EXF_rig)] || $Values(EXF_rig) == "" } {
@@ -607,11 +613,37 @@ proc extract { } {
 
 	# process time bounds
 	set fr [cstime $Values(EXF_from)]
-	set up [cstime $Values(EXF_upto)]
+
+	if { ![info exists Values(EXF_upto)] || $Values(EXF_upto) == "" } {
+		set up ""
+	} else {
+		set up $Values(EXF_upto)
+	}
 
 	if { $fr == "" } {
 		errpage "From time format is not recognizable"
 	}
+
+	if { $up == "" } {
+		# make it one day forward
+		set up [cstime $fr [expr 24 * 3600]]
+		if { $up == "" } {
+			errpage "The From time is too far into the future"
+		}
+	} else {
+		if { ![catch { expr $up } up] && $up > 0 } {
+			# a legit number
+			set up [cstime $fr [expr 24 * $up * 3600]]
+			if { $up == "" } {
+				errpage "The specified number of days is too\
+					far into the future"
+			}
+		} else {
+			# try a date
+			set up [cstime $Values(EXF_upto)]
+		}
+	}
+
 	if { $up == "" } {
 		errpage "Upto time format is not recognizable"
 	}
@@ -664,6 +696,9 @@ proc extract { } {
 	output "Content-type: text/ascii"
 	output "Content-disposition: attachment; filename=extract$fsu"
 	output ""
+	if { $fsu == ".csv" } {
+		output "Collector, Delivery Time, TS, Collection Time, Values"
+	}
 	output $txt 1
 }
 
@@ -728,7 +763,7 @@ proc dayload { di adv max fr up ri coll } {
 			break
 		}
 		if { $coll == "e" } {
-			if ![regexp "^EV$ri .(...............)" $rec jk ts] {
+			if ![regexp "^EV$ri (...............)" $rec jk ts] {
 				continue
 			}
 			if { [string compare $fr $ts] > 0 } {
@@ -738,19 +773,19 @@ proc dayload { di adv max fr up ri coll } {
 				continue
 			}
 			# we want this line
-			if ![regexp "(\[NY\])(...............) (.*)" $rec jk \
-			    df ts ms] {
+			if ![regexp " N (.*)" $rec jk ms] {
 				continue
 			}
 			set ts [normts $ts]
 			if { $ts == "" } {
 				continue
 			}
-			append txt "$df $ts $ms\n"
+			append txt "$ts $ms\n"
 		}
 		# data sample
-		if ![regexp "^SS$ri (\[NY\])(...............) (\[0-9\]+) (.*)" \
-		    $rec jk df ts co rec] {
+		if ![regexp \
+	"^SS$ri (...............) (\[NY\]) (...............) (\[0-9\]+) (.*)" \
+		    $rec jk ts df cs co rec] {
 			continue
 		}
 		if { $coll != "" && $coll != $co } {
@@ -767,8 +802,9 @@ proc dayload { di adv max fr up ri coll } {
 		if { $ts == "" } {
 			continue
 		}
+		set cs [normts $cs]
 
-		set lin "$co, $df, $ts"
+		set lin "$co, $ts, $df, $cs"
 
 		while 1 {
 			if ![regexp "(\[0-9\]+):(\[^ \]+)(.*)"\
@@ -814,8 +850,8 @@ proc escapefm { str } {
 	return $os
 }
 
-set DBPATH "database"
-#set DBPATH "/home/pawel/EMSDB/database"
+#set DBPATH "database"
+set DBPATH "/home/pawel/EMSDB/database"
 
 fconfigure stdout -translation crlf
 

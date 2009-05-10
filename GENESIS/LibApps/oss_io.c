@@ -12,6 +12,7 @@
 #if DM2100
 #include "phys_dm2100.h"
 #endif
+#include "storage.h"
 
 extern tarpCtrlType tarp_ctrl;
 

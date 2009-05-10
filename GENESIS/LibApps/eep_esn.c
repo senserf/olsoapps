@@ -2,6 +2,7 @@
 #include "app.h"
 #include "codes.h"
 #include "msg_gene.h"
+#include "storage.h"
 
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2005.                   */

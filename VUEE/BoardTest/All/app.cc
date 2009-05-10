@@ -5,6 +5,7 @@
 
 #include "globals.h"
 #include "threadhdrs.h"
+#include "storage.h"
 
 #define	MIN_PACKET_LENGTH	24
 #define	MAX_PACKET_LENGTH	46

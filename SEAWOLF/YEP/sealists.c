@@ -1,5 +1,6 @@
 #include "sysio.h"
 #include "sealists.h"
+#include "storage.h"
 
 lcdg_dm_obj_t *seal_mkcmenu (Boolean ev) {
 //

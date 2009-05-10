@@ -7,6 +7,7 @@
 #include "applib.h"
 #include "sealists.h"
 #include "net.h"
+#include "storage.h"
 
 lcdg_dm_men_t 	* lcd_menu;
 nbh_menu_t	nbh_menu;

@@ -8,6 +8,7 @@
 #include "msg_gene.h"
 #include "lib_app_if.h"
 #include "codes.h"
+#include "storage.h"
 // #include "trc.h"
 
 #define TINY_MEM 1

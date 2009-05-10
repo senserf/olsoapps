@@ -11,6 +11,7 @@
 #include "tcvphys.h"
 #include "tcvplug.h"
 #include "board_rf.h"
+#include "storage.h"
 
 heapmem {100};
 

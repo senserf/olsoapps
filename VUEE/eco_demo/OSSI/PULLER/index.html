@@ -1,49 +1,99 @@
-<html>
-<body bgcolor="#c3c0a6" link="#e7651a" vlink="#e7651a">
-
-<form method="post" action="puller.cgi">
-
-<hr>
-<h3>Usage</h3>
-
-<hr>
-
-<p align="justify">
-Each of the "From/Upto" fields should include a date/time in several popular
-formats, e.g., <b>Apr 29, 2009 12:33</b>, <b>17:15:03</b> (refers to the
-current day), <b>09-04-29 14:44</b>, and so on. Both fields are mandatory.
-
-<p align="justify">
-The "Rig Id" field should (must) include the EMS device number (415, 463).
-
-<p align="justify">
-The "Collector" field may be empty (all collectors) or may include a single
-collector number. If you put the word "events" into it, you will see
-event messages (i.e., all received messages that are not samples).
-
-<br>
-
-<p>
-<hr>
-
-<table>
-
-<tr>
-<td>From</td>
-<td>Upto</td>
-<td>Rig Id</td>
-<td>Collector</td>
-</tr>
-<tr>
-<td><input type="text" name="EXF_from" size="14"></td>
-<td><input type="text" name="EXF_upto" size="14"></td>
-<td><input type="text" name="EXF_rig" size="4"></td>
-<td><input type="text" name="EXF_coll" size="4"></td>
-</tr>
-</table>
-
-<hr>
-<input type="submit" value="Extract" name="EXB_extract">
-
-</body>
-</html>
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
+<HTML>
+<HEAD>
+	<META HTTP-EQUIV="CONTENT-TYPE" CONTENT="text/html; charset=windows-1252">
+	<TITLE></TITLE>
+	<META NAME="GENERATOR" CONTENT="OpenOffice.org 3.0  (Win32)">
+	<META NAME="CREATED" CONTENT="0;0">
+	<META NAME="CHANGEDBY" CONTENT="Pawel Gburzynski">
+	<META NAME="CHANGED" CONTENT="20090501;13114400">
+	<STYLE TYPE="text/css">
+	<!--
+		A:link { color: #e7651a }
+		A:visited { color: #e7651a }
+	-->
+	</STYLE>
+</HEAD>
+<BODY LANG="en-CA" LINK="#e7651a" VLINK="#e7651a" BGCOLOR="#c3c0a6" DIR="LTR">
+<H1><FONT FACE="Arial, sans-serif">EcoNetwork EMS Data Extraction</FONT></H1>
+<HR>
+<H3><FONT FACE="Arial, sans-serif">Usage:</FONT></H3>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The <FONT COLOR="#b80047">From</FONT>
+field should include a date/time in one of several popular formats,
+e.g., <B>Apr 29, 2009 12:33</B>, <B>17:15:03</B> (refers to the
+current day), <B>09-04-29 14:44</B>, and so on. This field is
+mandatory.</FONT></P>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The <FONT COLOR="#b80047">Upto</FONT>
+field may include a second (full) date/time string (specifying the
+upper limit) or a number of days (counted from the <FONT COLOR="#b80047">From</FONT>
+date/time). If the field is empty, it translates into <FONT COLOR="#b80047">1</FONT>
+day.</FONT></P>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The <FONT COLOR="#b80047">Rig
+Id</FONT> field is mandatory and must include the <FONT COLOR="#b80047">EMS
+device number</FONT> (<B>415</B>, <B>463</B>, and so on). </FONT>
+</P>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The <FONT COLOR="#b80047">Collector</FONT>
+field may be empty (all collectors) or may include a single collector
+number. If you put the word <FONT COLOR="#b80047">events</FONT> into
+it, you will see event messages (i.e., all received messages that are
+not samples). </FONT>
+</P>
+<HR>
+<FORM ACTION="puller.cgi" METHOD="POST">
+	<TABLE CELLPADDING=2 CELLSPACING=2>
+		<TR>
+			<TD>
+				<P><FONT FACE="Arial, sans-serif"><FONT SIZE=2><B>From</B></FONT></FONT></P>
+			</TD>
+			<TD>
+				<P><FONT FACE="Arial, sans-serif"><FONT SIZE=2><B>Upto</B></FONT></FONT></P>
+			</TD>
+			<TD>
+				<P><FONT FACE="Arial, sans-serif"><FONT SIZE=2><B>Rig Id</B></FONT></FONT></P>
+			</TD>
+			<TD>
+				<P><FONT FACE="Arial, sans-serif"><FONT SIZE=2><B>Collector</B></FONT></FONT></P>
+			</TD>
+		</TR>
+		<TR>
+			<TD>
+				<P><INPUT TYPE=TEXT NAME="EXF_from" SIZE=14 STYLE="width: 3.07cm; height: 0.64cm"></P>
+			</TD>
+			<TD>
+				<P><INPUT TYPE=TEXT NAME="EXF_upto" SIZE=14 STYLE="width: 3.07cm; height: 0.64cm"></P>
+			</TD>
+			<TD>
+				<P><INPUT TYPE=TEXT NAME="EXF_rig" SIZE=4 STYLE="width: 0.95cm; height: 0.64cm"></P>
+			</TD>
+			<TD>
+				<P><INPUT TYPE=TEXT NAME="EXF_coll" SIZE=4 STYLE="width: 0.95cm; height: 0.64cm"></P>
+			</TD>
+		</TR>
+	</TABLE>
+	<HR>
+	<P><INPUT TYPE=SUBMIT NAME="EXB_extract" VALUE="Extract" STYLE="width: 2.36cm; height: 0.93cm">
+		</P>
+</FORM>
+<HR>
+<H3><FONT FACE="Arial, sans-serif">Notes:</FONT></H3>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The primary time
+stamp of a sample/event (used for searching) is the <FONT COLOR="#b80047">Delivery
+Time</FONT>, as marked by the EMS database upon the reception of the
+sample from the satellite. This is the only time that is always and
+unconditionally reliable. Note that it is GMT at present. We can
+easily offset this time stamp as well as the time stamps of the
+collectors (the configuration setup provides a parameter for that).</FONT></P>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The <FONT COLOR="#b80047">TS</FONT>
+field in an extracted CSV file tells whether the collector's time
+stamp is reliable or not. The letter <FONT COLOR="#b80047">Y</FONT>
+means that the collector has acquired its time from the gateway, and
+<FONT COLOR="#b80047">N</FONT> that it has not.</FONT></P>
+<P ALIGN=JUSTIFY><FONT FACE="Arial, sans-serif">The database is
+updated every <FONT COLOR="#b80047">60</FONT> seconds by pulling any
+fresh batch of data from the EMS site.</FONT></P>
+<HR>
+<P ALIGN=RIGHT><FONT FACE="Arial, sans-serif"><FONT COLOR="#b80047"><FONT SIZE=2 STYLE="font-size: 9pt">Copyright
+(C) 2009,</FONT></FONT><FONT SIZE=2 STYLE="font-size: 9pt"> </FONT><A HREF="http://www.olsonet.com/"><FONT COLOR="#b80047"><FONT SIZE=2 STYLE="font-size: 9pt">Olsonet
+Communications Corporation</FONT></FONT></A></FONT></P>
+</BODY>
+</HTML>

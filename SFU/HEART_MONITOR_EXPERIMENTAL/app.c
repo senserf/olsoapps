@@ -9,6 +9,7 @@
 #include "tcvphys.h"
 #include "tcvplug.h"
 #include "board_rf.h"
+#include "storage.h"
 
 // #define	DONT_DISPLAY
 // #define	DEBUG_DISPLAY

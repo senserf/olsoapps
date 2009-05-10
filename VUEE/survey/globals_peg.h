@@ -19,6 +19,7 @@
 #include "tarp.h"
 
 #include "attribs_peg.h"
+#include "storage.h"
 
 heapmem {80, 20}; // how to find out a good ratio?
 
