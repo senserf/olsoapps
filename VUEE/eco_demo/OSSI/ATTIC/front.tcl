@@ -961,7 +961,6 @@ proc doit_virgin { arg } {
 			sendm $cmd
 			sendm $cmd
 			sendm $cmd
-			sendm "m"
 	
 			if [issue [scmd "a -1 -1 -1 3"] "^1005" 4 8] {
 				# collect all
@@ -1381,6 +1380,17 @@ proc prompt { } {
 	flush stdout
 }
 
+proc twod { nn } {
+
+	regsub "^0+" $nn "" nn
+
+	if { $nn == "" || [catch { format "%02d" [expr $nn % 100] } nn] } {
+		set nn "00"
+	} 
+
+	return $nn
+}
+
 proc t_parse { ln } {
 
 	upvar $ln line
@@ -1392,18 +1402,14 @@ proc t_parse { ln } {
 		if { $y < 2000 } {
 			set y 0
 		}
-		append res [format "%02d-%02d-%02d" 	[expr $y % 100] \
-							[expr $u % 100] \
-							[expr $d % 100] ]
+		append res "[twod $y]-[twod $u]-[twod $d]"
 	}
 	if [regexp "^\[ \t\]*(\[0-9\]+):(\[0-9\]+):(\[0-9\]+)" $line jk y u d] {
 		set line [string range $line [string length $jk] end]
 		if { $res != "" } {
 			append res " "
 		}
-		append res [format "%02d:%02d:%02d" 	[expr $y % 100] \
-							[expr $u % 100] \
-							[expr $d % 100] ]
+		append res "[twod $y]:[twod $u]:[twod $d]"
 	}
 
 	return $res

@@ -2,7 +2,13 @@
 ###########################\
 exec wish "$0" "$@"
 
-set ver [info tclversion]
+##########################################################
+#                                                        #
+# ECONNECT version 0.8                                   #
+#                                                        #
+# Copyright (C) Olsonet Communications Corporation, 2009 #
+#                                                        #
+##########################################################
 
 package require Tk
 
@@ -37,9 +43,30 @@ set PM(MLC)	1024
 set PM(ASH)	{
 			"Uptime:"
 			"Master:"
-			"Writing to strorage:"
+			"Writing to storage:"
 			"Entries stored:"
 			"Audit interval:"
+		}
+
+# Custodian status headers
+set PM(USH)	{
+			"Uptime:"
+			"Master:"
+			"Writing to storage:"
+			"Entries stored:"
+			"Satellite time:"
+			"Signal quality:"
+			"Lattitude:"
+			"Longitude:"
+			"Altitude:"
+		}
+
+# Collector status headers
+set PM(CSH)	{
+			"Uptime:"
+			"Writing to storage:"
+			"Entries stored:"
+			"Sampling interval:"
 		}
 
 # Counter to assign distinct names to some global windows
@@ -50,9 +77,49 @@ set ST(MOD)	0
 
 ### Patterns ##################################################################
 
+# time stamp
+set PT(TST) 	"(\[0-9\]+-\[0-9\]+-\[0-9\]+ \[0-9\]+:\[0-9\]+:\[0-9\]+)"
+
 # aggregator's status
 set PT(AST)	": (\[0-9\]+).: Audit freq (\[0-9\]+).*a_fl (\[0-9a-f\]+) "
 	append PT(AST) "Uptime (\[0-9\]+).*aster (\[0-9\]+).*entries (\[0-9\]+)"
+
+# aggregator's data sample line
+set PT(AGS)	"^1007 Col (\[0-9\]+) slot (\[0-9\]+).*A: (\[0-9\]+). "
+	append PT(AGS) $PT(TST)
+	append PT(AGS) "..A "
+	append PT(AGS) $PT(TST)
+	append PT(AGS) ". (.+)"
+
+# aggregator's event
+set PT(AEV)	"^1011 (\[^ \]+) (\[0-9\]+) "
+	append PT(AEV) $PT(TST)
+	append PT(AEV) " (.+)"
+
+# aggregator's end of list
+set PT(AEL)	"^1008 Did"
+
+# collector's status
+set PT(CST)	": (\[0-9\]+).: Maj_freq (\[0-9\]+).*c_fl (\[0-9a-f\]+) "
+	append PT(CST) "Uptime (\[0-9\]+) .*reads (\[0-9\]+)"
+
+# collector's data sample line
+set PT(COS)	"^2007 (\[^ \]+) slot (\[0-9\]+) "
+	append PT(COS) $PT(TST)
+	append PT(COS) ". (.+)"
+
+# collector's event
+set PT(CEV)	"^2011 (\[^ \]+) (\[0-9\]+) "
+	append PT(CEV) $PT(TST)
+	append PT(CEV) " (.+)"
+
+# collector's end of list
+set PT(CEL)	"^2008 Collector"
+
+# satellite status lines
+set PT(SSA)	"^.CMGS: .System Status.,\"(..-..-)(....)(..+)\""
+set PT(SSB)	"^(\[0-9\]+),(\[^ ,\]+),(\[^ ,\]+),\[^ ,\]+,\[^ ,\]+,\[^ ,\]+,"
+	append PT(SSB) "(\[^ ,\]+),\[^ ,\]+,"
 
 ###############################################################################
 
@@ -523,10 +590,8 @@ proc cancel_timeout { prt id } {
 	global WN
 
 	set id "t,$prt,$id"
-puts "cancel_timeout: $id"
 
 	if [info exists WN($id)] {
-puts "cancel_timeout: done"
 		catch { after cancel $WN($id) }
 		set WN($id) ""
 	}
@@ -553,7 +618,6 @@ proc cancel_issue { prt } {
 	global WN
 
 	cancel_timeout $prt I
-puts "set LI"
 	set WN(LI,$prt) "@A"
 }
 
@@ -587,7 +651,6 @@ proc issue { prt cmd pat ret del { nowarn "" } } {
 		if { $rv == "@A" } {
 			# abort
 			set WN(EX,$prt) ""
-puts "issue aborted"
 			return -1
 		}
 		if { $rv != "@T" } {
@@ -625,18 +688,21 @@ proc ciss { prt cmd pat ret del { nowarn "" } } {
 proc alert { msg } {
 
 	llog "" "Alert: $msg"
-
 	tk_dialog .alert "Attention!" $msg "" 0 "OK"
 }
 
 proc confirm { msg } {
 
-	return [tk_dialog .alert "Warning!" $msg "" 0 "NO" "YES"]
+	set res [tk_dialog .alert "Warning!" $msg "" 0 "NO" "YES"]
+	llog "" "Confirm: $msg -- returns $res"
+	return $res
 }
 
 proc cconfirm { msg } {
 
-	return [tk_dialog .alert "Question!" $msg "" 0 "NO" "YES" "Cancel"]
+	set res [tk_dialog .alert "Question!" $msg "" 0 "NO" "YES" "Cancel"]
+	llog "" "Confirm: $msg -- returns $res"
+	return $res
 }
 
 proc disable_main_window { } {
@@ -663,6 +729,9 @@ proc mk_mess_window { canc w h txt } {
 	set wn ".msg$ST(CNT)"
 
 	toplevel $wn
+
+	wm title $wn "Message"
+
 	label $wn.t -width $w -height $h -borderwidth 2 -state normal
 	pack $wn.t -side top -fill x -fill y
 	button $wn.c -text "Cancel" -command $canc
@@ -695,11 +764,11 @@ proc coutm { prt msgw msg } {
 proc cancel_connect { } {
 
 	global ST
-puts "cancel_connect"
 
 	if { $ST(CPR) != "" } {
 
 		set prt $ST(CPR)
+		llog $prt "connect cancelled"
 
 		# avoid loops
 		set ST(CPR) ""
@@ -837,6 +906,96 @@ proc agg_status_monitor { prt line } {
 	set_timeout $prt S 60 "update_status $prt 1"
 }
 
+proc cus_status_monitor { prt line } {
+
+	global WN PT
+
+	set upd 0
+
+	if [regexp $PT(SSA) $line jk md yr tm] {
+
+		# got time from the satellite
+		if { [catch { expr $yr } yr] || $yr < 2009 } {
+			# not set
+			set tm "??"
+		} else {
+			set tm "$md$yr$tm"
+		}
+
+		set WN(SV,$prt) [lreplace $WN(SV,$prt) 4 4 $tm]
+		set upd 1
+
+	} elseif [regexp $PT(SSB) $line jk ss la lo al] {
+
+		set WN(SV,$prt) [lreplace $WN(SV,$prt) 5 5 $ss]
+
+		if { $la == "n/a" } {
+			set WN(SV,$prt) [lreplace $WN(SV,$prt) 6 8 \
+				"??" "??" "??"]
+		} else {
+			set WN(SV,$prt) [lreplace $WN(SV,$prt) 6 8 \
+				$la $lo $al]
+		}
+		set upd 1
+
+	} elseif [regexp "^1005" $line] {
+
+		# this looks like a status line
+		if ![regexp -nocase $PT(AST) $line j agg fre fla upt mas sam] {
+			return
+		}
+
+       		if [catch { expr 0x$fla } fla] {
+        	        set fla 0
+        	}
+
+		set WN(NI,$prt) $agg
+
+		if { $mas == $agg } {
+			set mas "this node"
+		}
+
+		set WN(SV,$prt) [lreplace $WN(SV,$prt) 0 3 "$upt s" $mas \
+			[fltos $fla] $sam]
+		set upd 1
+	}
+
+	if $upd {
+		out_status $prt
+		set WN(SI,$prt) 60
+		set_timeout $prt S 60 "update_status $prt 1"
+	}
+}
+	
+proc col_status_monitor { prt line } {
+
+	global WN PT
+
+	if ![regexp "^2005" $line] {
+		return
+	}
+
+	# this looks like a status line
+	if ![regexp -nocase $PT(CST) $line j col fre fla upt sam] {
+		llog $prt "bad response from node: $line"
+		return
+	}
+
+        if [catch { expr 0x$fla } fla] {
+                set fla 0
+        }
+
+	set WN(NI,$prt) $col
+
+	set WN(SV,$prt) [list "$upt s" [fltos $fla] $sam "$fre s"]
+	out_status $prt
+
+	set WN(SI,$prt) 60
+
+	# slow rate is once per minute for an aggregator
+	set_timeout $prt S 60 "update_status $prt 1"
+}
+
 proc setup_window { prt } {
 
 	global WN
@@ -953,6 +1112,210 @@ proc setup_agg_window { prt } {
 	update_status $prt
 }
 
+proc setup_cus_window { prt } {
+
+	global WN PM
+
+	set w $WN(w,$prt,S)
+
+	set ti [cnotype $prt]
+
+	wm title $w "$ti on port $prt"
+
+	# the column of buttons
+	labelframe $w.b -text "Actions" -padx 2 -pady 2
+	pack $w.b -side left -fill y
+
+	# and the buttons
+	button $w.b.bst -text "Start" -state disabled -command "do_start $prt"
+	pack $w.b.bst -side top -fill x -pady 2
+
+	button $w.b.bso -text "Stop" -state disabled -command "do_stop $prt"
+	pack $w.b.bso -side top -fill x -pady 2
+
+	button $w.b.bsh -text "Show" -state disabled -command "do_show $prt"
+	pack $w.b.bsh -side top -fill x -pady 2
+
+	button $w.b.bex -text "Extract" -state disabled \
+		-command "do_extract $prt"
+	pack $w.b.bex -side top -fill x -pady 2
+
+	button $w.b.blo -text "Log" -state disabled -command "do_echo $prt"
+	pack $w.b.blo -side top -fill x -pady 2
+
+	button $w.b.bvi -text "Reset" -state disabled -command "do_virgin $prt"
+	pack $w.b.bvi -side top -fill x -pady 2
+
+	button $w.b.ben -text "Close" -state disabled -command "stop_port $prt"
+	pack $w.b.ben -side top -fill x -pady 2
+
+	set bl "bst bso bsh bex blo bvi ben"
+
+	set WN(BL,$prt) $bl
+
+	# the right side, i.e., node status label
+
+	labelframe $w.s -text "Node Status" -padx 2 -pady 2
+	pack $w.s -side left -fill y
+
+	# the actual pane
+	set p $w.s.p
+	frame $p
+	pack $p -side top
+
+	# a filler
+	frame $w.s.f
+	pack $w.s.f -fill y -expand y
+
+	mk_status_pane $prt $p $ti $PM(USH)
+
+	# insert satnode change button
+	label $p.tf.s -text " -> satnode $WN(AI,$prt)"
+	button $p.tf.b -text "Change" -command "change_ai $prt"
+
+	pack $p.tf.s -side left
+	pack $p.tf.b -side left
+
+	out_status $prt
+
+	# plug in the status monitor
+	set WN(SM,$prt) cus_status_monitor
+
+	enable_node_window $prt
+
+	update_status $prt
+}
+
+proc change_ai { prt } {
+#
+# Change satnode Id
+#
+	global WN ST MV
+
+	set w [smw $prt "Satnode ID"]
+
+	disable_node_window $prt
+
+	frame $w.o -pady 2 -padx 2
+	pack $w.o -side top -fill x
+
+	# the default
+	set MV(SN) $WN(AI,$prt)
+
+	label $w.o.sil -text "Enter new satnode ID:"
+	grid $w.o.sil -column 0 -row 0 -sticky w -padx 4
+	entry $w.o.sie -width 5 -textvariable MV(SN)
+	grid $w.o.sie -column 1 -row 0 -sticky w -padx 4
+
+	frame $w.b
+	pack $w.b -side top -fill x
+
+	button $w.b.go -text "Enter" -command "set ST(MOD) 1"
+	pack $w.b.go -side right
+
+	button $w.b.ca -text "Cancel" -command "set ST(MOD) 0"
+	pack $w.b.ca -side left
+
+	bind $w <Destroy> "set ST(MOD) 0"
+
+	wm transient $w $WN(w,$prt,S)
+	raise $w
+
+	while 1 {
+
+		tkwait variable ST(MOD)
+
+		if { $ST(MOD) == 0 } {
+			# cancelled
+			dmw $prt
+			enable_node_window $prt
+			return
+		}
+
+		# verify the argument
+		set sn [vnum $MV(SN) 1 65536]
+
+		if { $sn == "" || $sn == $WN(NI,$prt) } {
+			alert "Illegal or missing node Id; must be between 1\					and 65535 and different from custodian Id!"
+		} else {
+			break
+		}
+	}
+
+	# delete the modal window
+	dmw $prt
+	enable_node_window $prt
+	set WN(AI,$prt) $sn
+
+	set w $WN(SP,$prt)
+	$w.tf.s configure -text " -> satnode $sn"
+}
+
+proc setup_col_window { prt } {
+
+	global WN PM
+
+	set w $WN(w,$prt,S)
+
+	set ti [cnotype $prt]
+
+	wm title $w "$ti on port $prt"
+
+	# the column of buttons
+	labelframe $w.b -text "Actions" -padx 2 -pady 2
+	pack $w.b -side left -fill y
+
+	# and the buttons
+	button $w.b.bst -text "Start" -state disabled
+	pack $w.b.bst -side top -fill x -pady 2
+
+	button $w.b.bso -text "Stop" -state disabled -command "do_stop $prt"
+	pack $w.b.bso -side top -fill x -pady 2
+
+	button $w.b.bsh -text "Show" -state disabled
+	pack $w.b.bsh -side top -fill x -pady 2
+
+	button $w.b.bex -text "Extract" -state disabled \
+		-command "do_extract $prt"
+	pack $w.b.bex -side top -fill x -pady 2
+
+	button $w.b.blo -text "Log" -state disabled -command "do_echo $prt"
+	pack $w.b.blo -side top -fill x -pady 2
+
+	button $w.b.bvi -text "Reset" -state disabled -command "do_virgin $prt"
+	pack $w.b.bvi -side top -fill x -pady 2
+
+	button $w.b.ben -text "Close" -state disabled -command "stop_port $prt"
+	pack $w.b.ben -side top -fill x -pady 2
+
+	# the list of buttons (for disabling/enabling)
+	set bl "bso bex blo bvi ben"
+	set WN(BL,$prt) $bl
+
+	# the right side, i.e., node status label
+
+	labelframe $w.s -text "Node Status" -padx 2 -pady 2
+	pack $w.s -side left -fill y
+
+	# the actual pane
+	frame $w.s.p
+	pack $w.s.p -side top
+
+	# a filler
+	frame $w.s.f
+	pack $w.s.f -fill y -expand y
+
+	mk_status_pane $prt $w.s.p $ti $PM(CSH)
+	out_status $prt
+
+	# plug in the status monitor
+	set WN(SM,$prt) col_status_monitor
+
+	enable_node_window $prt
+
+	update_status $prt
+}
+
 proc enable_node_window { prt } {
 
 	global WN
@@ -988,22 +1351,27 @@ proc mk_status_pane { prt w tt hlist } {
 	global WN
 
 	# initialize the value list
-	set WN(SV,$prt) [list "??" "??" "??" "??" "??"]
+	set WN(SV,$prt) ""
 	set WN(ST,$prt) $tt
 
 	# the window pane pointer
 	set WN(SP,$prt) $w
 
 	# the title (will come up later)
-	label $w.t -text "" -justify left
-	grid $w.t -column 0 -row 0 -columnspan 2 -sticky nw -ipady 4
+	frame $w.tf
+	grid $w.tf -column 0 -row 0 -columnspan 2 -sticky nw -ipady 4
+	label $w.tf.t -text "" -justify left
+	pack $w.tf.t -side left
 
 	set cnt 0
 	foreach h $hlist {
+		append WN(SV,$prt) "?? "
 		label $w.h$cnt -text "    $h" -justify left
 		grid $w.h$cnt -column 0 -row [expr $cnt + 1] -sticky w
 		incr cnt
 	}
+
+	set WN(SV,$prt) [string trimright $WN(SV,$prt)]
 
 	for { set i 0 } { $i < $cnt } { incr i } {
 		# create value labels
@@ -1031,7 +1399,7 @@ proc out_status { prt } {
 		set ni "??"
 	}
 
-	$w.t configure -text "$t $ni"
+	$w.tf.t configure -text "$t $ni"
 
 	set i 0
 	foreach x $v {
@@ -1162,7 +1530,6 @@ proc add_text { w txt } {
 	$w insert end "$txt"
 	$w configure -state disabled
 	$w yview -pickplace end
-
 }
 
 proc end_line { w } {
@@ -1423,6 +1790,64 @@ proc start_aggregator { prt msgw intv plid erase } {
 	return 0
 }
 
+proc start_custodian { prt msgw intv plid erase } {
+
+	global WN
+
+	set msg "Resetting the satnode "
+
+	if $erase {
+		append msg "and erasing its storage "
+	}
+
+	append msg "..."
+
+	if [coutm $prt $msgw $msg] {
+		return 1
+	}
+
+	if $erase {
+		if [ciss $prt [scmd $prt "E"] "1001" 4 60] {
+			return 1
+		}
+	} else {
+		if [ciss $prt [scmd $prt "q"] "1001" 4 60] {
+			return 1
+		}
+	}
+
+	if [coutm $prt $msgw "Setting parameters ..."] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "Y $intv"] "^1013" 6 4] {
+		return 1
+	}
+
+	# make it a master
+	set msg [scmd $prt "m"]
+	sendm $prt $msg
+	sendm $prt $msg
+	sendm $prt $msg
+	sendm $prt $msg
+
+	if [ciss $prt [scmd $prt "P $plid"] "^1012" 6 4] {
+		return 1
+	}
+
+	# note, we do not set time for a satnode
+
+	if [ciss $prt [scmd $prt "a -1 -1 -1 3"] "^1005" 6 5] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "SA"] "^1010" 4 10] {
+		return 1
+	}
+
+	return 0
+}
+
 proc do_stop { prt } {
 
 	global WN
@@ -1498,6 +1923,40 @@ proc stop_aggregator { prt msgw mai } {
 	return  0
 }
 
+proc stop_custodian { prt msgw } {
+
+	global WN
+
+	if [coutm $prt $msgw "Resetting node ..."] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "q"] "^1001" 4 60] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "a -1 -1 -1 0"] "^1005" 4 8] {
+		return 1
+	}
+
+	return  0
+}
+
+proc stop_collector { prt msgw } {
+
+	global WN
+
+	if [coutm $prt $msgw "Resetting node for maintenance ..."] {
+		return 1
+	}
+
+	if [ciss $prt "M" "^2005" 4 30] {
+		return 1
+	}
+
+	return 0
+}
+
 proc do_virgin { prt } {
 
 	global WN ST MV
@@ -1538,6 +1997,16 @@ proc do_virgin { prt } {
 		# the default
 		set MV(SN) 60
 
+		if { $nt == "collector" } {
+			# store all samples?
+			label $w.o.sal -text "Store samples:"
+			grid $w.o.sal -column 0 -row 1 -sticky w -padx 4
+			tk_optionMenu $w.o.sas MV(SS) "All" "Unconfirmed" \
+				"Confirmed" "None"
+			set MB(SS) "All"
+			grid $w.o.sas -column 1 -row 1 -sticky w -padx 4
+		}
+
 		frame $w.b
 		pack $w.b -side top -fill x
 
@@ -1567,16 +2036,21 @@ proc do_virgin { prt } {
 			# verify the argument
 			set intv [fix_intv $MV(SN)]
 
-			if { $intv >= 0 } {
-				break
+			if { $intv < 0 } {
+				continue
 			}
+		
+			if { $nt == "collector" } {
+				set sas $MV(SS)
+			}
+			break
 		}
 
 		# delete the modal window
 		dmw $prt
 	} else {
 		# playing it safe
-		set intvl 60
+		set intv 60
 	}
 
 	set msgw [mk_mess_window "cancel_node_command $prt" 35 1 ""]
@@ -1585,9 +2059,9 @@ proc do_virgin { prt } {
 	if { $nt == "aggregator" } {
 		set res [virgin_aggregator $prt $msgw $intv]
 	} elseif { $nt == "collector" } {
-		set res [virgin_collector $prt $msgw $intv]
+		set res [virgin_collector $prt $msgw $intv $sas]
 	} else {
-		set res [virgin_custodian $prt $msgw $cus $intv]
+		set res [virgin_custodian $prt $msgw $intv $cus]
 	}
 
 	set WN(CP,$prt) 1
@@ -1653,6 +2127,115 @@ proc virgin_aggregator { prt msgw intv } {
 
 	if [ciss $prt "a -1 -1 -1 0" "^1005" 4 5] {
 		# do not collect any samples unless told so
+		return 1
+	}
+
+	return 0
+}
+
+proc virgin_custodian { prt msgw intv cus } {
+
+	global WN
+
+	if $cus {
+
+		if [coutm $prt $msgw "Returning the custodian to factory\
+		    state ..."] {
+			return 1
+		}
+
+		if [ciss $prt "Q" "^1001" 4 60] {
+			return 1
+		}
+
+		return 0
+	}
+
+	if [coutm $prt $msgw "Returning the satnode to factory state ..."] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "Q"] "^1001" 4 60] {
+		return 1
+	}
+
+	if { $intv == 0 } {
+		set intv 60
+	}
+
+	if [coutm $prt $msgw "Pre-setting the sampling interval ..."] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "Y $intv"] "^1013" 6 4] {
+		return 1
+	}
+
+	# make it a master
+	set cmd [scmd $prt "m"]
+	sendm $prt $cmd
+	sendm $prt $cmd
+	sendm $prt $cmd
+	sendm $prt $cmd
+
+	if [ciss $prt [scmd $prt "a -1 -1 -1 3"] "^1005" 4 8] {
+		# collect all
+		return 1
+	}
+
+	if [coutm $prt $msgw "Saving sampling parameters ..."] {
+		return 1	
+	}
+
+	if [ciss $prt [scmd $prt "SA"] "^1010" 4 6] {
+		return 1
+	}
+
+	if [coutm $prt $msgw "Bringing the node to stopped state ..."] {
+		return 1
+	}
+
+	if [ciss $prt [scmd $prt "a -1 -1 -1 0"] "^1005" 4 5] {
+		# do not collect any samples unless told so
+		return 1
+	}
+
+	return 0
+}
+
+proc virgin_collector { prt msgw intv sas } {
+
+	global WN
+
+	if [coutm $prt $msgw "Returning the collector to factory state ..."] {
+		return 1
+	}
+
+	if [ciss $prt "Q" "^CC1100" 3 60] {
+		return 1
+	}
+
+	if { $intv == 0 } {
+		# the default
+		set intv 60
+	}
+
+	if [coutm $prt $msgw "Pre-setting parameters: $intv / $sas ..."] {
+		return 1
+	}
+
+	switch $sas {
+		"All"		{ set sas 3 }
+		"Unconfirmed"	{ set sas 1 }
+		"Confirmed"	{ set sas 2 }
+		default 	{ set sas 0 }
+	}
+
+	if [ciss $prt "s $intv -1 0 -1 $sas" "^2005" 6 4] {
+		return 1
+	}
+
+	if [ciss $prt "SA" "^2010" 6 4] {
 		return 1
 	}
 
@@ -1807,7 +2390,6 @@ proc show_upd { prt col ts rvals } {
 #
 	global WN
 
-puts "show_up: $col $ts $rvals"
 	if ![info exists WN(w,$prt,H)] {
 		return
 	}
@@ -1971,10 +2553,19 @@ proc t_skip { ln pat } {
 	return $res
 }
 
+proc twod { nn } {
+
+	regsub "^0+" $nn "" nn
+
+	if { $nn == "" || [catch { format "%02d" [expr $nn % 100] } nn] } {
+		set nn "00"
+	} 
+
+	return $nn
+}
+
 proc t_parse { ln } {
-#
-# Parse a time stamp
-#
+
 	upvar $ln line
 
 	set res ""
@@ -1984,18 +2575,14 @@ proc t_parse { ln } {
 		if { $y < 2000 } {
 			set y 0
 		}
-		append res [format "%02d-%02d-%02d" 	[expr $y % 100] \
-							[expr $u % 100] \
-							[expr $d % 100] ]
+		append res "[twod $y]-[twod $u]-[twod $d]"
 	}
 	if [regexp "^\[ \t\]*(\[0-9\]+):(\[0-9\]+):(\[0-9\]+)" $line jk y u d] {
 		set line [string range $line [string length $jk] end]
 		if { $res != "" } {
 			append res " "
 		}
-		append res [format "%02d:%02d:%02d" 	[expr $y % 100] \
-							[expr $u % 100] \
-							[expr $d % 100] ]
+		append res "[twod $y]:[twod $u]:[twod $d]"
 	}
 
 	return $res
@@ -2029,8 +2616,9 @@ proc n_parse { ln { nn 0 } { fl 0 } } {
 		return ""
 	}
 
-	set line \
-		[string trimleft [string range $line [string length $code] end]]
+	set line [string range $line [string length $code] end]
+
+	regsub "^\[ ,\t\n\r\]+" $line "" line
 
 	return $num
 }
@@ -2042,7 +2630,6 @@ proc show_sensors { prt line } {
 	global WN
 
 	t_skip line " Col "
-puts "show_sensors: $line"
 
 	set cn [n_parse line 1]
 	if { $cn == "" } {
@@ -2071,9 +2658,6 @@ puts "show_sensors: $line"
 			break
 		}
 		lappend rv $v
-		if { [string index $line 0] == "," } {
-			set line [string range $line 1 end]
-		}
 	}
 
 	show_upd $prt $cn $ts $rv
@@ -2095,11 +2679,21 @@ puts "show_sensors: $line"
 
 proc do_extract { prt } {
 
-	global WN MV
+	global WN MV ST
 
 	if $WN(SE,$prt) {
 		# extracting already
 		return
+	}
+
+	if [info exists WN(w,$prt,E)] {
+		if ![confirm "You have an extraction window open for this node.\
+			It will be closed before starting the new extraction.\
+			Is that OK?"] {
+				return
+		}
+		catch { destroy $WN(w,$prt,E) }
+		catch { unset WN(w,$prt,E) }
 	}
 
 	if { $WN(NT,$prt) == "custodian" } {
@@ -2156,7 +2750,6 @@ proc do_extract { prt } {
 		entry $w.o.cne -width 5 -textvariable MV(CN)
 		grid $w.o.cne -column 1 -row 4 -sticky w -padx 4
 		set MV(CN) "all"
-		incr row
 	}
 
 	frame $w.b
@@ -2180,7 +2773,7 @@ proc do_extract { prt } {
 
 		if { $ST(MOD) == 0 } {
 			# cancelled
-			catch { destroy $w }
+			dmw $prt
 			enable_node_window $prt
 			return
 		}
@@ -2237,12 +2830,12 @@ proc do_extract { prt } {
 		}
 
 		if $ev {
-			set deff "events.txt"
-			set defe ".txt"
+			set deff "events.csv"
 		} else {
 			set deff "values.csv"
-			set defe ".csv"
 		}
+
+		set defe ".csv"
 
 		# time to handle the file
 		if { $MV(FI) == "File" } {
@@ -2264,6 +2857,8 @@ proc do_extract { prt } {
 				}
 			}
 
+			# the file name
+			set WN(EN,$prt) $fn
 			set WN(EF,$prt) $fd
 		} else {
 			set WN(EF,$prt) ""
@@ -2274,13 +2869,31 @@ proc do_extract { prt } {
 	}
 
 	# delete the modal window
-	catch { destroy $w }
+	dmw $prt
+
+	# command to start
+	set cmd "D $fr $up"
+
+	# calculate the mode parameter
+	if { $WN(NT,$prt) == "collector" } {
+		set em 3
+	} else {
+		set em 1
+		# aggregator
+		if $ev {
+			append cmd " 65535"
+		}
+	}
+
+	if $ev {
+		incr em
+	}
 
 	# this is the way to tell which case is which
 	if { $WN(EF,$prt) != "" } {
 		# writing to file, need a progress window of sorts
-		set WN(w,$prt,E) [mk_mess_window "abort_extraction $prt" 25 1\
-			"Extracting slot:     "]
+		set WN(w,$prt,E) [mk_mess_window "stop_extraction $prt 1" 25 1\
+			"Waiting for data to arrive ..."]
 	} else {
 		# have to open a terminal-like window to accommodate the stuff
 		if [info exists WN(w,$prt,E)] {
@@ -2295,14 +2908,18 @@ proc do_extract { prt } {
 
 		text $w.t
 
+		# header length
+		set wi [ewhdr $prt $em 1]
+
 		$w.t configure \
 			-yscrollcommand "$w.scroly set" \
 			-xscrollcommand "$w.scrolx set" \
+			-wrap none \
 			-setgrid true \
-        		-width 80 -height 24 \
+        		-width $wi -height 24 \
 			-font {-family courier -size 10} \
 			-exportselection 1 \
-			-state normal
+			-state disabled
 
 		$w.t delete 1.0 end
 
@@ -2322,23 +2939,399 @@ proc do_extract { prt } {
 		button $w.stat.cl -text "Close" -command "close_ewindow $prt"
 		pack $w.stat.cl -side right
 
-		button $w.stat.ab -text "Abort" -command "abort_extraction $prt"
-		pack $w.stat.cl -side left
+		label $w.stat.st -text "Running ...       "
+		pack $w.stat.st -side right
+
+		button $w.stat.ab -text "Abort" \
+			-command "stop_extraction $prt 1"
+		pack $w.stat.ab -side left
 
 		bind $w <Destroy> "close_ewindow $prt"
 	}
 
+	# extraction mode
+	set WN(SE,$prt) $em
 
+	# extracted so far
+	set WN(EC,$prt) 0
+		
+	# header
+	ewhdr $prt $em
 
-
-###here
-
-
-	
-
+	while 1 {
+		# startup
+		sendm $prt $cmd
+		set_timeout $prt E 30 "extract_timeout $prt"
+		# what is going to happen if the variable is unset?
+		tkwait variable WN(EC,$prt)
+		cancel_timeout $prt E
+		if { $WN(SE,$prt) == 0 } {
+			# aborted
+			return
+		}
+		if $WN(EC,$prt) {
+			# something has arrived
+			break
+		}
+	}
 }
 
+proc extract_timeout { prt } {
+
+	global WN
+
+	set ec $WN(EC,$prt)
+	set WN(EC,$prt) $ec
+}
+
+proc stop_extraction { prt abt } {
+#
+	global WN
+
+	# FIXME unfortunately, we have no way to tell the node
+
+	if { $WN(SE,$prt) == 0 } {
+		return
+	}
+
+	cancel_timeout $prt E
+
+	set WN(SE,$prt) 0
+
+	if [info exists WN(EF,$prt)] {
+
+		if $abt {
+			set msg \
+				"Extraction aborted: note that the node\
+				may have been left in a hung state, and you\
+				will have to reset it manually by powering it\
+				down and up again!"
+		}
+
+		# should we close the file
+		set fd $WN(EF,$prt)
+		if { $fd != "" } {
+			catch { close $fd }
+			catch { destroy $WN(w,$prt,E) }
+			catch { unset WN(w,$prt,E) }
+
+			if !$abt {
+				set msg "Extraction complete!"
+			}
+
+			if $WN(EC,$prt) {
+				alert $msg
+			} else {
+
+				append msg "\n\nNothing has been extracted!\
+				    Should I remove the empty output file?"
+
+				if [confirm $msg] {
+					catch {
+						file delete -force $WN(EN,$prt)
+					}
+				}
+			}
 	
+		} else {
+			# there is a window
+			if [info exists WN(w,$prt,E)] {
+				set w $WN(w,$prt,E)
+				if $abt {
+					set t "Aborted"
+				} else {
+					set t "Done"
+				}
+				$w.stat.st configure -text "$t      "
+			}
+
+			if $abt {
+				alert $msg
+			}
+		}
+			
+		unset WN(EF,$prt)
+	}
+	enable_node_window $prt
+}
+
+proc close_ewindow { prt } {
+#
+# Close the extraction window
+#
+	global WN
+
+	stop_extraction $prt 1
+
+	if [info exists WN(w,$prt,E)] {
+		catch { destroy $WN(w,$prt,E) }
+		catch { unset WN(w,$prt,E) }
+	}
+}
+
+proc ewhdr { prt em { len 0 } } {
+#
+# Output the extraction header
+#
+	global WN
+
+	if { $WN(EF,$prt) == "" } {
+		# this goes to the screen
+		if { [expr $em & 1] == 0 } {
+			# events
+			set ln "      Slot Event     Date     Time  Par1  Par2"
+			append ln "  Par3"
+			if $len {
+				return [string length $ln]
+			}
+		} elseif { $WN(NT,$prt) == "collector" } {
+			# collector
+			set ln "    Status       Slot     Date     Time"
+			append ln "   Raw Converted ..."
+		} else {
+			# aggregator
+			set ln " Coll  Coll Slot Agg Slot Col Date Col Time"
+			append ln "   Agg Date Agg Time   Raw Converted ..."
+		}
+		if $len {
+			return [expr [string length $ln] + 3 * 16 - 4]
+		}
+		set w $WN(w,$prt,E)
+		add_text $w.t $ln
+		end_line $w.t
+	} else {
+
+		# this goes to a file
+		if { [expr $em & 1] == 0 } {
+			# events
+			set ln "Slot, Event, Time, Par1, Par2, Par3"
+		} elseif { $WN(NT,$prt) == "collector" } {
+			# collector
+			set ln "Status, Slot, Time, Raw, Converted, ..."
+		} else {
+			# aggregator
+			set ln "Collector, CSlot, ASlot, CTime, ATime, "
+			append ln "Raw, Converted, ..."
+		}
+
+		if $len {
+			# irrelevant
+			return 0
+		}
+
+		catch { puts $WN(EF,$prt) $ln }
+	}
+	return 0
+}
+			
+proc extract_aggregator_samples { prt mode line } {
+
+	global WN PT
+
+	if { $mode < 2 } {
+		if [regexp $PT(AGS) $line jk col csl asl cts ats vls] {
+			dump_values $prt $col $csl $asl $cts $ats $vls
+			return 1
+		}
+	} else {
+		if [regexp $PT(AEV) $line jk col asl ats vls] {
+			dump_event $prt $col $asl $ats $vls
+			return 1
+		}
+	}
+	if [regexp $PT(AEL) $line] {
+		stop_extraction $prt 0
+	}
+	return 0
+}
+
+proc extract_collector_samples { prt mode line } {
+
+	global WN PT
+
+	set nfn 1
+
+	if { $mode < 4 } {
+		if [regexp $PT(COS) $line jk typ csl cts vls] {
+			dump_values $prt $typ $csl "" $cts "" $vls
+			return 1
+		}
+	} else {
+		if [regexp $PT(CEV) $line jk col asl ats vls] {
+			dump_event $prt $col $asl $ats $vls
+			return 1
+		}
+	}
+	if [regexp $PT(CEL) $line] {
+		stop_extraction $prt 0
+	}
+	return 0
+}
+
+proc eprogress { prt val } {
+#
+# Show extraction progress
+#
+	global WN
+
+	outmess $WN(w,$prt,E) "Extracting slot: $val / $WN(EC,$prt)"
+}
+
+proc dump_values { prt col csl asl cts ats vls } {
+
+	global WN
+
+	if ![info exists WN(EF,$prt)] {
+		# this is impossible and means nobody wants us any more
+		set WN(SE,$prt) 0
+		return
+	}
+
+	incr WN(EC,$prt)
+
+	# file descriptor
+	set fd $WN(EF,$prt)
+
+	set cts [t_parse cts]
+	if { $ats == "" } {
+		# this is a collector
+		set cn $WN(NI,$prt)
+		# display running slot number
+		set ds $csl
+	} else {
+		# aggregator
+		set cn $col
+		set ds $asl
+		set ats [t_parse ats]
+	}
+
+	# prepare the list of converted values
+	set cvs ""
+	set rvs ""
+	set inx 0
+
+	while 1 {
+		set n [n_parse vls 1]
+		if { $n == "" } {
+			break
+		}
+		lappend rvs $n
+		lappend cvs [snip_cnvrt $n $inx $cn]
+		incr inx
+	}
+
+	if { $fd == "" } {
+		# writing to the screen
+		if { $ats == "" } {
+			# collector
+			set ln [trims $col 10]
+			append ln [trims $csl 11]
+			append ln " [t_parse cts]"
+		} else {
+			# aggregator
+			set ln [trims $col 5]
+			append ln [trims $csl 11]
+			append ln [trims $asl 11]
+			append ln " $cts"
+			append ln " $ats"
+		}
+		# the values
+		foreach ra $rvs co $cvs {
+			append ln [trims $ra 6]
+			append ln [trims $co 10]
+		}
+			
+		set w $WN(w,$prt,E)
+		add_text $w.t $ln
+		end_line $w.t
+		return
+	}
+
+	if { $ats == "" } {
+		# collector
+		set ln "$col, $csl, $cts"
+	} else {
+		# aggregator
+		set ln "$col, $csl, $asl, $cts, $ats"
+	}
+	# the values
+	foreach ra $rvs co $cvs {
+		append ln ", $ra, $co"
+	}
+		
+	catch { puts $fd $ln }
+
+	eprogress $prt $ds
+}
+
+proc dump_event { prt evt slo tst par } {
+
+	global WN
+
+	if ![info exists WN(EF,$prt)] {
+		# this is impossible and means nobody wants us any more
+		set WN(SE,$prt) 0
+		return
+	}
+
+	incr WN(EC,$prt)
+
+	# file descriptor
+	set fd $WN(EF,$prt)
+
+	set tst [t_parse tst]
+
+	if { $fd == "" } {
+
+		# writing to the screen
+
+		set ln [format %10d $slo]
+		append ln [trims $evt 6]
+		append ln " $tst"
+
+		for { set i 0 } { $i < 3 } { incr i } {
+			if [catch { expr [lindex $par $i] } v] {
+				set v 0
+			}
+			append ln [format %6d $v]
+		}
+			
+		set w $WN(w,$prt,E)
+		add_text $w.t $ln
+		end_line $w.t
+		return
+	}
+
+	set ln "$slo, $evt, $tst"
+
+	for { set i 0 } { $i < 3 } { incr i } {
+		if [catch { expr [lindex $par $i] } v] {
+			set v 0
+		}
+		append ln ", $v"
+	}
+			
+	catch { puts $fd $ln }
+
+	eprogress $prt $slo
+}
+
+proc trims { t n } {
+#
+# Make sure t is at least n chars long
+#
+	set ln [string length $t]
+
+	set p ""
+
+	while { $ln < $n } {
+		append p " "
+		incr ln
+	}
+
+	return "$p$t"
+}
+
 proc do_connect { } {
 
 	global WN PM ST mpVal mrVal mnVal
@@ -2640,30 +3633,59 @@ proc snip_vsn { nm } {
 	return 0
 }
 
-proc snip_eval { sn val } {
-#
-# Safely evaluates a snippet for a given value
-#
-	set in [interp create -safe]
+## version dependent code #####################################################
 
-	if [catch {
-		# make sure we get out of loops
-		interp limit $in commands -value 512
+if { [info tclversion] < 8.5 } {
 
-		# build the script
-		set s "set value $val\n$sn\n"
-		append s { return $value }
-		set s [interp eval $in $s]
-	} err] {
-		# make sure to clean up
+	proc snip_eval { sn val } {
+	#
+	# Safely evaluates a snippet for a given value
+	#
+		set in [interp create -safe]
+
+		if [catch {
+			# build the script
+			set s "set value $val\n$sn\n"
+			append s { return $value }
+			set s [interp eval $in $s]
+		} err] {
+			# make sure to clean up
+			interp delete $in
+			error $err
+		}
 		interp delete $in
-		error $err
+		return $s
 	}
 
-	interp delete $in
-	return $s
+} else {
+
+	proc snip_eval { sn val } {
+	#
+	# Safely evaluates a snippet for a given value
+	#
+		set in [interp create -safe]
+	
+		if [catch {
+			# make sure we get out of loops
+			interp limit $in commands -value 512
+
+			# build the script
+			set s "set value $val\n$sn\n"
+			append s { return $value }
+			set s [interp eval $in $s]
+		} err] {
+			# make sure to clean up
+			interp delete $in
+			error $err
+		}
+
+		interp delete $in
+		return $s
+	}
+
 }
 
+###############################################################################
 proc snip_parse { cf } {
 #
 # Parse conversion snippets read from a file
@@ -3459,11 +4481,6 @@ proc set_home_dir { } {
 
 	# read conversion snippets
 	snip_read
-}
-
-if { $ver < 8.5 } {
-	alert "Sorry, this script requires Tcl/Tk version 8.5 or higher!"
-	exit 99
 }
 
 set_home_dir
