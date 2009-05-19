@@ -19,38 +19,35 @@ proc u_conf { speed } {
 	fileevent $ST(SFD) readable u_rdline
 }
 
+proc u_cdevl { pi } {
+#
+# Returns the candidate list of devices to open based on the port identifier
+#
+	if { [regexp "^\[0-9\]+$" $pi] && ![catch { expr $pi } pn] } {
+		# looks like a number
+		if { $pn < 10 } {
+			# use internal Tcl COM id, which is faster
+			set wd "COM${pn}:"
+		} else {
+			set wd "\\\\.\\COM$pn"
+		}
+		return [list $wd "/dev/ttyUSB$pn" "/dev/tty$pn"]
+	}
+
+	# not a number
+	return [list $pi "\\\\.\\$pi" "/dev/$pi" "/dev/tty$pi"]
+}
+
 proc u_start { udev speed } {
 #
 # Initialize UART
 #
 	global ST
 
-	if { $udev == "" } {
-		global argv
-		# take from arguments
-		set udev [lindex $argv 0]
-	}
-
-	if { $udev == "" } {
-		set devlist ""
-		for { set udev 0 } { $udev < 32 } { incr udev } {
-			lappend devlist "COM${udev}:"
-			lappend devlist "/dev/ttyUSB$udev"
-			lappend devlist "/dev/tty$udev"
-		}
-	} else {
-		if [catch { expr $udev } cn] {
-			# must be a complete device
-			set devlist \
-			    [list $udev ${udev}: "/dev/$udev" "/dev/tty$udev"]
-		} else {
-			# com number or tty number
-			set devlist [list "COM${udev}:" "/dev/ttyUSB$udev" \
-				"/dev/tty$udev"]
-		}
-	}
+	set devlist [u_cdevl $udev]
 
 	set fail 1
+
 	foreach udev $devlist {
 		if ![catch { open $udev "r+" } ST(SFD)] {
 			set fail 0
@@ -1611,14 +1608,12 @@ proc doit_connect { arg } {
 	set spd ""
 
 	if { $arg != "" } {
-		if ![regexp "^(\[0-9\]+)\[^0-9\]*(\[0-9\]*)$" $arg jk prt spd] {
+
+		if ![regexp "^(\[^ \t\]+)\[ \t\]*(\[0-9\]*)$" $arg jk prt spd] {
 			show_usage
 			return
 		}
-		if { [catch { expr int($prt) } prt] || $prt > 32 } {
-			puts "port number $prt out of range, 32 is max"
-			return
-		}
+
 		if { $spd != "" } {
 			if { [catch { expr int($spd) } spd] || ($spd != 9600 &&\
 			    $spd != 19200) } {
@@ -1634,7 +1629,7 @@ proc doit_connect { arg } {
 
 	if { $prt == "" } {
 		# scan ports
-		for { set prt 0 } { $prt <= 32 } { incr prt } {
+		foreach prt "0 1 2 3 4 5 6 7 8 9 CNCA0" {
 			if [catch { u_start $prt 19200 }] {
 				continue
 			}
@@ -1652,9 +1647,6 @@ proc doit_connect { arg } {
 				break
 			}
 			# failure: close and try again
-			u_stop
-		}
-		if { $prt > 32 } {
 			u_stop
 		}
 		if { $ST(SFD) == "" } {

@@ -18,7 +18,7 @@ package require Tk
 set PM(VER)	1.2
 
 # maximum number of ports to try
-set PM(MPN)	32
+set PM(MPN)	20
 
 # "home" directory path (ideally, we would have to go through an installation
 # procedure and store something in the registry (yyeeechh!)
@@ -143,7 +143,7 @@ variable Log
 proc abt { m } {
 
 	if [catch { ::abt $m } ] {
-		catch { puts stderr $m }
+		catch { alert "Aborted: $m" }
 		exit 99
 	}
 }
@@ -308,11 +308,32 @@ proc fclose { fd } {
 
 }
 
+proc u_cdevl { pi } {
+#
+# Returns the candidate list of devices to open based on the port identifier
+#
+	if { [regexp "^\[0-9\]+$" $pi] && ![catch { expr $pi } pn] } {
+		# looks like a number
+		if { $pn < 10 } {
+			# use internal Tcl COM id, which is faster
+			set wd "COM${pn}:"
+		} else {
+			set wd "\\\\.\\COM$pn"
+		}
+		return [list $wd "/dev/ttyUSB$pn" "/dev/tty$pn"]
+	}
+
+	# not a number
+	return [list $pi "\\\\.\\$pi" "/dev/$pi" "/dev/tty$pi"]
+}
+
 proc u_tryopen { pn } {
 #
 # Tries to open UART port pn
 #
-	foreach dev "COM${pn}: /dev/ttyUSB$pn /dev/tty$pn" {
+	set dl [u_cdevl $pn]
+
+	foreach dev $dl {
 		if ![catch { open $dev "r+" } fd] {
 			return $fd
 		}
@@ -321,21 +342,31 @@ proc u_tryopen { pn } {
 	return ""
 }
 
-proc u_preopen { } {
+proc u_preopen { n } {
 #
 # Determine which COM ports are openable
 #
 	global PM
 
-	set res ""
+	# note: it used to be automatic, but detecting ports above 9 is
+	# extremely slow, so let us hardwire this list (leaving auto
+	# detection as an (unused) option
 
-	for { set pn 0 } { $pn <= $PM(MPN) } { incr pn } {
-		set fd [u_tryopen $pn]
-		if { $fd != "" } {
+	if $n {
+		for { set pn 0 } { $pn <= $n } { incr pn } {
 			append res " $pn"
-			fclose $fd
+		}
+	} else {
+		for { set pn 0 } { $pn <= $PM(MPN) } { incr pn } {
+			set fd [u_tryopen $pn]
+			if { $fd != "" } {
+				append res " $pn"
+				fclose $fd
+			}
 		}
 	}
+
+	append res " CNCA0 CNCA1 CNCA2 CNCA3"
 
 	return $res
 }
@@ -2647,7 +2678,6 @@ proc show_sensors { prt line } {
 	}
 
 	if { [string first "gone" $line] >= 0 } {
-		puts "  GONE!!!"
 		return
 	}
 
@@ -3336,8 +3366,10 @@ proc do_connect { } {
 
 	global WN PM ST mpVal mrVal mnVal
 
-	if [catch { expr $mpVal } prt] {
+	if { $mpVal == "Auto" } {
 		set prt ""
+	} else {
+		set prt $mpVal
 	}
 
 	if [catch { expr $mrVal } spd] {
@@ -3376,64 +3408,71 @@ proc do_connect { } {
 		set fpr 0
 		set tpr $PM(MPN)
 	} else {
+		# these need not be numeric
 		set fpr $prt
 		set tpr $prt
 	}
 
 	# reset cancel flag
 	set ST(CAN) 0
-	for { set prt $fpr } { $prt <= $tpr } { incr prt } {
 
-		if [info exists WN(FD,$prt)] {
-			# already open, skip this one
-			continue
-		}
+	set prt $fpr
 
-		set fd [u_tryopen $prt]
+	while 1 {
 
-		if { $fd == "" } {
-			# not available
-			continue
-		}
+		if ![info exists WN(FD,$prt)] {
 
-		# tentatively preconfigure things without openining the window
+			# not already open
+			set fd [u_tryopen $prt]
 
-		preconf_port $prt $fd
-		set ST(CPR) $prt
+			if { $fd != "" } {
 
-		foreach sp $splist {
+				# tentatively preconfigure things
 
-			u_conf $prt $sp
+				preconf_port $prt $fd
+				set ST(CPR) $prt
 
-			if { $ST(CAN) || [outmess $msgw \
-			    "Connecting to port $prt at $sp"] } {
+				foreach sp $splist {
 
-				# cancelled (one way or the other)
-				set ST(CAN) 1
+					u_conf $prt $sp
+
+					if { $ST(CAN) || [outmess $msgw \
+			    		"Connecting to port $prt at $sp"] } {
+
+						# cancelled
+						set ST(CAN) 1
+						stop_port $prt
+						break
+					}
+
+					set fai [try_port $prt $nty]
+
+					if { $fai < 0 } {
+						# cancelled
+						set ST(CAN) 1
+						stop_port $prt
+						break
+					}
+
+					if { $fai == 0 } {
+						break
+					}
+
+				}
+
+				if { $fai == 0 } {
+					break
+				}
+
 				stop_port $prt
-				break
 			}
-
-			set fai [try_port $prt $nty]
-
-			if { $fai < 0 } {
-				# cancelled
-				set ST(CAN) 1
-				stop_port $prt
-				break
-			}
-
-			if { $fai == 0 } {
-				break
-			}
-
 		}
-
-		if { $fai == 0 } {
+		if { $prt == $tpr } {
 			break
 		}
-
-		stop_port $prt
+		if [catch { incr prt } ] {
+			break
+		}
 	}
 
 	enable_main_window
@@ -4462,15 +4501,40 @@ proc snip_write { } {
 
 # Startup #####################################################################
 
-proc set_home_dir { } {
+proc set_home_dir { ds } {
 #
 # Creates the home directory to include logs and configuration files; reads
 # in conversion snippets
 #
 	global PM
 
-	if [catch { file mkdir $PM(HOM) } err] {
-		abt "Cannot create home directory: $PM(HOM), sorry!"
+	if ![file isdirectory $PM(HOM)] {
+		# first time
+		if ![confirm \
+		       "You appear to be running EcoNNeCt for the first time!\n\
+			\nI am going to create this directory $PM(HOM), where I\
+			will be keeping logs and your configuration of\
+			conversion snippets for sensor values.\
+			The logs will be rotated (up to four files up to 1MB\
+			each). The snippet file will be initialized with some\
+			default set which you will be able to edit at will.\n\
+			\nIs it OK to continue?"] {
+
+			exit 0
+		}
+
+		if [catch { file mkdir $PM(HOM) } err] {
+			abt "Cannot create home directory: $PM(HOM), sorry!"
+		}
+
+		cd $PM(HOM)
+
+		if [catch { open $PM(COB) "w" 0666 } fd] {
+			alert "Failed2!"
+			exit 99
+		}
+		puts -nonewline $fd [string trim $ds]
+		catch { close $fd }
 	}
 
 	# this is where we will be working
@@ -4483,7 +4547,13 @@ proc set_home_dir { } {
 	snip_read
 }
 
-set_home_dir
+#################
+
+if 1 {
+catch { close stdin }
+catch { close stdout }
+catch { close stderr }
+}
 
 # current port tried for connection
 set ST(CPR)	""
@@ -4491,7 +4561,7 @@ set ST(CPR)	""
 # cancel flag
 set ST(CAN)	0
 
-wm title . "EcoNnect $PM(VER)"
+wm title . "EcoNNeCt $PM(VER)"
 
 # use a frame: we may want to add something to the window later
 labelframe .conn -text "New Connection" -padx 4 -pady 4
@@ -4501,7 +4571,7 @@ label .conn.lr -text "Rate:"
 tk_optionMenu .conn.mr mrVal "Auto" "9600" "19200"
 
 label .conn.lp -text "Port:"
-eval "tk_optionMenu .conn.mp mpVal Auto[u_preopen]"
+eval "tk_optionMenu .conn.mp mpVal Auto[u_preopen $PM(MPN)]"
 
 label .conn.ln -text "Node:"
 tk_optionMenu .conn.mn mnVal "Any" "Aggregator" "Custodian" "Collector"
@@ -4520,3 +4590,23 @@ pack .sne.ed -side left -expand 0 -fill none
 
 bind .conn <Destroy> { exit }
 bind . <Destroy> { exit }
+
+## default snippets; note that the best way to produce the argument to
+## set_home_dir is to edit those snippets using EcoNNeCt's snippet editor
+## and then insert here the contents of the resultant file
+
+set_home_dir {
+ 
+{SHT_Temp {set value [expr -39.62 + 0.01 * $value]} {1 200-400}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-400}} {SHT_Humid {set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
+if { $value < 0.0 } {
+	set value 0.0
+} elseif { $value > 100.0 } {
+	set value 100.0
+}} {2 200-400}} {PhotoDiode {set value [expr $value * 0.5]} {3 300-400}} {ECHO_5 {set value [expr $value * 0.9246 - 40.1]
+if { $value < 0.0 } {
+	set value 0.0
+} elseif { $value > 100.0 } {
+	set value 100.0
+}} {3 200-299}}
+
+}

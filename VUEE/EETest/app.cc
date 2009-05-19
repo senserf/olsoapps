@@ -7,7 +7,7 @@
 
 #include "globals.h"
 #include "threadhdrs.h"
-#inclide "storage.h"
+#include "storage.h"
 
 thread (root)
 
