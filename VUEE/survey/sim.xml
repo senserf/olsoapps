@@ -56,19 +56,21 @@
 	<defaults>
 	    <memory>8666 bytes</memory>
 	    <processes>32</processes>
-	    <power>7</power>
-	    <rate>1</rate>
-	    <channel>0</channel>
-	    <boost>0.0dB</boost>
-	    <preamble>32 bits</preamble>
-	    <lbt>
-		delay			8msec
-		threshold		-109.0dBm
-	    </lbt>
-	    <backoff>
-		min			8msec
-		max			303msec
-	    </backoff>
+	    <radio>
+	    	<power>7</power>
+	    	<rate>1</rate>
+	    	<channel>0</channel>
+	    	<boost>0.0dB</boost>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
 	    <leds number="3">
 	    	<output target="socket"></output>
 	    </leds>

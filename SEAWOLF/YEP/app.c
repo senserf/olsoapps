@@ -360,6 +360,7 @@ thread (root)
 
 	// Initialize the AB UART link
 	ab_init (SFD);
+	ab_mode (AB_MODE_ACTIVE);
 
 	// And run the show
 	net_opt (PHYSOPT_SETSID, &net_id);
@@ -956,13 +957,11 @@ ISen:
 	if ((Status = oep_im_snd (c [0], (byte)(c [1]), c [2])) != 0)
 		proceed (RS_SST);
 	// Accepted
-	// ab_off ();
 
     entry (RS_ISW)
 
 	Status = oep_wait (RS_ISW);
 	oep_im_cleanup ();
-	// ab_on ();
 	if (Status == OEP_STATUS_DONE)
 		Status = 0;
 	proceed (RS_SST);
@@ -975,13 +974,11 @@ ESen:
 	if ((Status = oep_ee_snd (c [0], (byte) (c [1]), ef, el)) != 0)
 		proceed (RS_SST);
 	// Accepted
-	// ab_off ();
 
     entry (RS_ESW)
 
 	Status = oep_wait (RS_ESW);
 	oep_ee_cleanup ();
-	// ab_on ();
 	if (Status == OEP_STATUS_DONE)
 		Status = 0;
 	proceed (RS_SST);
@@ -1018,7 +1015,6 @@ IRcv:
 	if (Status != 0)
 		proceed (RS_SST);
 
-	// ab_off ();
 	// Waiting: same as for sending
 	proceed (RS_ISW);
 
@@ -1032,7 +1028,6 @@ ERcv:
 	if ((Status = oep_ee_rcv (ef, el)) != 0)
 		proceed (RS_SST);
 
-	// ab_off ();
 	// Waiting
 	proceed (RS_ESW);
 
