@@ -9,6 +9,7 @@
 #include "stdattr.h"
 
 // Attribute conversion
+#include "attnames.h"
 
 // None
 
@@ -19,6 +20,7 @@
 #include "sysio.h"
 #include "plug_null.h"
 #include "ab.h"
+#include "storage.h"
 
 heapmem {10, 90};
 
