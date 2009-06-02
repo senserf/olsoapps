@@ -4,8 +4,6 @@
 
 #define SFD	_dac (Node, SFD)
 #define b	_dac (Node, b)
-#define chp	_dac (Node, chp)
-#define cc	_dac (Node, cc)
 #define ibuf	_dac (Node, ibuf)
 #define obuf	_dac (Node, obuf)
 #define adr	_dac (Node, adr)

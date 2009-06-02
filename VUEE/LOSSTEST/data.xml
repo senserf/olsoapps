@@ -43,18 +43,20 @@
     <nodes>
 	<defaults>
 	    <memory>2048 bytes</memory>
-	    <power>7</power>
-	    <preamble>32 bits</preamble>
-	    <lbt>
-		delay			8msec
-		threshold		-109.0dBm
-	    </lbt>
-	    <backoff>
-		min			8msec
-		max			303msec
-	    </backoff>
-	    <eeprom>4096 bytes</eeprom>
-	    <iflash>256 bytes in 2 pages</iflash>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <eeprom size="4096"></eeprom>
+	    <iflash size="256,2"></iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>

@@ -86,7 +86,7 @@ thread (receiver)
 
 endthread
 
-__PUBLF (Node, int, rcv_start) () {
+int rcv_start () {
 
 	rkillflag = 0;
 	tcv_control (sfd, PHYSOPT_RXON, NULL);
@@ -98,7 +98,7 @@ __PUBLF (Node, int, rcv_start) () {
 	return 0;
 }
 
-__PUBLF (Node, int, rcv_stop) () {
+int rcv_stop () {
 
 	if (RCVon) {
 		tcv_control (sfd, PHYSOPT_RXOFF, NULL);
@@ -173,7 +173,7 @@ Finish:
 
 endstrand
 
-__PUBLF (Node, int, snd_start) (int del) {
+int snd_start (int del) {
 
 	tkillflag = NO;
 	last_ack = last_snt;
@@ -188,7 +188,7 @@ __PUBLF (Node, int, snd_start) (int del) {
 	return 0;
 }
 
-__PUBLF (Node, int, snd_stop) () {
+int snd_stop () {
 
 	tcv_control (sfd, PHYSOPT_TXOFF, NULL);
 	if (XMTon) {

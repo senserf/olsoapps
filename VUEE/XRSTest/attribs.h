@@ -3,7 +3,6 @@
 #ifdef	__SMURPH__
 
 int _da (SFD), _da (b);
-const char * _da (chp), * _da (cc);
 char * _da (ibuf), * _da (obuf);
 
 lword _da (adr), _da (val), _da (u), _da (s), _da (pat);

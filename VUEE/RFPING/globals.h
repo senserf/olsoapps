@@ -19,11 +19,6 @@
 #define	rkillflag	_dac (Node, rkillflag)
 #define	tkillflag	_dac (Node, tkillflag)
 
-#define	rcv_start	_dac (Node, rcv_start)
-#define	rcv_stop	_dac (Node, rcv_stop)
-#define	snd_start	_dac (Node, snd_start)
-#define	snd_stop	_dac (Node, snd_stop)
-
 // ====================
 
 #else	/* PICOS */

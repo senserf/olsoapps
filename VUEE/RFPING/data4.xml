@@ -27,10 +27,7 @@
 		-5.0dB		9.9E-1
 	</ber>
 	<frame>12 0</frame>
-	<rssi>
-		0 	-202.0
-		255 	53.0
-	</rssi>
+	<rssi>0 -202.0 255 53.0</rssi>
 	<power>
 		0	-30.0dBm
 		1	-15.0dBm
@@ -41,46 +38,57 @@
 		6	  7.0dBm
 		7	 10.0dBm
 	</power>
-	<rates>
-		0	 9600
+	<rates boost="yes">
+		0	  4800		 3dB
+		1	 10000		 0dB
+		2	 38400		-4dB
+		3       200000		-10dB
 	</rates>
+	<channels number="255">
+		Cross channel separation
+		20dB 29dB 38dB 46dB 54dB 62dB 70dB 78dB 86dB 94dB 102dB
+	</channels>
     </channel>
     <nodes>
-	<defaults>
+	<defaults start="on">
 	    <memory>2048 bytes</memory>
-	    <power>7</power>
-	    <preamble>32 bits</preamble>
-	    <lbt>
-		delay			8msec
-		threshold		-109.0dBm
-	    </lbt>
-	    <backoff>
-		min			8msec
-		max			303msec
-	    </backoff>
-	    <eeprom>4096 bytes</eeprom>
-	    <iflash>256 bytes in 2 pages</iflash>
+	    <radio>
+	    	<power>7</power>
+	    	<rate>1</rate>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <eeprom size="4096"></eeprom>
+	    <iflash size="256,2"></iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
-	    <preinit tag="TEST1" type="word">13</preinit>
-	    <preinit tag="TEST2" type="lword">0xaaaaaaaa</preinit>
-	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
+	    <sensors>
+		<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
+		<sensor number="1" vsize="2" delay="0.220">16381</sensor>
+		<sensor number="2" vsize="2" delay="0.06">4095</sensor>
+		<actuator vsize="2" delay="0.0">15</actuator>
+	    </sensors>
 	</defaults>
 	<node number="0">
-	    <leds number="4">
+	    <leds number="4"> <output target="socket"></output> </leds>
+	    <pins number="12" adc="8" counter="1,48,48" notifier="2,64,1600" dac="6">
 		<output target="socket"></output>
-	    </leds>
-	    <pins number="10" adc="8">
-		<output target="device">pins_output0.txt</output>
-		<status>1111111111</status>
-		<values>0000000000</values>
-		<voltage>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</voltage>
 	    </pins>
 	    <location>1.0 1.0</location>
 	</node>
-	<node number="1">
+	<node number="1" start="off">
+	    <leds number="4"> <output target="socket"></output> </leds>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
@@ -88,25 +96,40 @@
 	    <preinit tag="TEST1" type="word">0x13</preinit>
 	    <preinit tag="TEST3" type="string"></preinit>
 	</node>
-	<node number="2">
-	    <pins number="10" adc="8">
-		<output target="socket"></output>
-	    </pins>
+	<node>
+	    <sensors></sensors>
 	    <location>11.0 11.0</location>
-	</node>
-	<node number="3">
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
-	    <location>11.0 1.0</location>
 	</node>
-	<node number="4">
+	<node>
+	    <sensors>
+		<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor vsize="2" delay="0.5,4.5">15</sensor>
+	    </sensors>
+	    <leds number="4"> <output target="socket"></output> </leds>
+		<location>11.0 1.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
-	    <location>6.0 6.0</location>
 	</node>
-	<node number="5">
+	<node>
+	    <sensors>
+		<output target="device">actuator_output4.txt</output>
+		<input source="string">T 12.0\r\nS 0 333\r\n</input>
+		<actuator vsize="2" delay="0.1">4095</actuator>
+		<sensor vsize="2"></sensor>
+	    </sensors>
+	    <leds number="4"> <output target="socket"></output> </leds>
+		<location>6.0 6.0</location>
+	    <pins number="10" adc="8">
+		<output target="socket"></output>
+	    </pins>
+	</node>
+	<node>
+	    <leds number="4"> <output target="socket"></output> </leds>
 	    <uart rate="9600" bsize="12">
 		<input source="string">s 4096\r\n</input>
 	    </uart>
@@ -114,7 +137,7 @@
 		<output target="socket"></output>
 	    </pins>
 	    <preinit tag="TEST1" type="word">13</preinit>
-	    <location>7.0 7.0</location>
+		<location>7.0 7.0</location>
 	</node>
     </nodes>
 
@@ -125,5 +148,9 @@
 		R 3 [1.0 1.0 64.0 64.0] [4.0 4.0] [2.0 4.0] -1.0
 	</input>
     </roamer>
+
+    <panel>
+	<input source="string">T 40.0\nF 2\nT +5.0\nO 2</input>
+    </panel>
 
 </network>

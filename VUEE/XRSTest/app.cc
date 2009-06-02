@@ -8,7 +8,37 @@
 #include "globals.h"
 #include "threadhdrs.h"
 
-const char hello [] = 
+// ============================================================================
+
+strand (outlines, const char)
+
+  const char *cc;
+  word nc;
+
+  entry (OL_INIT)
+
+	while (*data == '+')
+		data++;
+
+	if (*data == '\0')
+		finish;
+
+	for (cc = data; *cc != '+' && *cc != '\0'; cc++);
+	obuf = (char*) umalloc ((nc = (cc - data)) + 1);
+	strncpy (obuf, data, nc);
+	obuf [nc] = '\0';
+	savedata ((void*)(data + nc));
+
+  entry (OL_NEXT)
+
+	ab_out (OL_NEXT, obuf);
+	proceed (OL_INIT);
+
+endstrand
+	
+// ============================================================================
+
+const char eetest_menu [] = 
 		"EEPROM Test+"
 		"Commands:+"
 		"a adr int    -> store a word+"
@@ -28,46 +58,12 @@ const char hello [] =
 		"o adr        -> erase info flash+"
 		"q            -> return to main test+";
 
-thread (root)
-
-  entry (RS_INIT)
-
-	phys_uart (0, 84, 0);
-	tcv_plug (0, &plug_null);
-	if ((SFD = tcv_open (WNONE, 0, 0)) < 0)
-		syserror (ENODEVICE, "uart");
-	w = 0xffff;
-	tcv_control (SFD, PHYSOPT_SETSID, &w);
-	tcv_control (SFD, PHYSOPT_TXON, NULL);
-	tcv_control (SFD, PHYSOPT_RXON, NULL);
-	ab_init (SFD);
-	// ab_mode (AB_MODE_ACTIVE);
-	ee_open ();
-
-	ibuf = NULL;
+thread (eetest)
 
   entry (EP_INIT)
 
-	chp = hello;
-
-  entry (EP_NINIT)
-
-	while (*chp == '+')
-		chp++;
-
-	if (*chp == '\0')
-		proceed (EP_RCMD);
-
-	for (cc = chp; *cc != '+' && *cc != '\0'; cc++);
-	obuf = (char*) umalloc ((len = (cc - chp)) + 1);
-	strncpy (obuf, chp, len);
-	obuf [len] = '\0';
-
-  entry (EP_NEXTI)
-
-	ab_out (EP_NEXTI, obuf);
-	chp += len;
-	proceed (EP_NINIT);
+	join (runstrand (outlines, eetest_menu), EP_RCMD);
+	release;
 
   entry (EP_RCMD)
 
@@ -79,7 +75,7 @@ thread (root)
 	}
 
 	ibuf = ab_in (EP_RCMD);
-	diag ("GOT CMD");
+	diag ("EETEST GOT CMD");
 
 	switch (ibuf [0]) {
 		case 'a': proceed (EP_SWO);
@@ -98,7 +94,7 @@ thread (root)
 		case 'n': proceed (EP_FLR);
 		case 'o': proceed (EP_FLE);
 		// To be changed
-		case 'q': { proceed (EP_INIT); };
+		case 'q': finish;
 	}
 	
   entry (EP_RCMD1)
@@ -386,5 +382,67 @@ Done:
 	proceed (EP_ETS_N);
 
 endthread
+
+// ============================================================================
+
+const char root_menu [] = 
+	"TEST: XRS, EEPROM, ...+"
+	"Selection:+"
+	"E -> EEPROM test+"
+	"Q -> reset board+";
+
+thread (root)
+
+  entry (RS_INIT)
+
+	phys_uart (0, 84, 0);
+	tcv_plug (0, &plug_null);
+	if ((SFD = tcv_open (WNONE, 0, 0)) < 0)
+		syserror (ENODEVICE, "uart");
+	w = 0xffff;
+	tcv_control (SFD, PHYSOPT_SETSID, &w);
+	tcv_control (SFD, PHYSOPT_TXON, NULL);
+	tcv_control (SFD, PHYSOPT_RXON, NULL);
+	ab_init (SFD);
+	// ab_mode (AB_MODE_ACTIVE);
+	ee_open ();
+
+	ibuf = NULL;
+
+  entry (RS_RESTART)
+
+	join (runstrand (outlines, root_menu), RS_RCMD);
+	release;
+
+  entry (RS_RCMD)
+
+	if (ibuf) {
+		ufree (ibuf);
+		ibuf = NULL;
+	}
+
+	ibuf = ab_in (RS_RCMD);
+	diag ("ROOT GOT CMD");
+
+	switch (ibuf [0]) {
+
+		case 'E': {
+				join (runthread (eetest), RS_RESTART);
+				release;
+		}
+
+		case 'Q': {
+				reset ();
+		}
+
+	}
+	
+  entry (RS_RCMD1)
+
+	ab_outf (RS_RCMD1, "Illegal command or parameter");
+	proceed (RS_RESTART);
+
+endthread
+
 
 praxis_starter (Node);

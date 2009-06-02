@@ -28,8 +28,8 @@
 	</ber>
 	<frame>12 0</frame>
 	<rssi>
-		0 	-202.0dBm
-		255 	  53.0dBm
+		0 	-202.0
+		255 	53.0
 	</rssi>
 	<power>
 		0	-30.0dBm
@@ -41,36 +41,27 @@
 		6	  7.0dBm
 		7	 10.0dBm
 	</power>
-	<rates boost="yes">
-		0	  4800		 3dB
-		1	 10000		 0dB
-		2	 38400		-4dB
-		3       200000		-10dB
+	<rates>
+		0	 9600
 	</rates>
-	<channels number="255">
-		Cross channel separation
-		20dB 29dB 38dB 46dB 54dB 62dB 70dB 78dB 86dB 94dB 102dB
-	</channels>
     </channel>
     <nodes>
 	<defaults>
 	    <memory>2048 bytes</memory>
-	    <processes>16</processes>
-	    <power>7</power>
-	    <rate>1</rate>
-	    <channel>0</channel>
-	    <boost>0.0dB</boost>
-	    <preamble>32 bits</preamble>
-	    <lbt>
-		delay			8msec
-		threshold		-109.0dBm
-	    </lbt>
-	    <backoff>
-		min			8msec
-		max			303msec
-	    </backoff>
-	    <eeprom>4096 bytes</eeprom>
-	    <iflash>256 bytes in 2 pages</iflash>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <eeprom size="4096"></eeprom>
+	    <iflash size="256,2"></iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
@@ -80,14 +71,18 @@
 	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
 	</defaults>
 	<node number="0">
-	    <leds number="4"> <output target="socket"></output> </leds>
-	    <pins number="12" adc="8" dac="2">
+	    <leds number="4">
 		<output target="socket"></output>
+	    </leds>
+	    <pins number="10" adc="8">
+		<output target="device">pins_output0.txt</output>
+		<status>1111111111</status>
+		<values>0000000000</values>
+		<voltage>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</voltage>
 	    </pins>
 	    <location>1.0 1.0</location>
 	</node>
 	<node number="1">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
@@ -96,27 +91,24 @@
 	    <preinit tag="TEST3" type="string"></preinit>
 	</node>
 	<node number="2">
-	    <location>11.0 11.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
+	    <location>11.0 11.0</location>
 	</node>
 	<node number="3">
-	    <leds number="4"> <output target="socket"></output> </leds>
-		<location>11.0 1.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
+	    <location>11.0 1.0</location>
 	</node>
 	<node number="4">
-	    <leds number="4"> <output target="socket"></output> </leds>
-	    <location>6.0 6.0</location>
 	    <pins number="10" adc="8">
-	    <output target="socket"></output>
+		<output target="socket"></output>
 	    </pins>
+	    <location>6.0 6.0</location>
 	</node>
 	<node number="5">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <uart rate="9600" bsize="12">
 		<input source="string">s 4096\r\n</input>
 	    </uart>
@@ -124,7 +116,7 @@
 		<output target="socket"></output>
 	    </pins>
 	    <preinit tag="TEST1" type="word">13</preinit>
-		<location>7.0 7.0</location>
+	    <location>7.0 7.0</location>
 	</node>
     </nodes>
 

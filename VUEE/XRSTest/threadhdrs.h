@@ -3,13 +3,23 @@
 
 #ifdef	__SMURPH__
 
-process THREADNAME (root) (Node) {
+process THREADNAME (outlines) (Node) {
+
+	const char *data;
+	
+	states { OL_INIT, OL_NEXT };
+
+	void setup (const char *d) { data = (const char*) d; };
+
+	void savedata (void *d) { data = (const char*) d; };
+
+	perform;
+};
+
+process THREADNAME (eetest) (Node) {
 
 	states {
-			RS_INIT,
 			EP_INIT,
-			EP_NINIT,
-			EP_NEXTI,
 			EP_RCMD,
 			EP_RCMD1,
 			EP_SWO,
@@ -50,12 +60,28 @@ process THREADNAME (root) (Node) {
 	perform;
 };
 
+process THREADNAME (root) (Node) {
+
+	states {
+			RS_INIT,
+			RS_RESTART,
+			RS_RCMD,
+			RS_RCMD1
+	};
+
+	perform;
+};
+
 #else
 
-#define RS_INIT		0
-#define EP_INIT		1
-#define EP_NINIT	2
-#define EP_NEXTI	3
+// ============================================================================
+
+#define	OL_INIT		0
+#define	OL_NEXT		1
+
+// ============================================================================
+
+#define EP_INIT		0
 #define EP_RCMD		4
 #define EP_RCMD1	5
 #define EP_SWO		6
@@ -92,8 +118,16 @@ process THREADNAME (root) (Node) {
 #define EP_ETS_K	37
 #define EP_ETS_L	38
 
+// ============================================================================
+
+#define	RS_INIT		0
+#define	RS_RESTART	1
+#define	RS_RCMD		2
+#define	RS_RCMD		3
+
+// ============================================================================
+
 int SFD, b;
-const char * chp, * cc;
 char * ibuf, * obuf;
 
 lword adr, val, u, s, pat;

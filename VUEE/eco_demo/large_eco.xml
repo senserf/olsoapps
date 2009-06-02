@@ -58,7 +58,7 @@
 	    <leds number="3">
 	    	<output target="socket"></output>
 	    </leds>
-	    <eeprom size="524299" clean="ff"></eeprom>
+	    <eeprom size="524288" clean="0xFF"></eeprom>
 	    <iflash size="256,2"></iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
@@ -68,10 +68,12 @@
 	    	<input source="socket"></input>
 		<output target="socket"></output>
 		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
-		<sensor number="1" vsize="2" delay="0.220">16483</sensor>
-		<sensor number="2" vsize="2" delay="0.06">3339</sensor>
-		<sensor number="3" vsize="2" delay="0.6">2000</sensor>
-		<sensor number="4" vsize="2" delay="0.85">4095</sensor>
+		<sensor number="1" vsize="2" delay="0.6">2047</sensor>
+		<sensor number="2" vsize="2" delay="0.6">1024</sensor>
+		<sensor number="3" vsize="2" delay="0.6">1024</sensor>
+		<sensor number="4" vsize="2" delay="0.220">16483</sensor>
+		<sensor number="5" vsize="2" delay="0.06">3339</sensor>
+		<sensor number="6" vsize="2" delay="0.1">2000</sensor>
 	    </sensors>
 	    <preinit tag="HID" type="lword">3133857453</preinit>
 	    <preinit tag="MHOST" type="word">0</preinit>

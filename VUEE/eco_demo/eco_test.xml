@@ -58,8 +58,8 @@
 	    <leds number="3">
 	    	<output target="socket"></output>
 	    </leds>
-	    <eeprom>524288 bytes</eeprom>
-	    <iflash>256 bytes in 2 pages</iflash>
+	    <eeprom size="524288"></eeprom>
+	    <iflash size="256,2"></iflash>
 	    <uart rate="200000" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>

@@ -10,7 +10,7 @@
 		RP(d)/XP [dB] = -10 x 3.0 x log(d/1.0m) + X(1.0) - 38.0
  		=======================================================
 	</shadowing>
-	<cutoff>-110.0dBm</cutoff>
+	<cutoff>400m</cutoff>
 	<ber>
 		Interpolated ber table:
 		======================
@@ -27,8 +27,8 @@
 		-5.0dB		9.9E-1
 	</ber>
 	<frame>12 0</frame>
-	<rates>9600</rates>
 	<power>10.0dBm</power>
+	<rates>9600</rates>
     </channel>
     <nodes>
 	<defaults>
@@ -42,29 +42,18 @@
 		min			8msec
 		max			303msec
 	    </backoff>
-	    <eeprom>4096 bytes</eeprom>
-	    <iflash>256 bytes in 2 pages</iflash>
+	    <eeprom erase="byte" overwrite="no" size="33554432,32" timing="0.0001 0.0002 0.0004 0.0008 0.0009 0.0009">
+	    </eeprom>
+	    <iflash size="256,2"></iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
 	</defaults>
 	<node number="0">
-	    <leds number="4">
-		<output target="socket"></output>
-	    </leds>
-	    <pins number="10" adc="8">
-		<output target="device">pins_output0.txt</output>
-		<status>1111111111</status>
-		<values>0000000000</values>
-		<voltage>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</voltage>
-	    </pins>
 	    <location>1.0 4.0</location>
 	</node>
 	<node number="1">
-	    <pins number="10" adc="8">
-		<output target="socket"></output>
-	    </pins>
 	    <location>1.0 10.0</location>
 	</node>
     </nodes>

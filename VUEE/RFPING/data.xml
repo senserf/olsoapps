@@ -10,7 +10,7 @@
 		RP(d)/XP [dB] = -10 x 3.0 x log(d/1.0m) + X(1.0) - 38.0
  		=======================================================
 	</shadowing>
-	<cutoff>-120dBm</cutoff>
+	<cutoff>-110.0dBm</cutoff>
 	<ber>
 		Interpolated ber table:
 		======================
@@ -33,28 +33,25 @@
     <nodes>
 	<defaults>
 	    <memory>2048 bytes</memory>
-	    <preamble>32 bits</preamble>
-	    <lbt>
-		delay			8msec
-		threshold		-109.0dBm
-	    </lbt>
-	    <backoff>
-		min			8msec
-		max			303msec
-	    </backoff>
-	    <eeprom>4096 bytes</eeprom>
-	    <iflash>256 bytes in 2 pages</iflash>
-<!--
+	    <radio>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <eeprom size="4096"></eeprom>
+	    <iflash size="256,2"></iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
--->
 	</defaults>
 	<node number="0">
-	    <uart rate="9600" bsize="12">
-		<input source="string">s 2048\r\nr\r\n</input>
-	    </uart>
 	    <leds number="4">
 		<output target="socket"></output>
 	    </leds>
@@ -67,12 +64,6 @@
 	    <location>1.0 4.0</location>
 	</node>
 	<node number="1">
-	    <uart rate="9600" bsize="12">
-		<input source="string">s 2048\r\nr\r\n</input>
-	    </uart>
-	    <leds number="4">
-		<output target="socket"></output>
-	    </leds>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
