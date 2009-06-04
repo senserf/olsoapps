@@ -94,20 +94,22 @@ __PUBLF (NodeTag, void, sens_init) () {
 	lword l, u, m; 
 	byte b; 
 
-	if (ee_read (EE_SENS_MIN * EE_SENS_SIZE, &b, 1))
+	if (ee_read (EE_SENS_MIN * EE_SENS_SIZE, &b, 1)) {
+		// nothing helps, better halt
+		//ee_close();
+		//reset();
 		fatal_err (ERR_EER, 0, 0, 1);
+	}
 
 	memset (&sens_data, 0, sizeof (sensDataType));
 	if (b == 0xFF) { // normal operations (empty eeprom)
 		sens_data.eslot = EE_SENS_MIN;
 		sens_data.ee.s.f.status = SENS_FF;
 		sens_data.ee.s.f.mark = MARK_FF;
-		sens_data.ee.s.f.emptym = ee_emptym ? 1 : 0;
 		sens_data.ee.s.f.mark = MARK_FF;
 		return;
 	}
 
-	// only efter power down / soft reset there could be anything in eeprom
 	l = EE_SENS_MIN; u = EE_SENS_MAX;
 	while ((u - l) > 1) {
 		m = l + ((u -l) >> 1);
@@ -127,6 +129,7 @@ __PUBLF (NodeTag, void, sens_init) () {
 
 	if (b == 0xFF) {
 		if (l < u) {
+
 			if (ee_read (l * EE_SENS_SIZE, &b, 1))
 				fatal_err (ERR_EER,
 				       (word)((l * EE_SENS_SIZE) >> 16),
@@ -145,7 +148,6 @@ __PUBLF (NodeTag, void, sens_init) () {
 	sens_data.eslot++;
 	sens_data.ee.s.f.status = SENS_FF;
 	sens_data.ee.s.f.mark = MARK_FF;
-	sens_data.ee.s.f.emptym = ee_emptym ? 1 : 0;
 	sens_data.ee.s.f.mark = MARK_FF;
 #if 0
 	if (ee_read (sens_data.eslot * EE_SENS_SIZE, (byte *)&sens_data.ee,
@@ -241,7 +243,7 @@ __PUBLF (NodeTag, word, r_a_d) () {
 			sens_dump->ee.sval[1],
 			sens_dump->ee.sval[2],
 			sens_dump->ee.sval[3],
-			sens_dump->ee.sval[4]);
+			sens_dump->ee.sval[4], sens_dump->ee.sval[5]);
 	    }
 
 	    if (runstrand (oss_out, lbuf) == 0 ) {
@@ -715,8 +717,11 @@ thread (sens)
 		read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
 
 	entry (SE_4)
-		//read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
-		sens_data.ee.sval[4]++;
+		read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
+
+	 entry (SE_5)
+		read_sensor (SE_5, 5, &sens_data.ee.sval[5]);
+
 #else
 		app_diag (D_WARNING, "FAKE SENSORS");
 		sens_data.ee.sval[0]++;
@@ -724,6 +729,7 @@ thread (sens)
 		sens_data.ee.sval[2]++;
 		sens_data.ee.sval[3]++;
 		sens_data.ee.sval[4]++;
+		sens_data.ee.sval[5]++;
 
 		delay (SENS_COLL_TIME, SE_DONE);
 		release;
@@ -731,7 +737,6 @@ thread (sens)
 	entry (SE_DONE)
 		sens_data.ee.s.f.status = SENS_COLLECTED;
 		sens_data.ee.s.f.mark = MARK_FF;
-		sens_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 
 		//leds (LED_R, LED_BLINK);
 		trigger (SENS_DONE);
@@ -785,7 +790,11 @@ thread (root)
 
 	entry (RS_INIT)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
-		ee_open ();
+		if (ee_open ()) {
+			leds (LED_B, LED_BLINK);
+			fatal_err (ERR_EER, 0, 1, 1);
+		}
+
 		form (ui_obuf, ee_str, EE_SENS_MIN, EE_SENS_MAX -1,
 			EE_SENS_SIZE);
 

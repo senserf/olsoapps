@@ -1528,8 +1528,8 @@ proc try_port { } {
 		set ver "unknown"
 	}
 
-	if { $ver != 1.2 } {
-		puts "\nincompatible praxis version ($ver), 1.2 required"
+	if { $ver != 1.3 } {
+		puts "\nincompatible praxis version ($ver), 1.3 required"
 		return 0
 	}
 

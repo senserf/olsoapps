@@ -378,13 +378,13 @@ __PUBLF (NodeCus, void, write_agg) (word ti) {
 
 	agg_data.ee.s.f.status = tagArray[ti].state == confirmedTag ?
 		AGG_CONFIRMED : AGG_COLLECTED;
-	agg_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 	agg_data.ee.s.f.mark = MARK_FF;
 	agg_data.ee.sval[0] = tagArray[ti].rpload.ppload.sval[0];
 	agg_data.ee.sval[1] = tagArray[ti].rpload.ppload.sval[1];
 	agg_data.ee.sval[2] = tagArray[ti].rpload.ppload.sval[2];
 	agg_data.ee.sval[3] = tagArray[ti].rpload.ppload.sval[3];
 	agg_data.ee.sval[4] = tagArray[ti].rpload.ppload.sval[4];
+	agg_data.ee.sval[5] = tagArray[ti].rpload.ppload.sval[5];
 
 	agg_data.ee.ds = tagArray[ti].rpload.ds;
 	agg_data.ee.t_ds = tagArray[ti].rpload.ppload.ds;
@@ -470,7 +470,6 @@ __PUBLF (NodeCus, void, agg_init) () {
 		agg_data.eslot = EE_AGG_MIN;
 		agg_data.ee.s.f.status = AGG_FF;
 		agg_data.ee.s.f.mark = MARK_FF;
-		agg_data.ee.s.f.emptym = is_eem_empty ? 1 : 0;
 		agg_data.ee.s.f.mark = MARK_FF;
 		return;
 	}

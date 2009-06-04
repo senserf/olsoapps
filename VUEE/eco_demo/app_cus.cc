@@ -579,7 +579,8 @@ __PUBLF (NodeCus, void, oss_report_out) (char * buf) {
 		in_reportPload(buf, ppload.sval[1]),
 		in_reportPload(buf, ppload.sval[2]),
 		in_reportPload(buf, ppload.sval[3]),
-		in_reportPload(buf, ppload.sval[4])); // eoform
+		in_reportPload(buf, ppload.sval[4]),
+		in_reportPload(buf, ppload.sval[5])); // eoform
 
     } else if (in_report(buf, state) == sumTag) {
 		lbuf = form (NULL, repSum_str,
@@ -647,7 +648,7 @@ __PUBLF (NodeCus, word, r_a_d) () {
 			agg_dump->ee.sval[1],
 			agg_dump->ee.sval[2],
 			agg_dump->ee.sval[3],
-			agg_dump->ee.sval[4]);
+			agg_dump->ee.sval[4], agg_dump->ee.sval[5]);
 
 		if (runstrand (oss_out, lbuf) == 0 ) {
 			app_diag (D_SERIOUS, "oss_out failed");
@@ -799,7 +800,12 @@ thread (root)
 
 	entry (RS_INIT)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
-		ee_open ();
+
+		if (ee_open ()) {
+			leds (LED_B, LED_BLINK);
+			fatal_err (ERR_EER, 0, 1, 1);
+		}
+
 		form (ui_obuf, ee_str, EE_AGG_MIN, EE_AGG_MAX -1, EE_AGG_SIZE);
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF)

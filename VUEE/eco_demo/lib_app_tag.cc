@@ -161,7 +161,6 @@ __PUBLF (NodeTag, void, write_mark) (word what) {
                 return;
         }
 
-        mrk.ee.s.f.emptym = ee_emptym ? 0 : 1;
         mrk.ee.s.f.mark = what;
         mrk.ee.s.f.status = SENS_ALL;
 

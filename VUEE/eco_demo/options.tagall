@@ -96,7 +96,11 @@
 #ifndef SENS4_DESC
 #define SENS4_DESC ""
 #endif
- 
+
+#ifndef SENS5_DESC
+#define SENS5_DESC ""
+#endif
+
 // #define OSS_FMT	FMT_TERM
 
 #ifdef UART_RATE
@@ -113,7 +117,7 @@
 
 #define EE_NO_ERASE_BEFORE_WRITE 1
 
-#define EE_ERASE_ON_NEW_FLASH	0
+#define EE_ERASE_ON_NEW_FLASH	1
 
 #ifdef STORAGE_SDCARD
 #undef STORAGE_SDCARD
@@ -121,5 +125,4 @@
 #define STORAGE_SDCARD 		0
 
 #define SD_KEEP_IDLE 		1
-#define EMPTY_STORAGE_FF 	1
 

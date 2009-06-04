@@ -47,7 +47,7 @@ strand (oss_out, char)
 	// OO_START is the sat patch
 	entry (OO_START)
 		if (data == NULL) {
-			app_diag (D_SERIOUS, "NULL in oss_out");
+			app_diag (D_SERIOUS, "NULL oss_out");
 			finish;
 		}
 		if (IS_SATGAT) {
@@ -146,7 +146,7 @@ __PUBLF (NodePeg, void, show_ifla) () {
 	char * mbuf = NULL;
 
 	if (if_read (0) == 0xFFFF) {
-		diag (OPRE_APP_ACK "No custom sys data");
+		diag (OPRE_APP_ACK "No custom data");
 		return;
 	}
 	mbuf = form (NULL, ifla_str, if_read (0), if_read (1), if_read (2),
@@ -180,7 +180,7 @@ __PUBLF (NodePeg, void, read_ifla) () {
 	if (sync_freq > 0) {
 		master_ts = seconds();
 		master_date = -1;
-		diag (OPRE_APP_ACK "Implicit T 9-1-1 0:0:1");
+		diag (impl_date_str);
 	}
 	sat_mod = if_read (6);
 	if (master_host == local_host)
@@ -191,7 +191,7 @@ __PUBLF (NodePeg, void, read_ifla) () {
 __PUBLF (NodePeg, void, save_ifla) () {
 	if (if_read (0) != 0xFFFF) {
 		if_erase (0);
-		diag (OPRE_APP_ACK "Flash p0 overwritten");
+		diag (OPRE_APP_ACK "p0 owritten");
 	}
 	// there is 'show' after 'save'... don't check if_writes here (?)
 	if_write (0, local_host);
@@ -215,7 +215,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			host_pl, handle_a_flags (0xFFFF), seconds(),
 		       	master_ts, master_host,
 			agg_data.eslot == EE_AGG_MIN &&
-			  agg_data.ee.s.f.status == AGG_EMPTY ?
+			  IS_AGG_EMPTY (agg_data.ee.s.f.status) ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
 			mem, mmin, sat_mod);
 	} else {
@@ -349,7 +349,7 @@ FIXME: if that works, clean off sat_out()
 		return;
 
 	default:
-		app_diag (D_SERIOUS, "Got ? (%u)", in_header(buf, msg_type));
+		app_diag (D_SERIOUS, "Got ?(%u)", in_header(buf, msg_type));
 
   }
 }
@@ -794,7 +794,8 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 		in_reportPload(buf, ppload.sval[1]),
 		in_reportPload(buf, ppload.sval[2]),
 		in_reportPload(buf, ppload.sval[3]),
-		in_reportPload(buf, ppload.sval[4])); // eoform
+		in_reportPload(buf, ppload.sval[4]),
+		in_reportPload(buf, ppload.sval[5])); // eoform
       }
 
     } else if (in_report(buf, state) == sumTag) {
@@ -819,14 +820,15 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 
 static const char * markName (statu_t s) {
         switch (s.f.mark) {
-                case MARK_EMPTY:   return "NONE";
+		case 0:
+		case MARK_EMPTY:   return "NONE";
                 case MARK_BOOT: return "BOOT";
                 case MARK_PLOT: return "PLOT";
                 case MARK_SYNC: return "SYNC";
                 case MARK_MCHG: return "MCHG";
                 case MARK_DATE: return "DATE";
         }
-        app_diag (D_SERIOUS, "unexpected eeprom %x", s);
+        app_diag (D_SERIOUS, "? eeprom %x", s);
         return "????";
 }       
 
@@ -843,7 +845,7 @@ __PUBLF (NodePeg, word, r_a_d) () {
 		goto Finish;
 	}
 
-	if (agg_dump->ee.s.f.status == AGG_EMPTY) {
+	if (IS_AGG_EMPTY (agg_dump->ee.s.f.status)) {
 		if (agg_dump->fr <= agg_dump->to) {
 			goto Finish;
 		} else {
@@ -890,7 +892,7 @@ __PUBLF (NodePeg, word, r_a_d) () {
 			agg_dump->ee.sval[1],
 			agg_dump->ee.sval[2],
 			agg_dump->ee.sval[3],
-			agg_dump->ee.sval[4]);
+			agg_dump->ee.sval[4], agg_dump->ee.sval[5]);
 	    }
 
 	    if (runstrand (oss_out, lbuf) == 0 ) {
@@ -1081,8 +1083,14 @@ plus we dont want to flood the sat link
 				}
 			}
 #endif
+
+#if STORAGE_SDCARD
+// loop: likely SD is missing
 			delay (3000, RS_INIEE);
 			release;
+#else
+			fatal_err (ERR_EER, 0, 1, 1);
+#endif
 		}
 
 		leds (LED_B, LED_OFF);
@@ -1093,7 +1101,7 @@ plus we dont want to flood the sat link
 			if (if_read (IFLASH_SIZE -1) == ERR_EER) {
 				if_erase (IFLASH_SIZE -1);
 				break_flash;
-				diag (OPRE_APP_ACK "flash p1 erased");
+				diag (OPRE_APP_ACK "p1 erased");
 				reset();
 			}
 
@@ -1103,7 +1111,7 @@ plus we dont want to flood the sat link
 
 		// is_flash_new is set const (a branch compiled out)
 		if (is_flash_new) {
-			diag (OPRE_APP_ACK "Init eprom erase");
+			diag (OPRE_APP_ACK "Init ee erase");
 			ee_erase (WNONE, 0, 0);
 			break_flash;
 			read_ifla();
@@ -1115,10 +1123,13 @@ plus we dont want to flood the sat link
 
 	entry (RS_INIT1)
 
+#ifdef BCAST_SATEST_MSG
 #if BCAST_SATEST_MSG
 // FIXME clean it into a consistent oss / sat i/f
 		set_satest;
 #endif
+#endif
+
 		if (!IS_SATGAT) {
 			ser_out (RS_INIT1, ui_obuf);
 		} else { 
@@ -1131,7 +1142,7 @@ plus we dont want to flood the sat link
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 			leds (LED_R, LED_OFF);
-			diag (OPRE_APP_MENU_A "***Maintenance mode***"
+			diag (OPRE_APP_MENU_A "*Maint mode*"
 				OMID_CRB "%x %u %u %u",
 				if_read (IFLASH_SIZE -1),
 				if_read (IFLASH_SIZE -2),
@@ -1330,7 +1341,7 @@ plus we dont want to flood the sat link
 
 		case 'M':
 			if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
-				diag (OPRE_APP_ACK "Already in maintenance");
+				diag (OPRE_APP_ACK "Already in maint");
 				reset();
 			}
 			fatal_err (ERR_MAINT, (word)(seconds() >> 16),
@@ -1338,15 +1349,15 @@ plus we dont want to flood the sat link
 			// will reset
 
 		case 'E':
-			diag (OPRE_APP_ACK "erasing eeprom...");
+			diag (OPRE_APP_ACK "erasing ee...");
 			ee_erase (WNONE, 0, 0);
-			diag (OPRE_APP_ACK "eeprom erased");
+			diag (OPRE_APP_ACK "ee erased");
 			reset();
 
 		case 'F':
 			if_erase (IFLASH_SIZE -1);
 			break_flash;
-			diag (OPRE_APP_ACK "flash p1 erased");
+			diag (OPRE_APP_ACK "p1 erased");
 			reset();
 
 		case 'Q':
@@ -1482,8 +1493,7 @@ plus we dont want to flood the sat link
 				if (sync_freq > 0 && master_date >= 0) {
 					master_ts = seconds();
 					master_date = -1;
-					diag (OPRE_APP_ACK 
-						"Implicit T 9-1-1 0:0:1");
+					diag (impl_date_str); 
 				}
 				write_mark (MARK_SYNC);
 			}

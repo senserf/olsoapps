@@ -76,21 +76,21 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 	OPRE_APP_MENU_A 
 	"\tDisplay data:\tD [ from [ to [ col_id [ limit ]]]]\r\n"
 	OPRE_APP_MENU_A 
-	"\tMaintenance:\tM (*** No collection until F     ***)\r\n"
+	"\tMaintenance:\tM (* No collection until F     *)\r\n"
 	OPRE_APP_MENU_A
-	"\tEprom erase:\tE (*** deletes aggregated data   ***)\r\n"
+	"\tEprom erase:\tE (* deletes aggregated data   *)\r\n"
 	OPRE_APP_MENU_A 
-	"\tFlash erase:\tF (*** clears special conditions ***)\r\n"
+	"\tFlash erase:\tF (* clears special conditions *)\r\n"
 	OPRE_APP_MENU_A 
-	"\tClean reset:\tQ (*** to factory defaults (E+F) ***)\r\n"
+	"\tClean reset:\tQ (* to factory defaults (E+F) *)\r\n"
 	OPRE_APP_MENU_A
-	"\tID set / show:\tI[D id]   (*** CAREFUL Host ID   ***)\r\n"
+	"\tID set / show:\tI[D id]   (* CAREFUL Host ID   *)\r\n"
 	OPRE_APP_MENU_A
-	"\tID master set:\tIM id     (*** CAREFUL Master ID ***)\r\n"
+	"\tID master set:\tIM id     (* CAREFUL Master ID *)\r\n"
 	OPRE_APP_MENU_A 
-	"\tSave(d) sys:  \tS[A]      (*** Show, SAve iFLASH ***)\r\n"
+	"\tSave(d) sys:  \tS[A]      (* Show, SAve iFLASH *)\r\n"
 	OPRE_APP_MENU_A
-	"\tSync coll:    \tY [freq]  (*** Sync at freq      ***)\r\n"
+	"\tSync coll:    \tY [freq]  (* Sync at freq      *)\r\n"
 	OPRE_APP_MENU_A 
 	"\tQuit (reset)\tq\r\n"
 	OPRE_APP_MENU_A 
@@ -110,7 +110,7 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 static const char ill_str[] =	OPRE_APP_ILL 
 				"Illegal command (%s)\r\n";
 
-static const char not_in_maint_str[] = OPRE_APP_ILL "Not in Maintenance\r\n";
+static const char not_in_maint_str[] = OPRE_APP_ILL "Not in Maint\r\n";
 
 static const char only_master_str[] = OPRE_APP_ILL "Only at the Master\r\n";
 
@@ -137,7 +137,7 @@ static const char rep_str[] = OPRE_APP_REP OMID_CR
 	"  Agg %u slot %lu: %u-%u-%u %u:%u:%u" OMID_CR
 	"  Col %u slot %lu: %u-%u-%u %u:%u:%u%s" OMID_CR
 	"  " SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d, "
-	SENS3_DESC "%d, " SENS4_DESC "%d\r\n";
+	SENS3_DESC "%d, " SENS4_DESC "%d, " SENS5_DESC "%d\r\n";
 
 static const char satrep_str[] = OPRE_APP_REP "%lu %u:%lu %u-%u-%u %u:%u:%u%s"
 	SENS0_DESC "%d " SENS1_DESC "%d " SENS2_DESC "%d";
@@ -151,7 +151,8 @@ static const char repNo_str[] = OPRE_APP_REP_NO
 static const char dump_str[] = OPRE_APP_DUMP_A OMID_CR
 	"Col %u slot %lu (A: %lu) %u-%u-%u %u:%u:%u (A %u-%u-%u %u:%u:%u)"
 	OMID_CR " " SENS0_DESC "%d, " SENS1_DESC "%d, "
-	SENS2_DESC "%d, " SENS3_DESC "%d, " SENS4_DESC "%d\r\n";
+	SENS2_DESC "%d, " SENS3_DESC "%d, " SENS4_DESC "%d, "
+	SENS5_DESC "%d\r\n";
 
 static const char dumpmark_str[] = OPRE_APP_DMARK_A "%s %lu %u-%u-%u %u:%u:%u "
 	"%u %u %u\r\n";
@@ -162,5 +163,7 @@ static const char dumpend_str[] = OPRE_APP_DEND_A
 static const char plot_str[] = OPRE_APP_PLOT "Plot %u\r\n";
 
 static const char sync_str[] = OPRE_APP_SYNC "Synced to %u\r\n";
+
+static const char impl_date_str[] = OPRE_APP_ACK "Implicit T 9-1-1 0:0:1";
 
 #endif

@@ -388,7 +388,7 @@ __PUBLF (NodePeg, void, write_mark) (word what) {
 
 	memset (&mrk, 0, sizeof (aggDataType));
 
-	mrk.eslot = agg_data.ee.s.f.status == AGG_EMPTY ?
+	mrk.eslot = IS_AGG_EMPTY (agg_data.ee.s.f.status) ?
 		agg_data.eslot : agg_data.eslot +1;
 
 	if (mrk.eslot >= EE_AGG_MAX) {
@@ -396,7 +396,6 @@ __PUBLF (NodePeg, void, write_mark) (word what) {
 		return;
 	}
 
-	mrk.ee.s.f.emptym = ee_emptym ? 0 : 1;
 	mrk.ee.s.f.mark = what;
 	mrk.ee.s.f.status = AGG_ALL;
 
@@ -421,18 +420,18 @@ __PUBLF (NodePeg, void, write_mark) (word what) {
 
 __PUBLF (NodePeg, void, write_agg) (word ti) {
 
-	if (agg_data.ee.s.f.status != AGG_EMPTY)
+	if (!IS_AGG_EMPTY (agg_data.ee.s.f.status))
 		agg_data.eslot++;
 
 	agg_data.ee.s.f.status = tagArray[ti].state == confirmedTag ?
 		AGG_CONFIRMED : AGG_COLLECTED;
-	agg_data.ee.s.f.emptym = ee_emptym ? 0 : 1;
 	agg_data.ee.s.f.mark = MARK_EMPTY;
 	agg_data.ee.sval[0] = tagArray[ti].rpload.ppload.sval[0];
 	agg_data.ee.sval[1] = tagArray[ti].rpload.ppload.sval[1];
 	agg_data.ee.sval[2] = tagArray[ti].rpload.ppload.sval[2];
 	agg_data.ee.sval[3] = tagArray[ti].rpload.ppload.sval[3];
 	agg_data.ee.sval[4] = tagArray[ti].rpload.ppload.sval[4];
+	agg_data.ee.sval[5] = tagArray[ti].rpload.ppload.sval[5];
 
 	agg_data.ee.ds = tagArray[ti].rpload.ds;
 	agg_data.ee.t_ds = tagArray[ti].rpload.ppload.ds;
@@ -523,9 +522,8 @@ __PUBLF (NodePeg, void, agg_init) () {
 
 	memset (&agg_data, 0, sizeof(aggDataType));
 
-	if (b == EMPTY_BYTE) { // normal operations
+	if (IS_BYTE_EMPTY (b)) { // normal operations
 		agg_data.eslot = EE_AGG_MIN;
-		agg_data.ee.s.f.emptym = is_eem_empty ? 1 : 0;
 		agg_data.ee.s.f.mark = MARK_EMPTY;
 		agg_data.ee.s.f.status = AGG_EMPTY;
 		return;
@@ -541,7 +539,7 @@ __PUBLF (NodePeg, void, agg_init) () {
 			fatal_err (ERR_EER, (word)((m * EE_AGG_SIZE) >> 16),
 					(word)(m * EE_AGG_SIZE), 1);
 
-		if (b == EMPTY_BYTE)
+		if (IS_BYTE_EMPTY (b))
 			u = m;
 		else
 			l = m;
@@ -551,14 +549,14 @@ __PUBLF (NodePeg, void, agg_init) () {
 		fatal_err (ERR_EER, (word)((u * EE_AGG_SIZE) >> 16),
 				(word)(u * EE_AGG_SIZE), 1);
 
-	if (b == EMPTY_BYTE) {
+	if (IS_BYTE_EMPTY (b)) {
 		if (l < u) {
 			if (ee_read (l * EE_AGG_SIZE, &b, 1))
 				fatal_err (ERR_EER,
 					(word)((l * EE_AGG_SIZE) >> 16),
 					(word)(l * EE_AGG_SIZE), 1);
 
-			if (b == EMPTY_BYTE)
+			if (IS_BYTE_EMPTY (b))
 				fatal_err (ERR_SLOT, (word)(l >> 16),
 						(word)l, 0);
 

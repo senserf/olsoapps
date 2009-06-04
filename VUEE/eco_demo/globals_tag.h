@@ -55,7 +55,7 @@ sensEEDumpType	*sens_dump = NULL;
 static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_C 
-	"*EcoNet* 1.2" OMID_CRB "Collector commands\r\n"
+	"*EcoNet* 1.3" OMID_CRB "Collector commands\r\n"
 	OPRE_APP_MENU_C 
 	"\tSet/ show:\ts [ Maj_freq [ min_freq [ rx_span [ hex:pl_vec"
 	" [ hex:c_fl ]]]]]\r\n"
@@ -94,7 +94,7 @@ static const char ifla_str[] = OPRE_APP_IFLA_C
 static const char dump_str[] = OPRE_APP_DUMP_C OMID_CR
 	"%s slot %lu %u-%u-%u %u:%u:%u: " SENS0_DESC "%d, "
 	SENS1_DESC "%d, " SENS2_DESC "%d, " SENS3_DESC "%d, "
-       	SENS4_DESC "%d\r\n";
+       	SENS4_DESC "%d, " SENS5_DESC "%d\r\n";
 
 static const char dumpmark_str[] = OPRE_APP_DMARK_C "%s %lu %u-%u-%u %u:%u:%u "
 	"%u %u %u\r\n";

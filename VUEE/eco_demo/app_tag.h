@@ -22,7 +22,7 @@
 
 // check what it really is
 #define SENS_COLL_TIME	3000
-#define NUM_SENS	5
+#define NUM_SENS	6
 
 #define SENS_FF		0xF
 #define SENS_IN_USE	0xC
@@ -92,11 +92,10 @@ typedef struct pongParamsStruct {
 } pongParamsType;
 
 typedef struct sensEEDataStruct {
-	statu_t	s; // keep it byte 0 of the ee slot
+	statu_t	s; // keep it bytes 0,1 of the ee slot
 	word sval [NUM_SENS];
-	long ds; 	// keep it aligned
-} sensEEDataType;
-// for now, keep it at 2^N (16), we'll see about eeprom pages, etc.
+	long ds;
+} sensEEDataType; // 6 + NUM_SENS * 2 (+2 if misaligned)
 
 typedef struct sensEEDumpStruct {
 	sensEEDataType ee;
@@ -127,9 +126,8 @@ typedef struct sensDataStruct {
    bit 2: ee write collected [1]
    bit 3: ee write confirmed [0]
    bit 4: ee overwrite (cyclic stack) [0]
-   bit 5: ee marker of empty slots [1]
 */
-#define DEF_APP_FLAGS   0x24
+#define DEF_APP_FLAGS   4
 
 #define set_synced	(app_flags |= 1)
 #define clr_synced	(app_flags &= ~1)
@@ -148,11 +146,5 @@ typedef struct sensDataStruct {
 #define set_eew_over    (app_flags |= 16)
 #define clr_eew_over    (app_flags &= ~16)
 #define is_eew_over     (app_flags & 16)
-
-#define set_eem_empty   (app_flags |= 32)
-#define clr_eem_empty   (app_flags &= ~32)
-#define is_eem_empty    (app_flags & 32)
-#define ee_emptym       ((app_flags >> 5) & 1)
-
 
 #endif

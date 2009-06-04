@@ -169,7 +169,8 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 	in_statsPeg(out_buf, mts) = master_ts;
 
 	//in_statsPeg(out_buf, slot) is really # of entries
-	if (agg_data.eslot == EE_AGG_MIN && agg_data.ee.s.f.status == AGG_EMPTY)
+	if (agg_data.eslot == EE_AGG_MIN &&
+			IS_AGG_EMPTY (agg_data.ee.s.f.status))
 		in_statsPeg(out_buf, slot) = 0;
 	else
 		in_statsPeg(out_buf, slot) = agg_data.eslot -
@@ -320,7 +321,7 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 				sizeof (pongPloadType));
 		tagArray[tagIndex].rpload.ds = wall_date (0);
 		tagArray[tagIndex].rpload.eslot = agg_data.eslot;
-		if (agg_data.ee.s.f.status != AGG_EMPTY)
+		if (!IS_AGG_EMPTY (agg_data.ee.s.f.status))
 			tagArray[tagIndex].rpload.eslot++;
 
 	} else {
@@ -345,7 +346,7 @@ __PUBLF (NodePeg, void, msg_pong_in) (word state, char * buf, word rssi) {
 				sizeof (pongPloadType));
 			tagArray[tagIndex].rpload.ds = wall_date (0);
 			tagArray[tagIndex].rpload.eslot = agg_data.eslot;
-			if (agg_data.ee.s.f.status != AGG_EMPTY)
+			if (!IS_AGG_EMPTY (agg_data.ee.s.f.status))
 				tagArray[tagIndex].rpload.eslot++;
 			set_tagState (tagIndex, newTag, YES);
 		}

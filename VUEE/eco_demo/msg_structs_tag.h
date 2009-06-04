@@ -61,8 +61,7 @@ typedef struct msgPongStruct {
 typedef struct pongPloadStruct {
 	long 	ds; 
 	lword	eslot;
-	word	sval[5];	// NUM_SENS
-	word	spare;
+	word	sval[6];	// NUM_SENS
 } pongPloadType;
 #define in_pongPload(buf, field) (((pongPloadType *)(buf + \
 				sizeof(msgPongType)))->field)
