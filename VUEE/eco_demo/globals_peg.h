@@ -61,14 +61,14 @@ word	plot_id			= 0;
 // These are static const and can thus be shared
 static const char ee_str[] = OPRE_APP_MENU_A "EE from %lu to %lu size %u\r\n";
 
-static const char satstart_str[] = OPRE_APP_MENU_A "EcoNet 1.2";
+static const char satstart_str[] = OPRE_APP_MENU_A "EcoNet 1.3";
 // FIXME it'll change with a decent uart (sat, oss) i/f
 static const char satframe_str[] = "%s";
 
 // static const char noee_str[] = OPRE_APP_MENU_A "No NVM";
 
 static const char welcome_str[] = OPRE_APP_MENU_A 
-	"*EcoNet* 1.2" OMID_CRB "Aggregator commands:\r\n"
+	"*EcoNet* 1.3" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
 	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
