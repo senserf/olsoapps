@@ -74,23 +74,23 @@ static const char welcome_str[] = OPRE_APP_MENU_A
 	OPRE_APP_MENU_A 
 	"\tMaster Time:\tT [ y-m-d h:m:s ]\r\n"
 	OPRE_APP_MENU_A 
-	"\tDisplay data:\tD [ from [ to [ col_id [ limit ]]]]\r\n"
+	"\tDisp data:\tD [ from [ to [ col_id [ limit ]]]]\r\n"
 	OPRE_APP_MENU_A 
-	"\tMaintenance:\tM (* No collection until F *)\r\n"
+	"\tMaint:\tM (* No collection until F *)\r\n"
 	OPRE_APP_MENU_A
-	"\tEprom erase:\tE (* deletes aggregated data *)\r\n"
+	"\tEprom erase:\tE (* deletes agg data *)\r\n"
 	OPRE_APP_MENU_A 
 	"\tFlash erase:\tF (* clears special conditions *)\r\n"
 	OPRE_APP_MENU_A 
 	"\tClean reset:\tQ (* to factory defaults (E+F) *)\r\n"
 	OPRE_APP_MENU_A
-	"\tID set / show:\tI[D id]   (* CAREFUL Host ID *)\r\n"
+	"\tID set / show:\tI[D id]  (* CAREFUL Host ID *)\r\n"
 	OPRE_APP_MENU_A
-	"\tID master set:\tIM id     (* CAREFUL Master ID *)\r\n"
+	"\tID master set:\tIM id    (* CAREFUL Master ID *)\r\n"
 	OPRE_APP_MENU_A 
-	"\tSave(d) sys:  \tS[A]      (* Show, SAve iFLASH *)\r\n"
+	"\tSave(d) sys:  \tS[A]     (* Show, SAve iFLASH *)\r\n"
 	OPRE_APP_MENU_A
-	"\tSync coll:    \tY [freq]  (* Sync at freq *)\r\n"
+	"\tSync coll:    \tY [freq] (* Sync at freq *)\r\n"
 	OPRE_APP_MENU_A 
 	"\tQuit (reset)\tq\r\n"
 	OPRE_APP_MENU_A 

@@ -1070,7 +1070,8 @@ thread (root)
 
 	entry (RS_INIEE)
 		if (ee_open ()) {
-			leds (LED_B, LED_BLINK);
+			leds (LED_B, LED_ON);
+			leds (LED_R, LED_ON);
 #if 0
 don't even try it: I don't know what I am, as it is in NVM, 
 plus we dont want to flood the sat link
@@ -1089,11 +1090,14 @@ plus we dont want to flood the sat link
 			delay (3000, RS_INIEE);
 			release;
 #else
-			fatal_err (ERR_EER, 0, 1, 1);
+			//fatal_err (ERR_EER, 0, 1, 1);
+			app_diag (D_FATAL," ee_open failed");
+			halt();
 #endif
 		}
 
 		leds (LED_B, LED_OFF);
+		leds (LED_R, LED_OFF);
 		form (ui_obuf, ee_str, EE_AGG_MIN, EE_AGG_MAX -1, EE_AGG_SIZE);
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {

@@ -791,8 +791,10 @@ thread (root)
 	entry (RS_INIT)
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
 		if (ee_open ()) {
-			leds (LED_B, LED_BLINK);
-			fatal_err (ERR_EER, 0, 1, 1);
+			leds (LED_B, LED_ON);
+			leds (LED_R, LED_ON);
+			app_diag (D_FATAL, "HALT ee_open failed");
+			halt();
 		}
 
 		form (ui_obuf, ee_str, EE_SENS_MIN, EE_SENS_MAX -1,

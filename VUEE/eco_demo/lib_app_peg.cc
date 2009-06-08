@@ -369,8 +369,9 @@ __PUBLF (NodePeg, sint, check_msg_size) (char * buf, word size, word repLevel) {
 			return 0;
 
 		default:
-			app_diag (repLevel, "Can't check size of %u (%d)",
-				in_header(buf, msg_type), size);
+			// this may be useful, but we're running out of space:
+			//app_diag (repLevel, "Can't check size of %u (%d)",
+			//	in_header(buf, msg_type), size);
 			return 0;
 	}
 	
