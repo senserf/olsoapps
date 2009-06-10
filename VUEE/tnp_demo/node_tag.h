@@ -8,7 +8,7 @@
 #include "board.h"
 #include "plug_tarp.h"
 
-station	NodeTag : TNode {
+station	NodeTag : PicOSNode {
 
 	/*
 	 * Session (application) specific data

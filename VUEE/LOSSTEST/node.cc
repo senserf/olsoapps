@@ -3,7 +3,6 @@
 void Node::setup (data_no_t *nddata) {
 
 	PicOSNode::setup (nddata);
-	NNode::setup ();
 }
 
 void Node::init () {
@@ -16,5 +15,5 @@ void Node::init () {
 
 void Node::reset () {
 
-	NNode::reset ();
+	PicOSNode::reset ();
 }

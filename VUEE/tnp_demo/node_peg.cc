@@ -7,7 +7,6 @@
 void NodePeg::setup (data_no_t *nddata) {
 
 	PicOSNode::setup (nddata);
-	TNode::setup ();
 }
 
 void NodePeg::init () {
@@ -20,7 +19,7 @@ void NodePeg::init () {
 
 void NodePeg::reset () {
 
-	TNode::reset ();
+	PicOSNode::reset ();
 }
 
 void buildPegNode (data_no_t *nddata) {
