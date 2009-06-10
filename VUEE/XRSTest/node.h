@@ -3,7 +3,7 @@
 
 #include "board.h"
 
-station	Node : NNode {
+station	Node : PicOSNode {
 
 	/*
 	 * Session (application) specific data

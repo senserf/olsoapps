@@ -4,7 +4,7 @@
 #include "board.h"
 #include "plug_null.h"
 
-station	Node : NNode {
+station	Node : PicOSNode {
 
 	/*
 	 * Session (application) specific data

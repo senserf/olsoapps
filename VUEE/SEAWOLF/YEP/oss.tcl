@@ -815,6 +815,6 @@ u_ab_setif uget $PM(MPL)
 fconfigure stdin -buffering line -blocking 0
 fileevent stdin readable sget
 
-u_settrace 7 dump.txt
+#u_settrace 7 dump.txt
 
 vwait None

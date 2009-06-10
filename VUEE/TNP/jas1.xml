@@ -1,4 +1,4 @@
-<network nodes="2">
+<network nodes="3">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
     <channel>
@@ -10,7 +10,7 @@
 		RP(d)/XP [dB] = -10 x 3.0 x log(d/1.0m) + X(1.0) - 38.0
  		=======================================================
 	</shadowing>
-	<cutoff>400m</cutoff>
+	<cutoff>-115.0dBm</cutoff>
 	<ber>
 		Interpolated ber table:
 		======================
@@ -27,13 +27,24 @@
 		-5.0dB		9.9E-1
 	</ber>
 	<frame>12 0</frame>
-	<power>10.0dBm</power>
 	<rates>9600</rates>
+	<rssi>0 -202.0 255 53.0</rssi>
+	<power>
+		0	-30.0dBm
+		1	-15.0dBm
+		2	-10.0dBm
+		3	 -5.0dBm
+		4	  0.0dBm
+		5	  5.0dBm
+		6	  7.0dBm
+		7	 10.0dBm
+	</power>
     </channel>
     <nodes>
 	<defaults>
 	    <memory>2048 bytes</memory>
 	    <radio>
+	    	<power>7</power>
 	    	<preamble>32 bits</preamble>
 	    	<lbt>
 			delay			8msec
@@ -44,19 +55,29 @@
 			max			303msec
 	    	</backoff>
 	    </radio>
-	    <eeprom erase="byte" overwrite="no" size="33554432,32" timing="0.0001 0.0002 0.0004 0.0008 0.0009 0.0009">
-	    </eeprom>
-	    <iflash size="256,2"></iflash>
+	    <leds number="4">
+	    	<output target="socket"></output>
+	    </leds>
+	    <iflash>256 bytes in 2 pages</iflash>
 	    <uart rate="9600" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
+	    <preinit tag="HID" type="lword">3133857453</preinit>
+	    <preinit tag="MHOST" type="word">0</preinit>
+	    <preinit tag="NID" type="word">85</preinit>
 	</defaults>
-	<node number="0">
-	    <location>1.0 4.0</location>
+	<node number="0" type="peg">
+	    <location>5.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0063</preinit>
 	</node>
-	<node number="1">
-	    <location>1.0 10.0</location>
+        <node number="1" type="peg">
+            <location>10.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
+	</node>
+	<node number="2" type="tag">
+	    <location>10.0 10.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0101</preinit>
 	</node>
     </nodes>
 </network>

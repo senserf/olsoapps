@@ -12,7 +12,7 @@
 #include "board.h"
 #include "plug_tarp.h"
 
-station	NodeCus : TNode {
+station	NodeCus : PicOSNode {
 
 	/*
 	 * Session (application) specific data

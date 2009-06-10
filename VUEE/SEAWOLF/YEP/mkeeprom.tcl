@@ -64,6 +64,16 @@ set DP(NI)	$DP(NO)
 
 ###############################################################################
 
+proc logloc { w loc len } {
+
+	global BN
+
+	return
+
+	puts "Allocated $w at $loc / [format %08X $loc] -> [format %08X [expr \
+		$loc + $BN(TXT)]], size = $len"
+}
+
 proc msource { f } {
 #
 # Intelligent 'source'
@@ -452,13 +462,14 @@ proc alloc_menu { att lines } {
 #
 # Builds a menu
 #
-#    XLb YLb XHb YHb BLKw BLKw TPb Fn BGb FGb LINESw NLw Wb Hb FLw SHw SEw
+#    XLb YLb XHb YHb BLKa BLKa TPb Fn BGb FGb LINESa NLw Wb Hb FLw SHw SEw
 #    ------- ------- ---- ---- ------ ------- ------ --- ----- --- --- ---
 #        0      1      2    3     4      5       6    7    8    9   10  11
+#                      A    A                    A    W         W    W   W
 #
 	global FST MEM
 
-	set OFF(LI) 6
+	set OFF(FR) [list 0x0002 0x0003 0x0006 0x8007 0x8009 0x800A 0x800B]
 	set OFF(LE) 12
 
 	set bk ""
@@ -533,7 +544,6 @@ proc alloc_menu { att lines } {
 
 	# turn it into a complete object
 	set len [string length $bk]
-
 	# this doesn't have to be aligned
 	set lbk ""
 	# prepend the length header
@@ -542,15 +552,16 @@ proc alloc_menu { att lines } {
 
 	# follow it by the list of relocation points
 	set lbk ""
-	# the number of relocation points == 1 + NL
-	appendbs lbk [expr $NL + 1]
-	# the Lines array: 6
-	appendbs lbk $OFF(LI)
-
+	# the number of relocation points == NL + fixed tagged locations
+	appendbs lbk [expr $NL + [llength $OFF(FR)]]
+	# do the fixed part
+	foreach r $OFF(FR) {
+		appendbs lbk [expr $r]
+	}
 	set lof $OFF(LE)
 	for { set i 0 } { $i < $NL } { incr i } {
 		# string relocation
-		appendbs lbk [expr $lof | 0x8000]
+		appendbs lbk [expr $lof | 0x4000]
 		incr lof
 	}
 
@@ -558,6 +569,8 @@ proc alloc_menu { att lines } {
 	set bk "$bk$lbk"
 
 	set loc [string length $MEM(TXT)]
+
+	logloc "menu" $loc [string length $bk]
 
 	append MEM(TXT) $bk
 
@@ -568,13 +581,13 @@ proc alloc_text { att line } {
 #
 # Allocates a text structure
 #
-#    XLb YLb XHb YHb BLKw BLKw TPb Fn BGb FGb LINEw Wb Hb
+#    XLb YLb XHb YHb BLKa BLKa TPb Fn BGb FGb LINEa Wb Hb
 #    ------- ------- ---- ---- ------ ------- ----- -----
 #       0       1      2    3     4      5      6     7
 #
 	global FST MEM
 
-	set OFF(LI) 6
+	set OFF(FR) [list 0x0002 0x0003 0x4006]
 	# in words
 	set OFF(LE) 8
 
@@ -742,12 +755,14 @@ proc alloc_text { att line } {
 	appendbs lbk $len
 	set bk "$lbk$bk"
 
-	# there is a single relocation point
-	appendbs bk 1
-	appendbs bk [expr 0x8000 + $OFF(LI)]
-
+	# relocation tags
+	appendbs bk [llength $OFF(FR)]
+	foreach r $OFF(FR) {
+		appendbs bk [expr $r]
+	}
 	# that's it
 	set loc [string length $MEM(TXT)]
+	logloc "text" $loc [string length $bk]
 	append MEM(TXT) $bk
 	return $loc
 }
@@ -756,7 +771,13 @@ proc alloc_image { handle x y } {
 #
 # Allocates an image structure
 #
+#    XLb YLb XHb YHb BLKa BLKa TPb Ub Hw
+#    ------- ------- ---- ---- ------ --
+#       0       1      2    3     4    5
+#
 	global MEM
+
+	set OFF(FR) [list 0x0002 0x0003 0x8005]
 
 	set xd [expr (130 - $x) / 2]
 	set yd [expr (130 - $x) / 2]
@@ -779,12 +800,23 @@ proc alloc_image { handle x y } {
 
 	appendbs bk $handle
 
-	set lw ""
-	appendbs lw [string length $bk]
-	# there is no relocation
-	appendbs bk 0
+	# turn it into a complete object
+	set len [string length $bk]
+	set lbk ""
+	appendbs lbk $len
+	set bk "$lbk$bk"
+
+	# Tags (no relocation, fixed tags only)
+	appendbs bk [llength $OFF(FR)]
+	foreach r $OFF(FR) {
+		appendbs bk [expr $r]
+	}
+
 	set loc [string length $MEM(TXT)]
-	append MEM(TXT) "$lw$bk"
+
+	logloc "image" $loc [string length $bk]
+
+	append MEM(TXT) "$bk"
 
 	return $loc
 }

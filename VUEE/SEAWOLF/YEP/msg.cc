@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2009.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
@@ -7,38 +7,46 @@
 #include "applib.h"
 #include "net.h"
 
-msgBeacType myBeac;
-msgActType  myAct;
+#ifdef	__SMURPH__
 
-#define BEA_START	0
-#define BEA_SEND	1
+#else
+
+#include "msg_node_data.h"
+
+#define MSG_BEA_START	0
+#define MSG_BEA_SEND	1
+
+#define MSG_RC_TRY	0
+
+#endif
+
+// ============================================================================
+
 thread (beacon)
 
-	entry (BEA_START)
-		delay ((word)BEAC_FREQ * 1024 + rnd() % 2048, BEA_SEND);
+	entry (MSG_BEA_START)
+		delay ((word)BEAC_FREQ * 1024 + rnd() % 2048, MSG_BEA_SEND);
 		release;
 
-	entry (BEA_SEND)
+	entry (MSG_BEA_SEND)
 		handle_nbh (NBH_AUDIT, 0);
 		// we'll be crying for all those shortcuts
 		(void)net_tx (WNONE, (char *)&myBeac, sizeof(msgBeacType), 0);
-		proceed (BEA_START);
+		proceed (MSG_BEA_START);
 endthread
-#undef BEA_START
-#undef BEA_SEND
 
-#define RC_TRY	0
 thread (rcv)
 
-  entry (RC_TRY)
+  entry (MSG_RC_TRY)
 	if (rf_rcv.buf != NULL) {
 		ufree (rf_rcv.buf);
 		rf_rcv.buf = NULL;
 		rf_rcv.len = 0;
 	}
 
-	if ((rf_rcv.len = net_rx (RC_TRY, &rf_rcv.buf, &rf_rcv.rss, 0)) <= 0)
-		proceed (RC_TRY);
+	if ((rf_rcv.len = net_rx (MSG_RC_TRY, &rf_rcv.buf, &rf_rcv.rss, 0)) <=
+	    0)
+		proceed (MSG_RC_TRY);
 
 	// map rssi
 	if ((rf_rcv.rss >> 8) > 161)
@@ -49,10 +57,11 @@ thread (rcv)
 		rf_rcv.rss = 1;
 
 	process_incoming ();
-	proceed (RC_TRY);
+	proceed (MSG_RC_TRY);
 
 endthread
-#undef RC_TRY
+
+// ============================================================================
 
 int msg_reply (word a) {
 
@@ -120,31 +129,31 @@ int msg_send (msg_t t, nid_t r, hop_t h, word pload,
 /*
  * "Virtual" stuff needed by NET & TARP =======================================
  */
-int tr_offset (headerType *h) {
+__PUBLF (SeaNode, int, tr_offset) (headerType *h) {
 	return 0;
 }
 
-Boolean msg_isBind (msg_t m) {
+__PUBLF (SeaNode, Boolean, msg_isBind) (msg_t m) {
 	return NO;
 }
 
-Boolean msg_isTrace (msg_t m) {
+__PUBLF (SeaNode, Boolean, msg_isTrace) (msg_t m) {
 	return NO;
 }
 
-Boolean msg_isMaster (msg_t m) {
+__PUBLF (SeaNode, Boolean, msg_isMaster) (msg_t m) {
 	return (m == MSG_AD); // we'll see if mhopping makes sense at all
 }
 
-Boolean msg_isNew (msg_t m) {
+__PUBLF (SeaNode, Boolean, msg_isNew) (msg_t m) {
 	return NO;
 }
 
-Boolean msg_isClear (byte o) {
+__PUBLF (SeaNode, Boolean, msg_isClear) (byte o) {
 	return YES;
 }
 
-void set_master_chg () {
+__PUBLF (SeaNode, void, set_master_chg) () {
 	return;
 }
 

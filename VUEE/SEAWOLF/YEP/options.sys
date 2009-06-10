@@ -1,0 +1,41 @@
+#undef	UART_TCV
+#undef	UART_RATE
+#undef	UART_DRIVER
+#undef	DIAG_MESSAGES
+
+#define	UART_TCV	1
+#define	UART_RATE	115200
+#define	PID_VER_TYPE	1
+#define DIAG_MESSAGES	1
+#define	CC1100		1
+
+// Long argument lists in object creators
+#define	LCDG_DM_SOFT_CREATORS	2
+
+//DIAG_MESSAGES 1 saves 1152B
+
+#define	LCDG_N6100P_EPSON 0
+
+// ============================================================================
+
+#ifdef	__SMURPH__
+
+#define	BUTTON_0		0
+#define	BUTTON_1		1
+#define	JOYSTICK_N		2
+#define	JOYSTICK_E		3
+#define	JOYSTICK_S		4
+#define	JOYSTICK_W		5
+#define	JOYSTICK_PUSH		6
+
+#define	IS_JOYSTICK(b)		((b) >= JOYSTICK_N && (b) <= JOYSTICK_PUSH)
+
+#define VUEE_LIB_PLUG_NULL
+#define VUEE_LIB_PLUG_TARP
+#define VUEE_LIB_XRS
+#define VUEE_LIB_OEP
+#define VUEE_LIB_OL
+#define VUEE_LIB_LCDG
+
+#endif
+

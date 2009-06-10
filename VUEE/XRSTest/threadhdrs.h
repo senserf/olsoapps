@@ -123,7 +123,7 @@ process THREADNAME (root) (Node) {
 #define	RS_INIT		0
 #define	RS_RESTART	1
 #define	RS_RCMD		2
-#define	RS_RCMD		3
+#define	RS_RCMD1	3
 
 // ============================================================================
 

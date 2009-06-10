@@ -1,5 +1,5 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2009.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
@@ -9,14 +9,13 @@
 #include "net.h"
 #include "storage.h"
 
-lcdg_dm_men_t 	* lcd_menu;
-nbh_menu_t	nbh_menu;
-rf_rcv_t	rf_rcv, ad_rcv;
-word		top_flag;
-char 		* ad_buf;
-sea_rec_t	* curr_rec;
+#ifdef	__SMURPH__
 
-extern const lword host_id;
+#else
+
+#include "applib_node_data.h"
+
+#endif
 
 // ============================================================================
 
@@ -138,7 +137,7 @@ void init_glo () {
 	curr_rec = NULL;
 }
 
-int handle_ad (word act, word which) {
+word handle_ad (word act, word which) {
 
     sea_rec_t *rec;
     lcdg_dm_obj_t *im;
@@ -209,7 +208,7 @@ int handle_ad (word act, word which) {
 
 void process_incoming () {
 
-    int i = handle_nbh (NBH_FIND, in_header (rf_rcv.buf, snd));
+    word i = handle_nbh (NBH_FIND, in_header (rf_rcv.buf, snd));
 
     if (in_header (rf_rcv.buf, msg_type) != MSG_BEAC)
         diag ("Got %u.%u fr %u (%u) t%u", in_header (rf_rcv.buf, msg_type),
@@ -217,7 +216,7 @@ void process_incoming () {
 		    in_header (rf_rcv.buf, snd), i, (word)seconds());
     // beacons
     if (in_header(rf_rcv.buf, msg_type) == MSG_BEAC) {
-	if (i >= 0) {
+	if (i != WNONE) {
 		nbh_menu.mm[i].ts = (word)seconds();
 		if (nbh_menu.mm[i].st == HS_SILE)
 			update_line (ULSEL_C0, i, HS_BEAC, MLI0_INNH);
@@ -226,7 +225,7 @@ void process_incoming () {
     }
 
     // all else unwanted
-    if (i < 0 || nbh_menu.mm[i].gr != MLI1_YE) {
+    if (i == WNONE || nbh_menu.mm[i].gr != MLI1_YE) {
 	msg_reply (HS_NOSY);
 	return;
     }
@@ -293,8 +292,8 @@ void process_incoming () {
 }
 
 // expecting more 'whats' and trading op speed for code size...
-int handle_nbh (word what, word id) {
-    int i, j = nbh_menu.li;
+word handle_nbh (word what, word id) {
+    word i, j = nbh_menu.li;
 
     for (i = 0; i < j; i++) {
 	switch (what) {
@@ -321,5 +320,5 @@ int handle_nbh (word what, word id) {
 
 	}
     }
-    return -1;
+    return WNONE;
 }

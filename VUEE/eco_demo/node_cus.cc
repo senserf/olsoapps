@@ -7,7 +7,6 @@
 void NodeCus::setup (data_no_t *nddata) {
 
 	PicOSNode::setup (nddata);
-	TNode::setup ();
 }
 
 void NodeCus::init () {
@@ -20,7 +19,7 @@ void NodeCus::init () {
 
 void NodeCus::reset () {
 
-	TNode::reset ();
+	PicOSNode::reset ();
 }
 
 void buildCusNode (data_no_t *nddata) {

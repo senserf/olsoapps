@@ -20,3 +20,9 @@
 
 #define CODE_LONG_INTS	1
 
+
+#define	VUEE_LIB_PLUG_NULL
+#define	VUEE_LIB_XRS
+#define	VUEE_LIB_OEP
+#define	VUEE_LIB_OL
+#define	VUEE_LIB_LCDG

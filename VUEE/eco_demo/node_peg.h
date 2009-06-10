@@ -12,7 +12,7 @@
 #include "board.h"
 #include "plug_tarp.h"
 
-station	NodePeg : TNode {
+station	NodePeg : PicOSNode {
 
 	/*
 	 * Session (application) specific data

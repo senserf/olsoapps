@@ -1,16 +1,4 @@
-#include "sysio.h"
-#include "pins.h"
-#include "oep.h"
-#include "oep_ee.h"
-#include "lcdg_images.h"
-#include "lcdg_dispman.h"
-#include "plug_null.h"
-#include "phys_uart.h"
-#include "ab.h"
-#include "sealists.h"
-#include "msg.h"
-#include "net.h"
-#include "applib.h"
+#include "app.h"
 
 /*
  * Illustrates images, menus, OEP
@@ -19,20 +7,90 @@
 // ============================================================================
 
 //+++ "hostid.c"
-extern lword host_id;
 
 // ============================================================================
 
-static int SFD;
+#ifdef __SMURPH__
+
+#define	SFD		_daprx (SFD)
+#define	objects		_daprx (objects)
+#define	ibuf		_daprx (ibuf)
+
+process root {
+
+#include "app_root_static.h"
+
+	states {
+			RS_INIT,
+			RS_RDCMD,
+			RS_RDCME,
+			RS_SST,
+			RS_DSP,
+			RS_CRE,
+			RS_GME,
+			RS_GME1,
+			RS_GTE,
+			RS_GTE1,
+			RS_LIS,
+			RS_LDM,
+			RS_LDM1,
+			RS_LIM,
+			RS_LIM1,
+			RS_DIS,
+			RS_ERA,
+			RS_SEN,
+			RS_RCV,
+			RS_ISW,
+			RS_ESW,
+			RS_MEM,
+			RS_MEM1,
+			RS_FME,
+			RS_LNB,
+			RS_NBH,
+			RS_HOS,
+			RS_HOS1
+	};
+
+	perform;
+};
+
+#else
+
+#define RS_INIT         0
+#define RS_RDCMD        1
+#define RS_RDCME        2
+#define RS_SST          3
+#define RS_DSP          4
+#define RS_CRE          5
+#define RS_GME          6
+#define RS_GME1         7
+#define RS_GTE          8
+#define RS_GTE1         9
+#define RS_LIS          10
+#define RS_LDM          11
+#define RS_LDM1         12
+#define RS_LIM          13
+#define RS_LIM1         14
+#define RS_DIS          15
+#define RS_ERA          16
+#define RS_SEN          17
+#define RS_RCV          18
+#define RS_ISW          19
+#define RS_ESW          20
+#define RS_MEM          21
+#define RS_MEM1         22
+#define RS_FME          23
+#define RS_LNB          24
+#define RS_NBH          25
+#define RS_HOS          26
+#define RS_HOS1         27
+
+#include "app_node_data.h"
+
+#endif
 
 // ============================================================================
 // ============================================================================
-
-#define	MAXLINES	32
-#define	MAXOBJECTS	32
-
-static lcdg_dm_obj_t *objects [MAXOBJECTS];
-
 // ============================================================================
 
 static Boolean free_object (word ix) {
@@ -94,7 +152,7 @@ static void display_rec (word rh) {
 // Display the record (picture + meter) represented by the index
 //
 	if (curr_rec != NULL) {
-		lcdg_dm_free ((lcdg_dm_obj_t*)curr_rec);
+		ufree (curr_rec);
 		curr_rec = NULL;
 	}
 	if ((curr_rec = seal_getrec (rh)) == NULL)
@@ -202,6 +260,9 @@ static void buttons (word but) {
 		}
 	}
 
+	if (lcd_menu == NULL)
+		return;
+
 	mm = &nbh_menu.mm [lcdg_dm_menu_c(lcd_menu)];
 
 	if (but == BUTTON_0) {
@@ -274,11 +335,6 @@ static void buttons (word but) {
 
 // ============================================================================
 
-#define	NPVALUES	12
-#define	LABSIZE		(LCDG_IM_LABLEN+2)
-
-static char *ibuf = NULL;
-
 static void fibuf () {
 
 	if (ibuf) {
@@ -287,43 +343,15 @@ static void fibuf () {
 	}
 }
 
-int beacon (word, address);
-int rcv (word, address);
-
 thread (root)
-
-#define	RS_INIT		0
-#define	RS_RDCMD	1
-#define	RS_RDCME	2
-#define	RS_SST		3
-#define	RS_DSP		4
-#define	RS_CRE		5
-#define	RS_GME		6
-#define	RS_GTE		8
-#define	RS_LIS		10
-#define	RS_LDM		11
-#define	RS_LIM		13
-#define	RS_DIS		15
-#define	RS_ERA		16
-#define	RS_SEN		17
-#define	RS_RCV		18
-#define	RS_ISW		19
-#define	RS_ESW		20
-#define	RS_MEM		21
-#define	RS_FME		23
-#define RS_LNB		30
-#define RS_NBH		40
-#define RS_HOS		50
 
     word i;
     char *line;
     lword ef, el;
 
-    static word c [NPVALUES];
-    static byte Status;
-    static char lbl [LABSIZE];
-    static char **lines;
-    static lcdg_im_hdr_t *isig;
+// With __SMUPRH__, the dirst include (at the top of this file) will take
+// precedence
+#include "app_root_static.h"
 
     entry (RS_INIT)
 
@@ -555,9 +583,9 @@ Men:	// ====================================================================
 	fibuf ();
 	ab_outf (RS_GME, "Enter %u lines", NL - CN);
 
-    entry (RS_GME+1)
+    entry (RS_GME1)
 
-	ibuf = ab_in (RS_GME+1);
+	ibuf = ab_in (RS_GME1);
 
 	for (i = 0; ibuf [i] == ' ' || ibuf [i] == '\t'; i++);
 
@@ -625,9 +653,9 @@ Tex:	// ====================================================================
 	fibuf ();
 	ab_outf (RS_GTE, "Enter a line");
 
-    entry (RS_GTE+1)
+    entry (RS_GTE1)
 
-	ibuf = ab_in (RS_GTE+1);
+	ibuf = ab_in (RS_GTE1);
 
 	for (i = 0; ibuf [i] == ' ' || ibuf [i] == '\t'; i++);
 
@@ -707,7 +735,7 @@ Ldm: // =======================================================================
 	if (OIX == MAXOBJECTS)
 		goto Ret;
 
-    entry (RS_LDM+1) 
+    entry (RS_LDM1) 
 
 	switch (objects [OIX] -> Type & LCDG_DMTYPE_MASK) {
 
@@ -717,7 +745,7 @@ Ldm: // =======================================================================
 
 		case LCDG_DMTYPE_IMAGE:
 
-			ab_outf (RS_LDM+1,
+			ab_outf (RS_LDM1,
 				"%u = IMAGE: %x [%u,%u] [%u,%u]", OIX,
 					COI->EPointer,
 					COI->XL, COI->YL, COI->XH, COI->YH);
@@ -725,7 +753,7 @@ Ldm: // =======================================================================
 
 		case LCDG_DMTYPE_MENU:
 
-			ab_outf (RS_LDM+1,
+			ab_outf (RS_LDM1,
 			"%u = MENU: Fo%u, Bg%u, Fg%u, Nl%u [%u,%u] [%u,%u]",
 					OIX,
 					COM->Font, COM->BG, COM->FG, COM->NL,
@@ -735,7 +763,7 @@ Ldm: // =======================================================================
 
 		case LCDG_DMTYPE_TEXT:
 
-			ab_outf (RS_LDM+1,
+			ab_outf (RS_LDM1,
 			"%u = TEXT: Fo%u, Bg%u, Fg%u, Ll%u [%u,%u] [%u]",
 					OIX,
 					COT->Font, COT->BG, COT->FG,
@@ -744,7 +772,7 @@ Ldm: // =======================================================================
 			break;
 
 		default:
-			ab_outf (RS_LDM+1, "%u = UNKNOWN [%u]\r\n", OIX,
+			ab_outf (RS_LDM1, "%u = UNKNOWN [%u]\r\n", OIX,
 				objects [OIX] -> Type);
 	}
 
@@ -781,9 +809,9 @@ NLim:
 
 	isig->Label [LCDG_IM_LABLEN-1] = '\0';
 
-    entry (RS_LIM+1)
+    entry (RS_LIM1)
 
-	ab_outf (RS_LIM+1, "%u [%u,%u]: %s",
+	ab_outf (RS_LIM1, "%u [%u,%u]: %s",
 		OIX, isig->X, isig->Y, isig->Label);
 	goto NLim;
 
@@ -868,7 +896,7 @@ Nbr:
 	goto Ret;
 
 Nbm:
-	if ((c[1] = handle_nbh (NBH_FIND, c[0])) < 0) {
+	if ((c[1] = handle_nbh (NBH_FIND, c[0])) == WNONE) {
 		Status = 101;
 		goto Ret;
 	}
@@ -1036,9 +1064,9 @@ ERcv:
 	c [0] = memfree (0, c + 1);
 	c [2] = stackfree ();
 
-    entry (RS_MEM+1)
+    entry (RS_MEM1)
 
-	ab_outf (RS_MEM+1, "MEMORY: %u %u %u", c [0], c [1], c [2]);
+	ab_outf (RS_MEM1, "MEMORY: %u %u %u", c [0], c [1], c [2]);
 	goto Ret;
 
 // ============================================================================
@@ -1048,9 +1076,9 @@ ERcv:
 	c[0] = local_host;
 	scan (ibuf+1, "%u", &c[0]);
 
-    entry (RS_HOS +1)
+    entry (RS_HOS1)
 
-	ab_outf (RS_HOS +1, "lhost %u -> %u", local_host, c[0]);
+	ab_outf (RS_HOS1, "lhost %u -> %u", local_host, c[0]);
 	if (local_host != c[0]) {
 		local_host = c[0];
 		handle_nbh (NBH_INIT, 0);
@@ -1095,7 +1123,10 @@ FRe:	// ====================================================================
 	if ((objects [OIX] = seal_mkrmenu ()) == NULL)
 		Status = LCDG_DM_STATUS;
 
-	// Extras is now being used to store record handles
 	goto Ret;
 	
 endthread
+
+// ============================================================================
+
+praxis_starter (SeaNode);

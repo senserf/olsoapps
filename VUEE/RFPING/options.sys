@@ -26,6 +26,8 @@
 #define	dbg_e(c)	do { } while (0)
 #define	dbg_f(c)	do { } while (0)
 
+#define	VUEE_LIB_PLUG_NULL
+
 #else
 
 #undef	SPIN_WHEN_HALTED

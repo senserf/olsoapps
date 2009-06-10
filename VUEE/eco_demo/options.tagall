@@ -1,4 +1,9 @@
 #ifdef	__SMURPH__
+
+// Note: this is just define or not, no value
+#define	VUEE_LIB_PLUG_TARP
+#define	VUEE_LIB_PLUG_NULL
+
 #define	TCV_PRESENT			1
 #define	TCV_HOOKS			0
 #define	TCV_TIMERS			0
@@ -125,4 +130,3 @@
 #define STORAGE_SDCARD 		0
 
 #define SD_KEEP_IDLE 		1
-

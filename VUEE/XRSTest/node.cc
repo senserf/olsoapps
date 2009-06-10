@@ -1,10 +1,6 @@
 #include "node.h"
 
-void Node::setup (data_no_t *nddata) {
-
-	PicOSNode::setup (nddata);
-	NNode::setup ();
-}
+void Node::setup (data_no_t *nddata) { PicOSNode::setup (nddata); }
 
 void Node::init () {
 
@@ -14,7 +10,4 @@ void Node::init () {
 	appStart ();
 }
 
-void Node::reset () {
-
-	NNode::reset ();
-}
+void Node::reset () { PicOSNode::reset (); }
