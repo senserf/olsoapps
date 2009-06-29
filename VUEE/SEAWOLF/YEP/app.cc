@@ -361,6 +361,8 @@ thread (root)
 
 	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0)
 		syserror (ERESOURCE, "cc1100");
+
+	// 0,0 is taken by CC1100/TARP, right?
 	phys_uart (1, OEP_MAXRAWPL, 0);
 	tcv_plug (1, &plug_null);
 	oep_setphy (1);
@@ -377,7 +379,7 @@ thread (root)
 	if (oep_init () == NO)
 		syserror (ERESOURCE, "oep_init");
 
-	// Initialize the PHY
+	// Initialize the UART PHY
 	i = 0xffff;
 	tcv_control (SFD, PHYSOPT_SETSID, &i);
 	tcv_control (SFD, PHYSOPT_TXON, NULL);

@@ -4,22 +4,12 @@
 
 #include "node_peg.h"
 
-void NodePeg::setup (data_no_t *nddata) {
-
-	PicOSNode::setup (nddata);
-}
-
 void NodePeg::init () {
 
 #include "attribs_init_peg.h"
 
 	// Start application root
 	appStart ();
-}
-
-void NodePeg::reset () {
-
-	PicOSNode::reset ();
 }
 
 void buildPegNode (data_no_t *nddata) {

@@ -4,22 +4,12 @@
 
 #include "node_cus.h"
 
-void NodeCus::setup (data_no_t *nddata) {
-
-	PicOSNode::setup (nddata);
-}
-
 void NodeCus::init () {
 
 #include "attribs_init_cus.h"
 
 	// Start application root
 	appStart ();
-}
-
-void NodeCus::reset () {
-
-	PicOSNode::reset ();
 }
 
 void buildCusNode (data_no_t *nddata) {

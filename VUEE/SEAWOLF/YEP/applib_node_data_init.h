@@ -1,2 +1,2 @@
 
-_da (host_id)           = (lword) preinit ("HID");
+host_id = (lword) preinit ("HID");

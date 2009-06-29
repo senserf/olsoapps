@@ -1,0 +1,11 @@
+{SHT_Temp {set value [expr -39.62 + 0.01 * $value]} {1 100-399} {4 400-499}} {SHT_Humid {set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
+if { $value < 0.0 } {
+	set value 0.0
+} elseif { $value > 100.0 } {
+	set value 100.0
+}} {2 100-399} {5 400-499}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-499} {1 400-499} {2 400-499} {3 400-499}} {ECHO_5 {set value [expr $value * 0.9246 - 40.1]
+if { $value < 0.0 } {
+	set value 0.0
+} elseif { $value > 100.0 } {
+	set value 100.0
+}} {3 300-399}} {PhotoDiode {set value [expr $value * 0.5]} {3 600-700}}

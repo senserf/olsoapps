@@ -1,56 +1,58 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007                    */
+/* Copyright (C) Olsonet Communications, 2002 - 2009                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
+#include "vuee_snd.h"
+
 #include "sysio.h"
+#include "ser.h"
 #include "tcvphys.h"
+#include "phys_cc1100.h"
+#include "plug_null.h"
 
 #define	MAX_PACKET_LENGTH	60
 #define	IBUF_LENGTH		82
 
-/*
- *	This is a simple sender-receiver praxis to be used for illustration of
- *	PicOS -> VUEE conversion.
- */
+#ifdef	__SMURPH__
 
-#include "ser.h"
-#include "serf.h"
-#include "form.h"
-#include "phys_dm2200.h"
-#include "plug_null.h"
+strandhdr (sender, NodeSnd) {
 
-int 	sfd;
-word	Count;
+	char *data;
 
-void show (word st, address pkt) {
+	states { SN_SEND };
 
-	ser_outf (st, "RCV: %d [%s] pow = %d qua = %d\r\n",
-		Count++,
-		(char*)(pkt + 1),
-		((byte*)pkt) [tcv_left (pkt) - 1],
-		((byte*)pkt) [tcv_left (pkt) - 2]
-	);
-}
+	perform;
 
-#define	RC_TRY		0
-#define	RC_SHOW		1
+	void setup (char *bf) { data = bf; };
+};
 
-thread (receiver)
+threadhdr (root, NodeSnd) {
 
-  static address packet;
+	states { RS_INIT, RS_RCMD_M, RS_RCMD, RS_RCMD_E, RS_XMIT };
 
-  entry (RC_TRY)
+	perform;
+};
 
-	packet = tcv_rnp (RC_TRY, sfd);
+#define	sfd	_daprx (sfd)
+#define	spkt	_daprx (spkt)
+#define	ibuf	_daprx (ibuf)
 
-  entry (RC_SHOW)
+#else	/* PICOS */
 
-	show (RC_SHOW, packet);
-	tcv_endp (packet);
-	proceed (RC_TRY);
+#include "app_snd_data.h"
 
-endthread
+#define	SN_SEND		0
+
+#define	RS_INIT		0
+#define	RS_RCMD_M	1
+#define	RS_RCMD		2
+#define	RS_RCMD_E	3
+#define	RS_XMIT		4
+
+#endif	/* VUEE or PICOS */
+
+// ============================================================================
 
 word plen (char *str) {
 
@@ -63,47 +65,34 @@ word plen (char *str) {
 	return (k + 6) & 0xfe;
 }
 
-#define	SN_SEND		0
-
 strand (sender, char)
-
-  address packet;
 
   entry (SN_SEND)
 
-	packet = tcv_wnp (SN_SEND, sfd, plen (data));
-	packet [0] = 0;
-	strcpy ((char*)(packet + 1), data);
-	tcv_endp (packet);
+	spkt = tcv_wnp (SN_SEND, sfd, plen (data));
+	spkt [0] = 0;
+	strcpy ((char*)(spkt + 1), data);
+	tcv_endp (spkt);
 	finish;
 
 endstrand
 
-#define	RS_INIT		0
-#define	RS_RCMD_M	1
-#define	RS_RCMD		2
-#define	RS_RCMD_E	3
-#define	RS_XMIT		4
+// ============================================================================
 
 thread (root)
-
-  static char *ibuf;
 
   entry (RS_INIT)
 
 	ibuf = (char*) umalloc (IBUF_LENGTH);
-	phys_dm2200 (0, MAX_PACKET_LENGTH);
+	phys_cc1100 (0, MAX_PACKET_LENGTH);
 	tcv_plug (0, &plug_null);
 	sfd = tcv_open (WNONE, 0, 0);
 	tcv_control (sfd, PHYSOPT_TXON, NULL);
-	tcv_control (sfd, PHYSOPT_RXON, NULL);
 
 	if (sfd < 0) {
 		diag ("Cannot open tcv interface");
 		halt ();
 	}
-
-	runthread (receiver);
 
   entry (RS_RCMD_M)
 
@@ -131,3 +120,5 @@ thread (root)
 	proceed (RS_RCMD);
 
 endthread
+
+praxis_starter (NodeSnd);

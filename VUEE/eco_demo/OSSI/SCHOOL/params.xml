@@ -1,0 +1,23 @@
+<params>
+
+    <database name="global_econet">
+	<user>econet</user>
+	<password>2yNsk1!</password>
+	<host>127.0.0.1</host>
+	<port>7777</port>
+    </database>
+
+    <operator>
+	<email>pawel@cs.ualberta.ca</email>
+    </operator>
+
+    <repository>VALUES</repository>
+
+    <init>
+		Y 60
+		m
+		P 99
+		T %T
+    </init>
+
+</params>

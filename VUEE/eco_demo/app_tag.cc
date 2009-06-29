@@ -806,7 +806,7 @@ thread (root)
 			leds (LED_G, LED_BLINK);
 #ifndef __SMURPH__
 #if CRYSTAL2_RATE
-#error CRYSTAL2 RATE MUST BE 0, UART_RATE 9600
+//#error CRYSTAL2 RATE MUST BE 0, UART_RATE 9600
 #endif
 #endif
 		if (is_flash_new) {

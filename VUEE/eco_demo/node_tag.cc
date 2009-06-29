@@ -4,22 +4,12 @@
 
 #include "node_tag.h"
 
-void NodeTag::setup (data_no_t* nddata) {
-
-	PicOSNode::setup (nddata);
-}
-
 void NodeTag::init () {
 
 #include "attribs_init_tag.h"
 
 	// Start application root
 	appStart ();
-}
-
-void NodeTag::reset () {
-
-	PicOSNode::reset ();
 }
 
 void buildTagNode (data_no_t* nddata) {

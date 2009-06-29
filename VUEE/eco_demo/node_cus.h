@@ -23,9 +23,6 @@ station	NodeCus : PicOSNode {
 	 * Application starter
 	 */
 	void appStart ();
-
-	void setup (data_no_t*);
-	void reset ();
 	void init ();
 };
 

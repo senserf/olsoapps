@@ -1,0 +1,9 @@
+#define	TCV_PRESENT	1
+#define	TCV_HOOKS	0
+#define	TCV_TIMERS	0
+
+#define	UART_DRIVER	1
+#define	CODE_LONG_INTS	1
+
+#define	CC1100		1
+#define	RADIO_USE_LEDS	7

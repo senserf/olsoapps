@@ -1,8 +1,8 @@
 #ifndef __msg_node_data_h__
 #define	__msg_node_data_h__
 
-msgBeacType	_da (myBeac);
-msgActType	_da (myAct);
+msgBeacType	myBeac;
+msgActType	myAct;
 
 #ifdef	__SMURPH__
 

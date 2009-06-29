@@ -1,7 +1,5 @@
 #include "vuee.h"
 
-void SeaNode::setup (data_no_t *nddata) { PicOSNode::setup (nddata); }
-
 void SeaNode::init () {
 
 // ============================================================================
@@ -15,7 +13,3 @@ void SeaNode::init () {
 	// Start application root
 	appStart ();
 }
-
-#undef reset
-
-void SeaNode::reset () { PicOSNode::reset (); }

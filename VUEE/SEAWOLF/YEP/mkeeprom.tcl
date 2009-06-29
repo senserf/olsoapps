@@ -184,15 +184,6 @@ proc extract_font_sizes { ff } {
 
 ###############################################################################
 
-proc image_id { id } {
-#
-# Transforms record ID into picture file ID
-#
-	set id [string tolower $id]
-	regexp "^0x(.*)" $id junk id
-	return "image_${id}.nok"
-}
-
 proc output_block { org data } {
 #
 # Writes a chunk to the output file
@@ -767,7 +758,7 @@ proc alloc_text { att line } {
 	return $loc
 }
 
-proc alloc_image { handle x y } {
+proc alloc_image { handle x y { xd "" } { yd "" }} {
 #
 # Allocates an image structure
 #
@@ -779,8 +770,13 @@ proc alloc_image { handle x y } {
 
 	set OFF(FR) [list 0x0002 0x0003 0x8005]
 
-	set xd [expr (130 - $x) / 2]
-	set yd [expr (130 - $x) / 2]
+	if { $xd == "" || [expr $xd + $x] > 130 } {
+		set xd [expr (130 - $x) / 2]
+	}
+
+	if { $yd == "" || [expr $yd + $y] > 130 } {
+		set yd [expr (130 - $y) / 2]
+	}
 
 	set bk ""
 
@@ -926,7 +922,10 @@ proc handle_image { id } {
 	# for now, this is treated as a file name
 	if [catch { open $id "r" } ifd] {
 		# no image: WNONE
-		return ""
+		if { [file extension $id] != "" || \
+		     [catch { open "$id.nok" "r" } ifd] } {
+			return ""
+		}
 	}
 
 	# read the image
@@ -1092,8 +1091,6 @@ proc do_people { } {
 		if [catch { expr $it } ID] {
 			abt "illegal value of id ($it) at record $ni"
 		}
-		# this is supposed to produce the file name of the image
-		set II [image_id $it]
 
 		# name ########################################################
 		set nm [sxml_txt [sxml_child $rc "name"]]
@@ -1159,12 +1156,28 @@ proc do_people { } {
 		set MM [alloc_text $DP(MM) $it]
 
 		# image #######################################################
-		set IM [handle_image $II]
-		if { $IM != "" } {
-			set IM [alloc_image [lindex $IM 0] [lindex $IM 1] \
-				[lindex $IM 2]]
-		} else {
-			set IM -1
+
+		set im [sxml_child $rc "photo"]
+		set in [string trim [sxml_txt $im]]
+		set IM -1
+		if { $in != "" } {
+			# there is a photo
+			set im [sxml_attr $im "org"]
+			if { $im != "" } {
+				# extract coordinates of origin
+				set co [numbers $im]
+				set xo [lindex $co 0]
+				set yo [lindex $co 1]
+			} else {
+				set xo ""
+				set yo ""
+			}
+			set in [handle_image $in]
+			if { $in != "" } {
+				set IM [alloc_image [lindex $in 0] \
+						    [lindex $in 1] \
+						    [lindex $in 2] $xo $yo]
+			}
 		}
 
 		# append to data ##############################################

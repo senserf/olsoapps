@@ -1,44 +1,22 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2007                    */
+/* Copyright (C) Olsonet Communications, 2002 - 2009                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "globals.h"
-#include "threadhdrs.h"
+#include "sysio.h"
+#include "ser.h"
+#include "tcvphys.h"
+#include "phys_cc1100.h"
+#include "plug_null.h"
 
 #define	MAX_PACKET_LENGTH	60
 #define	IBUF_LENGTH		82
 
-/*
- *	This is a simple sender-receiver praxis to be used for illustration of
- *	PicOS -> VUEE conversion.
- */
+int 	sfd = -1;
 
-__PUBLF (Node, void, show) (word st, address pkt) {
+address spkt;
 
-	ser_outf (st, "RCV: %d [%s] pow = %d qua = %d\r\n",
-		Count++,
-		(char*)(pkt + 1),
-		((byte*)pkt) [tcv_left (pkt) - 1],
-		((byte*)pkt) [tcv_left (pkt) - 2]
-	);
-}
-
-thread (receiver)
-
-  entry (RC_TRY)
-
-	r_packet = tcv_rnp (RC_TRY, sfd);
-
-  entry (RC_SHOW)
-
-	show (RC_SHOW, r_packet);
-	tcv_endp (r_packet);
-	proceed (RC_TRY);
-
-endthread
-
-__PUBLF (Node, word, plen) (char *str) {
+word plen (char *str) {
 
 	word k;
 	if ((k = strlen (str)) > MAX_PACKET_LENGTH - 5) {
@@ -49,37 +27,44 @@ __PUBLF (Node, word, plen) (char *str) {
 	return (k + 6) & 0xfe;
 }
 
-strand (sender, char)
+#define	SN_SEND		0
 
-  address packet;	// This one is OK as a truly automatic variable
+strand (sender, char)
 
   entry (SN_SEND)
 
-	packet = tcv_wnp (SN_SEND, sfd, plen (data));
-	packet [0] = 0;
-	strcpy ((char*)(packet + 1), data);
-	tcv_endp (packet);
+	spkt = tcv_wnp (SN_SEND, sfd, plen (data));
+	spkt [0] = 0;
+	strcpy ((char*)(spkt + 1), data);
+	tcv_endp (spkt);
 	finish;
 
 endstrand
+
+// ============================================================================
+
+char	*ibuf;
+
+#define	RS_INIT		0
+#define	RS_RCMD_M	1
+#define	RS_RCMD		2
+#define	RS_RCMD_E	3
+#define	RS_XMIT		4
 
 thread (root)
 
   entry (RS_INIT)
 
 	ibuf = (char*) umalloc (IBUF_LENGTH);
-	phys_dm2200 (0, MAX_PACKET_LENGTH);
+	phys_cc1100 (0, MAX_PACKET_LENGTH);
 	tcv_plug (0, &plug_null);
 	sfd = tcv_open (WNONE, 0, 0);
 	tcv_control (sfd, PHYSOPT_TXON, NULL);
-	tcv_control (sfd, PHYSOPT_RXON, NULL);
 
 	if (sfd < 0) {
 		diag ("Cannot open tcv interface");
 		halt ();
 	}
-
-	runthread (receiver);
 
   entry (RS_RCMD_M)
 
@@ -107,5 +92,3 @@ thread (root)
 	proceed (RS_RCMD);
 
 endthread
-
-praxis_starter (Node);

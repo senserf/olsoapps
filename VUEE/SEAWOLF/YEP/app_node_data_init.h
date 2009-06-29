@@ -1,6 +1,6 @@
 
 for (int i = 0; i < MAXOBJECTS; i++)
-	_da (objects) [i] = NULL;
+	objects [i] = NULL;
 
-_da (ibuf) = NULL;
+ibuf = NULL;
 

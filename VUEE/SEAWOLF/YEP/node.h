@@ -22,12 +22,10 @@ station SeaNode : PicOSNode {
 
 #include "starter.h"
 
-	void setup (data_no_t*);
-	void reset ();
 	void init ();
 };
 
-#define	_daprx(a)	_dac (SeaNode, a)
+#define	_daprx(a)	_dan (SeaNode, a)
 
 #endif
 #endif
