@@ -1,4 +1,5 @@
 #include "app.h"
+#include "storage.h"
 
 /*
  * Illustrates images, menus, OEP
@@ -147,189 +148,207 @@ static void disp_cats () {
 
 // ============================================================================
 
-static void display_rec (word rh) {
-//
-// Display the record (picture + meter) represented by the index
-//
-	if (curr_rec != NULL) {
-		ufree (curr_rec);
-		curr_rec = NULL;
-	}
-	if ((curr_rec = seal_getrec (rh)) == NULL)
-		// Failed to get the record
-		return;
-
-	seal_disprec (curr_rec);
-	top_flag = TOP_DATA;
-}
-
-// ============================================================================
-
 static void preset_menus () {
 
-	word i;
+	word i, j;
 
 	for (i = 0; i < 4; i++)
 		if (objects [i] != NULL)
 			return;
 
-	if ((objects [0] = seal_mkcmenu (NO)) != NULL)
-		lcdg_dm_newtop (objects [0]);
-	if ((objects [1] = seal_mkcmenu (YES)) != NULL)
-		lcdg_dm_newtop (objects [1]);
-	// Note: I am calling applib's version of mkrmenu
-	if ((lcd_menu  = (lcdg_dm_men_t*)mkrmenu ()) != NULL)
-		lcdg_dm_newtop ((lcdg_dm_obj_t*)lcd_menu);
+	objects [0] = seal_mkcmenu (NO);
+	objects [1] = seal_mkcmenu (YES);
+	lcd_menu  = (lcdg_dm_men_t*)mkrmenu ();
+	if (objects [0] == NULL || objects [1] == NULL ||
+			lcd_menu == NULL) {
+		diag ("Amen"); // leds
+		halt();
+	}
+	if (nbh_menu.li < 4)
+		goto RetHier;
+
+	// 3 fist must be 1 bin digit, or demo nh bitmaps are blocked
+	for (i = 0; i < 3; i++) {
+		j = 0x8000;
+		while (j) {
+			if (j == nbh_menu.mm [i].id)
+				break;
+			j >>= 1;
+		}
+		if (j == 0)
+			goto RetHier;
+	}
+
+	cxt_flag.top = cxt_flag.cxt = TOP_NH;
+	return;
+RetHier:
+	cxt_flag.top = TOP_HIER;
+	cxt_flag.cxt = TOP_NONH;
+	lcdg_dm_newtop ((lcdg_dm_obj_t*)lcd_menu);
 }
 
 static void top_switch () {
 //
-// Rotate the top object
+// Switch views
 //
 	if (LCDG_DM_HEAD == NULL) {
-		lcdg_dm_dtop ();
-		preset_menus ();
-		lcdg_on (0);
-		return;
-	}
+		diag ("To LIV");
+		lcdg_dm_refresh();
+		cxt_flag.top =  cxt_flag.cxt = TOP_HIER;
+		lcdg_dm_newtop ((lcdg_dm_obj_t*)lcd_menu);
 
-	if (LCDG_DM_HEAD != LCDG_DM_TOP)
-		// More than one item
-		lcdg_dm_newtop (LCDG_DM_HEAD);
+	} else if (cxt_flag.cxt != TOP_NONH) {
+			diag ("To NBV");
+			lcdg_dm_remove (NULL);
+			cxt_flag.top = cxt_flag.cxt = TOP_NH;
+			paint_nh ();
+			diag ("All painted");
+	}
 }
 
 // ============================================================================
 
 static void buttons (word but) {
 
-	nbh_t * mm;
+	nbh_t * mmm = NULL;
+	word i =0, skip;
 
-	if (IS_JOYSTICK (but)) {
+	if (but == BUTTON_1) {
+		diag ("Contrast?");
+		return;
+	}
 
-		if (top_flag != TOP_HIER) { // outside hierarchy
+	if (cxt_flag.top == TOP_AD) {
+		if (but == JOYSTICK_N)
+			handle_ad (AD_RPLY, 1);
+		else if (but == JOYSTICK_S)
+			handle_ad (AD_RPLY, 0);
+		else
+			handle_ad (AD_CANC, 0);
+	}
 
-			if (top_flag == TOP_AD)
-				handle_ad (AD_CANC, 0);
+	if (but == BUTTON_0) {
+		top_switch();
+		return;
+	}
 
-			// kludge in disp_cats
-			if (but == JOYSTICK_E) { // east is 'down'
+	if (cxt_flag.top == TOP_AD)
+		goto Refresh;
+
+	if (cxt_flag.cxt == TOP_NH) {
+		if (nbh_menu.scr != 0) {
+			skip = nbh_menu.scr;
+			for (i = 0; i < 3; i++)
+				if (nbh_menu.cid & nbh_menu.mm[i].id &&
+						--skip == 0)
+					break;
+			mmm = &nbh_menu.mm[i];
+		}
+	} else if (lcd_menu) {
+		i = lcdg_dm_menu_c(lcd_menu);
+		mmm = &nbh_menu.mm [i];
+	}
+
+	if (mmm)
+		diag ("butt found %u %u", i, mmm->id);
+	else {
+		diag ("butt null mmm");
+		if (but != JOYSTICK_W && but != JOYSTICK_E)
+			return;
+	}
+
+	if (but == JOYSTICK_PUSH) { // drill down
+		if (cxt_flag.top == TOP_HIER || (cxt_flag.top == TOP_NH &&
+				nbh_menu.num > 1)) {
+			display_rec (i);
+			return;
+		}
+		if (cxt_flag.top == TOP_DATA) {
+			if (cxt_flag.cxt != TOP_NH) {
 				disp_cats();
 				return;
 			}
-
-			top_flag = TOP_HIER;
-			lcdg_dm_refresh ();
-			return;
+			goto Refresh;
 		}
+		return;
+	}
 
-		if (but == JOYSTICK_PUSH) {
-			top_switch ();
-			return;
-		}
-
-		if (LCDG_DM_TOP == NULL ||
-		    (LCDG_DM_TOP->Type & LCDG_DMTYPE_MASK) != LCDG_DMTYPE_MENU)
-			// Ignore the joystick, if the top object is not a menu
-			return;
-
-		switch (but) {
-
-		    case JOYSTICK_W:
-
+	if (but == JOYSTICK_W) { // up
+		if (cxt_flag.top == TOP_DATA)
+			goto Refresh;
+		if (cxt_flag.cxt != TOP_NH)
 			lcdg_dm_menu_u ((lcdg_dm_men_t*)LCDG_DM_TOP);
-			return;
-
-		    case JOYSTICK_E:
-
-			lcdg_dm_menu_d ((lcdg_dm_men_t*)LCDG_DM_TOP);
-			return;
-
-		    case JOYSTICK_N:
-
-			lcdg_dm_menu_l ((lcdg_dm_men_t*)LCDG_DM_TOP);
-			return;
-
-		    case JOYSTICK_S:
-
-			lcdg_dm_menu_r ((lcdg_dm_men_t*)LCDG_DM_TOP);
-			return;
-
-		    default:
-			// Impossible
-			return;
-		}
-	}
-
-	if (lcd_menu == NULL)
-		return;
-
-	mm = &nbh_menu.mm [lcdg_dm_menu_c(lcd_menu)];
-
-	if (but == BUTTON_0) {
-		switch (top_flag) {
-		    case TOP_AD:
-			handle_ad (AD_RPLY, 1);
-			break;
-		    case TOP_DATA:
-			if (mm->gr == MLI1_YE) {
-
-				if (mm->st == HS_BEAC)
-					update_line (ULSEL_C0,
-						lcdg_dm_menu_c(lcd_menu),
-						HS_ISND, MLI0_ISND);
-
-				if (mm->st == HS_IRCV || mm->st == HS_IDEC)
-					update_line (ULSEL_C0,
-						lcdg_dm_menu_c(lcd_menu),
-						HS_MATC, MLI0_MATC);
-
-				if (mm->st == HS_ISND || mm->st == HS_MATC)
-					msg_send (MSG_ACT, mm->id, 1, mm->st,
-						0, 0, NULL);
-			}
-			break;
-		    case TOP_HIER:
-			if (LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu)
-				update_line (ULSEL_C1,
-					       	lcdg_dm_menu_c(lcd_menu),
-						0, 0);
+		else if (nbh_menu.num) {
+			paint_scr (COLOR_BLACK);
+			if (nbh_menu.scr < 2)
+				nbh_menu.scr = nbh_menu.num;
 			else
-				top_switch();
-			return;
+				nbh_menu.scr--;
+			paint_scr (COLOR_WHITE);
 		}
-		top_flag = TOP_HIER;
-
-		// Refresh
-		lcdg_dm_refresh ();
 		return;
 	}
 
-	if (but == BUTTON_1) {
-		switch (top_flag) {
-			case TOP_HIER:
-				if (LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu)
-				    display_rec (lcdg_dm_menu_c (LCDG_DM_TOP));
-				else
-					top_switch();
-				return;
-
-			case TOP_AD:
-				handle_ad (AD_RPLY, 0);
-				break;
-
-			case TOP_DATA:
-				if (mm->gr == MLI1_YE && mm->st == HS_IRCV) {
-
-					update_line (ULSEL_C0,
-						lcdg_dm_menu_c(lcd_menu),
-						HS_IDEC, MLI0_IDEC);
-
-					msg_send (MSG_ACT, mm->id, 1, HS_DECL,
-							0, 0, NULL);
-				}
+	if (but == JOYSTICK_E) {
+		if (cxt_flag.top == TOP_DATA)
+			goto Refresh;
+		if (cxt_flag.cxt != TOP_NH)
+			lcdg_dm_menu_d ((lcdg_dm_men_t*)LCDG_DM_TOP);
+		else if (nbh_menu.num) {
+			paint_scr (COLOR_BLACK);
+			// .scr is :2
+			if (nbh_menu.scr == 3 ||
+					++nbh_menu.scr > nbh_menu.num)
+				nbh_menu.scr = 1;
+			paint_scr (COLOR_WHITE);
 		}
-		top_flag = TOP_HIER;
-		lcdg_dm_refresh ();
+		return;
+	}
+
+	// only positive _N (left) and negative _S (right) left
+	// keep the group +/-, even if now it doesn't make sense:
+	if (mmm->gr != MLI1_YE)
+		goto Refresh;
+
+	if (but == JOYSTICK_N) {
+		// this cascade may be 'entered' at any if:
+		if (mmm->st == HS_BEAC)
+			update_line (ULSEL_C0, i, HS_ISND, MLI0_ISND);
+
+		if (mmm->st == HS_IRCV || mmm->st == HS_IDEC)
+			update_line (ULSEL_C0, i, HS_MATC, MLI0_MATC);
+
+		if (mmm->st == HS_ISND || mmm->st == HS_MATC)
+			msg_send (MSG_ACT, mmm->id, 1, mmm->st, 0, 0, NULL);
+
+		goto Refresh;
+	}
+#if 0
+that was 'ignore' for TOP_HIER:
+if (LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu)
+	update_line (ULSEL_C1, i, 0, 0);
+#endif
+
+
+	if (but == JOYSTICK_S) {
+
+		if (mmm->st == HS_IRCV) {
+			update_line (ULSEL_C0, i, HS_IDEC, MLI0_IDEC);
+			msg_send (MSG_ACT, mmm->id, 1, HS_DECL, 0, 0, NULL);
+		}
+		goto Refresh;
+	}
+
+Refresh:
+
+	if (cxt_flag.top != TOP_NH && cxt_flag.top != TOP_HIER) {
+
+		cxt_flag.top = cxt_flag.cxt == TOP_NH ? TOP_NH : TOP_HIER;
+
+		if (cxt_flag.cxt == TOP_NH)
+			paint_nh ();
+		else
+			lcdg_dm_refresh ();
 	}
 }
 
@@ -361,8 +380,6 @@ thread (root)
 
 	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0)
 		syserror (ERESOURCE, "cc1100");
-
-	// 0,0 is taken by CC1100/TARP, right?
 	phys_uart (1, OEP_MAXRAWPL, 0);
 	tcv_plug (1, &plug_null);
 	oep_setphy (1);
@@ -379,7 +396,7 @@ thread (root)
 	if (oep_init () == NO)
 		syserror (ERESOURCE, "oep_init");
 
-	// Initialize the UART PHY
+	// Initialize the PHY
 	i = 0xffff;
 	tcv_control (SFD, PHYSOPT_SETSID, &i);
 	tcv_control (SFD, PHYSOPT_TXON, NULL);
@@ -398,7 +415,10 @@ thread (root)
 	net_opt (PHYSOPT_SETPOWER, &i);
 	net_opt (PHYSOPT_TXON, NULL);
 	net_opt (PHYSOPT_RXON, NULL);
-	top_switch ();
+	lcdg_dm_dtop();
+	lcdg_on (0);
+	preset_menus();
+	//top_switch ();
 	runthread (beacon);
 	runthread (rcv);
 

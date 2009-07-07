@@ -12,8 +12,8 @@
 #define AD_RPLY		2
 #define AD_CANC		3
 // hellish kludge - not sure about the advertisers
-#define AD_OLSO_ID	4
-#define AD_COMBAT_ID	5
+#define AD_GBN_ID	88
+#define EV_ORG_ID	77
 
 // updates c0 (status) or c1 (group) (never both)
 #define ULSEL_C0	1
@@ -42,16 +42,27 @@
 #define MLI0_DECL	'-'
 #define MLI0_IDEC	'~'
 
+// colors for the 'TOP_NH view'
+#define COL_NOSY	COLOR_BLACK
+#define COL_SYMM	COLOR_CYAN
+#define COL_ISND	COLOR_YELLOW
+#define COL_IRCV	COLOR_GREEN
+#define COL_MATC	COLOR_WHITE
+#define COL_DECL	COLOR_RED
+#define COL_IDEC	COLOR_PINK
+
 // codes for the group char (menu line[1]), so far +/- with 'ignore'
 #define MLI1_YE		'+'
 #define MLI1_NO		'-'
 #define MLI1_IY		'I'
 #define MLI1_IN		'i'
 
-// top_flag
+// cxt_flag.top, cxt
 #define TOP_HIER	0
 #define TOP_DATA	1
 #define TOP_AD		2
+#define TOP_NH		3
+#define TOP_NONH	4
 
 // Menu parameters (sealists doesn't need them any more) ======================
 
@@ -65,20 +76,29 @@
 typedef struct {
 	word	id;
 	word	ts;
-	word	gr :8; // :2 needed now
+	word	gr :8; // :2 needed now (byte is loaded from ee though)
 	word	st :8; // :4 needed
 } nbh_t;
 
 typedef struct {
 	word	li 	:8; // :7 enough
-	word	spare 	:8;
+	word	num 	:2;
+	word	scr	:2;
+	word	spare	:4;
+	word	cid;	// needed ?
 	nbh_t  *mm;
 } nbh_menu_t;
 
 typedef struct {
 	char	*buf;
-	word	 len; // len, rssi could be :8, but need addresses or doubles
+	word	 len; // len, rssi could be :8, but need addresses or doublets
 	word	 rss;
 } rf_rcv_t;
+
+typedef struct {
+	word	top : 4;
+	word	cxt : 4;
+	word	spare : 8;
+} cflags_t;	// context (LCD) flags
 
 #endif

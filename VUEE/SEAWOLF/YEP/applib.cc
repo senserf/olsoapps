@@ -78,7 +78,125 @@ URet:
 }
 
 // ============================================================================
-	
+
+void display_rec (word rh) {
+//
+// Display the record (picture + (optional) meter) represented by the index
+//
+        if (curr_rec != NULL) {
+                ufree (curr_rec);
+                curr_rec = NULL;
+        }
+        if ((curr_rec = seal_getrec (rh)) == NULL) {
+		diag ("seal_getrec failed");
+                // Failed to get the record
+                return;
+	}
+
+        seal_disprec (curr_rec, cxt_flag.cxt == TOP_NH ? NO : YES);
+        cxt_flag.top = TOP_DATA;
+}
+
+// ============================================================================
+
+void paint_scr (word c) {
+	word i;
+
+	if (nbh_menu.scr == 0)
+		return;
+
+	i = 10 + nbh_menu.scr * 120 / nbh_menu.num - 1; // bottom
+
+	lcdg_set (0, i - 9, 4, i);
+	lcdg_setc (c, c);
+	lcdg_clear ();
+}
+
+// ============================================================================
+
+static word color_c0 (word i) {
+
+	// traditional(?) char -> word
+	switch (lcd_menu->Lines [i][0]) {
+
+		case MLI0_NOSY:
+			return COL_NOSY;
+
+		case MLI0_SYMM:
+			return COL_SYMM;
+
+		case MLI0_ISND:
+			return COL_ISND;
+
+		case MLI0_IRCV:
+			return COL_IRCV;
+
+		case MLI0_MATC:
+			return COL_MATC;
+
+		case MLI0_DECL:
+			return COL_DECL;
+
+		case MLI0_IDEC:
+			return COL_IDEC;
+	}
+	return WNONE;
+}
+
+// ============================================================================
+
+static void paint_c0 (word i) {
+	word co, j = 0, po = 0;
+
+	if (i > 2 || !(nbh_menu.cid & nbh_menu.mm[i].id) ||
+			(co = color_c0 (i)) == WNONE)
+		return;
+
+	while (j < i) {
+		if (nbh_menu.cid & nbh_menu.mm[j].id)
+			po++;
+		j++;
+	}
+
+	po = 10 + po * 120 / nbh_menu.num;
+	lcdg_set (125, po, 129, po + 5);
+	lcdg_setc (co , co);
+	lcdg_clear ();
+}
+
+// ============================================================================
+
+void paint_nh () {
+	word i = handle_nbh (NBH_FIND, nbh_menu.cid);
+
+	if (nbh_menu.num == 0) {
+		lcdg_dm_dtop ();
+		return;
+	}
+
+	if (i == WNONE)
+		return;
+
+	display_rec (i);
+	// what a crap! this is not TOP_DATA, restore top after display_rec():
+	// double crap: single node is a schizo - treat it as TOP_NH:
+	if (i > 2 || nbh_menu.num == 1)
+		cxt_flag.top = TOP_NH;
+
+	nbh_menu.num = 0;
+	for (i = 0; i < 3; i++)
+		if (nbh_menu.cid & nbh_menu.mm[i].id)
+			nbh_menu.num++;
+
+	if (nbh_menu.num == 1 || nbh_menu.scr > nbh_menu.num)
+		nbh_menu.scr = nbh_menu.num;
+
+	paint_c0 (0); paint_c0 (1); paint_c0 (2);
+	paint_scr (COLOR_WHITE);
+}
+
+// ============================================================================
+
 void update_line (word sel, word i, word s, word c0) {
 
     switch (sel) {
@@ -87,6 +205,26 @@ void update_line (word sel, word i, word s, word c0) {
 
 		nbh_menu.mm[i].st = s;
 		lcd_menu->Lines [i][0] = c0;
+
+		if (cxt_flag.cxt != TOP_NH || i > 2)
+			break;
+
+		switch (c0) {
+			case MLI0_INNH:
+				nbh_menu.cid |= nbh_menu.mm[i].id;
+				nbh_menu.num++;
+				paint_nh ();
+				break;
+
+			case MLI0_GONE:
+				nbh_menu.cid &= ~nbh_menu.mm[i].id;
+				nbh_menu.num--;
+				paint_nh ();
+				break;
+
+			default:
+				paint_c0 (i);
+		}
 		break;
 
 	case ULSEL_C1:
@@ -112,7 +250,7 @@ void update_line (word sel, word i, word s, word c0) {
 	    }
     }
 
-    if (top_flag == TOP_HIER && LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu)
+    if (cxt_flag.top == TOP_HIER && LCDG_DM_TOP == (lcdg_dm_obj_t *)lcd_menu)
 	lcdg_dm_update (lcd_menu, i);
 }
 
@@ -129,11 +267,11 @@ void init_glo () {
 	myAct.header.hco = 1;
 
 	// applib
-	memset (&rf_rcv, 0, sizeof(nbh_menu_t));
+	memset (&rf_rcv, 0, sizeof(rf_rcv_t));
+	memset (&ad_rcv, 0, sizeof(rf_rcv_t));
 	memset (&nbh_menu, 0, sizeof(nbh_menu_t));
 	lcd_menu = NULL;
 	ad_buf = NULL;
-	top_flag = TOP_HIER;
 	curr_rec = NULL;
 }
 
@@ -170,24 +308,25 @@ word handle_ad (word act, word which) {
 		// improvise... 
 		ad_rcv.buf[ad_rcv.len -1] = '\0';
 		switch (nbh_menu.mm[which].id) {
-			case AD_OLSO_ID:
-				lcdg_setc (COLOR_WHITE, COLOR_BLUE);
-				lcdg_sett (64, 10, 8, 1);
-				lcdg_wl (&ad_rcv.buf[sizeof(msgAdType)],0,0,0);
+			case AD_GBN_ID:
+				lcdg_setc (COLOR_BLUE, COLOR_GREEN);
+				lcdg_sett (7, 40, 11, 1);
+				//lcdg_sett (10, 43, 8, 1);
+				//lcdg_sett (10, 43, 16, 1);
 				break;
 
-			case AD_COMBAT_ID:
+			case EV_ORG_ID:
 				lcdg_setc (COLOR_BLACK, COLOR_WHITE);
-				lcdg_sett (0, 43, 16, 1);
+				lcdg_sett (5, 83, 11, 1);
 				break;
 
 			default:
 				lcdg_setc (COLOR_BROWN, COLOR_WHITE);
-				lcdg_sett (0, 66, 16, 1);
+				lcdg_sett (10, 66, 16, 1);
 		}
 		lcdg_wl (&ad_rcv.buf[sizeof(msgAdType)], 0, 0, 0);
 		ufree (rec);
-		top_flag = TOP_AD;
+		cxt_flag.top = TOP_AD;
 	    }
 	    break;
 
@@ -232,6 +371,14 @@ void process_incoming () {
 
     if (in_header(rf_rcv.buf, msg_type) == MSG_AD) {
 	handle_ad (AD_GOT, i);
+	return;
+    }
+
+    // for now
+    if (in_header(rf_rcv.buf, msg_type) == MSG_ADACK) {
+
+	diag ("Ad Ack:%u from %u ref %u", in_adAck(rf_rcv.buf, ack),
+		in_header(rf_rcv.buf, snd), in_adAck(rf_rcv.buf, ref));
 	return;
     }
 
@@ -315,9 +462,9 @@ word handle_nbh (word what, word id) {
 		break;
 
 	    case NBH_FIND:
+
 		if (nbh_menu.mm[i].id == id)
 			return i;
-
 	}
     }
     return WNONE;

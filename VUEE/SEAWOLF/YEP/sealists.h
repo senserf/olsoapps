@@ -15,7 +15,7 @@ lcdg_dm_obj_t *seal_mkcmenu (Boolean);
 lcdg_dm_obj_t *seal_mkrmenu ();
 sea_rec_t *seal_getrec (word);
 word seal_findrec (lword);
-void seal_disprec (sea_rec_t*);
+void seal_disprec (sea_rec_t*, Boolean);
 
 #define seal_objaddr(ptr)	((lword)((ptr)+SEA_EOFF_TXT))
 #define seal_gettext(off) 	lcdg_dm_newtext_e (seal_objaddr (off))

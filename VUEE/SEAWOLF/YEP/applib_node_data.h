@@ -4,7 +4,7 @@
 lcdg_dm_men_t 	*lcd_menu;
 nbh_menu_t	nbh_menu;
 rf_rcv_t	rf_rcv, ad_rcv;
-word		top_flag;
+cflags_t	cxt_flag;
 char 		*ad_buf;
 sea_rec_t	*curr_rec;
 

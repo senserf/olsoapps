@@ -63,7 +63,7 @@ word seal_findrec (lword id) {
 	return WNONE;
 }
 
-void seal_disprec (sea_rec_t *r) {
+void seal_disprec (sea_rec_t *r, Boolean b) {
 //
 //
 //
@@ -79,6 +79,9 @@ void seal_disprec (sea_rec_t *r) {
 			lcdg_dm_free (nt);
 		}
 	}
+
+	if (!b)
+		return;
 
 	p = &(r->ME);
 	for (i = 0; i < 3; i++) {

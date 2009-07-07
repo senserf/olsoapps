@@ -1,4 +1,4 @@
-<network nodes="2">
+<network nodes="6">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
     <channel>
@@ -65,21 +65,42 @@
 	    </uart>
 	    <lcdg type="n6100p"></lcdg>
 	    <pins number="7">
-		<input source="socket"></input>
+		<output target="socket"></output>
 		<buttons polarity="low" timing="200">0 1 2 3 4 5 6</buttons>
 		<values>1111111</values>
 	    </pins>
-	    <preinit tag="NID" type="word">0x85</preinit>
+	    <preinit tag="NID" type="word">85</preinit>
+	    <preinit tag="MHOST" type="word">0</preinit>
 	</defaults>
 	<node number="0">
-	    <location>65.0 5.0</location>
+	    <location>5.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
-	    <eeprom size="524288" clean="0xFF" image="eeprom.nok"></eeprom>
+	    <eeprom size="524288" clean="0xFF" image="eeprom1.nok"></eeprom>
 	</node>
-	<node number="1">
-	    <location>205.0 5.0</location>
+	<node number="1" start="off">
+	    <location>5.0 15.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0002</preinit>
-	    <eeprom size="524288" clean="0xFF" image="eeprom.nok"></eeprom>
+	    <eeprom size="524288" clean="0xFF" image="eeprom2.nok"></eeprom>
+	</node>
+        <node number="2" start="off">
+            <location>15.0 15.0</location>
+            <preinit tag="HID" type="lword">0xBACA0004</preinit>
+            <eeprom size="524288" clean="0xFF" image="eeprom4.nok"></eeprom>
+        </node>
+        <node number="3" start="off">
+            <location>15.0 5.0</location>
+            <preinit tag="HID" type="lword">0xBACA0008</preinit>
+            <eeprom size="524288" clean="0xFF" image="eeprom8.nok"></eeprom>
+        </node>
+	<node number="4" start="on">
+	    <location>9.0 10.0</location>
+	    <preinit tag="HID" type="lword">0xBACA004D</preinit>
+	    <eeprom size="524288" clean="0xFF" image="eeprom_booth.nok"></eeprom>
+	</node>
+	<node number="5" start="on">
+	    <location>11.0 10.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0058</preinit>
+	    <eeprom size="524288" clean="0xFF" image="eeprom_booth.nok"></eeprom>
 	</node>
     </nodes>
 </network>
