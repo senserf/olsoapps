@@ -80,38 +80,31 @@ proc uart_init { rfun } {
 		unset Uart(FD)
 	}
 
-	# list of devices to try
-	set c [string index $Uart(DEV) 0]
-	set d $Uart(DEV)
-	set dl [list $d]
-	if { $c != "/" && $c != "\\" } {
-		# not an absolute path
-		lappend dl "\\\\/\\$d"
-		lappend dl "/dev/$d"
-		lappend dl "/dev/tty$d"
-	}
+	set d "/dev/ttyUSB"
 
 	while 1 {
 
-		msg "connecting to UART $Uart(DEV), encoding $Uart(PAR) ..."
+		msg "scanning ttyUSB devices, encoding $Uart(PAR) ..."
+
 		set c 1
-		foreach d $dl {
-			if ![catch { open $d RDWR } ser] {
+
+		for { set ix 0 } { $ix < 32 } { incr ix } {
+			set dv "$d$ix"
+			if ![catch { open $dv RDWR } ser] {
 				set c 0
 				break
 			}
 		}
 
 		if $c {
-puts "FAIL 0 $dl $ser"
+			msg "failed to locate a ttyUSB device"
 			after 20000
 			continue
 		}
 
 		if [catch { fconfigure $ser -mode $Uart(PAR) -handshake none \
 			-blocking 0 -translation binary } err] {
-puts "FAIL 1 $dl"
-
+			msg "failed to configure $dv: $err"
 			catch { close $ser }
 			after 20000
 			continue
@@ -120,6 +113,9 @@ puts "FAIL 1 $dl"
 		break
 	}
 
+	msg "opened $dv"
+
+	set Uart(DEV) $dv
 	set Uart(FD) $ser
 	set Uart(BF) ""
 	fileevent $Uart(FD) readable "uart_read"
@@ -162,10 +158,8 @@ proc uart_write { w } {
 
 	msg "-> $w"
 
-	catch {
-		puts -nonewline $Uart(FD) "$w\r\n" 
-		flush $Uart(FD)
-	}
+	puts -nonewline $Uart(FD) "$w\r\n" 
+	flush $Uart(FD)
 }
 
 proc uart_read { } {
@@ -173,7 +167,7 @@ proc uart_read { } {
 	global Uart
 
 	if [catch { read $Uart(FD) } chunk] {
-		# ignore errors
+		# ignore errors (detect them when writing)
 		return
 	}
 		
@@ -865,10 +859,20 @@ proc loop { } {
 
 	while 1 {
 
-		init_aggregator
+		set Turn 0
 
-		after 60000 { incr Turn }
-		vwait Turn
+		uart_init input_line
+
+		while 1 {
+			if [catch { init_aggregator } err] {
+				# restart everything
+				msg "write to $Uart(DEV) failed, $err,\
+					resetting"
+				break
+			}
+			after 60000 { incr Turn }
+			vwait Turn
+		}
 	}
 }
 
@@ -886,11 +890,7 @@ xml_read
 log_open [lindex $PM(LOG) 0] [lindex $PM(LOG) 1] [lindex $PM(LOG) 2]
 snip_read
 
-set Uart(DEV) [lindex $argv 0]
+set Uart(DEV) "none"
 set Uart(PAR) "19200,n,8,1"
-
-set Turn 0
-
-uart_init input_line
 
 loop

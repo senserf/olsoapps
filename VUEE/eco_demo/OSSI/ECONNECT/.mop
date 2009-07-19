@@ -1,2 +1,2 @@
 #!/bin/sh
-rm -f econnect.exe
+rm -f econnect.exe esdreader.exe

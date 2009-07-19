@@ -426,13 +426,13 @@ proc u_rdline { prt } {
 
 	set em $WN(SE,$prt)
 
-	if { $em < 3 } {
+	if { $em < 16 } {
 		if [extract_aggregator_samples $prt $em $line] {
 			# no log
 			return
 		}
 	} else {
-		if [extract_collector_samples $prt $em $line] {
+		if [extract_collector_samples $prt [expr $em - 16] $line] {
 			# no log
 			return
 		}
@@ -1054,6 +1054,10 @@ proc cnotype { prt } {
 # Return the node's official title
 #
 	global WN
+
+	if { $prt == "SD" } {
+		return "SD card"
+	}
 
 	set tt $WN(NT,$prt)
 
@@ -2380,7 +2384,11 @@ proc show_window { prt { redo 0 } } {
 					break
 				}
 				set vc [snip_cnvrt $vr $sen $cn]
-
+				if { $vc == "" } {
+					# no converter means value irrelevant
+					set vc "-"
+					set vr "-"
+				}
 				set s $l.vr${row}_$sen 
 				label $s -text $vr -anchor e -width 5
 				grid $s -column $col -row $row -sticky e \
@@ -2479,11 +2487,17 @@ proc show_upd { prt col ts rvals } {
 	set sen 0
 	foreach v $rvals {
 
+		set vc [snip_cnvrt $v $sen $col]
+		if { $vc == "" } {
+			set vc "-"
+			set v "-"
+		}
+
 		if [catch { $l.vr${ix}_$sen configure -text $v } ] {
 			# in case we somehow have gotten more values
 			break
 		}
-		$l.vc${ix}_$sen configure -text [snip_cnvrt $v $sen $col]
+		$l.vc${ix}_$sen configure -text $vc
 
 		incr sen
 	}
@@ -2700,7 +2714,13 @@ proc show_sensors { prt line } {
 	set line "$cn, $ts"
 	set ix 0
 	foreach v $rv {
-		append line ", $v, [snip_cnvrt $v $ix $cn]"
+		set vc [snip_cnvrt $v $ix $cn]
+		if { $vc == "" } {
+			# for file, we store zeros for unmapped values
+			set vc 0
+			set v 0
+		}
+		append line ", $v, $vc"
 		incr ix
 	}
 
@@ -2716,16 +2736,6 @@ proc do_extract { prt } {
 		return
 	}
 
-	if [info exists WN(w,$prt,E)] {
-		if ![confirm "You have an extraction window open for this node.\
-			It will be closed before starting the new extraction.\
-			Is that OK?"] {
-				return
-		}
-		catch { destroy $WN(w,$prt,E) }
-		catch { unset WN(w,$prt,E) }
-	}
-
 	if { $WN(NT,$prt) == "custodian" } {
 		if ![confirm "This is a custodian; do you really want to\
 		    extract from it?"] {
@@ -2733,190 +2743,27 @@ proc do_extract { prt } {
 		}
 	}
 
-	set w [smw $prt "Extraction parameters"]
+	set em [extract_dialog $prt]
 
-	# not sure if need this, but ... for now ...
-	disable_node_window $prt
-
-	frame $w.o -pady 2 -padx 2
-	pack $w.o -side top -fill x
-
-	label $w.o.sbl -text "Starting slot number:" -anchor w
-	grid $w.o.sbl -column 0 -row 0 -sticky w -padx 4
-
-	entry $w.o.sbe -width 9 -textvariable MV(FR)
-	grid $w.o.sbe -column 1 -row 0 -sticky w -padx 4
-	# the default
-	set MV(FR) 0
-
-	label $w.o.sel -text "Ending slot number:" -anchor w
-	grid $w.o.sel -column 0 -row 1 -sticky w -padx 4
-
-	entry $w.o.see -width 9 -textvariable MV(UP)
-	grid $w.o.see -column 1 -row 1 -sticky w -padx 4
-	# the default
-	set MV(UP) 999999999
-
-	label $w.o.tpl -text "Extract what:" -anchor w
-	grid $w.o.tpl -column 0 -row 2 -sticky w -padx 4
-
-	tk_optionMenu $w.o.tpe MV(EV) "Data" "Events"
-	grid $w.o.tpe -column 1 -row 2 -sticky w -padx 4
-	# the default
-	set MV(EV) "Data"
-
-	label $w.o.twl -text "To where:" -anchor w
-	grid $w.o.twl -column 0 -row 3 -sticky w -padx 4
-
-	tk_optionMenu $w.o.twe MV(FI) "Screen" "File"
-	grid $w.o.twe -column 1 -row 3 -sticky w -padx 4
-	# the default
-	set MV(FI) "Screen"
-
-	if { $WN(NT,$prt) != "collector" } {
-		# collector number
-		label $w.o.cnl -text "Collector number:" -anchor w
-		grid $w.o.cnl -column 0 -row 4 -sticky w -padx 4
-		entry $w.o.cne -width 5 -textvariable MV(CN)
-		grid $w.o.cne -column 1 -row 4 -sticky w -padx 4
-		set MV(CN) "all"
+	if { $em == "" } {
+		# cancelled
+		return
 	}
 
-	frame $w.b
-	pack $w.b -side top -fill x
-
-	button $w.b.go -text "Start" -command "set ST(MOD) 1"
-	pack $w.b.go -side right
-
-	button $w.b.ca -text "Cancel" -command "set ST(MOD) 0"
-	pack $w.b.ca -side left
-
-	bind $w <Destroy> "set ST(MOD) 0"
-
-	wm transient $w .
-
-	raise $w
-
-	while 1 {
-
-		tkwait variable ST(MOD)
-
-		if { $ST(MOD) == 0 } {
-			# cancelled
-			dmw $prt
-			enable_node_window $prt
-			return
-		}
-
-		# verify the arguments
-		set fr [string trim $MV(FR)]
-		if { $fr == "" } {
-			set fr 0
-		} else {
-			set fr [vnum $fr 0 1000000000]
-			if { $fr == "" } {
-				alert "Illegal starting slot number, must be\
-					between 0 and 999999999!"
-				continue
-			}
-		}
-
-		set up [string trim $MV(UP)]
-		if { $up == "" } {
-			set up 999999999
-		} else {
-			set up [vnum $up 0 1000000000]
-			if { $up == "" } {
-				alert "Illegal ending slot number, must be\
-					between 0 and 999999999!"
-				continue
-			}
-		}
-
-		if { $up < $fr } {
-			alert "Ending slot number is less than starting slot\
-				number!"
-			continue
-		}
-
-		if { $MV(EV) == "Data" } {
-			set ev 0
-		} else {
-			set ev 1
-		}
-
-		if { $WN(NT,$prt) != "collector" } {
-			set cn [string tolower [string trim $MV(CN)]]
-			if { $cn == "" || $cn == "all" || $cn == "any" } {
-				set cn ""
-			} else {
-				set cn [vnum $cn 100 65536]
-				if { $cn == "" } {
-					alert "Illegal collector number, must\
-						be between 100 and 65535!"
-					continue
-				}
-			}
-		}
-
-		if $ev {
-			set deff "events.csv"
-		} else {
-			set deff "values.csv"
-		}
-
-		set defe ".csv"
-
-		# time to handle the file
-		if { $MV(FI) == "File" } {
-
-			while 1 {
-				set fn [tk_getSaveFile -defaultextension $defe \
-					-initialfile $deff -parent $w \
-					-title "File to store the data"]
-
-				if { $fn == "" } {
-					# cancelled
-					catch { destroy $w }
-					enable_node_window $prt
-					return
-				}
-
-				if ![catch { open $fn "w" } fd] {
-					break
-				}
-			}
-
-			# the file name
-			set WN(EN,$prt) $fn
-			set WN(EF,$prt) $fd
-		} else {
-			set WN(EF,$prt) ""
-		}
-
-		# do it
-		break
-	}
-
-	# delete the modal window
-	dmw $prt
+	foreach { em fr up } $em { }
 
 	# command to start
 	set cmd "D $fr $up"
 
 	# calculate the mode parameter
 	if { $WN(NT,$prt) == "collector" } {
-		set em 3
+		# offset to indicate collector
+		incr em 16
 	} else {
-		set em 1
 		# aggregator
-		if $ev {
+		if { $em > 2 } {
 			append cmd " 65535"
 		}
-	}
-
-	if $ev {
-		incr em
 	}
 
 	# this is the way to tell which case is which
@@ -2926,57 +2773,10 @@ proc do_extract { prt } {
 			"Waiting for data to arrive ..."]
 	} else {
 		# have to open a terminal-like window to accommodate the stuff
-		if [info exists WN(w,$prt,E)] {
-			alert "Duplicate extract log, internal error 0003!"
+		if { [extract_tty $prt $em] == "" } {
+			# failed
 			return
 		}
-		set w ".exl$prt"
-		set WN(w,$prt,E) $w
-			toplevel $w
-
-		wm title $w "[cnotype $prt] on port $prt: data extraction"
-
-		text $w.t
-
-		# header length
-		set wi [ewhdr $prt $em 1]
-
-		$w.t configure \
-			-yscrollcommand "$w.scroly set" \
-			-xscrollcommand "$w.scrolx set" \
-			-wrap none \
-			-setgrid true \
-        		-width $wi -height 24 \
-			-font {-family courier -size 10} \
-			-exportselection 1 \
-			-state disabled
-
-		$w.t delete 1.0 end
-
-		scrollbar $w.scroly -command "$w.t yview"
-		scrollbar $w.scrolx -orient horizontal -command "$w.t xview"
-		pack $w.scroly -side right -fill y
-		pack $w.scrolx -side bottom -fill x
-
-		pack $w.t -expand yes -fill both
-		$w.t configure -state disabled
-
-		# abort/close
-
-		frame $w.stat -borderwidth 2
-		pack $w.stat -expand no -fill x
-
-		button $w.stat.cl -text "Close" -command "close_ewindow $prt"
-		pack $w.stat.cl -side right
-
-		label $w.stat.st -text "Running ...       "
-		pack $w.stat.st -side right
-
-		button $w.stat.ab -text "Abort" \
-			-command "stop_extraction $prt 1"
-		pack $w.stat.ab -side left
-
-		bind $w <Destroy> "close_ewindow $prt"
 	}
 
 	# extraction mode
@@ -3091,7 +2891,9 @@ proc close_ewindow { prt } {
 #
 	global WN
 
-	stop_extraction $prt 1
+	if { $prt != "SD" } {
+		stop_extraction $prt 1
+	}
 
 	if [info exists WN(w,$prt,E)] {
 		catch { destroy $WN(w,$prt,E) }
@@ -3105,45 +2907,81 @@ proc ewhdr { prt em { len 0 } } {
 #
 	global WN
 
+	if { $em >= 16 } {
+		# collector
+		set coll 1
+		incr em -16
+	} else {
+		set coll 0
+	}
+
 	if { $WN(EF,$prt) == "" } {
 		# this goes to the screen
-		if { [expr $em & 1] == 0 } {
+		if { $em > 2 } {
 			# events
 			set ln "      Slot Event     Date     Time  Par1  Par2"
 			append ln "  Par3"
 			if $len {
 				return [string length $ln]
 			}
-		} elseif { $WN(NT,$prt) == "collector" } {
-			# collector
-			set ln "    Status       Slot     Date     Time"
-			append ln "   Raw Converted ..."
+		} elseif { $em == 1 } {
+			# by collector
+			if $coll {
+				# collector
+				set ln "    Status       Slot     Date     Time"
+				append ln "   Raw Converted ..."
+			} else {
+				# aggregator
+				set ln " Coll  Coll Slot Agg Slot Col Date Col"
+				append ln " Time   Agg Date Agg Time   Raw "
+				append ln "Converted ..."
+			}
+			if $len {
+				return [expr [string length $ln] + 3 * 16 - 4]
+			}
 		} else {
-			# aggregator
-			set ln " Coll  Coll Slot Agg Slot Col Date Col Time"
-			append ln "   Agg Date Agg Time   Raw Converted ..."
-		}
-		if $len {
-			return [expr [string length $ln] + 3 * 16 - 4]
+			# by sensor
+			if $coll {
+				set ln \
+				      "Sen              TStamp   Raw Converted"
+			} else {
+				set ln \
+				" Coll Sen              TStamp   Raw Converted"
+			}
+			if $len {
+				return [string length $ln]
+			}
 		}
 		set w $WN(w,$prt,E)
 		add_text $w.t $ln
 		end_line $w.t
 	} else {
-
 		# this goes to a file
-		if { [expr $em & 1] == 0 } {
+		if { $em > 2 } {
 			# events
 			set ln "Slot, Event, Time, Par1, Par2, Par3"
-		} elseif { $WN(NT,$prt) == "collector" } {
-			# collector
-			set ln "Status, Slot, Time, Raw, Converted, ..."
+		} elseif { $em == 1 } {
+			# by collector
+			if $coll {
+				# collector
+				set ln "Status, Slot, Time, Raw, Converted, ..."
+			} else {
+				# aggregator
+				set ln "Collector, CSlot, ASlot, CTime, ATime, "
+				append ln "Raw, Converted, ..."
+			}
 		} else {
-			# aggregator
-			set ln "Collector, CSlot, ASlot, CTime, ATime, "
-			append ln "Raw, Converted, ..."
+			# by sensor
+			if $coll {
+				set ln "Sensor, TStamp, Raw, Converted"
+			} else {
+				set ln \
+				"Collector, Sensor, TStamp, Raw, Converted"
+			}
+			if $len {
+				return [string length $ln]
+			}
 		}
-
 		if $len {
 			# irrelevant
 			return 0
@@ -3158,9 +2996,9 @@ proc extract_aggregator_samples { prt mode line } {
 
 	global WN PT
 
-	if { $mode < 2 } {
+	if { $mode < 3 } {
 		if [regexp $PT(AGS) $line jk col csl asl cts ats vls] {
-			dump_values $prt $col $csl $asl $cts $ats $vls
+			dump_values $mode $prt $col $csl $asl $cts $ats $vls
 			return 1
 		}
 	} else {
@@ -3181,9 +3019,9 @@ proc extract_collector_samples { prt mode line } {
 
 	set nfn 1
 
-	if { $mode < 4 } {
+	if { $mode < 3 } {
 		if [regexp $PT(COS) $line jk typ csl cts vls] {
-			dump_values $prt $typ $csl "" $cts "" $vls
+			dump_values $mode $prt $typ $csl "" $cts "" $vls
 			return 1
 		}
 	} else {
@@ -3207,7 +3045,7 @@ proc eprogress { prt val } {
 	outmess $WN(w,$prt,E) "Extracting slot: $val / $WN(EC,$prt)"
 }
 
-proc dump_values { prt col csl asl cts ats vls } {
+proc dump_values { mode prt col csl asl cts ats vls } {
 
 	global WN
 
@@ -3222,17 +3060,80 @@ proc dump_values { prt col csl asl cts ats vls } {
 	# file descriptor
 	set fd $WN(EF,$prt)
 
-	set cts [t_parse cts]
 	if { $ats == "" } {
-		# this is a collector
-		set cn $WN(NI,$prt)
-		# display running slot number
+		# collector
 		set ds $csl
+		set cn $WN(NI,$prt)
 	} else {
-		# aggregator
-		set cn $col
 		set ds $asl
+		set cn $col
 		set ats [t_parse ats]
+	}
+
+	set cts [t_parse cts]
+
+	if { $mode > 1 } {
+		# per sensor
+		set cts "20$cts"
+		set inx 0
+		if { $fd == "" } {
+			# writing to the screen
+			while 1 {
+				set n [n_parse vls 1]
+				if { $n == "" } {
+					break
+				}
+				set c [snip_cnvrt $n $inx $cn]
+				if { $c == "" } {
+					# ignore unconverted values
+					incr inx
+					continue
+				}
+				if { $ats != "" } {
+					# this is an aggregator
+					set ln "[trims $col 5] "
+				} else {
+					set ln ""
+				}
+				# sensor number + time stamp
+				append ln "[trims $inx 3] $cts"
+				append ln "[trims $n 6][trims $c 10]"
+				incr inx
+				set w $WN(w,$prt,E)
+				add_text $w.t $ln
+				end_line $w.t
+			}
+			return
+		}
+
+		# writing to file
+
+		while 1 {
+			set n [n_parse vls 1]
+			if { $n == "" } {
+				break
+			}
+			set c [snip_cnvrt $n $inx $cn]
+			if { $c == "" } {
+				# ignore unconverted values
+				incr inx
+				continue
+			}
+			if { $ats != "" } {
+				# this is an aggregator
+				set ln "$col, "
+			} else {
+				set ln ""
+			}
+			# sensor number + time stamp
+			append ln "$inx, $cts, $n, $c"
+			catch { puts $fd $ln }
+			incr inx
+		}
+		if { $prt != "SD" } {
+			eprogress $prt $ds
+		}
+		return
 	}
 
 	# prepare the list of converted values
@@ -3245,8 +3146,13 @@ proc dump_values { prt col csl asl cts ats vls } {
 		if { $n == "" } {
 			break
 		}
+		set c [snip_cnvrt $n $inx $cn]
+		if { $c == "" } {
+			set c 0
+			set n 0
+		}
 		lappend rvs $n
-		lappend cvs [snip_cnvrt $n $inx $cn]
+		lappend cvs $c
 		incr inx
 	}
 
@@ -3291,7 +3197,9 @@ proc dump_values { prt col csl asl cts ats vls } {
 		
 	catch { puts $fd $ln }
 
-	eprogress $prt $ds
+	if { $prt != "SD" } {
+		eprogress $prt $ds
+	}
 }
 
 proc dump_event { prt evt slo tst par } {
@@ -3343,7 +3251,404 @@ proc dump_event { prt evt slo tst par } {
 			
 	catch { puts $fd $ln }
 
-	eprogress $prt $slo
+	if { $prt != "SD" } {
+		eprogress $prt $slo
+	}
+}
+
+proc extract_dialog { prt } {
+#
+# This is shared by Collector/Aggregator/SD extraction
+#
+	global WN MV ST
+
+	if [info exists WN(w,$prt,E)] {
+		if ![confirm "You have an extraction window open for this node.\
+			It will be closed before starting the new extraction.\
+			Is that OK?"] {
+				return ""
+		}
+		catch { destroy $WN(w,$prt,E) }
+		catch { unset WN(w,$prt,E) }
+	}
+
+	set w [smw $prt "Extraction parameters"]
+
+	# not sure if need this, but ... for now ...
+	if { $prt != "SD" } {
+		disable_node_window $prt
+	}
+
+	frame $w.o -pady 2 -padx 2
+	pack $w.o -side top -fill x
+
+	label $w.o.sbl -text "Starting slot number:" -anchor w
+	grid $w.o.sbl -column 0 -row 0 -sticky w -padx 4
+
+	entry $w.o.sbe -width 9 -textvariable MV(FR)
+	grid $w.o.sbe -column 1 -row 0 -sticky w -padx 4
+	# the default
+	set MV(FR) 0
+
+	label $w.o.sel -text "Ending slot number:" -anchor w
+	grid $w.o.sel -column 0 -row 1 -sticky w -padx 4
+
+	entry $w.o.see -width 9 -textvariable MV(UP)
+	grid $w.o.see -column 1 -row 1 -sticky w -padx 4
+	# the default
+	set MV(UP) 999999999
+
+	label $w.o.tpl -text "Extract what:" -anchor w
+	grid $w.o.tpl -column 0 -row 2 -sticky w -padx 4
+
+	tk_optionMenu $w.o.tpe MV(EV) "Data-c" "Data-s" "Events"
+	grid $w.o.tpe -column 1 -row 2 -sticky w -padx 4
+	# the default
+	set MV(EV) "Data-c"
+
+	label $w.o.twl -text "To where:" -anchor w
+	grid $w.o.twl -column 0 -row 3 -sticky w -padx 4
+
+	tk_optionMenu $w.o.twe MV(FI) "Screen" "File"
+	grid $w.o.twe -column 1 -row 3 -sticky w -padx 4
+	# the default
+	set MV(FI) "Screen"
+
+	if { $prt == "SD" || $WN(NT,$prt) != "collector" } {
+		# collector number
+		label $w.o.cnl -text "Collector number:" -anchor w
+		grid $w.o.cnl -column 0 -row 4 -sticky w -padx 4
+		entry $w.o.cne -width 5 -textvariable MV(CN)
+		grid $w.o.cne -column 1 -row 4 -sticky w -padx 4
+		set MV(CN) "all"
+	}
+
+	frame $w.b
+	pack $w.b -side top -fill x
+
+	button $w.b.go -text "Start" -command "set ST(MOD) 1"
+	pack $w.b.go -side right
+
+	button $w.b.ca -text "Cancel" -command "set ST(MOD) 0"
+	pack $w.b.ca -side left
+
+	bind $w <Destroy> "set ST(MOD) 0"
+
+	wm transient $w .
+
+	raise $w
+
+	while 1 {
+
+		tkwait variable ST(MOD)
+
+		if { $ST(MOD) == 0 } {
+			# cancelled
+			dmw $prt
+			if { $prt != "SD" } {
+				enable_node_window $prt
+			}
+			return ""
+		}
+
+		# verify the arguments
+		set fr [string trim $MV(FR)]
+		if { $fr == "" } {
+			set fr 0
+		} else {
+			set fr [vnum $fr 0 1000000000]
+			if { $fr == "" } {
+				alert "Illegal starting slot number, must be\
+					between 0 and 999999999!"
+				continue
+			}
+		}
+
+		set up [string trim $MV(UP)]
+		if { $up == "" } {
+			set up 999999999
+		} else {
+			set up [vnum $up 0 1000000000]
+			if { $up == "" } {
+				alert "Illegal ending slot number, must be\
+					between 0 and 999999999!"
+				continue
+			}
+		}
+
+		if { $up < $fr } {
+			alert "Ending slot number is less than starting slot\
+				number!"
+			continue
+		}
+
+		# decide on the mode
+		if { $MV(EV) == "Data-c" } {
+			# data by collector
+			set em 1
+		} elseif { $MV(EV) == "Data-s" } {
+			# data by sensor
+			set em 2
+		} else {
+			# events
+			set em 3
+		}
+
+		if { $prt == "SD" || $WN(NT,$prt) != "collector" } {
+			set cn [string tolower [string trim $MV(CN)]]
+			if { $cn == "" || $cn == "all" || $cn == "any" } {
+				set cn ""
+			} else {
+				set cn [vnum $cn 100 65536]
+				if { $cn == "" } {
+					alert "Illegal collector number, must\
+						be between 100 and 65535!"
+					continue
+				}
+			}
+		}
+
+		if { $em > 2 } {
+			# events
+			set deff "events.csv"
+		} else {
+			set deff "values.csv"
+		}
+
+		set defe ".csv"
+
+		# time to handle the file
+		if { $MV(FI) == "File" } {
+
+			while 1 {
+				set fn [tk_getSaveFile -defaultextension $defe \
+					-initialfile $deff -parent $w \
+					-title "File to store the data"]
+
+				if { $fn == "" } {
+					# cancelled
+					catch { destroy $w }
+					if { $prt != "SD"} {
+						enable_node_window $prt
+					}
+					return ""
+				}
+
+				if ![catch { open $fn "w" } fd] {
+					break
+				}
+			}
+
+			# the file name
+			set WN(EN,$prt) $fn
+			set WN(EF,$prt) $fd
+		} else {
+			set WN(EF,$prt) ""
+		}
+
+		# do it
+		break
+	}
+
+	# delete the modal window
+	dmw $prt
+	return [list $em $fr $up]
+}
+
+proc extract_tty { prt em } {
+#
+# Create extraction window (for on-screen extraction)
+#
+	global WN
+	
+	if [info exists WN(w,$prt,E)] {
+		alert "Duplicate extract log, internal error 0003!"
+		return ""
+	}
+
+	set w ".exl$prt"
+	set WN(w,$prt,E) $w
+	toplevel $w
+
+	wm title $w "[cnotype $prt] on port $prt: data extraction"
+
+	text $w.t
+
+	# header length
+	set wi [ewhdr $prt $em 1]
+
+	$w.t configure  -yscrollcommand "$w.scroly set" \
+			-xscrollcommand "$w.scrolx set" \
+			-wrap none \
+			-setgrid true \
+        		-width $wi -height 24 \
+			-font {-family courier -size 10} \
+			-exportselection 1 \
+			-state disabled
+
+	$w.t delete 1.0 end
+
+	scrollbar $w.scroly -command "$w.t yview"
+	scrollbar $w.scrolx -orient horizontal -command "$w.t xview"
+	pack $w.scroly -side right -fill y
+	pack $w.scrolx -side bottom -fill x
+
+	pack $w.t -expand yes -fill both
+	$w.t configure -state disabled
+
+	# abort/close
+
+	frame $w.stat -borderwidth 2
+	pack $w.stat -expand no -fill x
+
+	button $w.stat.cl -text "Close" -command "close_ewindow $prt"
+	pack $w.stat.cl -side right
+
+	if { $prt == "SD" } {
+
+		label $w.stat.st -text "Wait ...       "
+		pack $w.stat.st -side right
+
+	} else {
+
+		label $w.stat.st -text "Running ...       "
+		pack $w.stat.st -side right
+
+		button $w.stat.ab -text "Abort" \
+			-command "stop_extraction $prt 1"
+		pack $w.stat.ab -side left
+	}
+
+	bind $w <Destroy> "close_ewindow $prt"
+
+	return $w
+}
+
+proc esd_clean { } {
+#
+# Cleanup after SD extraction
+#
+	global ESD
+
+	if [info exists ESD(FD)] {
+		catch { close $ESD(FD) }
+	}
+
+	if [info exists ESD(SF)] {
+		catch { close $ESD(SF) }
+	}
+
+	if [info exists ESD(NO)] {
+		catch { destroy $ESD(NO) }
+	}
+
+	catch { file delete -force zzxtr.txt }
+}
+
+proc esd_mknotf { } {
+#
+# Notifier message
+#
+	global ESD ST
+
+	incr ST(CNT)
+
+	set wn ".msg$ST(CNT)"
+
+	toplevel $wn
+
+	wm title $wn "Message"
+
+	set ESD(NO) $wn
+
+	label $wn.t -width 50 -height 1 -borderwidth 2 -state normal
+	pack $wn.t -side top -fill x -fill y
+	$wn.t configure -text ""
+	raise $wn
+
+	return $wn
+}
+
+proc esd_note_go { } {
+
+	global ESD
+
+	incr ESD(NG)
+}
+
+proc esd_note { msg } {
+
+	global ESD
+
+	set ESD(NG) 0
+
+	if ![catch { $ESD(NO).t configure -text $msg } ] {
+		after 100 esd_note_go
+		vwait ESD(NG)
+	}
+}
+
+proc extract_sd { } {
+#
+# SD card extraction
+#
+	global WN ESD
+
+	set em [extract_dialog "SD"]
+
+	if { $em == "" } {
+		# cancelled
+		return
+	}
+
+	foreach { em fr up } $em { }
+
+	if { $WN(EF,SD) != "" } {
+		set ESD(SF) $WN(EF,SD)
+	}
+
+	esd_mknotf
+	esd_note "Running esdreader: this may take a while ..."
+
+	if [catch { exec esdreader -f $fr -t $up zzxtr.txt } err] {
+		alert "esdreader failed: $err"
+		esd_clean
+		return
+	}
+
+	if [catch { open "zzxtr.txt" r } efd] {
+		alert "esdreader failed: cannot read data file: $efd"
+		esd_clean
+		return
+	}
+
+	set ESD(FD) $efd
+
+	if { $WN(EF,SD) == "" } {
+		# to screen (we need a limit)
+		if { [extract_tty "SD" $em] == "" } {
+			# failed
+			esd_clean
+			return
+		}
+	}
+
+	ewhdr "SD" $em
+
+	esd_note "Extracting data ..."
+
+	while { [gets $efd line] >= 0 } {
+		extract_aggregator_samples "SD" $em $line
+	}
+
+	esd_clean
+
+	if [info exists WN(w,SD,E)] {
+		set w $WN(w,SD,E)
+		$w.stat.st configure -text "Done      "
+	}
+
+	alert "Extraction complete!"
 }
 
 proc trims { t n } {
@@ -3540,11 +3845,9 @@ proc snip_cnvrt { v s c } {
 	set snip $SC($c,$s)
 
 	if { $snip != "" && ![catch { snip_eval $snip $v } r] } {
-		set v $r
+		return [format %1.2f $r]
 	}
-
-	# format it
-	return [format %1.2f $v]
+	return ""
 }
 
 proc snip_icache { } {
@@ -4583,6 +4886,11 @@ button .conn.quit -text "Quit" -command { destroy .conn }
 pack .conn.lr .conn.mr .conn.lp .conn.mp .conn.ln .conn.mn -side left
 pack .conn.quit .conn.connect -side right
 
+labelframe .sdc -text "SD Card" -padx 4 -pady 4
+pack .sdc -side right -expand 0 -fill none
+button .sdc.ex -text "Extract" -command extract_sd
+pack .sdc.ex -side left -expand 0 -fill none
+
 labelframe .sne -text "Snippets" -padx 4 -pady 4
 pack .sne -side right -expand 0 -fill none
 button .sne.ed -text "Editor" -command snip_window
@@ -4597,16 +4905,16 @@ bind . <Destroy> { exit }
 
 set_home_dir {
  
-{SHT_Temp {set value [expr -39.62 + 0.01 * $value]} {1 200-400}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-400}} {SHT_Humid {set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
+{SHT_Temp {set value [expr -39.62 + 0.01 * $value]} {1 100-399} {4 400-499}} {SHT_Humid {set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
 if { $value < 0.0 } {
 	set value 0.0
 } elseif { $value > 100.0 } {
 	set value 100.0
-}} {2 200-400}} {PhotoDiode {set value [expr $value * 0.5]} {3 300-400}} {ECHO_5 {set value [expr $value * 0.9246 - 40.1]
+}} {2 100-399} {5 400-499}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-499} {1 400-499} {2 400-499} {3 400-499}} {ECHO_5 {set value [expr $value * 0.9246 - 40.1]
 if { $value < 0.0 } {
 	set value 0.0
 } elseif { $value > 100.0 } {
 	set value 100.0
-}} {3 200-299}}
+}} {3 300-399}} {PhotoDiode {set value [expr $value * 0.5]} {3 600-700}}
 
 }

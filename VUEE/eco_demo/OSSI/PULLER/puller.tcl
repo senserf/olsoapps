@@ -328,7 +328,7 @@ proc parse_response { } {
 	}
 
 	if { $Samples == "" } {
-		return
+		return 0
 	}
 
 	set Samples [lsort -ascii -index 0 $Samples]
@@ -343,6 +343,7 @@ proc parse_response { } {
 	}
 
 	set Samples ""
+	return 1
 }
 
 proc add_sample { di mes } {
@@ -510,13 +511,14 @@ proc pull_it { } {
 		return
 	}
 
-	# Parse the response
+	# debug version, preserve those data that contain samples
+	set sres $Response
 
+	if [parse_response] {
 ###############################
-exec echo $Response >> dump.txt
+exec echo $sres >> dump.txt
 ###############################
-
-	parse_response
+	}
 }
 
 ### Patterns ##################################################################
