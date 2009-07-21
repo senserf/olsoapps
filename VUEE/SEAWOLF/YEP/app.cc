@@ -126,7 +126,7 @@ static void disp_cats () {
 
 	for (i = 0; i < 16; i++) {
 		if ((curr_rec->MCats >> i) & 1) {
-			lcdg_sett (0, j*8, 21, 1);
+			lcdg_sett (0, 10 + j*8, 21, 1);
 			lcdg_wl (&((lcdg_dm_men_t*)(objects [1]))->Lines[i][3],
 				0, 0, 0);
 			if (j < 15)
@@ -137,7 +137,7 @@ static void disp_cats () {
 	lcdg_setc (SEA_MENU_CATMY_BG, SEA_MENU_CATMY_FG);
 	for (i = 0; i < 16; i++) {
 		if ((curr_rec->ECats >> i) & 1) {
-			lcdg_sett (0, j*8, 21, 1);
+			lcdg_sett (0, 10 + j*8, 21, 1);
 			lcdg_wl (&((lcdg_dm_men_t*)(objects [0]))->Lines[i][3],
 				0, 0, 0);
 			if (j < 15)
@@ -162,7 +162,7 @@ static void preset_menus () {
 	if (objects [0] == NULL || objects [1] == NULL ||
 			lcd_menu == NULL) {
 		diag ("Amen"); // leds
-		halt();
+		return; // halt();
 	}
 	if (nbh_menu.li < 4)
 		goto RetHier;
