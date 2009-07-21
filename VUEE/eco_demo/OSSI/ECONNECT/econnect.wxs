@@ -1,0 +1,43 @@
+<?xml version='1.0' encoding='windows-1252'?>
+<Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
+
+  <Product Name='EConnect 0.9' Id='BA02171A-761B-11DE-8DDD-9BD356D89593' UpgradeCode='C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35'
+    Language='1033' Codepage='1252' Version='1.0.0' Manufacturer='Olsonet Communications, Inc.'>
+
+    <Package Id='*' Keywords='Installer' Description="Olsonet's EConnect 0.9 Installer"
+      Comments='Olsonet software for extracting data from collectors/aggregators' Manufacturer='Olsonet Communications, Inc.'
+      InstallerVersion='100' Languages='1033' Compressed='yes' SummaryCodepage='1252' />
+
+
+	<Media Id='1' Cabinet='Sample.cab' EmbedCab='yes' DiskPrompt="CD-ROM #1" />
+	<Property Id='DiskPrompt' Value="Olsonet's EConnect 0.9 Installation [1]" />
+
+	<Directory Id='TARGETDIR' Name='SourceDir'>
+
+		<Directory Id="DesktopFolder" Name="Desktop"/>
+
+		<Directory Id='ProgramFilesFolder' Name='PFiles'>
+        		<Directory Id='Olsonet' Name='Olsonet'>
+          			<Directory Id='INSTALLDIR' Name='EConnect'>
+					<Component Id='Code' Guid='CDAB9BDE-9BF8-4094-9A30-432E60620536'>
+						<File Id='econnect' Name='econnect.exe' DiskId='1' Source='econnect.exe'>
+							<Shortcut Id="desktopeconnect" Directory="DesktopFolder" Name="econnect" WorkingDirectory='INSTALLDIR' Advertise='yes' Icon="econnect.exe" IconIndex="0" />
+						</File>
+						<File Id='esdreader' Name='esdreader.exe' DiskId='1' Source='esdreader.exe'>
+						</File>
+						<File Id='dll' Name='cygwin1.dll' DiskId='1' Source='cygwin1.dll'>
+						</File>
+					</Component>
+				</Directory>
+			</Directory>
+		</Directory>
+	</Directory>
+
+    	<Feature Id='Complete' Level='1'>
+    	  <ComponentRef Id='Code' />
+    	</Feature>
+
+	<Icon Id="econnect.exe" SourceFile="tool.ico" />
+
+  </Product>
+</Wix>

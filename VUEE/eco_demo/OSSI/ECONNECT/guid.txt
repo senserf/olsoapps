@@ -1,0 +1,7 @@
+Product:   BA02171A-761B-11DE-8DDD-9BD356D89593
+Component: CDAB9BDE-9BF8-4094-9A30-432E60620536
+Upgrade:   C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35
+
+http://createguid.com/
+http://www.tramontana.co.hu/wix/lesson1.php
+http://wix.mindcapers.com/wiki/Shortcuts_in_WiX#What_are_Advertised_Shortcuts.3F

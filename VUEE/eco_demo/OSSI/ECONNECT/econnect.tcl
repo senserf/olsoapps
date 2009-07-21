@@ -20,9 +20,12 @@ set PM(VER)	1.3
 # maximum number of ports to try
 set PM(MPN)	20
 
-# "home" directory path (ideally, we would have to go through an installation
-# procedure and store something in the registry (yyeeechh!)
-set PM(HOM)	"C:/econnect"
+# "home" directory path; this is relative to APPDATA
+set PM(HOM)	"econnect"
+
+# "program" directory path; relative to PROGRAMFILES; will be reset by
+# set_home_dir
+set PM(PGM)	[file join Olsonet EConnect]
 
 # sensor conversion formulas
 set PM(COB)	"snippets.dat"
@@ -3592,7 +3595,7 @@ proc extract_sd { } {
 #
 # SD card extraction
 #
-	global WN ESD
+	global WN ESD PM
 
 	set em [extract_dialog "SD"]
 
@@ -3608,9 +3611,11 @@ proc extract_sd { } {
 	}
 
 	esd_mknotf
-	esd_note "Running esdreader: this may take a while ..."
+	esd_note "Running esdreader: be patient, this may take a while ..."
 
-	if [catch { exec esdreader -f $fr -t $up zzxtr.txt } err] {
+	set esd [file join $PM(PGM) "esdreader.exe"]
+
+	if [catch { exec $esd -f $fr -t $up zzxtr.txt } err] {
 		alert "esdreader failed: $err"
 		esd_clean
 		return
@@ -4723,13 +4728,13 @@ proc snip_read { } {
 	snip_icache
 
 	if [catch { open $PM(COB) "r" } fd] {
-		return
+		return "You have no conversion snippets."
 	}
 
 	if [catch { read $fd } cf] {
 		catch { close $fd }
-		alert "Cannot access the (existing) snippets file $PM(COB): $cf"
-		return
+		return \
+	            "Cannot access the (existing) snippets file $PM(COB): $cf."
 	}
 
 	catch { close $fd }
@@ -4737,10 +4742,11 @@ proc snip_read { } {
 	set er [snip_parse $cf]
 
 	if { $er != "" } {
-		alert "The snippets file $PM(COB) in $PM(HOM) is invalid or\
-		    corrupted. The problem is this: $er. This file will be\
-			ignored!"
+		return "The snippets file $PM(COB) in $PM(HOM) is invalid or\
+		    corrupted. The problem is this: $er."
 	}
+
+	return ""
 }
 
 proc snip_encode { } {
@@ -4809,13 +4815,34 @@ proc set_home_dir { ds } {
 # Creates the home directory to include logs and configuration files; reads
 # in conversion snippets
 #
-	global PM
+	global PM env
 
-	if ![file isdirectory $PM(HOM)] {
+	# determine the program directory
+	if ![info exists env(PROGRAMFILES)] {
+		abt \
+		 "Cannot access Program Files. Are you running this on Windows?"
+	}
+
+	set pfn [file join $env(PROGRAMFILES) $PM(PGM)]
+
+	if ![file isdirectory $pfn] {
+		abt "Cannot access $pfn. The program appears to have not been\
+			installed correctly!"
+	}
+
+	set PM(PGM) $pfn
+
+	if ![info exists env(APPDATA)] {
+		abt "Cannot access AppData. Are you running this on Windows?"
+	}
+
+	set hfn [file join $env(APPDATA) $PM(HOM)]
+
+	if ![file isdirectory $hfn] {
 		# first time
 		if ![confirm \
-		       "You appear to be running EcoNNeCt for the first time!\n\
-			\nI am going to create this directory $PM(HOM), where I\
+		       "You appear to be running EConnect for the first time!\n\
+			\nI am going to create this directory $hfn, where I\
 			will be keeping logs and your configuration of\
 			conversion snippets for sensor values.\
 			The logs will be rotated (up to four files up to 1MB\
@@ -4826,28 +4853,43 @@ proc set_home_dir { ds } {
 			exit 0
 		}
 
-		if [catch { file mkdir $PM(HOM) } err] {
-			abt "Cannot create home directory: $PM(HOM), sorry!"
+		if [catch { file mkdir $hfn } err] {
+			abt "Cannot create home directory: $hfn, sorry!"
 		}
 
-		cd $PM(HOM)
+		cd $hfn
 
 		if [catch { open $PM(COB) "w" 0666 } fd] {
-			alert "Failed2!"
-			exit 99
+			abt "Cannot write to $hfn, sorry!"
 		}
 		puts -nonewline $fd [string trim $ds]
 		catch { close $fd }
 	}
 
 	# this is where we will be working
-	cd $PM(HOM)
+	cd $hfn
 
 	# open the log
 	log_open
 
 	# read conversion snippets
-	snip_read
+	set err [snip_read]
+
+	if { $err != "" } {
+		if ![confirm "$err I will set up default snippets for you."] {
+			exit 0
+		}
+		if [catch { open $PM(COB) "w" 0666 } fd] {
+			abt "Cannot write to $hfn, sorry!"
+		}
+		puts -nonewline $fd [string trim $ds]
+		catch { close $fd }
+
+		if { [snip_read] != "" } {
+			abt "Default snippets appear to be wrong.\
+				This is an internal error. Sorry!"
+		}
+	}
 }
 
 #################
