@@ -1,13 +1,41 @@
 <?xml version='1.0' encoding='windows-1252'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
 
-  <Product Name='EConnect 1.3' Id='BA02171A-761B-11DE-8DDD-9BD356D89593' UpgradeCode='C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35'
-    Language='1033' Codepage='1252' Version='1.3.1' Manufacturer='Olsonet Communications, Inc.'>
+  <Product Name='EConnect 1.3' Id='DF6ED942-2A9A-4279-81AD-2EEBE3699EB7' UpgradeCode='C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35'
+    Language='1033' Codepage='1252' Version='1.3.2' Manufacturer='Olsonet Communications, Inc.'>
 
     <Package Id='*' Keywords='Installer' Description="Olsonet's EConnect Installer"
       Comments='Olsonet software for extracting data from collectors/aggregators' Manufacturer='Olsonet Communications, Inc.'
       InstallerVersion='100' Languages='1033' Compressed='yes' SummaryCodepage='1252' />
 
+	<Property Id="WIXUI_INSTALLDIR" Value="INSTALLDIR" />  
+	<UIRef Id="WixUI_InstallDir" />
+
+	<WixVariable Id="WixUIBannerBmp" Value="banner.bmp" />  
+	<WixVariable Id="WixUIDialogBmp" Value="dialog.bmp" />  
+	<WixVariable Id="WixUILicenseRtf" Value="license.rtf" />
+
+	<Upgrade Id="C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35">
+	    <UpgradeVersion Minimum="1.3.1"
+                    IncludeMinimum="yes"
+                    Maximum="1.3.1"
+                    IncludeMaximum="yes"
+                    Property="OLDERVERSIONBEINGUPGRADED" />
+	</Upgrade>
+
+	<InstallExecuteSequence>
+    		<RemoveExistingProducts After="InstallInitialize"/>
+	</InstallExecuteSequence>
+
+	<Upgrade Id="C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35">
+	    <UpgradeVersion Minimum="1.3.2"
+                    OnlyDetect="yes"
+                    Property="NEWERVERSIONDETECTED" />
+	</Upgrade>
+
+	<Condition Message="A later version of [ProductName] is already installed. Setup will now exit.">
+  		NOT NEWERVERSIONDETECTED OR Installed
+	</Condition>
 
 	<Media Id='1' Cabinet='Sample.cab' EmbedCab='yes' DiskPrompt="CD-ROM #1" />
 	<Property Id='DiskPrompt' Value="Olsonet's EConnect 1.3 Installation [1]" />
@@ -19,7 +47,7 @@
 		<Directory Id='ProgramFilesFolder' Name='PFiles'>
         		<Directory Id='Olsonet' Name='Olsonet'>
           			<Directory Id='INSTALLDIR' Name='EConnect'>
-					<Component Id='Code' Guid='CDAB9BDE-9BF8-4094-9A30-432E60620536'>
+					<Component Id='OSSI' Guid='CDAB9BDE-9BF8-4094-9A30-432E60620536'>
 						<File Id='econnect' Name='econnect.exe' DiskId='1' Source='econnect.exe'>
 							<Shortcut Id="desktopeconnect" Directory="DesktopFolder" Name="econnect" WorkingDirectory='INSTALLDIR' Advertise='yes' Icon="econnect.exe" IconIndex="0" />
 						</File>
@@ -28,16 +56,23 @@
 						<File Id='dll' Name='cygwin1.dll' DiskId='1' Source='cygwin1.dll'>
 						</File>
 					</Component>
+					<Component Id='Flasher' Guid='CF80213B-2C3A-439C-81A2-2F45B6CB0C20'>
+						<File Id='genimage' Name='genimage.exe' DiskId='1' Source='genimage.exe'>
+							<Shortcut Id="desktopgenimage" Directory="DesktopFolder" Name="genimage" WorkingDirectory='INSTALLDIR' Advertise='yes' Icon="genimage.exe" IconIndex="0" />
+						</File>
+					</Component>
 				</Directory>
 			</Directory>
 		</Directory>
 	</Directory>
 
     	<Feature Id='Complete' Level='1'>
-    	  <ComponentRef Id='Code' />
+    	  <ComponentRef Id='OSSI' />
+    	  <ComponentRef Id='Flasher' />
     	</Feature>
 
 	<Icon Id="econnect.exe" SourceFile="tool.ico" />
+	<Icon Id="genimage.exe" SourceFile="mixer.ico" />
 
   </Product>
 </Wix>

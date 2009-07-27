@@ -1,2 +1,2 @@
 #!/bin/sh
-rm -f econnect.exe esdreader.exe econnect.wixobj econnect.wixpdb econnect.msi cygwin1.dll
+rm -f genimage.exe econnect.exe esdreader.exe econnect.wixobj econnect.wixpdb econnect.msi cygwin1.dll
