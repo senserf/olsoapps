@@ -74,7 +74,8 @@ typedef struct msgStatsPegStruct {
 	long		mts;
 	lword		slot;
 	word		audi;
-	word		pl; // :4 would be enough
+	word		pl  :4;
+	word		inp :12;
 	word		mhost;
 	word		mem;
 	word		mmin;

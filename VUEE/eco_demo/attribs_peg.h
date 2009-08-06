@@ -17,6 +17,8 @@ __EXTERN msgPongAckType _da (pong_ack);
 __EXTERN word	_da (sync_freq);
 __EXTERN word	_da (sat_mod);
 __EXTERN word	_da (plot_id);
+__EXTERN word   _da (pow_sup);
+__EXTERN lword  _da (pow_ts);
 
 // Methods/functions: need no EXTERN
 

@@ -178,6 +178,7 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 
 	in_statsPeg(out_buf, audi) = tag_auditFreq;
 	in_statsPeg(out_buf, pl) = host_pl;
+	in_statsPeg(out_buf, inp) = local_host == master_host ? pow_sup : 0;
 	in_statsPeg(out_buf, mhost) = master_host;
 	in_statsPeg(out_buf, mem) = mem;
 	in_statsPeg(out_buf, mmin) = mmin;

@@ -24,6 +24,8 @@
 #define sync_freq	_dac (NodePeg, sync_freq)
 #define sat_mod		_dac (NodePeg, sat_mod)
 #define plot_id		_dac (NodePeg, plot_id)
+#define pow_ts		_dac (NodePeg, pow_ts)
+#define pow_sup		_dac (NodePeg, pow_sup)
 
 // Methods
 #define show_ifla		_dac (NodePeg, show_ifla)

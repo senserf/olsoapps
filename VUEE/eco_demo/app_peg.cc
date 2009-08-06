@@ -105,7 +105,9 @@ __PUBLF (NodePeg, void, sat_rep) (char * b) {
 	sint len;
 	char * obuf;
 
-	if (!is_satest)
+	// oss_out is called also when the net is not inited yet, and
+	// it calls in here; ignore - custodian will not hear it
+	if (!is_satest || net_opt (PHYSOPT_PHYSINFO, NULL) == -1)
 		return;
 
 	if (b == NULL) // came from sat into ui_ibuf
@@ -217,7 +219,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			agg_data.eslot == EE_AGG_MIN &&
 			  IS_AGG_EMPTY (agg_data.ee.s.f.status) ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
-			mem, mmin, sat_mod);
+			mem, mmin, sat_mod, pow_sup);
 	} else {
 	  switch (in_header (buf, msg_type)) {
 	    case msg_statsPeg:
@@ -227,7 +229,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			in_statsPeg(buf, a_fl),
 			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
 			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
-			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 12345);
+			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 0, 0);
 		break;
 
 	    case msg_statsTag:
@@ -445,7 +447,7 @@ endthread
   AS_ <-> Audit State
   --------------------
 */
-
+#define POW_FREQ_SHIFT 6
 thread (audit)
 
 	nodata;
@@ -455,6 +457,12 @@ thread (audit)
 		aud_buf_ptr = NULL;
 
 	entry (AS_START)
+		if (local_host == master_host && (pow_ts == 0 ||
+	(word)(seconds() - pow_ts) >= (tag_auditFreq << POW_FREQ_SHIFT))) {
+			read_sensor (AS_START, 0, &pow_sup);
+			pow_ts = seconds();
+			stats (NULL);
+		}
 
 		if (aud_buf_ptr != NULL) {
 			ufree (aud_buf_ptr);
@@ -502,6 +510,7 @@ thread (audit)
 		lhold (AS_HOLD, &lh_time);
 		proceed (AS_START);
 endthread
+#undef POW_FREQ_SHIFT
 
 __PUBLF (NodePeg, void, tmpcrap) (word what) {
 	switch (what) {

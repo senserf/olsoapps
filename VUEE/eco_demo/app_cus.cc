@@ -198,7 +198,7 @@ __PUBLF (NodeCus, void, stats) (char * buf) {
 			agg_data.eslot == EE_AGG_MIN &&
 			  agg_data.ee.s.f.status == AGG_FF ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
-			mem, mmin, sat_mod);
+			mem, mmin, sat_mod, 0);
 	} else {
 	  switch (in_header (buf, msg_type)) {
 	    case msg_statsPeg:
@@ -208,7 +208,8 @@ __PUBLF (NodeCus, void, stats) (char * buf) {
 			in_statsPeg(buf, a_fl),
 			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
 			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
-			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 12345);
+			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 0,
+			in_statsPeg(buf, inp));
 		break;
 
 	    case msg_statsTag:

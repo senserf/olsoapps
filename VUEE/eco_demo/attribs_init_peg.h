@@ -26,3 +26,7 @@
 	_da (sat_mod)		= 0;
 
 	_da (plot_id)		= 0;
+
+	_da (pow_ts)		= 0;
+
+	_da (pow_sup)		= 0;

@@ -36,6 +36,8 @@ lword	master_ts	= 0;
 word	app_flags 		= DEF_APP_FLAGS;
 word	tag_auditFreq 		= 59;	// in seconds
 long 	master_date		= 0;
+lword	pow_ts			= 0;
+word	pow_sup			= 0;
 
 // if we can get away with it, it's better to have it in IRAM (?)
 tagDataType tagArray [tag_lim];
@@ -116,8 +118,8 @@ static const char only_master_str[] = OPRE_APP_ILL "Only at the Master\r\n";
 
 static const char stats_str[] = OPRE_APP_STATS_A 
 	"Stats for agg (%lx: %u):" OMID_CR
-	" Audit freq %u PLev %u a_fl %x Uptime %lu Mts %ld Master %u" OMID_CR
-	" Stored entries %lu Mem free %u min %u mode %u\r\n";
+	" Audit %u PLev %u a_fl %x Uptime %lu Mts %ld Master %u" OMID_CR
+	" Stored %lu Mem free %u min %u mode %u inp %u\r\n";
 
 static const char statsCol_str[] = OPRE_APP_STATS_CA
 	"Stats for coll (%lx: %u) via %u:" OMID_CR

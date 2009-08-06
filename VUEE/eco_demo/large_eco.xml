@@ -80,13 +80,21 @@
 	    <preinit tag="NID" type="word">85</preinit>
 	</defaults>
 	<node number="0" type="peg">
-	    <sensors></sensors>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="0" vsize="2" delay="0.01">2047</sensor>
+	    </sensors>
 	    <location>65.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
 	    <preinit tag="MHOST" type="word">10</preinit>
 	</node>
 	<node number="1" type="peg">
-	    <sensors></sensors>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="0" vsize="2" delay="0.01">2047</sensor>
+	    </sensors>
 	    <location>205.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
 	    <preinit tag="MHOST" type="word">10</preinit>
