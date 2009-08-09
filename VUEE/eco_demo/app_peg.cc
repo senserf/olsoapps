@@ -780,7 +780,10 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 			" ***gone***" : " ",
 		in_reportPload(buf, ppload.sval[0]),
 		in_reportPload(buf, ppload.sval[1]),
-		in_reportPload(buf, ppload.sval[2]));
+		in_reportPload(buf, ppload.sval[2]),
+		in_reportPload(buf, ppload.sval[3]),
+		in_reportPload(buf, ppload.sval[4]),
+		in_reportPload(buf, ppload.sval[5]));
       } else {
 	lbuf = form (NULL, rep_str,
 

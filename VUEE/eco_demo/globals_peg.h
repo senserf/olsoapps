@@ -141,8 +141,10 @@ static const char rep_str[] = OPRE_APP_REP OMID_CR
 	"  " SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d, "
 	SENS3_DESC "%d, " SENS4_DESC "%d, " SENS5_DESC "%d\r\n";
 
+// back to 5 sensors via sat:
 static const char satrep_str[] = OPRE_APP_REP "%lu %u:%lu %u-%u-%u %u:%u:%u%s"
-	SENS0_DESC "%d " SENS1_DESC "%d " SENS2_DESC "%d";
+	SENS0_DESC "%d " SENS1_DESC "%d " SENS2_DESC "%d, "
+	SENS3_DESC "%d, " SENS4_DESC "%d, " SENS5_DESC "%d";
 
 static const char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";
