@@ -3,7 +3,7 @@ if { $value < 0.0 } {
 	set value 0.0
 } elseif { $value > 100.0 } {
 	set value 100.0
-}} {2 100-399} {5 400-499}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-499} {1 400-499} {2 400-499} {3 400-499}} {ECHO_5 {set value [expr $value * 0.9246 - 40.1]
+}} {2 100-399} {5 400-499}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-499} {1 400-499} {2 400-499} {3 400-499}} {ECHO_5 {set value [expr $value * 0.09246 - 40.1]
 if { $value < 0.0 } {
 	set value 0.0
 } elseif { $value > 100.0 } {

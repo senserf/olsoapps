@@ -13,8 +13,8 @@
 #include "sensors.h"
 #else
 #define SENSOR_LIST alamakota
-#define powerdown() 	diag ("pdown");
-#define powerup()	diag ("pup");
+//#define powerdown() 	diag ("pdown");
+//#define powerup()	diag ("pup");
 #endif
 
 // elsewhere may be a better place for this:

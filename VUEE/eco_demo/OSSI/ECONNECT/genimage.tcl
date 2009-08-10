@@ -537,9 +537,15 @@ proc change_ifn { } {
 #
 	global DEFS IFN
 
+	if { $DEFS(SRD) == "" } {
+		set dd [defhome]
+	} else {
+		set dd $DEFS(SRD)
+	}
+
 	set fn [tk_getOpenFile \
 			-defaultextension ".a43" \
-			-initialdir $DEFS(SRD) \
+			-initialdir $dd \
 			-filetypes {{ "Intel Hex" {*.a43}} { "All" {*.*} }} \
 			-title "Source Image File"]
 
