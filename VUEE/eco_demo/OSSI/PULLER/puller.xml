@@ -1,37 +1,21 @@
 <puller>
 
-    <repository interval="30" user="FF0818z36z234">
+    <repository interval="60" user="FF0818z36z234">
 	http://emsgateway.emstechnologies.ca/EMS_Gateway/EMSGateway_v2_0.asmx
     </repository>
 
     <target>
-	<!-- for testing only, use /home/... -->
-	database
+	/home/pawel/EMSDB/database
     </target>
 
+<!--
     <timeoffsets>
 		<default>-7</default>
 		<satellite>-7</satellite>
 		<device id="^415$">-7</device>
     </timeoffsets>
+-->
 
-    <!-- applicable to all "200" series collectors -->
+    <snippets>/home/pawel/web_docs/EMS/snippets.dat</snippets>
 
-    <snippet collector="^2" sensor="0">
-	set value [expr $value * 1.47]
-    </snippet>
-
-    <snippet collector="^2" sensor="1">
-	set value [expr -39.62 + 0.01 * $value]
-    </snippet>
-
-    <snippet collector="^2" sensor="2">
-	set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
-	if { $value < 0.0 } {
-		set value 0.0
-	} elseif { $value > 100.0 } {
-		set value 100.0
-	}
-    </snippet>
-	
 </puller>

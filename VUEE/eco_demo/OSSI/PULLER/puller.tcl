@@ -45,12 +45,14 @@ proc msource { f } {
 msource xml.tcl
 msource log.tcl
 msource sdb.tcl
+msource snippets.tcl
 
 ###############################################################################
 
 package require xml 1.0
 package require log 1.0
 package require sdb 1.0
+package require snippets 1.0
 
 ###############################################################################
 
@@ -157,7 +159,7 @@ proc read_xml_config { } {
 #
 # Read and parse the config file 
 #
-	global Files Params PT SN
+	global Files Params PT
 
 	if [catch { open $Files(XMLC) r } xfd] {
 		abt "cannot open configuration file $Files(XMLC): $xfd"
@@ -250,21 +252,25 @@ proc read_xml_config { } {
 	}
 
 	# get the conversion snippets
-	set def [sxml_children $xc "snippet"]
-	foreach s $def {
-		# collector ID pattern
-		set cp [sxml_attr $s "collector"]
-		if { $cp == "" || [catch { regexp $cp "1999" } ] } {
-			errpage "Ilegal contents of config file: collector ID\
-				pattern illegal or missing in <snippet>"
-		}
-		# sensor number
-		set sn [sxml_attr $s "sensor"]
-		if { $sn == "" || [catch { expr int($sn) } sn] } {
-			errpage "Ilegal contents of config file: sensor number\
-				llegale or missing in <snippet>"
-		}
-		lappend SN($sn) [list $cp [sxml_txt $s]]
+	set s [sxml_txt [sxml_child $xc "snippets"]]
+	if { $s == "" } {
+		abt "no snippets file specified in the data set"
+	}
+
+	if [catch { open $s "r" } fd] {
+		abt "cannot open snippets file $s: $fd"
+	}
+
+	if [catch { read $fd } cp] {
+		abt "cannot read snippets file $s: $cp"
+	}
+
+	catch { close $fd }
+
+	set fd [snip_parse $cp]
+
+	if { $fd != "" } {
+		abt "cannot parse the snippets file: $fd"
 	}
 }
 
@@ -363,7 +369,7 @@ proc add_sample { di mes } {
 
 proc extract_data { block } {
 
-	global Samples Params PT
+	global Samples Params PT FMODE
 
 	# message Id
 	set mid ""
@@ -431,44 +437,19 @@ proc extract_data { block } {
 	set sid 0
 
 	while 1 {
-		set vals [string trimleft $vals]
+		set vals [string trimleft $vals " ,"]
 		if ![regexp "^($PT(DI))(.*)" $vals junk val vals] {
 			break
 		}
-		append mes " [svalue $val $col $sid]"
+		append mes " $val:[snip_cnvrt $val $sid $col]"
 		incr sid
 	}
 
 	# use satellite reported time as the record index
 	lappend Samples [list $ts "SS$did" $df $mes]
-}
-
-proc svalue { v c s } {
-#
-# Convert sensor value
-#
-	global SN
-
-	set value "?"
-	if [info exists SN($s)] {
-		foreach sn $SN($s) {
-			# collector pattern
-			set p [lindex $sn 0]
-			if { [catch { regexp $p $c } r] || !$r } {
-				continue
-			}
-			# we have an applicable snippet
-			set value $v
-			if [catch { eval [lindex $sn 1] } er] {
-				log "snippet failed $s $p: $er"
-				set value "?"
-				break
-			}
-			break
-		}
+	if $FMODE {
+		puts "EXTRACTED: $ts $did $df $mes"
 	}
-	
-	return "$v:$value"
 }
 
 proc pull_it { } {
@@ -553,6 +534,7 @@ set fn [lindex $argv 1]
 
 if { $fn != "" } {
 	# from file
+	set FMODE 1
 	if [catch { open $fn "r" } fd] {
 		abt "cannot open source file $fn: $fd"
 	}
@@ -567,6 +549,8 @@ if { $fn != "" } {
 	parse_response
 	exit
 }
+
+set FMODE 0
 
 while 1 {
 

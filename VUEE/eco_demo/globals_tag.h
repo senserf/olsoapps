@@ -92,9 +92,9 @@ static const char ifla_str[] = OPRE_APP_IFLA_C
 	"Flash: id %u pl %x c_fl %x Maj_freq %u min_freq %u rx_span %u\r\n";
 
 static const char dump_str[] = OPRE_APP_DUMP_C OMID_CR
-	"%s slot %lu %u-%u-%u %u:%u:%u: " SENS0_DESC "%d, "
-	SENS1_DESC "%d, " SENS2_DESC "%d, " SENS3_DESC "%d, "
-       	SENS4_DESC "%d, " SENS5_DESC "%d\r\n";
+	"%s slot %lu %u-%u-%u %u:%u:%u: " SENS0_DESC "%d "
+	SENS1_DESC "%d " SENS2_DESC "%d " SENS3_DESC "%d "
+       	SENS4_DESC "%d " SENS5_DESC "%d\r\n";
 
 static const char dumpmark_str[] = OPRE_APP_DMARK_C "%s %lu %u-%u-%u %u:%u:%u "
 	"%u %u %u\r\n";

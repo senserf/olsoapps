@@ -126,8 +126,8 @@ static const char clock_str[] = OPRE_APP_T
 static const char rep_str[] = OPRE_APP_REP OMID_CR
 	"  Agg %u slot %lu: %u-%u-%u %u:%u:%u" OMID_CR
 	"  Col %u slot %lu: %u-%u-%u %u:%u:%u%s" OMID_CR
-	"  " SENS0_DESC "%d, " SENS1_DESC "%d, " SENS2_DESC "%d, "
-	SENS3_DESC "%d, " SENS4_DESC "%d, " SENS5_DESC "%d\r\n";
+	"  " SENS0_DESC "%d " SENS1_DESC "%d " SENS2_DESC "%d "
+	SENS3_DESC "%d " SENS4_DESC "%d " SENS5_DESC "%d\r\n";
 
 static const char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";
@@ -137,8 +137,8 @@ static const char repNo_str[] = OPRE_APP_REP_NO
 
 static const char dump_str[] = OPRE_APP_DUMP_A OMID_CR
 	"Col %u slot %lu (A: %lu) %u-%u-%u %u:%u:%u (A %u-%u-%u %u:%u:%u)"
-	OMID_CR " " SENS0_DESC "%d, " SENS1_DESC "%d, "
-	SENS2_DESC "%d, " SENS3_DESC "%d, " SENS4_DESC "%d, "
+	OMID_CR " " SENS0_DESC "%d " SENS1_DESC "%d "
+	SENS2_DESC "%d " SENS3_DESC "%d " SENS4_DESC "%d "
 	SENS5_DESC "%d\r\n";
 
 static const char dumpend_str[] = OPRE_APP_DEND_A

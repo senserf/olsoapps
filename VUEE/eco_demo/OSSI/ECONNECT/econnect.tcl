@@ -30,15 +30,6 @@ set PM(PGM)	[file join Olsonet EConnect]
 # sensor conversion formulas
 set PM(COB)	"snippets.dat"
 
-# number of sensor assignment columns in the snippet map
-set PM(NAS)	4
-
-# maximum length of snippet name
-set PM(SNL)	32
-
-# maximum number of sensors per node
-set PM(SPN)	10
-
 # Max line count for scrollable terminals
 set PM(MLC)	1024
 
@@ -57,6 +48,7 @@ set PM(USH)	{
 			"Master:"
 			"Writing to storage:"
 			"Entries stored:"
+			"Battery voltage:"
 			"Satellite time:"
 			"Signal quality:"
 			"Lattitude:"
@@ -84,8 +76,8 @@ set ST(MOD)	0
 set PT(TST) 	"(\[0-9\]+-\[0-9\]+-\[0-9\]+ \[0-9\]+:\[0-9\]+:\[0-9\]+)"
 
 # aggregator's status
-set PT(AST)	": (\[0-9\]+).: Audit freq (\[0-9\]+).*a_fl (\[0-9a-f\]+) "
-	append PT(AST) "Uptime (\[0-9\]+).*aster (\[0-9\]+).*entries (\[0-9\]+)"
+set PT(AST)	": (\[0-9\]+).: Audit\[^0-9\]+(\[0-9\]+).*a_fl (\[0-9a-f\]+) "
+	append PT(AST) "Uptime (\[0-9\]+).*aster (\[0-9\]+)\[^0-9\]+(\[0-9\]+)"
 
 # aggregator's data sample line
 set PT(AGS)	"^1007 Col (\[0-9\]+) slot (\[0-9\]+).*A: (\[0-9\]+). "
@@ -131,6 +123,492 @@ proc abt { msg } {
 	alert $msg
 	exit 99
 }
+
+### Snippets ##################################################################
+
+package provide snippets 1.0
+#
+# Conversion snippets for sensors
+#
+
+namespace eval SNIPPETS {
+
+# snippet cache
+variable SC
+
+# the snippets themselves
+variable SN
+
+# parameters
+variable PM
+
+# max snippet name length
+set PM(SNL)	32
+
+# number of sensor assignment columns in the snippet map (restricted to fit
+# a window, but hardly hard)
+set PM(NAS)	4
+
+# maximum number of sensors per node
+set PM(SPN)	10
+
+proc snip_getparam { pm } {
+
+	variable PM
+
+	if ![info exists PM($pm)] {
+		return ""
+	} else {
+		return $PM($pm)
+	}
+}
+
+proc snip_cnvrt { v s c } {
+#
+# Convert a raw sensor value
+#
+	variable SN
+	variable SC
+
+	if ![info exists SC($c,$s)] {
+		# build the cache entry
+		set fn 0
+		foreach sn [array names SN] {
+			foreach a [lrange $SN($sn) 1 end] {
+				if { [lindex $a 0] != $s } {
+					# not this sensor
+					continue
+				}
+				# scan the collector range
+				foreach r [lindex $a 1] {
+					set x [lindex $r 0]
+					if { $c == $x } {
+						set fn 1
+						break
+					}
+					set y [lindex $r 1]
+					if { $y != "" && $c > $x && $c <= $y } {
+						set fn 1
+						break
+					}
+				}
+				if $fn {
+					break
+				}
+			}
+			if $fn {
+				break
+			}
+		}
+		if $fn {
+			set SC($c,$s) [lindex $SN($sn) 0]
+		} else {
+			set SC($c,$s) ""
+		}
+	}
+
+	set snip $SC($c,$s)
+
+	if { $snip != "" && ![catch { snip_eval $snip $v } r] } {
+		return [format %1.2f $r]
+	}
+	return ""
+}
+
+proc snip_icache { } {
+#
+# Invalidate snippet cache
+#
+	variable SC
+
+	array unset SC
+}
+
+proc ucs { cl } {
+#
+# Unpack and validate a collector set
+#
+	set v ""
+
+	while 1 {
+
+		set cl [string trimleft $cl]
+
+		if { $cl == "" } {
+			# empty is OK, it stands for all
+			break
+		}
+
+		if [regexp -nocase "^all" $cl] {
+			# overrides everything
+			return "all"
+		}
+
+		if { [string index $cl 0] == "," } {
+			# ignore commas
+			set cl [string range $cl 1 end]
+			continue
+		}
+
+		# expect a number or range
+		set a ""
+		set b ""
+		if ![regexp "^(\[0-9\]+) *- *(\[0-9\]+)" $cl ma a b] {
+			regexp "^(\[0-9\]+)" $cl ma a
+		}
+
+		if { $a == "" } {
+			# error
+			return ""
+		}
+
+		set a [vnum $a 100 65536]
+		if { $a == "" } {
+			return ""
+		}
+
+		if { $b == "" } {
+			# single value
+			lappend v $a
+		} else {
+			set b [vnum $b 100 65536]
+			if { $b == "" || $b < $a } {
+				return ""
+			}
+			# range
+			lappend v "$a $b"
+		}
+
+		set cl [string range $cl [string length $ma] end]
+	}
+
+	if { $v == "" } {
+		return "all"
+	} else {
+		return $v
+	}
+}
+
+proc pcs { lv } {
+#
+# Convert collector set from list to text
+#
+	if { $lv == "" } {
+		return "all"
+	}
+
+	set tx ""
+
+	foreach s $lv {
+	
+		set a [lindex $s 0]
+		set b [lindex $s 1]
+
+		if { $tx != "" } {
+			append tx " "
+		}
+
+		append tx $a
+
+		if { $b != "" } {
+			append tx "-$b"
+		}
+	}
+
+	return $tx
+}
+
+proc snip_names { } {
+
+	variable SN
+
+	return [lsort [array names SN]]
+}
+
+proc snip_vsn { nm } {
+#
+# Validate snippet name
+#
+	if { $nm == "" } {
+		return 1
+	}
+
+	if { [string length $nm] > [snip_getparam SNL] } {
+		return 1
+	}
+
+	if ![regexp -nocase "^\[a-z\]\[0-9a-z_\]*$" $nm] {
+		return 1
+	}
+
+	return 0
+}
+
+proc snip_assignments { nm } {
+
+	variable SN
+
+	if ![info exists SN($nm)] {
+		return ""
+	}
+
+	set asl [lrange $SN($nm) 1 end]
+
+	set res ""
+
+	foreach as $asl {
+		lappend res [list [lindex $as 0] [pcs [lindex $as 1]]]
+	}
+
+	return $res
+}
+
+proc snip_script { nm } {
+
+	variable SN
+
+	if ![info exists SN($nm)] {
+		return ""
+	}
+
+	return [lindex $SN($nm) 0]
+}
+
+proc snip_exists { nm } {
+
+	variable SN
+
+	return [info exists SN($nm)]
+}
+
+proc snip_delete { nm } {
+
+	variable SN
+
+	if [info exists SN($nm)] {
+		unset SN($nm)
+	}
+}
+
+proc snip_set { nm scr asl } {
+
+	variable SN
+
+	if [snip_vsn $nm] {
+		return "the name is invalid, must be no more than\
+			[snip_getparam SNL] alphanumeric characters starting\
+			with a letter (no spaces)"
+	}
+
+	if [catch { snip_eval $scr 1000 } err] {
+		return "execution fails, $err"
+	}
+
+	set ssl ""
+	set i 0
+	foreach as $asl {
+		set asg [lindex $as 0]
+		set cli [ucs [lindex $as 1]]
+		incr i
+		if { $cli == "" } {
+			return "collector set number $i is broken"
+		}
+		lappend ssl [list $asg $cli]
+	}
+
+	set SN($nm) [concat [list $scr] $ssl]
+
+	return ""
+}
+
+## version dependent code #####################################################
+
+if { [info tclversion] < 8.5 } {
+
+	proc snip_eval { sn val } {
+	#
+	# Safely evaluates a snippet for a given value
+	#
+		set in [interp create -safe]
+
+		if [catch {
+			# build the script
+			set s "set value $val\n$sn\n"
+			append s { return $value }
+			set s [interp eval $in $s]
+		} err] {
+			# make sure to clean up
+			interp delete $in
+			error $err
+		}
+		interp delete $in
+		return $s
+	}
+
+} else {
+
+	proc snip_eval { sn val } {
+	#
+	# Safely evaluates a snippet for a given value
+	#
+		set in [interp create -safe]
+	
+		if [catch {
+			# make sure we get out of loops
+			interp limit $in commands -value 512
+
+			# build the script
+			set s "set value $val\n$sn\n"
+			append s { return $value }
+			set s [interp eval $in $s]
+		} err] {
+			# make sure to clean up
+			interp delete $in
+			error $err
+		}
+
+		interp delete $in
+		return $s
+	}
+
+}
+
+proc snip_parse { cf } {
+#
+# Parse conversion snippets, e.g., read from a file
+#
+	variable SN
+
+	# invalidate the cache
+	snip_icache
+
+	set ix 0
+
+	set snl [snip_getparam SNL]
+	set nas [snip_getparam NAS]
+
+	foreach snip $cf {
+
+		# we start from 1 and end up with the correct count
+		incr ix
+
+		# snippet name
+		set nm [lindex $snip 0]
+
+		# the code
+		set ex [lindex $snip 1]
+
+		if [snip_vsn $nm] {
+			return "illegal name '$nm' of snippet number $ix,\
+				must be no more than $snl alphanumeric\
+				characters starting with a letter (no spaces)"
+		}
+		if [info exists SN($nm)] {
+			return "duplicate snippet name '$nm', snippet number\
+				$ix"
+		}
+
+		# this is the list of up to PM(NAS) assignments
+		set asgs [lrange $snip 2 end]
+
+		if { [llength $asgs] > $nas } {
+			return "too many (> $nas) assignments in snippet\
+				'$nm' (number $ix)"
+		}
+
+		if [catch { snip_eval $ex 1000 } er] {
+			return "cannot evaluate snippet $nm (number $ix), $er"
+		}
+
+		# we produce an internal representation, which is a name-indexed
+		# bunch of lists
+		
+		set SN($nm) [list $ex]
+		set spn [snip_getparam SPN]
+
+		set iy 0
+		foreach as $asgs {
+
+			incr iy
+
+			# this is a sensor number (small)
+			set ss [lindex $as 0]
+			set se [vnum $ss 0 $spn]
+
+			if { $se == "" } {
+				return "illegal sensor number '$ss' in\
+					assignment $iy of snippet '$nm'"
+			}
+
+			# this is a set of collectors which consists of
+			# individual numbers and/or ranges
+			set ss [lindex $as 1]
+			set sv [ucs $ss]
+
+			if { $sv == "" } {
+				return "illegal collector range '$ss' in\
+					 assignment $iy of snippet '$nm'"
+			}
+			if { $sv == "all" } {
+				set sv ""
+			}
+			lappend SN($nm) [list $se $sv]
+		}
+	}
+	return ""
+}
+
+proc snip_scmp { a b } {
+#
+# Compares two strings in a flimsy sort of way
+#
+	set a [string trim $a]
+	regexp -all "\[ \t\n\r\]" $a " " a
+	set b [string trim $b]
+	regexp -all "\[ \t\n\r\]" $b " " b
+
+	return [string compare $a $b]
+}
+
+proc snip_encode { } {
+#
+# Encode conversion snippets to be written back to the file
+#
+	variable SN
+
+	set res ""
+
+	foreach nm [array names SN] {
+
+		set curr ""
+
+		set ex [lindex $SN($nm) 0]
+		set al [lrange $SN($nm) 1 end]
+
+		lappend curr $nm
+		lappend curr $ex
+
+		foreach a $al {
+
+			set se [lindex $a 0]
+			set cs [lindex $a 1]
+
+			lappend curr [list $se [pcs $cs]]
+		}
+
+		lappend res $curr
+	}
+
+	return $res
+}
+
+namespace export snip_*
+
+}
+
+namespace import ::SNIPPETS::*
+
+###############################################################################
 
 ### Logging ###################################################################
 
@@ -843,8 +1321,15 @@ proc update_status { prt { rcl 0 } } {
 
 	switch $WN(NT,$prt) {
 
-		"custodian"  -
+		"custodian"  {
+				if { $WN(NI,$prt) == "" } {
+					sendm $prt "a"
+				}
+				sendm $prt "a $WN(AI,$prt)"
+			     }
+
 		"aggregator" {	sendm $prt "a" }
+
 		"collector"  {	sendm $prt "s" }
 
 		default	     {  return }
@@ -956,18 +1441,18 @@ proc cus_status_monitor { prt line } {
 			set tm "$md$yr$tm"
 		}
 
-		set WN(SV,$prt) [lreplace $WN(SV,$prt) 4 4 $tm]
+		set WN(SV,$prt) [lreplace $WN(SV,$prt) 5 5 $tm]
 		set upd 1
 
 	} elseif [regexp $PT(SSB) $line jk ss la lo al] {
 
-		set WN(SV,$prt) [lreplace $WN(SV,$prt) 5 5 $ss]
+		set WN(SV,$prt) [lreplace $WN(SV,$prt) 6 6 $ss]
 
 		if { $la == "n/a" } {
-			set WN(SV,$prt) [lreplace $WN(SV,$prt) 6 8 \
+			set WN(SV,$prt) [lreplace $WN(SV,$prt) 7 9 \
 				"??" "??" "??"]
 		} else {
-			set WN(SV,$prt) [lreplace $WN(SV,$prt) 6 8 \
+			set WN(SV,$prt) [lreplace $WN(SV,$prt) 7 9 \
 				$la $lo $al]
 		}
 		set upd 1
@@ -979,19 +1464,38 @@ proc cus_status_monitor { prt line } {
 			return
 		}
 
-       		if [catch { expr 0x$fla } fla] {
-        	        set fla 0
-        	}
+		if { [string first "(5A7E" $line] > 0 } {
+			# this is satnode
+			if { $agg != $WN(AI,$prt) } {
+				# wrong satnode, ignore
+				return
+			}
+			# check for battery status
+			if { [regexp " inp (\[0-9\]+)" $line j bs] &&
+			     ![catch { expr ($bs / 4095.0) * 16.5 } bs] } {
+				set bs [format %1.2f $bs]
+			} else {
+				set bs "?"
+			} 
 
-		set WN(NI,$prt) $agg
+       			if [catch { expr 0x$fla } fla] {
+        		        set fla 0
+        		}
 
-		if { $mas == $agg } {
-			set mas "this node"
+			if { $mas == $agg } {
+				set mas "this satnode"
+			}
+
+			set WN(SV,$prt) [lreplace $WN(SV,$prt) 0 4 "$upt s"\
+				$mas [fltos $fla] $sam $bs]
+			set upd 1
+		} else {
+			# custodian itself - just the node number
+			if { $agg != $WN(NI,$prt) } {
+				set upd 1
+				set WN(NI,$prt) $agg
+			}
 		}
-
-		set WN(SV,$prt) [lreplace $WN(SV,$prt) 0 3 "$upt s" $mas \
-			[fltos $fla] $sam]
-		set upd 1
 	}
 
 	if $upd {
@@ -3802,319 +4306,11 @@ proc do_connect { } {
 	}
 }
 
-### Snippets ##################################################################
-
-proc snip_cnvrt { v s c } {
-#
-# Convert a raw sensor value
-#
-	global SN SC
-
-	if ![info exists SC($c,$s)] {
-		# build the cache entry
-		set fn 0
-		foreach sn [array names SN] {
-			foreach a [lrange $SN($sn) 1 end] {
-				if { [lindex $a 0] != $s } {
-					# not this sensor
-					continue
-				}
-				# scan the collector range
-				foreach r [lindex $a 1] {
-					set x [lindex $r 0]
-					if { $c == $x } {
-						set fn 1
-						break
-					}
-					set y [lindex $r 1]
-					if { $y != "" && $c > $x && $c <= $y } {
-						set fn 1
-						break
-					}
-				}
-				if $fn {
-					break
-				}
-			}
-			if $fn {
-				break
-			}
-		}
-		if $fn {
-			set SC($c,$s) [lindex $SN($sn) 0]
-		} else {
-			set SC($c,$s) ""
-		}
-	}
-
-	set snip $SC($c,$s)
-
-	if { $snip != "" && ![catch { snip_eval $snip $v } r] } {
-		return [format %1.2f $r]
-	}
-	return ""
-}
-
-proc snip_icache { } {
-#
-# Invalidate snippet cache
-#
-	global SC
-
-	array unset SC
-}
-
-proc snip_ucs { cl } {
-#
-# Unpack and validate a collector set
-#
-	set v ""
-
-	while 1 {
-
-		set cl [string trimleft $cl]
-
-		if { $cl == "" } {
-			# empty is OK, it stands for all
-			break
-		}
-
-		if [regexp -nocase "^all" $cl] {
-			# overrides everything
-			return "all"
-		}
-
-		if { [string index $cl 0] == "," } {
-			# ignore commas
-			set cl [string range $cl 1 end]
-			continue
-		}
-
-		# expect a number or range
-		set a ""
-		set b ""
-		if ![regexp "^(\[0-9\]+) *- *(\[0-9\]+)" $cl ma a b] {
-			regexp "^(\[0-9\]+)" $cl ma a
-		}
-
-		if { $a == "" } {
-			# error
-			return ""
-		}
-
-		set a [vnum $a 100 65536]
-		if { $a == "" } {
-			return ""
-		}
-
-		if { $b == "" } {
-			# single value
-			lappend v $a
-		} else {
-			set b [vnum $b 100 65536]
-			if { $b == "" || $b < $a } {
-				return ""
-			}
-			# range
-			lappend v "$a $b"
-		}
-
-		set cl [string range $cl [string length $ma] end]
-	}
-
-	if { $v == "" } {
-		return "all"
-	} else {
-		return $v
-	}
-}
-
-proc snip_pcs { lv } {
-#
-# Convert collector set from list to text
-#
-
-	if { $lv == "" } {
-		return "all"
-	}
-
-	set tx ""
-
-	foreach s $lv {
-	
-		set a [lindex $s 0]
-		set b [lindex $s 1]
-
-		if { $tx != "" } {
-			append tx " "
-		}
-
-		append tx $a
-
-		if { $b != "" } {
-			append tx "-$b"
-		}
-	}
-
-	return $tx
-}
-
-proc snip_vsn { nm } {
-#
-# Validate snippet name
-#
-	global PM
-
-	if { $nm == "" } {
-		return 1
-	}
-
-	if { [string length $nm] > $PM(SNL) } {
-		return 1
-	}
-
-	if ![regexp -nocase "^\[a-z\]\[0-9a-z_\]*$" $nm] {
-		return 1
-	}
-
-	return 0
-}
-
-## version dependent code #####################################################
-
-if { [info tclversion] < 8.5 } {
-
-	proc snip_eval { sn val } {
-	#
-	# Safely evaluates a snippet for a given value
-	#
-		set in [interp create -safe]
-
-		if [catch {
-			# build the script
-			set s "set value $val\n$sn\n"
-			append s { return $value }
-			set s [interp eval $in $s]
-		} err] {
-			# make sure to clean up
-			interp delete $in
-			error $err
-		}
-		interp delete $in
-		return $s
-	}
-
-} else {
-
-	proc snip_eval { sn val } {
-	#
-	# Safely evaluates a snippet for a given value
-	#
-		set in [interp create -safe]
-	
-		if [catch {
-			# make sure we get out of loops
-			interp limit $in commands -value 512
-
-			# build the script
-			set s "set value $val\n$sn\n"
-			append s { return $value }
-			set s [interp eval $in $s]
-		} err] {
-			# make sure to clean up
-			interp delete $in
-			error $err
-		}
-
-		interp delete $in
-		return $s
-	}
-
-}
-
-###############################################################################
-proc snip_parse { cf } {
-#
-# Parse conversion snippets read from a file
-#
-	global SN PM
-
-	set ix 0
-	foreach snip $cf {
-
-		# we start from 1 and end up with the correct count
-		incr ix
-
-		# snippet name
-		set nm [lindex $snip 0]
-
-		# the code
-		set ex [lindex $snip 1]
-
-		if [snip_vsn $nm] {
-			return "illegal name '$nm' of snippet number $ix,\
-				must be no more than $PM(SNL) alphanumeric\
-				characters starting with a letter (no spaces)"
-		}
-		if [info exists SN($nm)] {
-			return "duplicate snippet name '$nm', snippet number\
-				$ix"
-		}
-
-		# this is the list of up to PM(NAS) assignments
-		set asgs [lrange $snip 2 end]
-
-		if { [llength $asgs] > $PM(NAS) } {
-			return "too many (> $PM(NAS)) assignments in snippet\
-				'$nm' (number $ix)"
-		}
-
-		if [catch { snip_eval $ex 1000 } er] {
-			return "cannot evaluate snippet $nm (number $ix), $er"
-		}
-
-		# we produce an internal representation, which is a name-indexed
-		# bunch of lists
-		
-		set SN($nm) [list $ex]
-
-		set iy 0
-		foreach as $asgs {
-
-			incr iy
-
-			# this is a sensor number (small)
-			set ss [lindex $as 0]
-			set se [vnum $ss 0 $PM(SPN)]
-
-			if { $se == "" } {
-				return "illegal sensor number '$ss' in\
-					assignment $iy of snippet '$nm'"
-			}
-
-			# this is a set of collectors which consists of
-			# individual numbers and/or ranges
-			set ss [lindex $as 1]
-			set sv [snip_ucs $ss]
-
-			if { $sv == "" } {
-				return "illegal collector range '$ss' in\
-					 assignment $iy of snippet '$nm'"
-			}
-			if { $sv == "all" } {
-				set sv ""
-			}
-			lappend SN($nm) [list $se $sv]
-		}
-	}
-	return ""
-}
-
-proc snip_window { { ge "" } } {
+proc snp_window { { ge "" } } {
 #
 # Opens a global window listing all snippets
 #
-	global ST SN PM
+	global ST PM
 
 	if [info exists ST(w,S)] {
 		raise $ST(w,S)
@@ -4122,15 +4318,14 @@ proc snip_window { { ge "" } } {
 		return
 	}
 
-	# Note: SN is single-dimensional (snippet names only)
-	set sl [lsort [array names SN]]
+	set sl [snip_names]
 
 	if { $sl == "" } {
 		# no snippets 
 		if [confirm "You have no snippets at present. Would you like to\
 		    create some?"] {
 			# open a snippet editor
-			snip_ewin ""
+			snp_ewin ""
 		}
 		return
 	}
@@ -4158,17 +4353,18 @@ proc snip_window { { ge "" } } {
 	set ix 0
 	foreach sn $sl {
 
-		button $z.b$ix -text $sn -anchor w -command "snip_ewin $sn"
+		button $z.b$ix -text $sn -anchor w -command "snp_ewin $sn"
 		grid $z.b$ix -column 0 -row $row -sticky we -padx 10
 
-		set asl [lrange $SN($sn) 1 end]
+		set asn [snip_assignments $sn]
 		set ast ""
-		foreach as $asl {
+
+		foreach an $asn {
 			# build the assignment string
 			if { $ast != "" } {
 				append ast " / "
 			}
-			append ast "[lindex $as 0] @ [snip_pcs [lindex $as 1]]"
+			append ast "[lindex $an 0] @ [lindex $an 1]"
 		}
 		# maximum length
 		if { [string length $ast] > 80 } {
@@ -4185,16 +4381,16 @@ proc snip_window { { ge "" } } {
 	frame $w.b
 	pack $w.b -side top -fill x -expand no
 
-	button $w.b.n -text "New" -command "snip_ewin"
+	button $w.b.n -text "New" -command "snp_ewin"
 	pack $w.b.n -side left
 
-	button $w.b.q -text "Quit" -command "snip_quitm"
+	button $w.b.q -text "Quit" -command "snp_quitm"
 	pack $w.b.q -side right
 
-	bind $w <Destroy> snip_quitm
+	bind $w <Destroy> snp_quitm
 }
 
-proc snip_quitm { } {
+proc snp_quitm { } {
 #
 # Quit the master snippet window
 #
@@ -4212,7 +4408,7 @@ proc snip_quitm { } {
 	}
 
 	# quit all editor windows
-	snip_qewins
+	snp_qewins
 
 	set w $ST(w,S)
 	unset ST(w,S)
@@ -4220,7 +4416,7 @@ proc snip_quitm { } {
 	catch { destroy $w }
 }
 
-proc snip_redom { } {
+proc snp_redom { } {
 #
 # Redo the main window
 #
@@ -4228,7 +4424,7 @@ proc snip_redom { } {
 
 	if ![info exists ST(w,S)] {
 		# just create it
-		snip_window
+		snp_window
 		return
 	}
 
@@ -4245,10 +4441,10 @@ proc snip_redom { } {
 	unset ST(w,S)
 	unset ST(v,S,H)
 
-	snip_window $ge
+	snp_window $ge
 }
 
-proc snip_fwbn { nm } {
+proc snp_fwbn { nm } {
 #
 # Find editor window by snippet name
 #
@@ -4265,23 +4461,22 @@ proc snip_fwbn { nm } {
 	return 0
 }
 
-proc snip_ewin { { nm "" } } {
+proc snp_ewin { { nm "" } } {
 #
 # Open a snippet editor
 #
-	global ST SN PM
+	global ST PM
 
 	if { $nm != "" } {
 		# check is a named window with the same name is not open
 		# already
-		if [snip_fwbn $nm] {
+		if [snp_fwbn $nm] {
 			alert "An edit window for snippet $nm is already open"
 			return
 		}
 		# the script
-		set ex [lindex $SN($nm) 0]
-		# the assignments
-		set al [lrange $SN($nm) 1 end]
+		set ex [snip_script $nm]
+		set al [snip_assignments $nm]
 	} else {
 		set ex ""
 		set al ""
@@ -4318,7 +4513,11 @@ proc snip_ewin { { nm "" } } {
 	pack $w.a -side top -fill x -expand no
 
 	set snsel "0"
-	for { set i 1 } { $i < $PM(SPN) } { incr i } {
+
+	set spn [snip_getparam SPN]
+	set nas [snip_getparam NAS]
+
+	for { set i 1 } { $i < $spn } { incr i } {
 		# build the list of options for sensor number
 		append snsel " $i"
 	}
@@ -4340,11 +4539,11 @@ proc snip_ewin { { nm "" } } {
 
 		if { $a != "" } {
 			set ST(v,E,$wi,C,$i) [lindex $a 0]
-			set ST(v,E,$wi,A,$i) [snip_pcs [lindex $a 1]]
+			set ST(v,E,$wi,A,$i) [lindex $a 1]
 		}
 
 		incr i
-		if { $i == $PM(NAS) } {
+		if { $i == $nas } {
 			break
 		}
 
@@ -4386,12 +4585,12 @@ proc snip_ewin { { nm "" } } {
 		pack $w.b.p -side left
 	} else {
 		# display the snippet in the window
-		add_text $w.t [lindex $SN($nm) 0]
+		add_text $w.t $ex
 	}
 	# make sure we can edit it
 	$w.t configure -state normal
 
-	button $w.b.t -text "Try it out" -command "snip_tryout $wi"
+	button $w.b.t -text "Try it out" -command "snp_tryout $wi"
 	pack $w.b.t -side left
 
 	label $w.b.a -text "value = "
@@ -4401,19 +4600,19 @@ proc snip_ewin { { nm "" } } {
 	pack $w.b.v -side left
 
 	# save/exit
-	button $w.b.e -text "Exit" -command "snip_qewin $wi 0"
+	button $w.b.e -text "Exit" -command "snp_qewin $wi 0"
 	pack $w.b.e -side right
 
-	button $w.b.s -text "Save" -command "snip_esave $wi"
+	button $w.b.s -text "Save" -command "snp_esave $wi"
 	pack $w.b.s -side right
 
-	button $w.b.d -text "Delete" -command "snip_delete $wi"
+	button $w.b.d -text "Delete" -command "snp_delete $wi"
 	pack $w.b.d -side right
 
-	bind $w <Destroy> "snip_qewin $wi 1"
+	bind $w <Destroy> "snp_qewin $wi 1"
 }
 
-proc snip_qewins { } {
+proc snp_qewins { } {
 #
 # Cancel all editor windows
 #
@@ -4424,23 +4623,23 @@ proc snip_qewins { } {
 	foreach w $wl {
 		# this cannot fail
 		regexp "^w,E,(.+)" $w jk ix
-		snip_qewin $ix 1
+		snp_qewin $ix 1
 	}
 }
 
-proc snip_scmp { a b } {
+proc snp_scmp { a b } {
 #
 # Compares two strings in a flimsy sort of way
 #
 	set a [string trim $a]
-	regexp -all "\[ \t\n\r\]" $a " " a
+	regsub -all "\[ \t\n\r\]" $a " " a
 	set b [string trim $b]
-	regexp -all "\[ \t\n\r\]" $b " " b
+	regsub -all "\[ \t\n\r\]" $b " " b
 
-	return [string compare $a $b]
+	return [string equal $a $b]
 }
 
-proc snip_tryout { wi } {
+proc snp_tryout { wi } {
 #
 # Try to run the snippet
 #
@@ -4491,7 +4690,7 @@ proc snip_ifmod { wi } {
 #
 # Check if modified
 #
-	global ST SN PM
+	global ST PM
 
 	set w $ST(w,E,$wi)
 
@@ -4501,7 +4700,7 @@ proc snip_ifmod { wi } {
 	# code
 	set new [string trim [$w.t get 1.0 end]]
 
-	if { $nm == "" || ![info exists SN($nm)] } {
+	if { $nm == "" || ![snip_exists $nm] } {
 		# not one of the existing
 		if { $new == "" } {
 			# empty, OK
@@ -4510,15 +4709,16 @@ proc snip_ifmod { wi } {
 		return 1
 	}
 
-	if [snip_scmp $new [lindex $SN($nm) 0]] {
+	if ![snp_scmp $new [snip_script $nm]] {
 		# code differs
 		return 1
 	}
 
 	# how about the assignments?
-	set al [lrange $SN($nm) 1 end]
+	set al [snip_assignments $nm]
+	set nas [snip_getparam NAS]
 
-	for { set i 0 } { $i < $PM(NAS) } { incr i } {
+	for { set i 0 } { $i < $nas } { incr i } {
 		# assignment
 		set as [string trim $ST(v,E,$wi,A,$i)]
 		# from the original
@@ -4534,33 +4734,26 @@ proc snip_ifmod { wi } {
 			continue
 		}
 
-		set ua [snip_ucs $as]
-		if { $ua == "" } {
-			# illegal, give them a chance to fix it
-			return 1
-		}
-
 		# compare the sensors and assignments
 		set os [lindex $og 0]
 		set se $ST(v,E,$wi,C,$i)
-		if { $oa != $ua || $se != $os } {
+		if { $oa != $as || $se != $os } {
 			return 1
 		}
 	}
 	return 0
 }
 
-proc snip_qewin { wi abt } {
+proc snp_qewin { wi abt } {
 #
 # Quit an editor window
 #
-	global ST SN
+	global ST
 
 	if ![info exists ST(w,E,$wi)] {
 		# already gone
 		return
 	}
-
 
 	# have to check if saved?
 	if { !$abt && [snip_ifmod $wi] } {
@@ -4578,11 +4771,11 @@ proc snip_qewin { wi abt } {
 	array unset ST "v,E,$wi,*"
 }
 
-proc snip_delete { wi } {
+proc snp_delete { wi } {
 #
 # Delete the snippet
 #
-	global ST SN
+	global ST
 
 	if ![info exists ST(w,E,$wi)] {
 		# already gone
@@ -4597,7 +4790,7 @@ proc snip_delete { wi } {
 	set warn 1
 	set updt 1
 
-	if { $nm == "" || ![info exists SN($nm)] } {
+	if { $nm == "" || ![snip_exists $nm] } {
 		set updt 0
 		if { $new == "" } {
 			set warn 0
@@ -4612,24 +4805,24 @@ proc snip_delete { wi } {
 	}
 
 	if $updt {
-		unset SN($nm)
-		if { [array names SN] == "" } {
+		snip_delete $nm
+		if { [snip_names] == "" } {
 			# no more, close the master window
-			snip_quitm
+			snp_quitm
 		} else {
-			snip_redom
+			snp_redom
 		}
-		snip_write
+		snp_write
 	}
 
-	snip_qewin $wi 1
+	snp_qewin $wi 1
 }
 
-proc snip_esave { wi } {
+proc snp_esave { wi } {
 #
 # Save the snippet
 #
-	global ST PM SN
+	global ST PM
 
 	if ![info exists ST(w,E,$wi)] {
 		# cannot happen
@@ -4646,23 +4839,10 @@ proc snip_esave { wi } {
 		return
 	}
 
-	if [snip_vsn $nm] {
-		alert "The snippet's name is invalid;\
-			must be no more than $PM(SNL) alphanumeric\
-			characters starting with a letter (no spaces)"
-		return
-	}
-
 	# get the code
 	set new [string trim [$w.t get 1.0 end]]
 	if { $new == "" } {
 		alert "The snippet code is empty!"
-		return
-	}
-
-	# try to execute
-	if [catch { snip_eval $new 1000 } err] {
-		alert "The snippet doesn't execute: $err"
 		return
 	}
 
@@ -4671,7 +4851,9 @@ proc snip_esave { wi } {
 
 	set skip 0
 	set cmpr 0
-	for { set i 0 } { $i < $PM(NAS) } { incr i } {
+
+	set nas [snip_getparam NAS]
+	for { set i 0 } { $i < $nas } { incr i } {
 		# assignment
 		set se $ST(v,E,$wi,C,$i)
 		set as [string trim $ST(v,E,$wi,A,$i)]
@@ -4683,20 +4865,12 @@ proc snip_esave { wi } {
 		if $skip {
 			set cmpr 1
 		}
-
-		set ua [snip_ucs $as]
-		if { $ua == "" } {
-			alert "Assignment set number [expr $i + 1] is\
-				invalid, please correct before saving!"
-			return
-		}
-
-		lappend asl [list $se $ua]
+		lappend asl [list $se $as]
 	}
 
 	if $cmpr {
 		# there were holes: compress the assignments in the window
-		for { set i 0 } { $i < $PM(NAS) } { incr i } {
+		for { set i 0 } { $i < $nas } { incr i } {
 			set el [lindex $asl $i]
 			set se [lindex $el 0]
 			set as [lindex $el 1]
@@ -4709,23 +4883,25 @@ proc snip_esave { wi } {
 	}
 
 	# OK, ready to save
-	set SN($nm) [concat [list $new] $asl]
+	set er [snip_set $nm $new $asl]
+
+	if { $er != "" } {
+		alert "The snippet is invalid: $er"
+		return
+	}
 
 	# redo the main window (later we may try to be more selective)
-	snip_redom
+	snp_redom
 
 	# write back to file
-	snip_write
+	snp_write
 }
 
-proc snip_read { } {
+proc snp_read { } {
 #
 # Read snippets from file
 #
 	global PM
-
-	# make sure there is no cache
-	snip_icache
 
 	if [catch { open $PM(COB) "r" } fd] {
 		return "You have no conversion snippets."
@@ -4749,39 +4925,7 @@ proc snip_read { } {
 	return ""
 }
 
-proc snip_encode { } {
-#
-# Encode conversion snippets to be written back to the file
-#
-	global PM SN
-
-	set res ""
-
-	foreach nm [array names SN] {
-
-		set curr ""
-
-		set ex [lindex $SN($nm) 0]
-		set al [lrange $SN($nm) 1 end]
-
-		lappend curr $nm
-		lappend curr $ex
-
-		foreach a $al {
-
-			set se [lindex $a 0]
-			set cs [lindex $a 1]
-
-			lappend curr [list $se [snip_pcs $cs]]
-		}
-
-		lappend res $curr
-	}
-
-	return $res
-}
-
-proc snip_write { } {
+proc snp_write { } {
 #
 # Write back conversion snippets
 #
@@ -4873,7 +5017,7 @@ proc set_home_dir { ds } {
 	log_open
 
 	# read conversion snippets
-	set err [snip_read]
+	set err [snp_read]
 
 	if { $err != "" } {
 		if ![confirm "$err I will set up default snippets for you."] {
@@ -4885,7 +5029,7 @@ proc set_home_dir { ds } {
 		puts -nonewline $fd [string trim $ds]
 		catch { close $fd }
 
-		if { [snip_read] != "" } {
+		if { [snp_read] != "" } {
 			abt "Default snippets appear to be wrong.\
 				This is an internal error. Sorry!"
 		}
@@ -4935,7 +5079,7 @@ pack .sdc.ex -side left -expand 0 -fill none
 
 labelframe .sne -text "Snippets" -padx 4 -pady 4
 pack .sne -side right -expand 0 -fill none
-button .sne.ed -text "Editor" -command snip_window
+button .sne.ed -text "Editor" -command snp_window
 pack .sne.ed -side left -expand 0 -fill none
 
 bind .conn <Destroy> { exit }
