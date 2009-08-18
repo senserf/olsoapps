@@ -7,7 +7,9 @@
 #include <unistd.h>
 
 typedef __u16 word;
+typedef __s16 iword;
 typedef __u32 lword;
+typedef __s32 ilword;
 typedef	unsigned char byte;
 typedef	word nid_t;
 typedef	byte Boolean;
@@ -60,7 +62,7 @@ typedef struct aggEEDumpStruct {
 } aggEEDumpType;
 
 typedef union {
-	lword secs;
+	ilword secs;
 	struct {
 		word f  :1;
 		word yy :5;

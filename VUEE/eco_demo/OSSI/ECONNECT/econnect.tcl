@@ -15,7 +15,7 @@ package require Tk
 ### Parameters ################################################################
 
 # version number
-set PM(VER)	1.3
+set PM(VER)	1.3.4
 
 # maximum number of ports to try
 set PM(MPN)	20
@@ -262,7 +262,7 @@ proc ucs { cl } {
 			return ""
 		}
 
-		set a [vnum $a 100 65536]
+		set a [vnum $a 1 65536]
 		if { $a == "" } {
 			return ""
 		}
@@ -271,7 +271,7 @@ proc ucs { cl } {
 			# single value
 			lappend v $a
 		} else {
-			set b [vnum $b 100 65536]
+			set b [vnum $b 1 65536]
 			if { $b == "" || $b < $a } {
 				return ""
 			}
@@ -411,7 +411,7 @@ proc snip_set { nm scr asl } {
 		set cli [ucs [lindex $as 1]]
 		incr i
 		if { $cli == "" } {
-			return "collector set number $i is broken"
+			return "node set number $i is broken"
 		}
 		lappend ssl [list $asg $cli]
 	}
@@ -546,7 +546,7 @@ proc snip_parse { cf } {
 			set sv [ucs $ss]
 
 			if { $sv == "" } {
-				return "illegal collector range '$ss' in\
+				return "illegal node range '$ss' in\
 					 assignment $iy of snippet '$nm'"
 			}
 			if { $sv == "all" } {
@@ -923,7 +923,7 @@ proc u_rdline { prt } {
 	llog $prt "<- $line"
 }
 
-proc vnum { n min max } {
+proc vnum { n { min "" } { max "" } } {
 #
 # Verify integer number
 #
@@ -931,7 +931,7 @@ proc vnum { n min max } {
 		return ""
 	}
 
-	if { $n < $min || $n >= $max } {
+	if { ($min != "" && $n < $min) || ($max != "" && $n >= $max) } {
 		return ""
 	}
 
@@ -1079,11 +1079,17 @@ proc try_port { prt nt } {
 		set ver "unknown"
 	}
 
-	if { $ver != $PM(VER) } {
-		alert "Node ($nt) responding on port $prt runs software version\
-			$ver, which is incompatible with required $PM(VER). The\
-			node will be ignored!"
-		return 1
+	regsub "\[.\]\[^.\]*$" $PM(VER) "" vv
+
+	if { $ver != $vv } {
+		if ![confirm "The node ($tp) responding on port $prt runs\
+			software version $ver, which is incompatible with\
+			$vv required by this program. If you say YES,\
+			I will try to connect to that node at the risk of\
+			problems."] {
+
+			return 1
+		}
 	}
 
 	set WN(NT,$prt) $tp
@@ -1392,6 +1398,30 @@ proc dmw { prt } {
 	array unset MV
 }
 
+proc uptime { upt } {
+
+	set upt [vnum $upt 0]
+	if { $upt == "" } {
+		return "unknown"
+	}
+
+	set s "[expr $upt % 60]s"
+	set m [expr $upt / 60]
+	if $m {
+		set s "[expr $m % 60]m, $s"
+		set m [expr $m / 60]
+		if $m {
+			set s "[expr $m % 24]h, $s"
+			set m [expr $m / 24]
+			if $m {
+				set s "${m}d, $s"
+			}
+		}
+	}
+
+	return $s
+}
+
 proc agg_status_monitor { prt line } {
 
 	global WN PT
@@ -1416,7 +1446,7 @@ proc agg_status_monitor { prt line } {
 		set mas "this node"
 	}
 		
-	set WN(SV,$prt) [list "$upt s" $mas [fltos $fla] $sam "$fre s"]
+	set WN(SV,$prt) [list [uptime $upt] $mas [fltos $fla] $sam "$fre s"]
 	out_status $prt
 
 	set WN(SI,$prt) 60
@@ -1471,9 +1501,12 @@ proc cus_status_monitor { prt line } {
 				return
 			}
 			# check for battery status
-			if { [regexp " inp (\[0-9\]+)" $line j bs] &&
-			     ![catch { expr ($bs / 4095.0) * 16.5 } bs] } {
-				set bs [format %1.2f $bs]
+			if [regexp " inp (\[0-9\]+)" $line j bs] {
+				# this is sensor 0
+				set cs [snip_cnvrt $bs 0 $agg]
+				if { $cs != "" } {
+					set bs $cs
+				}
 			} else {
 				set bs "?"
 			} 
@@ -1486,8 +1519,8 @@ proc cus_status_monitor { prt line } {
 				set mas "this satnode"
 			}
 
-			set WN(SV,$prt) [lreplace $WN(SV,$prt) 0 4 "$upt s"\
-				$mas [fltos $fla] $sam $bs]
+			set WN(SV,$prt) [lreplace $WN(SV,$prt) 0 4\
+				[uptime $upt] $mas [fltos $fla] $sam $bs]
 			set upd 1
 		} else {
 			# custodian itself - just the node number
@@ -1525,7 +1558,7 @@ proc col_status_monitor { prt line } {
 
 	set WN(NI,$prt) $col
 
-	set WN(SV,$prt) [list "$upt s" [fltos $fla] $sam "$fre s"]
+	set WN(SV,$prt) [list [uptime $upt] [fltos $fla] $sam "$fre s"]
 	out_status $prt
 
 	set WN(SI,$prt) 60
@@ -3056,8 +3089,12 @@ proc show_startf { prt } {
 
 		set w $WN(w,$prt,H)
 
-		set fn [tk_getSaveFile -defaultextension ".csv" -initialfile \
-		    "values.csv" -parent $w -title "File to store the samples"]
+		set fn [tk_getSaveFile \
+			-defaultextension ".csv" \
+			-initialdir [defhome] \
+			-initialfile "values.csv" \
+			-parent $w \
+			-title "File to store the samples"]
 
 		if { $fn == "" } {
 			# cancelled
@@ -3124,10 +3161,7 @@ proc t_parse { ln } {
 
 	if [regexp "^\[ \t\]*(\[0-9\]+)-(\[0-9\]+)-(\[0-9\]+)" $line jk y u d] {
 		set line [string range $line [string length $jk] end]
-		if { $y < 2000 } {
-			set y 0
-		}
-		append res "[twod $y]-[twod $u]-[twod $d]"
+		append res "20[twod $y]-[twod $u]-[twod $d]"
 	}
 	if [regexp "^\[ \t\]*(\[0-9\]+):(\[0-9\]+):(\[0-9\]+)" $line jk y u d] {
 		set line [string range $line [string length $jk] end]
@@ -3426,8 +3460,8 @@ proc ewhdr { prt em { len 0 } } {
 		# this goes to the screen
 		if { $em > 2 } {
 			# events
-			set ln "      Slot Event     Date     Time  Par1  Par2"
-			append ln "  Par3"
+			set ln "      Slot Event       Date     Time  Par1"
+			append ln "  Par2  Par3"
 			if $len {
 				return [string length $ln]
 			}
@@ -3435,12 +3469,12 @@ proc ewhdr { prt em { len 0 } } {
 			# by collector
 			if $coll {
 				# collector
-				set ln "    Status       Slot     Date     Time"
-				append ln "   Raw Converted ..."
+				set ln "    Status       Slot       Date"
+				append ln "     Time   Raw Converted ..."
 			} else {
 				# aggregator
-				set ln " Coll  Coll Slot Agg Slot Col Date Col"
-				append ln " Time   Agg Date Agg Time   Raw "
+				set ln " Coll  Coll Slot   Agg Slot   Col Date"
+				append ln " Col Time   Agg Date Agg Time   Raw "
 				append ln "Converted ..."
 			}
 			if $len {
@@ -3580,8 +3614,7 @@ proc dump_values { mode prt col csl asl cts ats vls } {
 	set cts [t_parse cts]
 
 	if { $mode > 1 } {
-		# per sensor
-		set cts "20$cts"
+		# by sensor
 		set inx 0
 		if { $fd == "" } {
 			# writing to the screen
@@ -3669,7 +3702,7 @@ proc dump_values { mode prt col csl asl cts ats vls } {
 			# collector
 			set ln [trims $col 10]
 			append ln [trims $csl 11]
-			append ln " [t_parse cts]"
+			append ln " $cts"
 		} else {
 			# aggregator
 			set ln [trims $col 5]
@@ -3928,7 +3961,9 @@ proc extract_dialog { prt } {
 		if { $MV(FI) == "File" } {
 
 			while 1 {
-				set fn [tk_getSaveFile -defaultextension $defe \
+				set fn [tk_getSaveFile \
+					-defaultextension $defe \
+					-initialdir [defhome] \
 					-initialfile $deff -parent $w \
 					-title "File to store the data"]
 
@@ -4144,10 +4179,14 @@ proc extract_sd { } {
 
 	ewhdr "SD" $em
 
-	esd_note "Extracting data ..."
+	set scn 0
 
 	while { [gets $efd line] >= 0 } {
+		if { [expr $scn % 1000] == 0 } {
+			esd_note "Extracting data ... [expr $scn / 1000]K"
+		}
 		extract_aggregator_samples "SD" $em $line
+		incr scn
 	}
 
 	esd_clean
@@ -5036,6 +5075,35 @@ proc set_home_dir { ds } {
 	}
 }
 
+proc defhome { } {
+#
+# Return the default home directory, like the Desktop, for saving files
+#
+	global env
+
+	if ![info exists env(HOMEPATH)] {
+		return [pwd]
+	}
+
+	set dfn [file join $env(HOMEPATH) Desktop]
+
+	if [file isdirectory $dfn] {
+		return $dfn
+	}
+
+	set dfn [file join $env(HOMEPATH) Documents]
+
+	if [file isdirectory $dfn] {
+		return $dfn
+	}
+
+	if [file isdirectory $env(HOMEPATH)] {
+		return $env(HOMEPATH)
+	}
+
+	return [pwd]
+}
+
 #################
 
 if 1 {
@@ -5091,16 +5159,16 @@ bind . <Destroy> { exit }
 
 set_home_dir {
  
-{SHT_Temp {set value [expr -39.62 + 0.01 * $value]} {1 100-399} {4 400-499}} {SHT_Humid {set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
+{AggBatSen {set value [expr $value * (11.0 * 1.5 / 4095.0)]} {0 10-20}} {SHT_Temp {set value [expr -39.62 + 0.01 * $value]} {1 100-399} {4 400-499}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-499} {1 400-499} {2 400-499} {3 400-499}} {SHT_Humid {set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
 if { $value < 0.0 } {
 	set value 0.0
 } elseif { $value > 100.0 } {
 	set value 100.0
-}} {2 100-399} {5 400-499}} {PAR_QSO {set value [expr $value * 1.47]} {0 200-499} {1 400-499} {2 400-499} {3 400-499}} {ECHO_5 {set value [expr $value * 0.9246 - 40.1]
+}} {2 100-399} {5 400-499}} {PhotoDiode {set value [expr $value * 0.5]} {3 600-700}} {ECHO_5 {set value [expr $value * 0.09246 - 40.1]
 if { $value < 0.0 } {
 	set value 0.0
 } elseif { $value > 100.0 } {
 	set value 100.0
-}} {3 300-399}} {PhotoDiode {set value [expr $value * 0.5]} {3 600-700}}
+}} {3 300-399}}
 
 }

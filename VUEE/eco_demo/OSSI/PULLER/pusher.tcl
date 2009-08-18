@@ -89,12 +89,6 @@ proc read_xml_config { } {
 		abt "URL format error in configuration file"
 	}
 
-	set Params(INT) [sxml_attr $el "interval"]
-	if { $Params(INT) == "" } {
-		# one minute is the default
-		set Params(INT) 60
-	}
-
 	set Params(POR) [sxml_attr $el "port"]
 	if [catch { expr $Params(POR) } Params(POR)] {
 		set Params(POR) 80
@@ -103,12 +97,6 @@ proc read_xml_config { } {
 	set Params(UID) [sxml_attr $el "user"]
 	if { $Params(UID) == "" } {
 		abt "no user attribute in <repository>"
-	}
-
-	set el [sxml_child $xc "target"]
-	set Params(TAR) [sxml_txt $el]
-	if { $Params(TAR) == "" } {
-		set Params(TAR) "puller_data.txt"
 	}
 
 	set el [sxml_child $xc "log"]

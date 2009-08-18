@@ -9,7 +9,7 @@ exec tclsh "$0" "$@"
 ############################################################################
 
 set PM(HOM)	"econnect"
-set PM(VER)	1.3
+set PM(VER)	1.3.4
 
 proc verify_pnm { s } {
 #
@@ -30,13 +30,13 @@ proc verify_pnm { s } {
 	return $v
 }
 
-proc verify_idn { s } {
+proc verify_idn { s n } {
 #
 # A string of bytes represented as hex digits in little endian
 #
 	set ln [string length $s]
 
-	if { $ln != 8 } {
+	if { $ln != $n } {
 		return ""
 	}
 
@@ -416,8 +416,12 @@ proc setdefs { } {
 		set DEFS(TFN) "Image_nnnn.a43"
 	}
 
-	if { ![info exists DEFS(IDN)] || [verify_idn $DEFS(IDN)] == "" } {
+	if { ![info exists DEFS(IDN)] || [verify_idn $DEFS(IDN) 8] == "" } {
 		set DEFS(IDN) "BACADEAD"
+	}
+
+	if { ![info exists DEFS(PFX)] || [verify_idn $DEFS(PFX) 4] == "" } {
+		set DEFS(PFX) "BACA"
 	}
 
 	if { ![info exists DEFS(FRM)] || [verify_pnm $DEFS(FRM)] == "" } {
@@ -616,9 +620,15 @@ proc generate { } {
 		return
 	}
 
-	set idn [verify_idn $DEFS(IDN)]
+	set idn [verify_idn $DEFS(IDN) 8]
 	if { $idn == "" } {
 		alert "The cookie is illegal, must be an 8-digit hex number!"
+		return
+	}
+
+	set pfx [verify_idn $DEFS(PFX) 4]
+	if { $pfx == "" } {
+		alert "The prefix is illegal, must be a 4-digit hex number!"
 		return
 	}
 
@@ -628,7 +638,7 @@ proc generate { } {
 	}
 
 	# transform str into hex string
-	set frm [verify_idn "[string range $DEFS(IDN) 0 3][format %04X $str]"]
+	set frm [verify_idn "$DEFS(PFX)[format %04X $str]" 8]
 	if { $frm == "" } {
 		# impossible
 		alert "Internal error converting node number!"
@@ -768,6 +778,18 @@ set w ".sel.co"
 
 entry $w.co -width 10 -textvariable DEFS(IDN)
 pack $w.co -side top -padx 4
+
+##
+
+labelframe .sel.pr -text "Prefix" -padx 4 -pady 4
+pack .sel.pr -side left -expand 0 -fill x -fill y
+
+##
+
+set w ".sel.pr"
+
+entry $w.pr -width 5 -textvariable DEFS(PFX)
+pack $w.pr -side top -padx 4
 
 ##
 
