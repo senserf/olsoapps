@@ -1116,6 +1116,7 @@ plus we dont want to flood the sat link
 
 			if (if_read (IFLASH_SIZE -1) == ERR_EER) {
 				if_erase (IFLASH_SIZE -1);
+				mdelay (500);
 				break_flash;
 				diag (OPRE_APP_ACK "p1 erased");
 				reset();
@@ -1373,7 +1374,7 @@ plus we dont want to flood the sat link
 		case 'F':
 			if_erase (IFLASH_SIZE -1);
 			break_flash;
-			diag (OPRE_APP_ACK "p1 erased");
+			diag (OPRE_APP_ACK "p2 erased");
 			reset();
 
 		case 'Q':

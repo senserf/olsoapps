@@ -579,7 +579,8 @@ __PUBLF (NodePeg, void, fatal_err) (word err, word w1, word w2, word w3) {
 	if_write (IFLASH_SIZE -2, w1);
 	if_write (IFLASH_SIZE -3, w2);
 	if_write (IFLASH_SIZE -4, w3);
-	if (err != ERR_MAINT && err != ERR_EER) {
+	if (err != ERR_MAINT) {
+		leds (LED_R, LED_ON);
 		app_diag (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
 		halt();
 	}

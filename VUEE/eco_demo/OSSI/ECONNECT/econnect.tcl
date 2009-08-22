@@ -15,7 +15,7 @@ package require Tk
 ### Parameters ################################################################
 
 # version number
-set PM(VER)	1.3.4
+set PM(VER)	1.3.5
 
 # maximum number of ports to try
 set PM(MPN)	20
@@ -2303,7 +2303,8 @@ proc start_aggregator { prt msgw intv plid erase } {
 		return 1
 	}
 
-	if { [string first "1005" $WN(LI,$prt)] >= 0 } {
+	if { [string first "1005" $WN(LI,$prt)] >= 0 ||
+	     [string first "Maint" $WN(LI,$prt)] >= 0 } {
 
 		if [coutm $prt $msgw "Clearing maintenance mode ..."] {
 			return 1

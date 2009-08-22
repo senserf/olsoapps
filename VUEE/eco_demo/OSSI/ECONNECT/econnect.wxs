@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='windows-1252'?>
 <Wix xmlns='http://schemas.microsoft.com/wix/2006/wi'>
 
-  <Product Name='EConnect 1.3.4' Id='87CB6658-125B-4B2C-AEBD-0594C06F3B79' UpgradeCode='C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35'
-    Language='1033' Codepage='1252' Version='1.3.4' Manufacturer='Olsonet Communications, Inc.'>
+  <Product Name='EConnect 1.3.5' Id='03363B48-4541-4BD4-95C6-02824F1220A3' UpgradeCode='C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35'
+    Language='1033' Codepage='1252' Version='1.3.5' Manufacturer='Olsonet Communications, Inc.'>
 
     <Package Id='*' Keywords='Installer' Description="Olsonet's EConnect Installer"
       Comments='Olsonet software for extracting data from collectors/aggregators' Manufacturer='Olsonet Communications, Inc.'
@@ -18,7 +18,7 @@
 	<Upgrade Id="C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35">
 	    <UpgradeVersion Minimum="1.3.1"
                     IncludeMinimum="yes"
-                    Maximum="1.3.3"
+                    Maximum="1.3.4"
                     IncludeMaximum="yes"
                     Property="OLDERVERSIONBEINGUPGRADED" />
 	</Upgrade>
@@ -28,7 +28,7 @@
 	</InstallExecuteSequence>
 
 	<Upgrade Id="C2CBE5A5-E9D0-4EAA-B0B8-AB9A32CB7C35">
-	    <UpgradeVersion Minimum="1.3.4"
+	    <UpgradeVersion Minimum="1.3.5"
                     OnlyDetect="yes"
                     Property="NEWERVERSIONDETECTED" />
 	</Upgrade>
@@ -38,7 +38,7 @@
 	</Condition>
 
 	<Media Id='1' Cabinet='Sample.cab' EmbedCab='yes' DiskPrompt="CD-ROM #1" />
-	<Property Id='DiskPrompt' Value="Olsonet's EConnect 1.3.4 Installation [1]" />
+	<Property Id='DiskPrompt' Value="Olsonet's EConnect 1.3.5 Installation [1]" />
 
 	<Directory Id='TARGETDIR' Name='SourceDir'>
 
@@ -47,7 +47,7 @@
 		<Directory Id='ProgramFilesFolder' Name='PFiles'>
         		<Directory Id='Olsonet' Name='Olsonet'>
           			<Directory Id='INSTALLDIR' Name='EConnect'>
-					<Component Id='OSSI' Guid='8C418092-0BFE-4C41-82EB-B2218AF8BF0A'>
+					<Component Id='OSSI' Guid='A65722BB-E2E9-471C-978D-93B3FFFA8C1A'>
 						<File Id='econnect' Name='econnect.exe' DiskId='1' Source='econnect.exe'>
 							<Shortcut Id="desktopeconnect" Directory="DesktopFolder" Name="econnect" WorkingDirectory='INSTALLDIR' Advertise='yes' Icon="econnect.exe" IconIndex="0" />
 						</File>
@@ -56,7 +56,7 @@
 						<File Id='dll' Name='cygwin1.dll' DiskId='1' Source='cygwin1.dll'>
 						</File>
 					</Component>
-					<Component Id='Flasher' Guid='54ECB341-232B-4010-9E44-02526FDCBEAC'>
+					<Component Id='Flasher' Guid='CC13165F-3359-459E-910F-CB04E0EECA28'>
 						<File Id='genimage' Name='genimage.exe' DiskId='1' Source='genimage.exe'>
 							<Shortcut Id="desktopgenimage" Directory="DesktopFolder" Name="genimage" WorkingDirectory='INSTALLDIR' Advertise='yes' Icon="genimage.exe" IconIndex="0" />
 						</File>
