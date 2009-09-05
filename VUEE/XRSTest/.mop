@@ -1,0 +1,3 @@
+#!/bin/sh
+cleanapp
+rm -f eeprom.img
