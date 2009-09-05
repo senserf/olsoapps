@@ -14,37 +14,9 @@
 
 #define	MAX_PACKET_LENGTH	60
 
-#ifdef	__SMURPH__
-
-threadhdr (receiver, NodeRcv) {
-
-	states { RC_TRY, RC_SHOW };
-
-	perform;
-
-};
-
-threadhdr (root, NodeRcv) {
-
-	states { RS_INIT };
-
-	perform;
-};
-
-#define	sfd	_daprx (sfd)
-#define	Count	_daprx (Count)
-#define	rpkt	_daprx (rpkt)
-
-#else	/* PICOS */
-
+#define	__dcx_def__
 #include "app_rcv_data.h"
-
-#define	RC_TRY		0
-#define	RC_SHOW		1
-
-#define	RS_INIT		0
-
-#endif	/* VUEE or PICOS */
+#undef	__dcx_def__
 
 // ============================================================================
 

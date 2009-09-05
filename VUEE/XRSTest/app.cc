@@ -3,10 +3,93 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-// We shall use this one to test XRS, OEP, and the new forthcoming stuff
+// Test EEPROM, but also XRS (which includes non-persisitent UART over TCV),
+// as well as line UART over TCV
 
 #include "globals.h"
 #include "threadhdrs.h"
+
+#if UART_TCV_MODE == UART_TCV_MODE_L
+//
+// Note: this is how you could handle the UART option in a PicOS praxis. VUEE
+// is more flexible, as different nodes (even of the same praxis) can in
+// principle use different modes of UART over TCV (which option is selected in
+// the data file).
+//
+// Note that for VUEE, selecting UART_TCV_MODE in options.sys, does not select
+// the actual UART mode, which must be indicated in the input file (on the
+// per-node basis). 
+//
+
+#define	UART_LINE_LENGTH	81
+#define	uart_extra_init()	CNOP
+#define	uart_free_ibuf()	do { \
+					if (ibuf) tcv_endp ((address) ibuf); \
+					ibuf = NULL; \
+				} while (0)
+#define	uart_in(stt)		((char*) tcv_rnp (stt, SFD))
+
+void uart_out (word stt, char *ostr) {
+
+	address p;
+	int n;
+
+	p = tcv_wnp (stt, SFD, n = strlen (ostr));
+	strncpy ((char*)p, ostr, n);
+	ufree (ostr);
+	tcv_endp (p);
+}
+
+void uart_outf (word stt, const char *fm, ...) {
+
+	va_list ap;
+	address p;
+	int n;
+
+	va_start (ap, fm);
+
+	p = tcv_wnp (stt, SFD, n = vfsize (fm, ap));
+	vform ((char*)p, fm, ap);
+
+	tcv_endp (p);
+}
+
+// ============================================================================
+
+#else
+
+#define	UART_LINE_LENGTH	84
+#define	uart_extra_init()	do { \
+					w = 0xffff; \
+					tcv_control (SFD, PHYSOPT_SETSID, &w); \
+					ab_init (SFD); \
+				} while (0)
+#define	uart_free_ibuf()	do { \
+					if (ibuf) ufree (ibuf); \
+					ibuf = NULL; \
+				} while (0)
+
+#define	uart_in(stt)			ab_in (stt)
+#define	uart_out(stt,ostr)		ab_out (stt, ostr)
+#define	uart_outf(stt,ostr, ...)	ab_outf (stt, ostr, ## __VA_ARGS__)
+
+#endif
+
+void uart_init () {
+
+	phys_uart (0, UART_LINE_LENGTH, 0);
+
+	tcv_plug (0, &plug_null);
+	if ((SFD = tcv_open (WNONE, 0, 0)) < 0)
+		syserror (ENODEVICE, "uart");
+
+	tcv_control (SFD, PHYSOPT_TXON, NULL);
+	tcv_control (SFD, PHYSOPT_RXON, NULL);
+
+	uart_extra_init ();
+
+	ibuf = NULL;
+}
 
 // ============================================================================
 
@@ -31,7 +114,7 @@ strand (outlines, const char)
 
   entry (OL_NEXT)
 
-	ab_out (OL_NEXT, obuf);
+	uart_out (OL_NEXT, obuf);
 	proceed (OL_INIT);
 
 endstrand
@@ -69,12 +152,9 @@ thread (eetest)
 
 	err = 0;
 
-	if (ibuf) {
-		ufree (ibuf);
-		ibuf = NULL;
-	}
+	uart_free_ibuf ();
 
-	ibuf = ab_in (EP_RCMD);
+	ibuf = uart_in (EP_RCMD);
 	diag ("EETEST GOT CMD");
 
 	switch (ibuf [0]) {
@@ -99,7 +179,7 @@ thread (eetest)
 	
   entry (EP_RCMD1)
 
-	ab_outf (EP_RCMD1, "Illegal command or parameter");
+	uart_outf (EP_RCMD1, "Illegal command or parameter");
 	proceed (EP_INIT);
 
   entry (EP_SWO)
@@ -109,7 +189,7 @@ thread (eetest)
 
   entry (EP_SWO1)
 
-	ab_outf (EP_SWO1, "[%d] Stored %u at %lu", err, w, adr);
+	uart_outf (EP_SWO1, "[%d] Stored %u at %lu", err, w, adr);
 	proceed (EP_RCMD);
 
   entry (EP_SLW)
@@ -119,7 +199,7 @@ thread (eetest)
 
   entry (EP_SLW1)
 
-	ab_outf (EP_SLW1, "[%d] Stored %lu at %lu", err, val, adr);
+	uart_outf (EP_SLW1, "[%d] Stored %lu at %lu", err, val, adr);
 	proceed (EP_RCMD);
 
   entry (EP_SST)
@@ -133,7 +213,7 @@ thread (eetest)
 
   entry (EP_SST1)
 
-	ab_outf (EP_SST1, "[%d] Stored %s (%u) at %lu", err, str, len,
+	uart_outf (EP_SST1, "[%d] Stored %s (%u) at %lu", err, str, len,
 		adr);
 	proceed (EP_RCMD);
 
@@ -144,7 +224,7 @@ thread (eetest)
 
   entry (EP_RWO1)
 
-	ab_outf (EP_RWO1, "[%d] Read %u (%x) from %lu", err, w, w, adr);
+	uart_outf (EP_RWO1, "[%d] Read %u (%x) from %lu", err, w, w, adr);
 	proceed (EP_RCMD);
 
   entry (EP_RLW)
@@ -154,7 +234,7 @@ thread (eetest)
 
   entry (EP_RLW1)
 
-	ab_outf (EP_RLW1, "[%d] Read %lu (%lx) from %lu",
+	uart_outf (EP_RLW1, "[%d] Read %lu (%lx) from %lu",
 		err, val, val, adr);
 	proceed (EP_RCMD);
 
@@ -170,7 +250,7 @@ thread (eetest)
 
   entry (EP_RST1)
 
-	ab_outf (EP_RST+1, "[%d] Read %s (%u) from %lu",
+	uart_outf (EP_RST+1, "[%d] Read %s (%u) from %lu",
 		err, str, len, adr);
 	proceed (EP_RCMD);
 
@@ -188,7 +268,7 @@ thread (eetest)
   entry (EP_WRI1)
 
 Done:
-	ab_outf (EP_WRI+1, "Done %d", err);
+	uart_outf (EP_WRI+1, "Done %d", err);
 	proceed (EP_RCMD);
 
   entry (EP_REA)
@@ -288,9 +368,9 @@ Done:
   entry (EP_ETS_O)
 
 	if (u == 0) {
-		ab_outf (EP_ETS_O, "ERASING ALL FLASH");
+		uart_outf (EP_ETS_O, "ERASING ALL FLASH");
 	} else {
-		ab_outf (EP_ETS_O, "ERASING from %lu (%lx) to %lu (%lx)",
+		uart_outf (EP_ETS_O, "ERASING from %lu (%lx) to %lu (%lx)",
 			s, s, u - 4, u - 4);
 	}
 
@@ -301,7 +381,7 @@ Done:
 
   entry (EP_ETS_F)
 
-	ab_outf (EP_ETS_F, "ERASE COMPLETE, %u ERRORS", w);
+	uart_outf (EP_ETS_F, "ERASE COMPLETE, %u ERRORS", w);
 
 	adr = s;
 	w = 0;
@@ -329,7 +409,7 @@ Done:
 
 	//w += ee_sync (WNONE);
 	w += ee_sync (EP_ETS_H);
-	ab_outf (EP_ETS_H, "WRITE COMPLETE, %u ERRORS", w);
+	uart_outf (EP_ETS_H, "WRITE COMPLETE, %u ERRORS", w);
 
 	// Start reading
 	adr = s;
@@ -366,19 +446,19 @@ Done:
 
   entry (EP_ETS_J)
 
-	ab_outf (EP_ETS_J, "READ COMPLETE, %u ERRORS, %u MISREADS",
+	uart_outf (EP_ETS_J, "READ COMPLETE, %u ERRORS, %u MISREADS",
 		w, err);
 
 	proceed (EP_RCMD);
 
   entry (EP_ETS_K)
 
-	ab_outf (EP_ETS_K, "WRITTEN %lu (%lx)", adr, adr);
+	uart_outf (EP_ETS_K, "WRITTEN %lu (%lx)", adr, adr);
 	proceed (EP_ETS_M);
 
   entry (EP_ETS_L)
 
-	ab_outf (EP_ETS_L, "READ %lu (%lx)", adr, adr);
+	uart_outf (EP_ETS_L, "READ %lu (%lx)", adr, adr);
 	proceed (EP_ETS_N);
 
 endthread
@@ -395,19 +475,9 @@ thread (root)
 
   entry (RS_INIT)
 
-	phys_uart (0, 84, 0);
-	tcv_plug (0, &plug_null);
-	if ((SFD = tcv_open (WNONE, 0, 0)) < 0)
-		syserror (ENODEVICE, "uart");
-	w = 0xffff;
-	tcv_control (SFD, PHYSOPT_SETSID, &w);
-	tcv_control (SFD, PHYSOPT_TXON, NULL);
-	tcv_control (SFD, PHYSOPT_RXON, NULL);
-	ab_init (SFD);
-	// ab_mode (AB_MODE_ACTIVE);
-	ee_open ();
+	uart_init ();
 
-	ibuf = NULL;
+	ee_open ();
 
   entry (RS_RESTART)
 
@@ -416,12 +486,9 @@ thread (root)
 
   entry (RS_RCMD)
 
-	if (ibuf) {
-		ufree (ibuf);
-		ibuf = NULL;
-	}
+	uart_free_ibuf ();
 
-	ibuf = ab_in (RS_RCMD);
+	ibuf = uart_in (RS_RCMD);
 	diag ("ROOT GOT CMD");
 
 	switch (ibuf [0]) {
@@ -439,7 +506,7 @@ thread (root)
 	
   entry (RS_RCMD1)
 
-	ab_outf (RS_RCMD1, "Illegal command or parameter");
+	uart_outf (RS_RCMD1, "Illegal command or parameter");
 	proceed (RS_RESTART);
 
 endthread

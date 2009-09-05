@@ -25,6 +25,10 @@ heapmem {10, 90};
 
 #endif	/* SMURPH or PICOS */
 
+#if UART_TCV_MODE == UART_TCV_MODE_N
 #include "ab.h"
+#else
+#include "form.h"
+#endif
 
 #endif

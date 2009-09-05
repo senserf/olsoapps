@@ -14,43 +14,9 @@
 #define	MAX_PACKET_LENGTH	60
 #define	IBUF_LENGTH		82
 
-#ifdef	__SMURPH__
-
-strandhdr (sender, NodeSnd) {
-
-	char *data;
-
-	states { SN_SEND };
-
-	perform;
-
-	void setup (char *bf) { data = bf; };
-};
-
-threadhdr (root, NodeSnd) {
-
-	states { RS_INIT, RS_RCMD_M, RS_RCMD, RS_RCMD_E, RS_XMIT };
-
-	perform;
-};
-
-#define	sfd	_daprx (sfd)
-#define	spkt	_daprx (spkt)
-#define	ibuf	_daprx (ibuf)
-
-#else	/* PICOS */
-
+#define	__dcx_def__
 #include "app_snd_data.h"
-
-#define	SN_SEND		0
-
-#define	RS_INIT		0
-#define	RS_RCMD_M	1
-#define	RS_RCMD		2
-#define	RS_RCMD_E	3
-#define	RS_XMIT		4
-
-#endif	/* VUEE or PICOS */
+#undef	__dcx_def__
 
 // ============================================================================
 
