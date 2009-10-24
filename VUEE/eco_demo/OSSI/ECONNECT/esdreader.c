@@ -14,9 +14,6 @@ typedef	unsigned char byte;
 typedef	word nid_t;
 typedef	byte Boolean;
 
-// These are the same as in ..
-// Should be encapsulated into a single file and stored in one place
-
 #define	NUM_SENS	6
 
 typedef union {
@@ -112,7 +109,6 @@ lword	slot_from = 0xffffffff,
 int	sd_desc;
 off_t	sd_size;
 
-aggDataType agg_data;
 aggEEDumpType agg_dump_s;
 aggEEDumpType *agg_dump = &agg_dump_s;
 
@@ -149,10 +145,11 @@ void esd_open () {
 		}
 		fnd = 0;
 	} else {
-		for (i = 0; i < 32; i++) {
+		for (i = 0; i < 18; i++) {
 			j = i >> 1;
 			sprintf (vname, "/dev/sd%c%s",
-				'b' + j, (i & 1) ? "1" : "");
+				'a' + j, (i & 1) ? "1" : "");
+
 			if ((sd_desc = open (vname, O_RDONLY)) < 0)
 				continue;
 			// Read the signature
@@ -169,7 +166,6 @@ void esd_open () {
 				printf ("card found as %s\n", vname);
 				goto Found;
 			}
-// printf ("MAGIC: %02x %02x %04x\n", buf [0], buf [1], m);
 		}
 
 		fprintf (stderr, "couldn't find a valid card\n");
@@ -220,7 +216,7 @@ Err:
 	}
 
 	sd_size = be * 512;
-	printf ("card size = %lld bytes\n", sd_size);
+	printf ("card size = %lld bytes, %u slots\n", sd_size, EE_AGG_MAX + 1);
 }
 
 word ee_read (lword addr, byte *buf, word len) {
@@ -245,60 +241,6 @@ word ee_read (lword addr, byte *buf, word len) {
 	return 0;
 }
 		
-void esd_prescan () {
-//
-// Locate the boundaries of data
-//
-	lword l, u, m;
-	byte b;
-
-	ee_read ((lword)EE_AGG_MIN * EE_AGG_SIZE, &b, 1);
-
-	memset (&agg_data, 0, sizeof (aggDataType));
-
-	if (IS_BYTE_EMPTY (b)) { // normal operations
-		agg_data.eslot = EE_AGG_MIN;
-		agg_data.ee.s.f.mark = MARK_EMPTY;
-		agg_data.ee.s.f.status = AGG_EMPTY;
-		printf ("the card is empty\n");
-		exit (0);
-	}
-
-	l = EE_AGG_MIN; u = EE_AGG_MAX;
-
-	while ((u - l) > 1) {
-
-		m = l + ((u -l) >> 1);
-
-		ee_read (m * EE_AGG_SIZE, &b, 1);
-
-		if (IS_BYTE_EMPTY (b))
-			u = m;
-		else
-			l = m;
-	}
-
-	ee_read (u * EE_AGG_SIZE, &b, 1);
-
-	if (IS_BYTE_EMPTY (b)) {
-		if (l < u) {
-			ee_read (l * EE_AGG_SIZE, &b, 1);
-
-			if (IS_BYTE_EMPTY (b)) {
-				fprintf (stderr, "illegal card contents\n");
-				exit (1);
-			}
-
-			agg_data.eslot = l;
-		}
-	} else
-		agg_data.eslot = u;
-
-	ee_read (agg_data.eslot * EE_AGG_SIZE, (byte *)&agg_data.ee,
-				EE_AGG_SIZE);
-	printf ("last slot = %1u\n", agg_data.eslot);
-}
-
 void s2d (mdate_t * in) {
 
 	long l1;
@@ -448,6 +390,7 @@ int esd_dump () {
 	char * lbuf = NULL;
 	mdate_t md, md2;
 	FILE *df;
+	lword ecount;
 
 	// Open the dump file
 	if ((df = fopen (dmpname, "w")) == NULL) {
@@ -463,19 +406,21 @@ int esd_dump () {
 	agg_dump->fr = slot_from;
 	agg_dump->to = slot_to;
 
-	if (agg_dump->fr > agg_data.eslot)
-		agg_dump->fr = agg_data.eslot;
+	if (agg_dump->fr > EE_AGG_MAX)
+		agg_dump->fr = EE_AGG_MAX;
 
 	if (agg_dump->fr < EE_AGG_MIN)
 		agg_dump->fr = EE_AGG_MIN;
 
-	if (agg_dump->to > agg_data.eslot)
-		agg_dump->to = agg_data.eslot; //EE_AGG_MAX;
+	if (agg_dump->to > EE_AGG_MAX)
+		agg_dump->to = EE_AGG_MAX;
 
 	if (agg_dump->to < EE_AGG_MIN)
 		agg_dump->to = EE_AGG_MIN;
 
 	agg_dump->ind = agg_dump->fr;
+
+	ecount = 0;
 
 	while (1) {
 	
@@ -484,10 +429,14 @@ int esd_dump () {
 
 		if (IS_AGG_EMPTY (agg_dump->ee.s.f.status)) {
 			if (agg_dump->fr <= agg_dump->to) {
-				goto Done;
+				ecount++;
+				if (ecount >= 512)
+					goto Done;
 			}
 			goto Continue;
 		}
+
+		ecount = 0;
 
 		if (agg_dump->tag == 0 || agg_dump->ee.tag == agg_dump->tag ||
 			agg_dump->ee.s.f.status == AGG_ALL) {
@@ -645,7 +594,6 @@ int main (int argc, const char *argv []) {
 
 	do_args (argc, argv);
 	esd_open ();
-	esd_prescan ();
 	esd_dump ();
 	exit (0);
 }

@@ -15,7 +15,7 @@ package require Tk
 ### Parameters ################################################################
 
 # version number
-set PM(VER)	1.3.5
+set PM(VER)	1.3.6
 
 # maximum number of ports to try
 set PM(MPN)	20
