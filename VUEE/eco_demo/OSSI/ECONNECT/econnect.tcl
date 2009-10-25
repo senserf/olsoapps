@@ -4,7 +4,7 @@ exec wish "$0" "$@"
 
 ##########################################################
 #                                                        #
-# ECONNECT version 0.8                                   #
+# ECONNECT version 1.3.7                                 #
 #                                                        #
 # Copyright (C) Olsonet Communications Corporation, 2009 #
 #                                                        #
@@ -15,7 +15,7 @@ package require Tk
 ### Parameters ################################################################
 
 # version number
-set PM(VER)	1.3.6
+set PM(VER)	1.3.7
 
 # maximum number of ports to try
 set PM(MPN)	20
@@ -3823,45 +3823,68 @@ proc extract_dialog { prt } {
 	frame $w.o -pady 2 -padx 2
 	pack $w.o -side top -fill x
 
+	set rwn 0
+
+	if { $prt == "SD" } {
+		# Include device selector
+		label $w.o.dsl -text "Device number:" -anchor w
+		grid $w.o.dsl -column 0 -row $rwn -sticky w -padx 4
+		tk_optionMenu $w.o.dse MV(DS) "Scan" "Auto" "NoLbl" \
+			 "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "10"
+		grid $w.o.dse -column 1 -row $rwn -sticky w -padx 4
+		# the default
+		set MV(DS) "Auto"
+		incr rwn
+	}
+
 	label $w.o.sbl -text "Starting slot number:" -anchor w
-	grid $w.o.sbl -column 0 -row 0 -sticky w -padx 4
+	grid $w.o.sbl -column 0 -row $rwn -sticky w -padx 4
 
 	entry $w.o.sbe -width 9 -textvariable MV(FR)
-	grid $w.o.sbe -column 1 -row 0 -sticky w -padx 4
+	grid $w.o.sbe -column 1 -row $rwn -sticky w -padx 4
 	# the default
 	set MV(FR) 0
 
+	incr rwn
+
 	label $w.o.sel -text "Ending slot number:" -anchor w
-	grid $w.o.sel -column 0 -row 1 -sticky w -padx 4
+	grid $w.o.sel -column 0 -row $rwn -sticky w -padx 4
 
 	entry $w.o.see -width 9 -textvariable MV(UP)
-	grid $w.o.see -column 1 -row 1 -sticky w -padx 4
+	grid $w.o.see -column 1 -row $rwn -sticky w -padx 4
 	# the default
 	set MV(UP) 999999999
 
+	incr rwn
+
 	label $w.o.tpl -text "Extract what:" -anchor w
-	grid $w.o.tpl -column 0 -row 2 -sticky w -padx 4
+	grid $w.o.tpl -column 0 -row $rwn -sticky w -padx 4
 
 	tk_optionMenu $w.o.tpe MV(EV) "Data-c" "Data-s" "Events"
-	grid $w.o.tpe -column 1 -row 2 -sticky w -padx 4
+	grid $w.o.tpe -column 1 -row $rwn -sticky w -padx 4
 	# the default
 	set MV(EV) "Data-c"
 
+	incr rwn
+
 	label $w.o.twl -text "To where:" -anchor w
-	grid $w.o.twl -column 0 -row 3 -sticky w -padx 4
+	grid $w.o.twl -column 0 -row $rwn -sticky w -padx 4
 
 	tk_optionMenu $w.o.twe MV(FI) "Screen" "File"
-	grid $w.o.twe -column 1 -row 3 -sticky w -padx 4
+	grid $w.o.twe -column 1 -row $rwn -sticky w -padx 4
 	# the default
 	set MV(FI) "Screen"
+
+	incr rwn
 
 	if { $prt == "SD" || $WN(NT,$prt) != "collector" } {
 		# collector number
 		label $w.o.cnl -text "Collector number:" -anchor w
-		grid $w.o.cnl -column 0 -row 4 -sticky w -padx 4
+		grid $w.o.cnl -column 0 -row $rwn -sticky w -padx 4
 		entry $w.o.cne -width 5 -textvariable MV(CN)
-		grid $w.o.cne -column 1 -row 4 -sticky w -padx 4
+		grid $w.o.cne -column 1 -row $rwn -sticky w -padx 4
 		set MV(CN) "all"
+		incr rwn
 	}
 
 	frame $w.b
@@ -3892,71 +3915,98 @@ proc extract_dialog { prt } {
 			return ""
 		}
 
-		# verify the arguments
-		set fr [string trim $MV(FR)]
-		if { $fr == "" } {
+		# flag == scan for a card device
+		set scn 0
+
+		if { $prt == "SD" } {
+			# device selector
+			set ds $MV(DS)
+			if { $ds == "Scan" } {
+				# scan for a card
+				set scn 1
+			}
+		}
+
+		if $scn {
+
+			# scan for a card device
+
 			set fr 0
+			set up 0
+			set em -1
+			set deff "scan.txt"
+			set defe ".txt"
+
 		} else {
-			set fr [vnum $fr 0 1000000000]
+
+			# verify the arguments
+			set fr [string trim $MV(FR)]
 			if { $fr == "" } {
-				alert "Illegal starting slot number, must be\
-					between 0 and 999999999!"
-				continue
-			}
-		}
-
-		set up [string trim $MV(UP)]
-		if { $up == "" } {
-			set up 999999999
-		} else {
-			set up [vnum $up 0 1000000000]
-			if { $up == "" } {
-				alert "Illegal ending slot number, must be\
-					between 0 and 999999999!"
-				continue
-			}
-		}
-
-		if { $up < $fr } {
-			alert "Ending slot number is less than starting slot\
-				number!"
-			continue
-		}
-
-		# decide on the mode
-		if { $MV(EV) == "Data-c" } {
-			# data by collector
-			set em 1
-		} elseif { $MV(EV) == "Data-s" } {
-			# data by sensor
-			set em 2
-		} else {
-			# events
-			set em 3
-		}
-
-		if { $prt == "SD" || $WN(NT,$prt) != "collector" } {
-			set cn [string tolower [string trim $MV(CN)]]
-			if { $cn == "" || $cn == "all" || $cn == "any" } {
-				set cn ""
+				set fr 0
 			} else {
-				set cn [vnum $cn 100 65536]
-				if { $cn == "" } {
-					alert "Illegal collector number, must\
-						be between 100 and 65535!"
+				set fr [vnum $fr 0 1000000000]
+				if { $fr == "" } {
+					alert "Illegal starting slot number,\
+					    must be between 0 and 999999999!"
 					continue
 				}
 			}
-		}
 
-		if { $em > 2 } {
-			# events
-			set deff "events.csv"
-		} else {
-			set deff "values.csv"
-		}
+			set up [string trim $MV(UP)]
+			if { $up == "" } {
+				set up 999999999
+			} else {
+				set up [vnum $up 0 1000000000]
+				if { $up == "" } {
+					alert "Illegal ending slot number, must\
+						be between 0 and 999999999!"
+					continue
+				}
+			}
 
-		set defe ".csv"
+			if { $up < $fr } {
+				alert "Ending slot number is less than starting\
+					slot number!"
+				continue
+			}
+
+			# decide on the mode
+			if { $MV(EV) == "Data-c" } {
+				# data by collector
+				set em 1
+			} elseif { $MV(EV) == "Data-s" } {
+				# data by sensor
+				set em 2
+			} else {
+				# events
+				set em 3
+			}
+
+			if { $prt == "SD" || $WN(NT,$prt) != "collector" } {
+				set cn [string tolower [string trim $MV(CN)]]
+				if { $cn == "" || $cn == "all" || 
+				    $cn == "any" } {
+					set cn ""
+				} else {
+					set cn [vnum $cn 100 65536]
+					if { $cn == "" } {
+						alert "Illegal collector\
+						    number, must be between 100\
+							and 65535!"
+						continue
+					}
+				}
+			}
+
+			if { $em > 2 } {
+				# events
+				set deff "events.csv"
+			} else {
+				set deff "values.csv"
+			}
+	
+			set defe ".csv"
+		}
 
 		# time to handle the file
 		if { $MV(FI) == "File" } {
@@ -3995,6 +4045,10 @@ proc extract_dialog { prt } {
 
 	# delete the modal window
 	dmw $prt
+
+	if { $prt == "SD" } {
+		return [list $ds $em $fr $up]
+	}
 	return [list $em $fr $up]
 }
 
@@ -4018,7 +4072,11 @@ proc extract_tty { prt em } {
 	text $w.t
 
 	# header length
-	set wi [ewhdr $prt $em 1]
+	if { $em < 0 } {
+		set wi [expr -$em]
+	} else {
+		set wi [ewhdr $prt $em 1]
+	}
 
 	$w.t configure  -yscrollcommand "$w.scroly set" \
 			-xscrollcommand "$w.scrolx set" \
@@ -4144,7 +4202,7 @@ proc extract_sd { } {
 		return
 	}
 
-	foreach { em fr up } $em { }
+	foreach { ds em fr up } $em { }
 
 	if { $WN(EF,SD) != "" } {
 		set ESD(SF) $WN(EF,SD)
@@ -4155,7 +4213,72 @@ proc extract_sd { } {
 
 	set esd [file join $PM(PGM) "esdreader.exe"]
 
-	if [catch { exec $esd -f $fr -t $up zzxtr.txt } err] {
+	if { $ds == "Scan" } {
+		# scan for cards
+		if [catch { exec $esd -s -n } out] {
+			alert "esdreader failed: $out"
+			esd_clean
+			return
+		}
+		# out contains the result of scan, write it wherever it should
+		# go
+		if { $WN(EF,SD) != "" } {
+			# write to file
+			if [catch { puts -nonewline $WN(EF,SD) $out } err] {
+				alert "cannot write to $WN(EN,SD): $err"
+				esd_clean
+				return
+			}
+			esd_clean
+			alert "Scan complete!"
+			return
+		}
+		# write to screen
+		if { [extract_tty "SD" -74] == "" } {
+			# failed
+			esd_clean
+			return
+		}
+		set w $WN(w,SD,E)
+		while 1 {
+			set nl [string first "\n" $out]
+			if { $nl < 0 } {
+				break
+			}
+			set ln [string trim [string range $out 0 $nl] "\r\n"]
+			incr nl
+			set out [string range $out $nl end]
+			add_text $w.t $ln
+			end_line $w.t
+		}
+		esd_clean
+		$w.stat.st configure -text "Done      "
+		alert "Scan complete!"
+		return
+	}
+
+	switch $ds {
+
+	    "Auto" {
+		set ln [catch { exec $esd -f $fr -t $up zzxtr.txt } err]
+	    }
+
+	    "NoLbl" {
+		set ln [catch { exec $esd -n -f $fr -t $up zzxtr.txt } err]
+	    }
+
+	    default {
+		if [catch { expr $ds } ds] {
+			alert "illegal scan parameter, internal error 0004!"
+			esd_clean
+			return
+		}
+		set ln [catch { exec $esd -n -d $ds -f $fr -t $up zzxtr.txt }\
+			err]
+	    }
+	}
+
+	if $ln {
 		alert "esdreader failed: $err"
 		esd_clean
 		return

@@ -95,13 +95,23 @@ typedef union {
 // ============================================================================
 
 #define	MAGIC	0x00ec
-#define	BUFSIZE	(512*16)
+#define	BUFSIZE	512
+
+#define	MINBLOCKS	(1048576- 32768) // 0.5G - epsilon
+#define	MAXBLOCKS	(4194304+131072) // 2.0G + epsilon
 
 #define	ONEMEG	(1024*1024)
 
-const char *devname = NULL,
-	   *prgname = "esdump",
-	   *dmpname = NULL;
+const char *devname = NULL,		// Forced device name (or number)
+	   *prgname = "esdump",		// How we have been called
+	   *dmpname = NULL;		// Dump file name
+
+char	   vname [64];			// Generated device name
+
+int	   devskip = 0,			// Devices to skip/scan flag
+	   nolabel = 0;			// Ignore label
+
+FILE	   *df;				// Dump file
 
 lword	slot_from = 0xffffffff,
 	slot_to   = 0xffffffff;
@@ -112,67 +122,66 @@ off_t	sd_size;
 aggEEDumpType agg_dump_s;
 aggEEDumpType *agg_dump = &agg_dump_s;
 
-unsigned char gbuf [BUFSIZE];
+unsigned char buf [BUFSIZE];
 
-void esd_open () {
+void bad_args () {
 
+	fprintf (stderr,
+		"Usage: %s [-d dname/skip] [-n] [-f sl] [-t sl] [dumpfile]\n"
+	 	"       %s -s [-n] [dumpfile]\n", prgname, prgname);
+	exit (1);
+}
+
+void esd_show (int n) {
+//
+// Dump the contents of the first block
+//
 	int i, j;
-	char vname [64];
-	unsigned char buf [512];
+	unsigned char *bp;
+	char cc, cdmp [17];
+
+	fprintf (df, "DEVICE NUMBER %1d <%s>, size = %u\n", n, vname, sd_size);
+
+	bp = buf;
+	cdmp [16] = '\0';
+	for (i = 0; i < 32; i++) {
+		for (j = 0; j < 16; j++) {
+			cc = bp [j];
+			if (isspace (cc) || !isprint (cc))
+				cc = ' ';
+			cdmp [j] = cc;
+		}
+		fprintf (df, "%03x: "
+			" %02x %02x %02x %02x %02x %02x %02x %02x"
+			" %02x %02x %02x %02x %02x %02x %02x %02x"
+			" -- %s\n", i * 16,
+				bp [ 0], bp [ 1], bp [ 2], bp [ 3],
+				bp [ 4], bp [ 5], bp [ 6], bp [ 7],
+				bp [ 8], bp [ 9], bp [10], bp [11],
+				bp [12], bp [13], bp [14], bp [15],
+					cdmp);
+		bp += 16;
+	}
+	fprintf (df, "\n");
+}
+
+int esd_size () {
+
 	unsigned int l;
 	off_t nb, be, en;
 	word m;
-	Boolean fnd;
-	
 
-	if (devname != NULL) {
-		if ((sd_desc = open (devname, O_RDONLY)) < 0) {
-			fprintf (stderr, "cannot open device %s\n", devname);
-			exit (1);
-		}
-		// Check for magic
-		if (read (sd_desc, buf, 2) != 2) {
-			close (sd_desc);
-			fprintf (stderr, "cannot read from %s\n", devname);
-			exit (1);
-		}
-		m =   (word) buf [0] 		|
-		    (((word) buf [1]) <<  8);
+	// Assuming the initial block has been read into buf
 
-		if (m != MAGIC) {
-			printf ("warning: the card has opened, but it has a "
-					"bad header\n");
-		}
-		fnd = 0;
-	} else {
-		for (i = 0; i < 18; i++) {
-			j = i >> 1;
-			sprintf (vname, "/dev/sd%c%s",
-				'a' + j, (i & 1) ? "1" : "");
-
-			if ((sd_desc = open (vname, O_RDONLY)) < 0)
-				continue;
-			// Read the signature
-			if (read (sd_desc, buf, 2) != 2) {
-				close (sd_desc);
-				continue;
-			}
-
-			m =   (word) buf [0] 		|
-			    (((word) buf [1]) <<  8);
-
-			if (m == MAGIC) {
-				fnd = 1;
-				printf ("card found as %s\n", vname);
-				goto Found;
-			}
-		}
-
-		fprintf (stderr, "couldn't find a valid card\n");
-		exit (1);
+	if (nolabel == 0) {
+		// Check the label
+		m =   (word) buf [0] | (((word) buf [1]) <<  8);
+		if (m != MAGIC)
+			return 1;
 	}
-Found:
-	// Locate the end
+
+	// Determine the length
+
 	be = 0;
 	// This is 4G / 512, i.e., more than the max number of block
 	en = 1024 * 1024 * 4 * 2;
@@ -181,14 +190,14 @@ Found:
 
 		nb = (be + en) / 2;
 
-		if (lseek (sd_desc, nb * 512, SEEK_SET) < 0) {
+		if (lseek (sd_desc, nb * BUFSIZE, SEEK_SET) < 0) {
 			// Assume we are too far
 TooFar:
 			en = nb;
 			continue;
 		}
 
-		if (read (sd_desc, buf, 512) <= 0)
+		if (read (sd_desc, buf, BUFSIZE) <= 0)
 			// Too far?
 			goto TooFar;
 
@@ -197,26 +206,108 @@ TooFar:
 
 	// Trailing check
 
-	lseek (sd_desc, be * 512, SEEK_SET);
-	if ((l = read (sd_desc, buf, 512)) < 0) {
+	lseek (sd_desc, be * BUFSIZE, SEEK_SET);
+	if ((l = read (sd_desc, buf, BUFSIZE)) < 0)
 		// This cannot happen
-Err:
-		fprintf (stderr, "cannot read from card\n");
-		exit (1);
-	}
+		return 1;
 
 	if (l != 0) {
 		// One more block
 		be++;
-		if ((l = read (sd_desc, buf, 512)) < 0) {
-			goto Err;
-		}
-		if (l == 512)
+		if ((l = read (sd_desc, buf, BUFSIZE)) < 0)
+			return 1;
+		if (l == BUFSIZE)
 			be++;
 	}
 
-	sd_size = be * 512;
-	printf ("card size = %lld bytes, %u slots\n", sd_size, EE_AGG_MAX + 1);
+	if (be < MINBLOCKS || be > MAXBLOCKS)
+		return 1;
+
+	sd_size = be * BUFSIZE;
+
+	return 0;
+}
+
+void esd_gendn (int i) {
+
+	int j;
+
+	j = i >> 1;
+	sprintf (vname, "/dev/sd%c%s", 'a' + j, (i & 1) ? "1" : "");
+}
+
+int esd_verify () {
+
+	if ((sd_desc = open (vname, O_RDONLY)) < 0)
+		// Cannot open
+		return 1;
+	// Check if can read
+	if (read (sd_desc, buf, BUFSIZE) != BUFSIZE) {
+		// Cannot read
+Ignore:
+		close (sd_desc);
+		return 1;
+	}
+	// Calculate the length
+	if (esd_size ())
+		goto Ignore;
+	// Re-read block zero
+	if (lseek (sd_desc, 0, SEEK_SET) < 0)
+		goto Ignore;
+	if (read (sd_desc, buf, BUFSIZE) != BUFSIZE)
+		goto Ignore;
+
+	return 0;
+}
+
+void esd_scan () {
+
+	int i, n;
+
+	for (n = i = 0; i < 18; i++) {
+		esd_gendn (i);
+		if (esd_verify () == 0) {
+			esd_show (n);
+			n++;
+		}
+	}
+}
+
+void esd_open () {
+
+	int i, n;
+
+	if (devname != NULL) {
+		// Explicit name
+		if (strlen (devname) > 63)
+			bad_args ();
+		strcpy (vname, devname);
+		if (esd_verify ()) {
+			fprintf (stderr, "cannot open device %s\n", devname);
+			exit (1);
+		}
+		printf ("card size = %lld bytes, %u slots\n", sd_size,
+			EE_AGG_MAX + 1);
+		return;
+	}
+
+	// Scanning
+	for (n = i = 0; i < 18; i++) {
+		esd_gendn (i);
+		if (esd_verify () == 0) {
+			if (devskip == 0 || n == devskip) {
+				// Got it
+				printf ("card device number %1d, name %s, "
+					"size = %lld bytes, %u slots\n",
+						n, vname, sd_size,
+							EE_AGG_MAX + 1);
+				return;
+			}
+			n++;
+		}
+	}
+	fprintf (stderr, "couldn't find a valid card\n");
+	exit (1);
 }
 
 word ee_read (lword addr, byte *buf, word len) {
@@ -389,14 +480,7 @@ int esd_dump () {
 
 	char * lbuf = NULL;
 	mdate_t md, md2;
-	FILE *df;
 	lword ecount;
-
-	// Open the dump file
-	if ((df = fopen (dmpname, "w")) == NULL) {
-		fprintf (stderr, "cannot open dump file %s\n", dmpname);
-		exit (1);
-	}
 
 	memset (agg_dump, 0, sizeof(aggEEDumpType));
 
@@ -515,13 +599,6 @@ Done:
 	printf ("done\n");
 }
 
-void bad_args () {
-
-	fprintf (stderr, "Usage: %s [-d devname] [-f sl] [-t sl] [dumpfile]\n",
-		prgname);
-	exit (1);
-}
-
 void do_args (int argc, const char **argv) {
 //
 // Handle arguments
@@ -548,9 +625,23 @@ void do_args (int argc, const char **argv) {
 
 		switch (*(*argv + 1)) {
 
+			case 's' :
+				// Scan: report open-able devices
+				if (devskip)
+					bad_args ();
+				devskip = -1;
+				break;
+
+			case 'n' :
+				// No label check
+				if (nolabel)
+					bad_args ();
+				nolabel = 1;
+				break;
+
 			case 'd' :
 				// Explicit device indication
-				if (argc == 0 || devname != NULL)
+				if (argc == 0 || devname != NULL || devskip)
 					bad_args ();
 				argc--;
 				argv++;
@@ -581,8 +672,24 @@ void do_args (int argc, const char **argv) {
 		}
 	}
 
-	if (dmpname == NULL)
-		dmpname = "sddump.txt";
+	df = NULL;
+	if (dmpname == NULL) {
+		if (devskip < 0) {
+			// Reporting - set it to stdout
+			df = stdout;
+		} else {
+			// The default for dumping
+			dmpname = "sddump.txt";
+		}
+	}
+
+	if (df == NULL) {
+		// Open the dump/report file
+		if ((df = fopen (dmpname, "w")) == NULL) {
+			fprintf (stderr, "cannot open dump file %s\n", dmpname);
+			exit (1);
+		}
+	}
 
 	if (slot_from == 0xffffffff)
 		slot_from = 0;
@@ -592,7 +699,27 @@ void do_args (int argc, const char **argv) {
 
 int main (int argc, const char *argv []) {
 
+	const char *cp;
+
 	do_args (argc, argv);
+
+	if (devskip < 0) {
+		// Scan
+		if (devname != NULL)
+			bad_args ();
+		esd_scan ();
+		exit (0);
+	}
+
+	if (devname != NULL) {
+		// Check if this is in fact a skip count
+		for (cp = devname; *cp != '\0'; cp++)
+			if (!isdigit (*cp))
+				goto DName;
+		devskip = atoi (devname);
+		devname = NULL;
+	}
+DName:
 	esd_open ();
 	esd_dump ();
 	exit (0);
