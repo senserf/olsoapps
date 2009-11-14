@@ -227,7 +227,16 @@ endprocess (1)
 #undef IRS_FIN
 
 
+#if DM2200
+
 extern void hstat (word); // kludge from phys_dm2200.c
+#define	HSTAT_OFF	hstat (0)
+
+#else
+
+#define	HSTAT_OFF	CNOP
+
+#endif
 	
 #define CS_INIT         00
 #define CS_ACT          10
@@ -310,10 +319,10 @@ process (cyc_man, void)
 			while (cyc_left != 0) {
 				if (cyc_left > MAX_UINT) {
 					cyc_left -= MAX_UINT;
-					hstat (0);
+					HSTAT_OFF;
 					freeze (MAX_UINT);
 				} else {
-					hstat (0);
+					HSTAT_OFF;
 					freeze ((word)cyc_left);
 					cyc_left = 0;
 				}

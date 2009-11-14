@@ -652,7 +652,7 @@ void oss_get_in (word state) {
 
 	  case ATTR_SYSVER:
 		cmd_ctrl.oplen += 2;
-		cmd_line[2] = SYSVER_B >> 8;
+		cmd_line[2] = SYSVER_BB >> 8;
 		cmd_line[3] = (byte)SYSVER_B;
 		return;
 

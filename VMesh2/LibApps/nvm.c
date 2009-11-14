@@ -5,6 +5,7 @@
 #include "pinopts.h"
 #include "tarp.h"
 #include "lib_app_if.h"
+#include "storage.h"
 
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2006.                   */

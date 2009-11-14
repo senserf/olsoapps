@@ -9,4 +9,6 @@
 #define DM2200_CFG1		0x03
 
 #undef SYSVER_B
-#define SYSVER_B		0x300
+#define SYSVER_B		"0x300"
+
+#define SYSVER_BB		0x300

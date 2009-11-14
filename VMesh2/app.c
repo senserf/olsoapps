@@ -10,6 +10,7 @@
 #include "lib_app_if.h"
 #include "codes.h"
 #include "pinopts.h"
+#include "storage.h"
 // #include "trc.h"
 
 #define TINY_MEM 1
