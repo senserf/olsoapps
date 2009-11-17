@@ -4,7 +4,7 @@ exec wish "$0" "$@"
 
 ##########################################################
 #                                                        #
-# ECONNECT version 1.3.7                                 #
+# ECONNECT version 1.3.8                                 #
 #                                                        #
 # Copyright (C) Olsonet Communications Corporation, 2009 #
 #                                                        #
@@ -15,7 +15,7 @@ package require Tk
 ### Parameters ################################################################
 
 # version number
-set PM(VER)	1.3.7
+set PM(VER)	1.3.8
 
 # maximum number of ports to try
 set PM(MPN)	20
@@ -3835,6 +3835,13 @@ proc extract_dialog { prt } {
 		# the default
 		set MV(DS) "Auto"
 		incr rwn
+		# Legacy format
+		label $w.o.fml -text "Data format:" -anchor w
+		grid $w.o.fml -column 0 -row $rwn -sticky w -padx 4
+		tk_optionMenu $w.o.fme MV(DF) "V1.3" "V1.2-F" "V1.2-0"
+		grid $w.o.fme -column 1 -row $rwn -sticky w -padx 4
+		set MV(DF) "V1.3"
+		incr rwn
 	}
 
 	label $w.o.sbl -text "Starting slot number:" -anchor w
@@ -3925,6 +3932,7 @@ proc extract_dialog { prt } {
 				# scan for a card
 				set scn 1
 			}
+			set df $MV(DF)
 		}
 
 		if $scn {
@@ -4047,7 +4055,7 @@ proc extract_dialog { prt } {
 	dmw $prt
 
 	if { $prt == "SD" } {
-		return [list $ds $em $fr $up]
+		return [list $ds $df $em $fr $up]
 	}
 	return [list $em $fr $up]
 }
@@ -4202,7 +4210,7 @@ proc extract_sd { } {
 		return
 	}
 
-	foreach { ds em fr up } $em { }
+	foreach { ds df em fr up } $em { }
 
 	if { $WN(EF,SD) != "" } {
 		set ESD(SF) $WN(EF,SD)
@@ -4257,28 +4265,35 @@ proc extract_sd { } {
 		return
 	}
 
-	switch $ds {
 
-	    "Auto" {
-		set ln [catch { exec $esd -f $fr -t $up zzxtr.txt } err]
-	    }
+	# arguments
+	set eag ""
 
-	    "NoLbl" {
-		set ln [catch { exec $esd -n -f $fr -t $up zzxtr.txt } err]
-	    }
-
-	    default {
-		if [catch { expr $ds } ds] {
-			alert "illegal scan parameter, internal error 0004!"
-			esd_clean
-			return
+	if { $ds != "Auto" } {
+		lappend eag "-n"
+		if { $ds != "NoLbl" } {
+			if [catch { expr $ds } ds] {
+				alert "illegal scan parameter,\
+					internal error 0004!"
+				esd_clean
+				return
+			}
+			lappend eag "-d"
+			lappend eag $ds
 		}
-		set ln [catch { exec $esd -n -d $ds -f $fr -t $up zzxtr.txt }\
-			err]
-	    }
 	}
 
-	if $ln {
+	if { $df != "V1.3" } {
+		lappend eag "-o"
+		if { $df == "V1.2-0" } {
+			lappend eag "0"
+		}
+	}
+
+	set eag [concat $eag -f $fr -t $up zzxtr.txt]
+
+	if [catch { eval [list exec] [list $esd] $eag } err] {
+
 		alert "esdreader failed: $err"
 		esd_clean
 		return

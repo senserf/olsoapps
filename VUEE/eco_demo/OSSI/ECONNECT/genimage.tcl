@@ -9,7 +9,7 @@ exec tclsh "$0" "$@"
 ############################################################################
 
 set PM(HOM)	"econnect"
-set PM(VER)	1.3.7
+set PM(VER)	1.3.8
 
 proc verify_pnm { s } {
 #
