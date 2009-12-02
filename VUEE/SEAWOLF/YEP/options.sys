@@ -6,7 +6,7 @@
 #define	UART_TCV	1
 #define	UART_RATE	115200
 #define	PID_VER_TYPE	1
-#define DIAG_MESSAGES	1
+#define DIAG_MESSAGES	2
 #define	CC1100		1
 
 // Long argument lists in object creators
