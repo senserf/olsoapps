@@ -47,7 +47,7 @@
 // Semaphores
 #define CMD_READER	(&cmd_line)
 #define CMD_WRITER	((&cmd_line)+1)
-
+#define OSS_DONE	((&cmd_line)+2)
 // =============
 // OSS reporting
 // =============
@@ -61,6 +61,7 @@ strand (oss_out, char)
 			app_diag (D_SERIOUS, "NULL in oss_out");
 		else
 			ser_outb (OO_RETRY, data);
+		trigger (OSS_DONE);
 		finish;
 endstrand
 
@@ -1091,11 +1092,14 @@ thread (root)
 		proceed (RS_FREE);
 
 	entry (RS_DUMP)
-		if (r_a_d ()) {
-			// delay is needed in VUEE, not a bad idea in PicOS
-			delay (200, RS_DUMP);
+		if (running (oss_out)) {
+			delay (50, RS_DUMP);
+			when (OSS_DONE, RS_DUMP);
 			release;
 		}
+		if (r_a_d ())
+			proceed (RS_DUMP);
+
 		ufree (agg_dump);
 		agg_dump = NULL;
 		proceed (RS_FREE);

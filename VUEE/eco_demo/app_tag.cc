@@ -43,6 +43,7 @@
 #define CMD_READER	(&cmd_line)
 #define CMD_WRITER	((&cmd_line)+1)
 #define SENS_DONE	(&lh_time)
+#define OSS_DONE	((&lh_time) +1)
 
 // rx switch control
 #define RX_SW_ON	(&pong_params.rx_span)
@@ -55,6 +56,7 @@
 strand (oss_out, char)
     entry (OO_RETRY)
 	ser_outb (OO_RETRY, data);
+	trigger (OSS_DONE);
 	finish;
 endstrand
 
@@ -1073,10 +1075,15 @@ thread (root)
 		proceed (RS_FREE);
 
 	entry (RS_DUMP)
-		if (r_a_d ()) {
-			delay (200, RS_DUMP);
+		if (running (oss_out)) {
+			delay (50, RS_DUMP);
+			when (OSS_DONE, RS_DUMP);
 			release;
 		}
+
+		if (r_a_d ())
+			proceed (RS_DUMP);
+
 		ufree (sens_dump);
 		sens_dump = NULL;
 		proceed (RS_FREE);
