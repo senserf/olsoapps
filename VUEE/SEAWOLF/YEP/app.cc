@@ -17,7 +17,7 @@
 #define	objects		_daprx (objects)
 #define	ibuf		_daprx (ibuf)
 
-process root {
+threadhdr (root, SeaNode) {
 
 #include "app_root_static.h"
 

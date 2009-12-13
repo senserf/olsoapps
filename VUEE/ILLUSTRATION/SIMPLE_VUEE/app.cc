@@ -17,7 +17,7 @@
 
 #ifdef	__SMURPH__
 
-process	receiver {
+threadhdr (receiver, Node) {
 
 	states { RC_TRY, RC_SHOW };
 
@@ -25,7 +25,7 @@ process	receiver {
 
 };
 
-process sender {
+threadhdr (sender, Node) {
 
 	char *data;
 
@@ -36,7 +36,7 @@ process sender {
 	void setup (char *bf) { data = bf; };
 };
 
-process root {
+threadhdr (root, Node) {
 
 	states { RS_INIT, RS_RCMD_M, RS_RCMD, RS_RCMD_E, RS_XMIT };
 

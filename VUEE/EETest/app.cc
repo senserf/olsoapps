@@ -62,10 +62,16 @@ thread (root)
 		case 'o': proceed (RS_FLE);
 		case 'l':
 			  scan (ibuf + 1, "%u %u", &w, &bs);
-			  if (w > 3 || bs > 2) // LED3?
+			  if (w > 4 || bs > 3) // LED3?
 				  proceed (RS_RCMD_E);
+			  if (bs == 3) {
+				fastblink (YES);
+				bs = 2;
+			  } else {
+				fastblink (NO);
+			  }
 			  leds (w, bs);
-			  ser_out (RS_RCMD, "Done with leds");
+			  ser_outf (RS_RCMD, "Done with leds %d", is_fastblink);
 			  proceed (RS_RCMD);
 		case 'r': reset();
 	}

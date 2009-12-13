@@ -18,14 +18,14 @@
 #define	myBeac		_daprx (myBeac)
 #define	myAct		_daprx (myAct)
 
-process beacon {
+threadhdr (beacon, SeaNode) {
 
 	states { MSG_BEA_START, MSG_BEA_SEND };
 
 	perform;
 };
 
-process rcv {
+threadhdr (rcv, SeaNode) {
 
 	states { MSG_RC_TRY };
 

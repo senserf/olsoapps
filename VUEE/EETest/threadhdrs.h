@@ -3,7 +3,7 @@
 
 #ifdef	__SMURPH__
 
-process THREADNAME (root) (Node) {
+threadhdr (root, Node) {
 
 	char ibuf [IBUFLEN];
 	byte str [IBUFLEN], *blk;

@@ -3,7 +3,7 @@
 
 #ifdef	__SMURPH__
 
-process	THREADNAME (receiver) (Node) {
+threadhdr (receiver, Node) {
 
 	word	r_sn, r_pl;
 	byte	r_sl;
@@ -13,7 +13,7 @@ process	THREADNAME (receiver) (Node) {
 	perform;
 };
 
-process THREADNAME (sender) (Node) {
+threadhdr (sender, Node) {
 
 	states { SN_SEND, SN_OUT };
 
@@ -21,7 +21,7 @@ process THREADNAME (sender) (Node) {
 
 };
 
-process THREADNAME (root) (Node) {
+threadhdr (root, Node) {
 
 	char *t_ibuf;
 	word t_i;

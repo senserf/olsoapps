@@ -3,7 +3,7 @@
 
 #ifdef	__SMURPH__
 
-process THREADNAME (outlines) (Node) {
+threadhdr (outlines, Node) {
 
 	const char *data;
 	
@@ -16,7 +16,7 @@ process THREADNAME (outlines) (Node) {
 	perform;
 };
 
-process THREADNAME (eetest) (Node) {
+threadhdr (eetest, Node) {
 
 	states {
 			EP_INIT,
@@ -60,7 +60,7 @@ process THREADNAME (eetest) (Node) {
 	perform;
 };
 
-process THREADNAME (root) (Node) {
+threadhdr (root, Node) {
 
 	states {
 			RS_INIT,

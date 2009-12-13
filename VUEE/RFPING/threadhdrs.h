@@ -3,7 +3,7 @@
 
 #ifdef	__SMURPH__
 
-process	THREADNAME (receiver) (Node) {
+threadhdr (receiver, Node) {
 
 	address r_packet;
 
@@ -14,7 +14,7 @@ process	THREADNAME (receiver) (Node) {
 
 #ifdef	PMON_NOTEVENT
 
-process THREADNAME (sender) (Node) {
+threadhdr (sender, Node) {
 
 	address x_packet;
 	word	data, packet_length;
@@ -31,7 +31,7 @@ process THREADNAME (sender) (Node) {
 
 #endif
 
-process THREADNAME (pin_monitor) (Node) {
+threadhdr (pin_monitor, Node) {
 
 	long CNT, CMP;
 	word STA;
@@ -49,7 +49,7 @@ process THREADNAME (pin_monitor) (Node) {
 	perform;
 };
 
-process THREADNAME (root) (Node) {
+threadhdr (root, Node) {
 
 	char *ibuf;
 	int k, n1;

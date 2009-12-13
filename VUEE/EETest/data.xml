@@ -54,6 +54,9 @@
 	</defaults>
 	<node number="0">
 	    <location>1.0 4.0</location>
+	    <leds number="4">
+		<output target="socket"/>
+	    </leds>
 	</node>
 	<node number="1">
 	    <location>1.0 10.0</location>
