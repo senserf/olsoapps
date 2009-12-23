@@ -82,10 +82,11 @@ void uart_init () {
 	tcv_plug (0, &plug_null);
 	if ((SFD = tcv_open (WNONE, 0, 0)) < 0)
 		syserror (ENODEVICE, "uart");
-
+#if 0
+	// Not needed any more: they are ON initially
 	tcv_control (SFD, PHYSOPT_TXON, NULL);
 	tcv_control (SFD, PHYSOPT_RXON, NULL);
-
+#endif
 	uart_extra_init ();
 
 	ibuf = NULL;
@@ -108,6 +109,10 @@ strand (outlines, const char)
 
 	for (cc = data; *cc != '+' && *cc != '\0'; cc++);
 	obuf = (char*) umalloc ((nc = (cc - data)) + 1);
+	if (obuf == NULL) {
+		umwait (OL_INIT);
+		release;
+	}
 	strncpy (obuf, data, nc);
 	obuf [nc] = '\0';
 	savedata ((void*)(data + nc));
@@ -501,7 +506,6 @@ thread (root)
 		case 'Q': {
 				reset ();
 		}
-
 	}
 	
   entry (RS_RCMD1)
@@ -510,6 +514,5 @@ thread (root)
 	proceed (RS_RESTART);
 
 endthread
-
 
 praxis_starter (Node);

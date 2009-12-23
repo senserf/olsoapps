@@ -1,0 +1,17 @@
+#define VUEE_LIB_PLUG_NULL
+#define VUEE_LIB_XRS
+
+#define	TCV_PRESENT	1
+#define	TCV_HOOKS	0
+#define	TCV_TIMERS	0
+
+#undef	UART_DRIVER
+#define	UART_DRIVER	0
+
+#define	CODE_LONG_INTS	1
+#define	UART_TCV_MODE	UART_TCV_MODE_N
+#undef	UART_TCV
+#define	UART_TCV	1
+
+#define	CC1100		1
+#define	RADIO_USE_LEDS	7

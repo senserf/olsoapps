@@ -2,6 +2,11 @@
 ###########################\
 exec tclsh "$0" "$@"
 
+if { [info tclversion] < 8.5 } {
+	puts stderr "This script requires Tcl 8.5 or newer!"
+	exit 99
+}
+
 proc msource { f } {
 #
 # Intelligent 'source'
@@ -33,7 +38,7 @@ proc msource { f } {
 }
 
 msource oss_u.tcl
-msource oss_u_ab.tcl
+msource oss_u_xrs.tcl
 msource oep.tcl
 
 package require oep 1.0
@@ -805,7 +810,7 @@ set ST(ILI)	""
 set TM(OUT)	2048
 set TM(LNG)	5000
 
-if [catch { u_start "" 115200 "" } err] {
+if [catch { u_start [lindex $argv 0] 115200 N $PM(MPL) } err] {
 	log $err
 	exit 99
 }

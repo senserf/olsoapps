@@ -3,7 +3,7 @@
     <nodes>
 	<defaults>
 	    <memory>2048 bytes</memory>
-	    <uart rate="115200" mode="packet">
+	    <uart rate="115200" mode="p">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>

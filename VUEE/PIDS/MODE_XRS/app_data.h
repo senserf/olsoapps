@@ -1,8 +1,7 @@
 #ifndef __app_data_h__
 #define	__app_data_h__
 
-byte	*ibuf;
+char	*buff;
 int	SFD;
-word	IBL;
 
 #endif

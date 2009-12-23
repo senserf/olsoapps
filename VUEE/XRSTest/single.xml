@@ -7,7 +7,7 @@
 	    	<output target="socket"></output>
 	    </leds>
 	    <iflash size="512,2"></iflash>
-	    <uart rate="9600" bsize="12" mode="packet">
+	    <uart rate="9600" bsize="12" mode="n">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>

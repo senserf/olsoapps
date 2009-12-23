@@ -59,7 +59,7 @@
 	    	<output target="socket"></output>
 	    </leds>
 	    <iflash size="256,2"></iflash>
-	    <uart rate="115200" bsize="256,256" mode="packet">
+	    <uart rate="115200" bsize="256,256" mode="n">
 		<input source="socket"></input>
 		<output target="socket"></output>
 	    </uart>
