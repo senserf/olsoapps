@@ -117,7 +117,7 @@ void pidmess (int st, int ord) {
 	byte *packet;
 	sint p;
 
-	packet = abb_out (st, 3);
+	packet = abb_outf (st, 3);
 	packet [0] = rep [ord];
 	p = getcpid ();
 	memcpy (packet + 1, (char*)(&p), 2);
@@ -264,13 +264,13 @@ BL:
 
   entry (RS_ECHO)
 
-	opacket = abb_out (RS_ECHO, ibl);
+	opacket = abb_outf (RS_ECHO, ibl);
 	memcpy (opacket, ipacket, ibl);
 	goto UF;
 
   entry (RS_OK)
 
-	opacket = abb_out (RS_OK, 1);
+	opacket = abb_outf (RS_OK, 1);
 	opacket [0] = rep [ORD_R_OK];
 	goto UF;
 
