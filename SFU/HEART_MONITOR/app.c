@@ -10,6 +10,7 @@
 #include "tcvplug.h"
 #include "board_rf.h"
 #include "storage.h"
+#include "lcd_st7036.h"
 
 // #define	DONT_DISPLAY
 // #define	DEBUG_DISPLAY

@@ -5,6 +5,7 @@
 
 #include "sysio.h"
 #include "pinopts.h"
+#include "lcd_st7036.h"
 
 #include "ser.h"
 #include "serf.h"
