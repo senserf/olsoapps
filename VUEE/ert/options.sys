@@ -1,0 +1,46 @@
+
+#undef  UART_DRIVER
+#undef  UART_TCV
+
+#define UART_TCV	1
+#define UART_DRIVER	0
+#define VUEE_LIB_XRS
+
+#if UART_TCV > 0 && UART_DRIVER > 0
+#error UART either tcv or ser
+#endif
+
+#ifdef __SMURPH__
+#define UART_A  0
+#if UART_DRIVER > 0
+#error UART io not allowed in VUEE
+#endif
+#endif
+
+
+#ifdef UART_RATE
+#undef UART_RATE
+#endif
+#define UART_RATE	9600
+
+#undef LBT_THRESHOLD
+#define LBT_THRESHOLD		33
+
+#define dbg_level		7
+//#define dbg_level		0xffff
+#define dbg_binary		1
+
+#define CON_ON_PINS		1
+
+#define DM2200_CFG1		0x03
+
+#undef SYSVER_B
+#define SYSVER_B		"0x0001"
+
+#define SYSVER_BB		0x0001
+#define UART_INPUT_BUFFER_LENGTH 76
+
+#define VUEE_LIB_PLUG_TARP
+#define VUEE_LIB_PLUG_NULL
+#define CC1100	1
+

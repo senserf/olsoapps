@@ -1,0 +1,17 @@
+# Macra for Hands On section steps s1 - sc, from E-RTags Operations
+# ver. 1.0 November 2009
+#s1 - s3 are phys. actions, see the doc
+s4 = "0x0a 1 0 0"
+s5 = "2 0x8b 1 0 1 2 0"
+s6 = "2 0x8d 2 0 0x0a 0x1d 0x34"
+s7 = "2 0x8e 2 0 4 7 0"
+s8 = "2 0x80 2 0 9 0x1d"
+s9 = "3 1 0 0"
+#check conn. LED solid ON
+#s10 observe msg_new output every 31 s.
+sb = "5 0x80 2 0 1 0 0xca 0xba 0x55 0 1"
+# note that output from msg_br is 4B shorter than in the doc.
+#
+# from Terminal 2:
+sc = "0xfe 1 2 0xaa 0xbb 0xcc 0xdd 0 0x99"
+

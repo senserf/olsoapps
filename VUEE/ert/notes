@@ -1,0 +1,56 @@
+
+Not documented:
+
+In VMesh, the input was: 0x00 <len> <len bytes of payload> <0x04>
+in ERTags, it is: <len bytes of payload>
+See ho_test.mac for macra from 'Hands On' in ERTags_Ops.odt.
+Output stays unchanged (for now).
+
+Main functionality of ERTags work nice, on WAR_ERT and in VUEE. However, this
+is just an initial stage of this application. To do:
+- Decide if sensor registration / tables should be implemented (as they were
+		in Genesis). Update the functionality.
+- Decide if CON_ON_PINS functionality should be removed.
+- Same with DM2200_CFG1 (or equivalent) option
+- Meticulous tests in VUEE, documentation
+- Removal of UART_DRIVER; wait until all obscure functionality is tested
+- Decide if we want a free format SensoRx input, served by UART_TCV in _L
+  mode. If so, we'd need dynamic switching between _L text and _N bin modes.
+
+-----------
+
+Testing: uf.tcl -p CNCA0 | CNCA! | COMn -m x -b ho_test.mac
+(copy ho_test.mac to Scripts). For VUEE, run side test3.xml.
+
+Note that all test cases could be similarly encoded - we may even attempt on
+automated testing using !trace, possibly with some record / playback /
+compare extensions. Wow. Later.
+
+------------
+
+Docs now:
+ERTags_Ops.odt, ERtags_IF.odt - what vanished into Savi, lame start of ERTags.
+VMesh.zip - VersaMesh brick we did for RFM.
+
+Docs for final ERTags:
+ERTags.zip - as good as VMesh.zip. Or better. Test descs, possibly with
+uf macra.
+
+------------
+
+Implemenational bits and pieces in no particular order:
+
+Although we have just one praxis here (ert), we forsee needs for additions,
+possibly temporary, e.g. custodians, sniffers, test helpers.
+So, from the start, we go with the app_ert praxis.
+
+tarp stuff - methods?
+
+app_ert.h can't be included in vuee_ert.h - becomes invisible for functions, as it is already included within the node class
+
+the other way around: e.g. defines from board_option.sys are not in the
+station... { } scope... e.g. UART_INPUT_BUFFER_LENGTH
+
+.text: no UART - 0x93c4; UART_DRIVER - 0xb0fe (diff over 7K)
+
+how would one init cmd_ctrl to nonzeros?
