@@ -26,8 +26,8 @@ byte		* cmd_line	__sinit (NULL);
 byte		* dat_ptr	__sinit (NULL);
 byte		dat_seq		__sinit (0);
 // spare byte
-cmdCtrlType	cmd_ctrl;
-// dupa cmdCtrlType	cmd_ctrl	__sinit ({0, 0x00, 0x00, 0x00, 0x00});
+// cmdCtrlType	cmd_ctrl;
+cmdCtrlType	cmd_ctrl	__sinit (0, 0x00, 0x00, 0x00, 0x00);
 brCtrlType	br_ctrl;
 cycCtrlType	cyc_ctrl;
 sint		shared_left;

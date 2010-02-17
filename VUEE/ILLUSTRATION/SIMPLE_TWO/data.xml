@@ -47,6 +47,9 @@
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
 	</defaults>
 	<node number="0" type="snd">
 	    <location>1.0 4.0</location>

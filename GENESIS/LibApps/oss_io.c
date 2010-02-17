@@ -434,8 +434,8 @@ void oss_get_in (word state) {
 
 	  case ATTR_SYSVER:
 		cmd_ctrl.oplen += 4;
-		cmd_line[2] = SYSVER_B >> 8;
-		cmd_line[3] = (byte)SYSVER_B;
+		cmd_line[2] = SYSVER_U;
+		cmd_line[3] = SYSVER_L;
 		memcpy (cmd_line +4, &sensrx_ver, 2);
 		return;
 
