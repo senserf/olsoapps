@@ -1,16 +1,27 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2010                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "globals_peg.h"
-#include "threadhdrs_peg.h"
+#include "msg_peg.h"
+#include "vuee_peg.h"
+
 #include "flash_stamps.h"
-#include "sat_peg.h"
 
 #ifndef __SMURPH__
 #include "lhold.h"
 #endif
+
+#define __dcx_def__
+#include "app_peg_data.h"
+#undef  __dcx_def__
+
+#include "diag.h"
+#include "str_peg.h"
+
+#include "ser.h"
+#include "form.h"
+#include "net.h"
 
 // elsewhere may be a better place for this:
 #if CC1000
@@ -31,7 +42,7 @@
 
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 #define DEF_NID			85
-#define DEF_MHOST		10
+#define DEF_MHOST		1
 
 // Semaphores
 #define CMD_READER	(&cmd_line)
@@ -42,57 +53,21 @@
 // OSS reporting
 // =============
 strand (oss_out, char)
-	char * b;
-	sint len;
 
-	// OO_START is the sat patch
 	entry (OO_START)
 		if (data == NULL) {
 			app_diag (D_SERIOUS, "NULL oss_out");
 			finish;
 		}
-		if (IS_SATGAT) {
-			len = SATWRAPLEN + 2 + strlen (data);
-			b = get_mem (WNONE, len);
-			if (b == NULL)
-				finish;
-			strcpy (b, SATWRAP);
-			strcpy (&b[SATWRAPLEN], data);
-			b[len -2] = (char)26;
-			b[len -1] = '\0';
-			// PG: the code will do
-			data [4] = '\0';
-			sat_rep (data);
-			// End PG
-			ufree (data);
-			data = b;
-			savedata (data);
-		}
-
 	entry (OO_RETRY)
 		ser_outb (OO_RETRY, data);
 		trigger (OSS_DONE);
 		finish;
 endstrand
 
-strand (satcmd_out, char)
-	entry (SCO_TRY)
-		ser_out (SCO_TRY, data);
-		sat_rep (data);
-		finish;
-endstrand
-
 thread (mbeacon)
 
     entry (MB_START)
-
-	// periodically get GPS time, or if not set or sat. i/f uninited
-	if (IS_SATGAT && (seconds() - master_ts  > SAT_TIMEADJ || 
-			master_date > -SID * 90 || sat_mod == SATMOD_UNINIT))
-		(void)runstrand (satcmd_out, SATCMD_STATUS);
-
-	if (IS_SATGAT && sat_mod == SATMOD_UNINIT) // just in case
-		(void)runstrand (satcmd_out, SATCMD_PDC);
 
 	delay (25 * 1024 + rnd() % 10240, MB_SEND); // 30 +/- 5s
 	release;
@@ -103,50 +78,7 @@ thread (mbeacon)
 
 endthread
 
-__PUBLF (NodePeg, void, sat_rep) (char * b) {
-	sint len;
-	char * obuf;
-
-	// oss_out is called also when the net is not inited yet, and
-	// it calls in here; ignore - custodian will not hear it
-	if (!is_satest || net_opt (PHYSOPT_PHYSINFO, NULL) == -1)
-		return;
-
-	if (b == NULL) // came from sat into ui_ibuf
-		b = ui_ibuf;
-
-	if ((len = strlen (b)) > MAX_SATLEN) {
-		len = MAX_SATLEN;
-		b[MAX_SATLEN] = '\0';
-	}
-	len += sizeof (headerType) +1; // + '\0'
-
-	if ((obuf  = get_mem (WNONE, len)) == NULL)
-		return;
-
-	strcpy (&obuf[sizeof(headerType)], b);
-	in_header(obuf, msg_type) = msg_satest;
-	in_header(obuf, rcv) = 0; // must be bcast
-	in_header(obuf, hco) = 1; // no hopping
-	send_msg (obuf, len);
-	ufree (obuf);
-}
-
-__PUBLF (NodePeg, void, sat_out) (char * buf) {
-	sint len = strlen (&buf[sizeof (headerType)]) +1; // + '\0'
-	char * mbuf;
-
-	if ((mbuf = get_mem (WNONE, len)) == NULL)
-		return;
-
-	strcpy (mbuf, &buf[sizeof (headerType)]);
-
-	// note that there could be double-wrapping in sat. crap here
-	if (runstrand (oss_out, mbuf) == 0)
-		ufree (mbuf);
-}
-
-__PUBLF (NodePeg, void, show_ifla) () {
+void show_ifla () {
 	char * mbuf = NULL;
 
 	if (if_read (0) == 0xFFFF) {
@@ -162,14 +94,12 @@ __PUBLF (NodePeg, void, show_ifla) () {
 	}
 }
 
-__PUBLF (NodePeg, void, read_ifla) () {
+void read_ifla () {
 
 	if (if_read (0) == 0xFFFF) { // usual defaults
 		local_host = (word)host_id;
-#ifndef __SMURPH__
 		master_host = DEF_MHOST;
-#endif
-		sat_mod = IS_DEFSATGAT ? SATMOD_UNINIT : SATMOD_NO;
+
 		if (master_host == local_host)
 			plot_id = local_host;
 		return;
@@ -186,13 +116,12 @@ __PUBLF (NodePeg, void, read_ifla) () {
 		master_date = -1;
 		diag (impl_date_str);
 	}
-	sat_mod = if_read (6);
 	if (master_host == local_host)
 		plot_id = local_host;
 }
 
 
-__PUBLF (NodePeg, void, save_ifla) () {
+void save_ifla () {
 	if (if_read (0) != 0xFFFF) {
 		if_erase (0);
 		diag (OPRE_APP_ACK "p0 owritten");
@@ -204,11 +133,10 @@ __PUBLF (NodePeg, void, save_ifla) () {
 	if_write (3, tag_auditFreq);
 	if_write (4, master_host);
 	if_write (5, sync_freq);
-	if_write (6, IS_SATGAT ? SATMOD_UNINIT : SATMOD_NO);
 }
 
 // Display node stats on UI
-__PUBLF (NodePeg, void, stats) (char * buf) {
+void stats (char * buf) {
 	char * mbuf = NULL;
 	word mmin, mem;
 
@@ -221,7 +149,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			agg_data.eslot == EE_AGG_MIN &&
 			  IS_AGG_EMPTY (agg_data.ee.s.f.status) ?
 			0 : agg_data.eslot - EE_AGG_MIN +1,
-			mem, mmin, sat_mod, pow_sup);
+			mem, mmin, pow_sup);
 	} else {
 	  switch (in_header (buf, msg_type)) {
 	    case msg_statsPeg:
@@ -231,7 +159,7 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 			in_statsPeg(buf, a_fl),
 			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
 			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
-			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 0, 0);
+			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 0);
 		break;
 
 	    case msg_statsTag:
@@ -257,18 +185,22 @@ __PUBLF (NodePeg, void, stats) (char * buf) {
 	}
 }
 
-__PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
-								word rssi) {
+void process_incoming (word state, char * buf, word size, word rssi) {
   sint    w_len;
 
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
 
+  if (in_header(buf, snd) == master_host) {
+	  con_ts = seconds();
+	  leds (LED_B, LED_OFF);
+  }
+
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
 
-		if (in_header(buf, snd) / 1000 != local_host / 1000)
+		if (in_header(buf, snd) / 10 != local_host / 10)
 			return;
 
 		if (in_pong_rxon(buf)) 
@@ -328,10 +260,6 @@ smells a bit...
 			return;
 		}
 
-		// don't compete with sat. multilines
-		if (sat_mod == SATMOD_WAITRX)
-			return;
-
 		w_len = strlen (&buf[sizeof (headerType)]) +1;
 
 		// sanitize
@@ -344,14 +272,6 @@ smells a bit...
 		trigger (CMD_READER);
 		return;
 
-	case msg_satest:
-#if 0
-FIXME: if that works, clean off sat_out()
-		sat_out (buf);
-#endif
-		ser_out (state, &buf[sizeof(headerType)]);
-		return;
-
 	default:
 		app_diag (D_SERIOUS, "Got ?(%u)", in_header(buf, msg_type));
 
@@ -362,7 +282,7 @@ FIXME: if that works, clean off sat_out()
 
 // [0, FF] -> [1, F]
 // it can't be 0, as find_tags() will mask the rssi out!
-static word map_rssi (word r) {
+word map_rssi (word r) {
 #if 0
 #ifdef __SMURPH__
 /* temporary rough estimates
@@ -381,7 +301,8 @@ static word map_rssi (word r) {
 	return 1;
 #endif
 #endif
-	return 1; // eco demo: don't overwhelm
+
+	return (r & 0xff00) ? (r >> 8) : 1;
 }
 
 /*
@@ -394,33 +315,27 @@ static word map_rssi (word r) {
 // In this model, a single rcv is forked once, and runs / sleeps all the time
 thread (rcv)
 
-	entry (RC_INIT)
-
-		rcv_packet_size = 0;
-		rcv_buf_ptr = NULL;
-		rcv_rssi = 0;
-
 	entry (RC_TRY)
 
-		if (rcv_buf_ptr != NULL) {
-			ufree (rcv_buf_ptr);
-			rcv_buf_ptr = NULL;
-			rcv_packet_size = 0;
+		if (rcv_buf) {
+			ufree (rcv_buf);
+			rcv_buf = NULL;
+			rcv_psize = 0;
 		}
-    		rcv_packet_size = net_rx (RC_TRY, &rcv_buf_ptr, &rcv_rssi, 0);
-		if (rcv_packet_size <= 0) {
+    		rcv_psize = net_rx (RC_TRY, &rcv_buf, &rcv_rssi, 0);
+		if (rcv_psize <= 0) {
 			app_diag (D_SERIOUS, "net_rx failed (%d)",
-				rcv_packet_size);
+				rcv_psize);
 			proceed (RC_TRY);
 		}
 
 		app_diag (D_DEBUG, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",			  
-		rcv_packet_size, in_header(rcv_buf_ptr, msg_type),
-			  in_header(rcv_buf_ptr, seq_no) & 0xffff,
-			  in_header(rcv_buf_ptr, snd),
-			  in_header(rcv_buf_ptr, rcv),
-			  in_header(rcv_buf_ptr, hoc) & 0xffff,
-			  in_header(rcv_buf_ptr, hco) & 0xffff);
+		rcv_psize, in_header(rcv_buf, msg_type),
+			  in_header(rcv_buf, seq_no) & 0xffff,
+			  in_header(rcv_buf, snd),
+			  in_header(rcv_buf, rcv),
+			  in_header(rcv_buf, hoc) & 0xffff,
+			  in_header(rcv_buf, hco) & 0xffff);
 
 		// that's how we could check which plugin is on
 		// if (net_opt (PHYSOPT_PLUGINFO, NULL) != INFO_PLUG_TARP)
@@ -429,15 +344,15 @@ thread (rcv)
 #if 0
 	will be needed for all sorts of calibrations
 //#endif
-		if (in_header(rcv_buf_ptr, msg_type) == msg_pong)
+		if (in_header(rcv_buf, msg_type) == msg_pong)
 			app_diag (D_UI, "rss (%d.%d): %d",
-				in_header(rcv_buf_ptr, snd),
-				in_pong(rcv_buf_ptr, level), rcv_rssi >> 8);
+				in_header(rcv_buf, snd),
+				in_pong(rcv_buf, level), rcv_rssi >> 8);
 		else
 			app_diag (D_UI, "rss %d from %d", rcv_rssi >> 8,
-					in_header(rcv_buf_ptr, snd));
+					in_header(rcv_buf, snd));
 #endif
-		process_incoming (RC_MSG, rcv_buf_ptr, rcv_packet_size,
+		process_incoming (RC_MSG, rcv_buf, rcv_psize,
 			map_rssi(rcv_rssi));
 		proceed (RC_TRY);
 
@@ -452,12 +367,6 @@ endthread
 #define POW_FREQ_SHIFT 6
 thread (audit)
 
-	nodata;
-
-	entry (AS_INIT)
-
-		aud_buf_ptr = NULL;
-
 	entry (AS_START)
 		if (local_host == master_host && (pow_ts == 0 ||
 	(word)(seconds() - pow_ts) >= (tag_auditFreq << POW_FREQ_SHIFT))) {
@@ -466,9 +375,9 @@ thread (audit)
 			stats (NULL);
 		}
 
-		if (aud_buf_ptr != NULL) {
-			ufree (aud_buf_ptr);
-			aud_buf_ptr = NULL;
+		if (aud_buf) {
+			ufree (aud_buf);
+			aud_buf = NULL;
 		}
 		if (tag_auditFreq == 0) {
 			app_diag (D_WARNING, "Audit stops");
@@ -477,44 +386,45 @@ thread (audit)
 		aud_ind = tag_lim;
 		app_diag (D_DEBUG, "Audit starts");
 
-		if (IS_SATGAT)
-			(void)runstrand (satcmd_out, SATCMD_QUEUE);
-
 	entry (AS_TAGLOOP)
 
 		if (aud_ind-- == 0) {
 			app_diag (D_DEBUG, "Audit ends");
-			lh_time = tag_auditFreq;
+			aud_lhtime = tag_auditFreq;
+
+			if (local_host != master_host &&
+					seconds() - con_ts > 3 * aud_lhtime)
+				leds (LED_B, LED_BLINK);
+
 			proceed (AS_HOLD);
 		}
 
 	entry (AS_TAGLOOP1)
 
-		check_tag (AS_TAGLOOP1, aud_ind, &aud_buf_ptr);
+		check_tag (AS_TAGLOOP1, aud_ind, &aud_buf);
 
-		if (aud_buf_ptr) {
+		if (aud_buf) {
 			if (local_host == master_host) {
-				in_header(aud_buf_ptr, snd) = local_host;
-				oss_report_out (aud_buf_ptr);
+				in_header(aud_buf, snd) = local_host;
+				oss_report_out (aud_buf);
 			} else
-				send_msg (aud_buf_ptr,
-					in_report_pload(aud_buf_ptr) ?
+				send_msg (aud_buf,
+					in_report_pload(aud_buf) ?
 				sizeof(msgReportType) + sizeof(reportPloadType)
 				: sizeof(msgReportType));
 
-			ufree (aud_buf_ptr);
-			aud_buf_ptr = NULL;
+			ufree (aud_buf);
+			aud_buf = NULL;
 		}
 		proceed (AS_TAGLOOP);
 
 	entry (AS_HOLD)
-
-		lhold (AS_HOLD, &lh_time);
+		lhold (AS_HOLD, &aud_lhtime);
 		proceed (AS_START);
 endthread
 #undef POW_FREQ_SHIFT
 
-__PUBLF (NodePeg, void, tmpcrap) (word what) {
+void tmpcrap (word what) {
 	switch (what) {
 		case 0:
 			if (tag_auditFreq != 0 && !running (audit))
@@ -533,9 +443,6 @@ __PUBLF (NodePeg, void, tmpcrap) (word what) {
    --------------------
 */
 thread (cmd_in)
-
-	mdate_t md;
-	word u[6];
 
 	entry (CS_INIT)
 
@@ -557,167 +464,14 @@ thread (cmd_in)
 			release;
 		}
 
-		if (!IS_SATGAT || sat_mod == SATMOD_WAITRX) {
-			cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
-			strcpy (cmd_line, ui_ibuf);
-			if (sat_mod == SATMOD_WAITRX)
-				sat_mod = SATMOD_YES;
-			trigger (CMD_READER);
-
-			if (IS_SATGAT)
-				goto SatRep;
-			else
-				proceed (CS_IN);
-		}
-		// there may be more SATWAITs
-
-		if (str_cmpn (ui_ibuf, SATATT_MSG, SAT_MSGLEN) == 0) {
-			sat_mod = SATMOD_WAITRX;
-			goto SatRep;
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_RNG, SAT_RNGLEN) == 0) {
-			if (sat_mod == SATMOD_UNINIT)
-				sat_mod = SATMOD_YES;
-			(void)runstrand (satcmd_out, SATCMD_GET);
-			goto SatRep;
-		}
-
-		if (str_cmpn (ui_ibuf, SATHEX_MSG, SAT_MSGLEN) == 0) {
-			(void)runstrand (satcmd_out, SATCMD_H2T);
-			goto SatRep;
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_SBBB, SAT_SSETLEN) == 0) {
-			set_satest;
-			goto SatRep;
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_SPPP, SAT_SSETLEN) == 0) {
-			clr_satest;
-			goto SatRep;
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_SMMM, SAT_SSETLEN) == 0) {
-			clr_satest;
-			sat_mod = SATMOD_NO;
-			goto SatRep;
-		}
-
-		u[0] = strlen (ui_ibuf);
-
-		if (str_cmpn (ui_ibuf, SATIN_QUE, SAT_QUELEN) == 0) {
-			if (u[0] < SAT_QUEMINLEN || scan (ui_ibuf +SAT_QUEOSET,
-					SAT_QUEFORM, &u[0], &u[1]) != 2) {
-
-				ui_ibuf[0] = '!';
-
-			} else {
-
-				if (u[0] < SAT_QUEFULL) {
-					if (sat_mod != SATMOD_YES) {
-						ui_ibuf[1] = '+';
-						sat_mod = SATMOD_YES;
-					}
-				} else {
-#if 0
-					ui_ibuf[0] = 'F';
-					if (sat_mod != SATMOD_FULL) {
-						ui_ibuf[1] = '+';
-						sat_mod = SATMOD_FULL;
-					}
-#endif
-					// let's try this:
-					runstrand (satcmd_out, SATCMD_BOOT);
-					sat_mod = SATMOD_UNINIT;
-					strcpy (ui_ibuf, "PDT Reboot");
-				}
-			}
-
-			goto SatRep;
-		}
-
-		if (str_cmpn (ui_ibuf, SATIN_STA, SAT_STALEN) == 0) {
-
-			if (sat_mod == SATMOD_UNINIT)
-				sat_mod = SATMOD_YES;
-
-			if (u[0] < SAT_STAMINLEN || scan (ui_ibuf +SAT_STAOSET,
-					SAT_STAFORM, &u[0], &u[1], &u[2],
-						&u[3], &u[4], &u[5]) != 6 ||
-					u[2] < 2009) { // not from GPS
-				ui_ibuf[0] = '?';
-				goto SatRep;
-			}
-
-			if (master_date > -SID * 90)
-				ui_ibuf[0] = 's';
-
-			md.dat.f = 1;
-			md.dat.yy = u[2] - 2008;
-			md.dat.mm = u[0];
-			md.dat.dd = u[1];
-			md.dat.h = u[3];
-			md.dat.m = u[4];
-			md.dat.s = u[5];
-			d2s (&md);
-
-			if (ui_ibuf[0] != 's') {
-			       if (md.secs !=  wall_date (0)) {
-				       ui_ibuf[0] = 'U';
-			       } else {
-				       ui_ibuf[0] = 'u';
-			       }
-			}
-			master_date = md.secs;
-			master_ts = seconds();
-			goto SatRep;
-
-#if 0
-
-			// no time yet
-			if (master_date > -SID * 90) {
-				master_ts = seconds();
-				md.dat.f = 1;
-				md.dat.yy = u[2] - 2008;
-				md.dat.mm = u[0];
-				md.dat.dd = u[1];
-				md.dat.h = u[3];
-				md.dat.m = u[4];
-				md.dat.s = u[5];
-				d2s (&md);
-				master_date = md.secs;
-				ui_ibuf[0] = 's';
-				goto SatRep;
-			}
-
-			// time to adjust time?
-			if (seconds() - master_ts  > SAT_TIMEADJ) {
-                                md.dat.f = 1;
-                                md.dat.yy = u[2] - 2008;
-                                md.dat.mm = u[0];
-                                md.dat.dd = u[1];
-                                md.dat.h = u[3];
-                                md.dat.m = u[4];
-                                md.dat.s = u[5];
-                                d2s (&md);
-				if (md.secs !=  master_date) {
-					master_date = md.secs;
-					master_ts = seconds();
-					ui_ibuf[0] = 'u';
-				}
-			}
-#endif
-
-		}
-
-		// report (via RF)  everything (to a custodian)
-SatRep:		sat_rep (NULL);
+		cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
+		strcpy (cmd_line, ui_ibuf);
+		trigger (CMD_READER);
 		proceed (CS_IN);
 endthread
 
 #if 0
-static char * stateName (unsigned state) {
+char * stateName (unsigned state) {
 	switch ((tagStateType)state) {
 		case noTag:
 			return "noTag";
@@ -740,7 +494,7 @@ static char * stateName (unsigned state) {
 	}
 }
 
-static char * locatName (word id, word rssi) {
+char * locatName (word id, word rssi) {
 	if (id == 0)
 		return "total";
 
@@ -759,45 +513,32 @@ static char * locatName (word id, word rssi) {
 }
 #endif
 
-__PUBLF (NodePeg, void, oss_report_out) (char * buf) {
+void oss_report_out (char * buf) {
 
   char * lbuf = NULL;
   mdate_t md, md2;
 
   if (in_report_pload(buf)) {
 
-	  md.secs = in_reportPload(buf, ds);
-	  s2d (&md);
-	  md2.secs = in_reportPload(buf, ppload.ds);
-	  s2d (&md2);
-
-      if (IS_SATGAT) {
-        lbuf = form (NULL, satrep_str,
-		in_reportPload(buf, eslot), 
-		in_report(buf, tagid), in_reportPload(buf, ppload.eslot),
-		md2.dat.f ?  2009 + md2.dat.yy : 2001 + md2.dat.yy,
-		md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
-
-		in_report(buf, state) == goneTag ?
-			" ***gone***" : " ",
-		in_reportPload(buf, ppload.sval[0]),
-		in_reportPload(buf, ppload.sval[1]),
-		in_reportPload(buf, ppload.sval[2]),
-		in_reportPload(buf, ppload.sval[3]),
-		in_reportPload(buf, ppload.sval[4]),
-		in_reportPload(buf, ppload.sval[5]));
-      } else {
-	lbuf = form (NULL, rep_str,
+	md.secs = in_reportPload(buf, ds);
+	s2d (&md);
+	md2.secs = in_reportPload(buf, ppload.ds);
+	s2d (&md2);
+	
+	lbuf = form (NULL, rep_str, in_report(buf, state) == goneTag ?
+			OPRE_APP_REP_GONE : OPRE_APP_REP,
 
 		in_header(buf, snd),
+#if 0
 		in_reportPload(buf, eslot),
-
+#endif
 		md.dat.f ?  2009 + md.dat.yy : 1001 + md.dat.yy,
 		md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
 
 		in_report(buf, tagid),
+#if 0
 		in_reportPload(buf, ppload.eslot),
-
+#endif
 		md2.dat.f ?  2009 + md2.dat.yy : 1001 + md2.dat.yy,
 		md2.dat.mm, md2.dat.dd, md2.dat.h, md2.dat.m, md2.dat.s,
 
@@ -809,8 +550,8 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
 		in_reportPload(buf, ppload.sval[2]),
 		in_reportPload(buf, ppload.sval[3]),
 		in_reportPload(buf, ppload.sval[4]),
-		in_reportPload(buf, ppload.sval[5])); // eoform
-      }
+		in_reportPload(buf, ppload.sval[5]), (word)in_report(buf, rssi),
+		seconds()); // eoform
 
     } else if (in_report(buf, state) == sumTag) {
 		lbuf = form (NULL, repSum_str,
@@ -832,7 +573,7 @@ __PUBLF (NodePeg, void, oss_report_out) (char * buf) {
     }
 }
 
-static const char * markName (statu_t s) {
+const char * markName (statu_t s) {
         switch (s.f.mark) {
 		case 0:
 		case MARK_EMPTY:   return "NONE";
@@ -846,7 +587,7 @@ static const char * markName (statu_t s) {
         return "????";
 }       
 
-__PUBLF (NodePeg, word, r_a_d) () {
+word r_a_d () {
 	char * lbuf = NULL;
 	mdate_t md, md2;
 
@@ -952,7 +693,7 @@ ThatsIt:
 	return 0;
 }
 
-__PUBLF (NodePeg, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
+void oss_findTag_in (word state, nid_t tag, nid_t peg) {
 
 	char * out_buf = NULL;
 	sint tagIndex;
@@ -994,7 +735,7 @@ __PUBLF (NodePeg, void, oss_findTag_in) (word state, nid_t tag, nid_t peg) {
 	ufree (out_buf);
 }
 
-__PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
+void oss_master_in (word state, nid_t peg) {
 
 	char * out_buf = NULL;
 
@@ -1013,7 +754,7 @@ __PUBLF (NodePeg, void, oss_master_in) (word state, nid_t peg) {
 	ufree (out_buf);
 }
 
-__PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
+void oss_setTag_in (word state, word tag,
 	       	nid_t peg, word maj, word min, 
 		word span, word pl, word c_fl) {
 
@@ -1049,13 +790,13 @@ __PUBLF (NodePeg, void, oss_setTag_in) (word state, word tag,
 	ufree (out_buf);
 }
 
-__PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg, 
+void oss_setPeg_in (word state, nid_t peg, 
 				word audi, word pl, word a_fl) {
 
 	char * out_buf = get_mem (state, sizeof(msgSetPegType));
 	memset (out_buf, 0, sizeof(msgSetPegType));
 
-	in_header(out_buf, msg_type) = msg_setPeg; // hco == 0
+	in_header(out_buf, msg_type) = msg_setPeg;
 	in_header(out_buf, rcv) = peg;
 	in_setPeg(out_buf, level) = pl;
 	in_setPeg(out_buf, audi) = audi;
@@ -1076,7 +817,6 @@ __PUBLF (NodePeg, void, oss_setPeg_in) (word state, nid_t peg,
 thread (root)
 
 	mdate_t md;
-	char * tmpb; // FIXME this crap should be clean up soon
 
 	sint	i1, i2, i3, i4, i5, i6, i7;
 
@@ -1085,20 +825,8 @@ thread (root)
 
 	entry (RS_INIEE)
 		if (ee_open ()) {
-			leds (LED_B, LED_ON);
+			leds (LED_B, LED_BLINK);
 			leds (LED_R, LED_ON);
-#if 0
-don't even try it: I don't know what I am, as it is in NVM, 
-plus we dont want to flood the sat link
-			if (!IS_SATGAT) { 
-				ser_out (RS_INIEE, noee_str);
-			} else {
-				tmpb = form (NULL, satframe_str, noee_str);
-				if (runstrand (oss_out, tmpb) == 0) {
-					ufree (tmpb);
-				}
-			}
-#endif
 
 #if STORAGE_SDCARD
 // loop: likely SD is missing
@@ -1142,21 +870,7 @@ plus we dont want to flood the sat link
 
 	entry (RS_INIT1)
 
-#ifdef BCAST_SATEST_MSG
-#if BCAST_SATEST_MSG
-// FIXME clean it into a consistent oss / sat i/f
-		set_satest;
-#endif
-#endif
-
-		if (!IS_SATGAT) {
-			ser_out (RS_INIT1, ui_obuf);
-		} else { 
-			tmpb = form (NULL, satframe_str, ui_obuf);
-			if (runstrand (oss_out, tmpb) == 0) {
-				ufree (tmpb);
-			}
-		}
+		ser_out (RS_INIT1, ui_obuf);
 		agg_init();
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
@@ -1175,18 +889,9 @@ plus we dont want to flood the sat link
 		leds (LED_G, LED_OFF);
 
 	entry (RS_INIT2)
-		if (!IS_SATGAT) {
-			ser_out (RS_INIT2, welcome_str);
-		} else {
-			tmpb = form (NULL, satframe_str, satstart_str);
-			if (runstrand (oss_out, tmpb) == 0) {
-				ufree (tmpb);
-			}
-		}
+		ser_out (RS_INIT2, welcome_str);
 
-#ifndef __SMURPH__
 		net_id = DEF_NID;
-#endif
 		tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
 
 		init_tags();
@@ -1210,18 +915,6 @@ plus we dont want to flood the sat link
 			tarp_ctrl.param &= 0xFE;
 		}
 		write_mark (MARK_BOOT);
-
-		// PG: just the OPRE code (all I need)
-		if (IS_SATGAT) {
-			ui_obuf [4] = '\0';
-			sat_rep (OPRE_APP_MENU_A);
-			// We do it three times for reliability; it would be
-			// stupid to reset the node multiple times if packets
-			// are lost.
-			sat_rep (OPRE_APP_MENU_A);
-			sat_rep (OPRE_APP_MENU_A);
-		}
-		// End PG
 
 		proceed (RS_RCMD);
 
@@ -1259,14 +952,7 @@ plus we dont want to flood the sat link
 		case ' ': proceed (RS_FREE); // ignore if starts with blank
 
                 case 'h':
-			if (!IS_SATGAT) {
-				ser_out (RS_DOCMD, welcome_str);
-			} else {
-				tmpb = form (NULL, satframe_str, satstart_str);
-				if (runstrand (oss_out, tmpb) == 0) {
-					ufree (tmpb);
-				}
-			}
+			ser_out (RS_DOCMD, welcome_str);
 			proceed (RS_FREE);
 
 		case 'T':
@@ -1387,27 +1073,6 @@ plus we dont want to flood the sat link
 			diag (OPRE_APP_ACK "all erased");
 			reset();
 
-		case 's':
-			switch (cmd_line[1]) {
-				case '+':
-					if (sat_mod == SATMOD_NO)
-						sat_mod = SATMOD_UNINIT;
-					clr_satest;
-					break;
-				case '-':
-					sat_mod = SATMOD_NO;
-					clr_satest;
-					break;
-				case '!':
-					if (sat_mod == SATMOD_NO)
-						sat_mod = SATMOD_UNINIT;
-					set_satest;
-					break;
-			}
-
-			stats (NULL);
-			proceed (RS_FREE);
-
 		case 'm':
 			 i1 = 0;
 			 scan (cmd_line+1, "%u", &i1);
@@ -1524,14 +1189,7 @@ plus we dont want to flood the sat link
 	  }
 
 	entry (RS_UIOUT)
-               if (!IS_SATGAT) { 
-                        ser_out (RS_UIOUT, ui_obuf);
-                } else { 
-                        tmpb = form (NULL, satframe_str, ui_obuf);
-                        if (runstrand (oss_out, tmpb) == 0) {
-                                ufree (tmpb);
-                        }
-                }
+		ser_out (RS_UIOUT, ui_obuf);
 		proceed (RS_FREE);
 
 	entry (RS_DUMP)

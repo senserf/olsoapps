@@ -777,8 +777,9 @@ __PUBLF (NodeCus, void, oss_setPeg_in) (word state, nid_t peg,
 				word audi, word pl, word a_fl) {
 
 	char * out_buf = get_mem (state, sizeof(msgSetPegType));
+	memset (out_buf, 0, sizeof(msgSetPegType));
 
-	in_header(out_buf, msg_type) = msg_setPeg;
+	in_header(out_buf, msg_type) = msg_setPeg; // hco == 0
 	in_header(out_buf, rcv) = peg;
 	in_setPeg(out_buf, level) = pl;
 	in_setPeg(out_buf, audi) = audi;

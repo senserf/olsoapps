@@ -44,8 +44,8 @@ __PUBLF (NodePeg, void, msg_report_out) (word state, word tIndex,
 
 	if (*out_buf == NULL)
 		*out_buf = get_mem (state, w);
-	else
-		memset (*out_buf, 0, w);
+
+	memset (*out_buf, 0, w);
 
 	in_header(*out_buf, msg_type) = msg_report;
 	in_header(*out_buf, rcv) = master_host;
@@ -136,8 +136,8 @@ __PUBLF (NodePeg, void, msg_findTag_out) (word state, char** buf_out,
 
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, sizeof(msgFindTagType));
-	else
-		memset (*buf_out, 0, sizeof(msgFindTagType));
+
+	memset (*buf_out, 0, sizeof(msgFindTagType));
 
 	in_header(*buf_out, msg_type) = msg_findTag;
 	in_header(*buf_out, rcv) = peg;
@@ -163,6 +163,7 @@ __PUBLF (NodePeg, void, msg_setPeg_in) (char * buf) {
 
 	mem = memfree (0, &mmin);
 	in_header(out_buf, msg_type) = msg_statsPeg;
+	in_header(out_buf, hco) = 0;
 	in_header(out_buf, rcv) = in_header(buf, snd);
 	in_statsPeg(out_buf, hostid) = host_id;
 	in_statsPeg(out_buf, ltime) = seconds();
@@ -218,8 +219,8 @@ __PUBLF (NodePeg, void, msg_fwd_out) (word state, char** buf_out, word size,
 					nid_t tag, nid_t peg) {
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, size);
-	else
-		memset (*buf_out, 0, size);
+
+	memset (*buf_out, 0, size);
 
 	in_header(*buf_out, msg_type) = msg_fwd;
 	in_header(*buf_out, rcv) = peg;
@@ -284,8 +285,8 @@ __PUBLF (NodePeg, void, msg_master_out) (word state, char** buf_out,
 
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, sizeof(msgMasterType));
-	else
-		memset (*buf_out, 0, sizeof(msgMasterType));
+
+	memset (*buf_out, 0, sizeof(msgMasterType));
 
 	in_header(*buf_out, msg_type) = msg_master;
 	in_header(*buf_out, rcv) = peg;
@@ -482,8 +483,8 @@ __PUBLF (NodePeg, void, msg_reportAck_out) (word state, char * buf,
 							char** out_buf) {
 	if (*out_buf == NULL)
 		*out_buf = get_mem (state, sizeof(msgReportAckType));
-	else
-		memset (*out_buf, 0, sizeof(msgReportAckType));
+
+	memset (*out_buf, 0, sizeof(msgReportAckType));
 
 	in_header(*out_buf, msg_type) = msg_reportAck;
 	in_header(*out_buf, rcv) = in_header(buf, snd);

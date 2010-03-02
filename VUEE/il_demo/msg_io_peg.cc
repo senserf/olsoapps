@@ -1,37 +1,28 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2010                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#ifdef __SMURPH__
-#include "globals_cus.h"
-#include "threadhdrs_cus.h"
-#endif
+#include "vuee_peg.h"
 
 #include "diag.h"
-#include "app_cus.h"
+#include "app_peg.h"
 #include "msg_peg.h"
 #include "oss_fmt.h"
 
 #ifdef	__SMURPH__
 
-#include "node_cus.h"
 #include "stdattr.h"
 
 #else	/* PICOS */
 
 #include "net.h"
-#include "form.h"
 
 #endif
 
-#include "attnames_cus.h"
-#include "sat_cus.h"
-
 // int tIndex is no good; we would need two zeroes...
 // this kludgy crap whould be rewritten anyway.
-__PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
-					char** out_buf, word flags) {
+void msg_report_out (word state, word tIndex, char** out_buf, word flags) {
 	word w = sizeof(msgReportType);
 
 	// we'll see about selective reporting...
@@ -39,8 +30,6 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 			tagArray[tIndex].rpload.ppload.ds != 0x80000000)
 		w += sizeof(reportPloadType);
 
-	// FIXME this is crap, I think: find tag goes through here, and
-	// doesn't need a master (?)
 	if (master_host == 0) { // nobody to report to
 		app_diag (D_INFO, "I'm a Ronin");
 		return;
@@ -54,7 +43,6 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 	in_header(*out_buf, msg_type) = msg_report; // hco == 0
 	in_header(*out_buf, rcv) = master_host;
 	in_report(*out_buf, flags) = flags;
-
 	if (tIndex & 0x8000) {
 		in_report(*out_buf, tagid) = 0;
 		in_report(*out_buf, rssi) = 0;
@@ -68,7 +56,7 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 	in_report(*out_buf, rssi) = tagArray[tIndex].rssi;
 	in_report(*out_buf, pl) = tagArray[tIndex].pl;
 	in_report(*out_buf, tStamp) = wall_date (seconds() -
-			tagArray[tIndex].evTime);
+		tagArray[tIndex].evTime);
 	in_report(*out_buf, state) = tagArray[tIndex].state;
 	in_report(*out_buf, count) = ++tagArray[tIndex].count;
 
@@ -84,7 +72,7 @@ __PUBLF (NodeCus, void, msg_report_out) (word state, word tIndex,
 	}
 }
 
-__PUBLF (NodeCus, void, msg_findTag_in) (word state, char * buf) {
+void msg_findTag_in (word state, char * buf) {
 
 	char * out_buf = NULL;
 	sint tagIndex;
@@ -123,33 +111,37 @@ __PUBLF (NodeCus, void, msg_findTag_in) (word state, char * buf) {
 		}
 	}
 	if (out_buf) {
-		in_header(out_buf, snd) = local_host;
-		oss_report_out (out_buf);
+		if (local_host == master_host) {
+			in_header(out_buf, snd) = local_host;
+			oss_report_out (out_buf);
+		} else
+			send_msg (out_buf,
+				in_report_pload(out_buf) ?
+				sizeof(msgReportType) + sizeof(reportPloadType)
+				: sizeof(msgReportType));
 
 		ufree (out_buf);
 	}
 }
 
-__PUBLF (NodeCus, void, msg_findTag_out) (word state, char** buf_out,
-							nid_t tag, nid_t peg) {
+void msg_findTag_out (word state, char** buf_out, nid_t tag, nid_t peg) {
 
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, sizeof(msgFindTagType));
 
 	memset (*buf_out, 0, sizeof(msgFindTagType));
 
-	in_header(*buf_out, msg_type) = msg_findTag; // hco == 0
+	in_header(*buf_out, msg_type) = msg_findTag;
 	in_header(*buf_out, rcv) = peg;
 	in_findTag(*buf_out, target) = tag;
 }
 
-__PUBLF (NodeCus, void, msg_setPeg_in) (char * buf) {
+void msg_setPeg_in (char * buf) {
 	word mmin, mem;
 	char * out_buf = get_mem (WNONE, sizeof(msgStatsPegType));
 
 	if (out_buf == NULL)
 		return;
-
 
 	if (in_setPeg(buf, audi) != 0xffff) {
 		tag_auditFreq = in_setPeg(buf, audi);
@@ -170,7 +162,8 @@ __PUBLF (NodeCus, void, msg_setPeg_in) (char * buf) {
 	in_statsPeg(out_buf, mts) = master_ts;
 
 	//in_statsPeg(out_buf, slot) is really # of entries
-	if (agg_data.eslot == EE_AGG_MIN && agg_data.ee.s.f.status == AGG_FF)
+	if (agg_data.eslot == EE_AGG_MIN &&
+			IS_AGG_EMPTY (agg_data.ee.s.f.status))
 		in_statsPeg(out_buf, slot) = 0;
 	else
 		in_statsPeg(out_buf, slot) = agg_data.eslot -
@@ -178,7 +171,7 @@ __PUBLF (NodeCus, void, msg_setPeg_in) (char * buf) {
 
 	in_statsPeg(out_buf, audi) = tag_auditFreq;
 	in_statsPeg(out_buf, pl) = host_pl;
-	in_statsPeg(out_buf, inp) = 0;
+	in_statsPeg(out_buf, inp) = local_host == master_host ? pow_sup : 0;
 	in_statsPeg(out_buf, mhost) = master_host;
 	in_statsPeg(out_buf, mem) = mem;
 	in_statsPeg(out_buf, mmin) = mmin;
@@ -187,7 +180,7 @@ __PUBLF (NodeCus, void, msg_setPeg_in) (char * buf) {
 	ufree (out_buf);
 }
 
-__PUBLF (NodeCus, void, msg_fwd_in) (word state, char * buf, word size) {
+void msg_fwd_in (word state, char * buf, word size) {
 
 	char * out_buf = NULL;
 	sint tagIndex;
@@ -214,8 +207,7 @@ __PUBLF (NodeCus, void, msg_fwd_in) (word state, char * buf, word size) {
 	msg4tag.tstamp = seconds();
 }
 
-__PUBLF (NodeCus, void, msg_fwd_out) (word state, char** buf_out, word size,
-					nid_t tag, nid_t peg) {
+void msg_fwd_out (word state, char** buf_out, word size, nid_t tag, nid_t peg) {
 	if (*buf_out == NULL)
 		*buf_out = get_mem (state, size);
 
@@ -226,7 +218,14 @@ __PUBLF (NodeCus, void, msg_fwd_out) (word state, char** buf_out, word size,
 	in_fwd(*buf_out, target) = tag;
 }
 
-__PUBLF (NodeCus, void, msg_master_in) (char * buf) {
+#ifndef __SMURPH__
+sint mbeacon (word, address);
+#endif
+
+void msg_master_in (char * buf) {
+	long dd = 0;
+	word mark = MARK_EMPTY;
+
 	if (master_host != in_header(buf, snd)) {
 		app_diag (D_SERIOUS, "master? %d %d", master_host,
 			in_header(buf, snd));
@@ -234,102 +233,60 @@ __PUBLF (NodeCus, void, msg_master_in) (char * buf) {
 		set_master_chg();
 	}
 
+	// do NOT react if the master doesn't have the time set
+	// and master_date is set
+	// (April 1st (90) deals with  the 'bogus set' for synchronization)
 	if (in_master(buf, mdate) < -SID * 90 ||
 			master_date > -SID * 90) {
-		master_date = in_master(buf, mdate);
-		master_ts = seconds();
+		if ((dd = wall_date (0) - in_master(buf, mdate)) > TIME_TOLER ||
+				dd < -TIME_TOLER) {
+			master_date = in_master(buf, mdate);
+			master_ts = seconds();
+			mark = MARK_DATE;
+		}
 	}
 
-	sync_freq = in_master(buf, syfreq);
+	if (sync_freq != in_master(buf, syfreq)) {
+		sync_freq = in_master(buf, syfreq);
+		mark = MARK_SYNC;
+	}
+
+	if (plot_id != in_master(buf, plotid)) {
+		plot_id = in_master(buf, plotid);
+		mark = MARK_PLOT;
+	}
 
 	if (is_master_chg) {
 		clr_master_chg;
+		if (running (mbeacon)) { // I was the Master
+			killall (mbeacon);
+			tarp_ctrl.param |= 0x01; // routing ON
+			diag (OPRE_APP_ACK "Abdicating for %u", master_host);
+		} else {
 		diag (OPRE_APP_ACK "Set master to %u", master_host);
-	}
-}
-
-// FIXME kludge alert
-#define _MAX_RPC_ 30
-__PUBLF (NodeCus, sint, msg_rpc_out) (char * bin) {
-	char bout [_MAX_RPC_ + sizeof(headerType)];
-	sint host = -1;
-	char * ptr;
-
-	if (strlen (bin) > _MAX_RPC_)
-		return -1;
-
-	bout[sizeof(headerType)] = '\0';
-	scan (bin, "%d %s", &host, bout +sizeof(headerType));
-
-	if (host < 0 || host == local_host)
-		return -2;
-
-	bout[_MAX_RPC_ + sizeof(headerType) -1] = '\0'; // just in case...
-
-	ptr = bout +sizeof(headerType);
-	do {
-		if (*ptr == '_')
-			*ptr = ' ';
-	} while (*(++ptr));
-
-	in_header(bout, msg_type) = msg_rpc;
-	in_header(bout, rcv) = host;
-	in_header(bout, hco) = 1; // no hopping
-	send_msg (bout, sizeof(headerType) +
-			strlen (&bout[sizeof(headerType)]) +1);
-	// unusually, obout is on stack
-	return 0;
-}
-#undef _MAX_RPC_
-
-__PUBLF (NodeCus, sint, msg_satest_out) (char * bin) {
-	char * bout;
-	sint len = strlen (bin);
-
-	if (len < 3 || bin[0] != 's')
-		return -1;
-
-	// we either have to terminate with '\0' or add the length, as on the
-	// other side padding skews the length. Adding '\0'.
-	if (bin[1] == ' ') { // TextMsg
-		if (len > MAX_SATLEN - SATWRAPLEN +2 -1) {
-			diag ("satest cut %d %d", len -2, 
-					MAX_SATLEN - SATWRAPLEN -1);
-			len = MAX_SATLEN - SATWRAPLEN +2 -1;
-			bin[MAX_SATLEN - SATWRAPLEN +2 -1] = '\0';
 		}
-		//AT+CMGS=TextMsg p,f,r, (22B of SATWRAPLEN) 
-		// -2 (starting at [2]) +1 (ctrl-Z) +1 ('\0')
-		len += sizeof (headerType) +  SATWRAPLEN - 2 + 1 +1;
-		if ((bout = get_mem (WNONE,len)) == NULL)
-			return -len;
-		strcpy (&bout[sizeof (headerType)], SATWRAP);
-		strcpy ( &bout[sizeof (headerType) +  SATWRAPLEN], &bin[2]);
-		bout[len -2] = (char)26; // ctrl+Z
-
-	} else { // msg -1 (starting at [1]) +1 (CR) +1 ('\0')
-		if (len > MAX_SATLEN -1) {
-			diag ("satest cut %d %d", len -1, MAX_SATLEN -1);
-			len = MAX_SATLEN -1;
-			bin[MAX_SATLEN -1] = '\0';
-		}
-		len += sizeof (headerType) -1 +1 +1;
-		if ((bout = get_mem (WNONE, len)) == NULL)
-			return -len;
-		strcpy (&bout[sizeof (headerType)], &bin[1]);
-		bout[len -2] = (char)13; // CR
-	}
-
-	bout[len -1] = '\0';
-	in_header(bout, msg_type) = msg_satest;
-	in_header(bout, rcv) = 0; // maybe it should be somehow addressed?
-	in_header(bout, hco) = 1; // no hopping
-	send_msg (bout, len);
-	ufree (bout);
-	return 0;
+		write_mark (MARK_MCHG);
+	} else
+		if (mark != MARK_EMPTY)
+			write_mark (mark);
 }
 
-__PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
+void msg_master_out (word state, char** buf_out, nid_t peg) {
+
+	if (*buf_out == NULL)
+		*buf_out = get_mem (state, sizeof(msgMasterType));
+
+	memset (*buf_out, 0, sizeof(msgMasterType));
+
+	in_header(*buf_out, msg_type) = msg_master; // hco == 0
+	in_header(*buf_out, rcv) = peg;
+
+	in_master(*buf_out, mdate) = wall_date (0);
+	in_master(*buf_out, syfreq) = sync_freq;
+	in_master(*buf_out, plotid) = plot_id;
+}
+
+void msg_pong_in (word state, char * buf, word rssi) {
 	char * out_buf = NULL; // is static needed / better here? (state)
 	sint tagIndex;
 
@@ -356,7 +313,7 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 				sizeof (pongPloadType));
 		tagArray[tagIndex].rpload.ds = wall_date (0);
 		tagArray[tagIndex].rpload.eslot = agg_data.eslot;
-		if (agg_data.ee.s.f.status != AGG_FF)
+		if (!IS_AGG_EMPTY (agg_data.ee.s.f.status))
 			tagArray[tagIndex].rpload.eslot++;
 
 	} else {
@@ -372,16 +329,21 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ds !=
 				in_pongPload(buf, ds)) {
 
-			if (is_eew_coll &&
-				       	tagArray[tagIndex].state == reportedTag)
-				write_agg ((word)tagIndex);
+			if (tagArray[tagIndex].state == reportedTag) {
+				if (is_eew_coll) {
+					write_agg ((word)tagIndex);
+				} else {
+					app_diag (D_INFO, "Unconfirmed %d",
+						tagArray[tagIndex].id);
+				}
+			}
 
 			memcpy (&tagArray[tagIndex].rpload.ppload,
 				buf + sizeof (msgPongType),
 				sizeof (pongPloadType));
 			tagArray[tagIndex].rpload.ds = wall_date (0);
 			tagArray[tagIndex].rpload.eslot = agg_data.eslot;
-			if (agg_data.ee.s.f.status != AGG_FF)
+			if (!IS_AGG_EMPTY (agg_data.ee.s.f.status))
 				tagArray[tagIndex].rpload.eslot++;
 			set_tagState (tagIndex, newTag, YES);
 		}
@@ -395,14 +357,20 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 		case newTag:
 			msg_report_out (state, tagIndex, &out_buf,
 					REP_FLAG_PLOAD);
-			set_tagState (tagIndex, confirmedTag, NO);
+			if (master_host == local_host)
+				set_tagState (tagIndex, confirmedTag, NO);
+			else
+				set_tagState (tagIndex, reportedTag, NO);
 			break;
 
 		case reportedTag:
 			tagArray[tagIndex].lastTime = seconds();
 			msg_report_out (state, tagIndex, &out_buf,
 					REP_FLAG_PLOAD);
-			set_tagState (tagIndex, confirmedTag, NO);
+			// this shit may happen if the master is changed to
+			// be local host:
+			if (master_host == local_host)
+				set_tagState (tagIndex, confirmedTag, NO);
 			break;
 
 		case confirmedTag:
@@ -430,15 +398,22 @@ __PUBLF (NodeCus, void, msg_pong_in) (word state, char * buf, word rssi) {
 	}
 
 	if (out_buf) { // won't be if I'm a Ronin
-		in_header(out_buf, snd) = local_host;
-		oss_report_out (out_buf);
+		if (local_host == master_host) {
+			// master with tags - hack the sender
+			in_header(out_buf, snd) = local_host;
+			oss_report_out (out_buf);
+		} else
+			send_msg (out_buf,
+			in_report_pload(out_buf) ?
+				sizeof(msgReportType) + sizeof(reportPloadType)
+				: sizeof(msgReportType));
 
 		ufree (out_buf);
 		out_buf = NULL;
 	}
 }
 
-__PUBLF (NodeCus, void, msg_report_in) (word state, char * buf) {
+void msg_report_in (word state, char * buf) {
 	char * out_buf = NULL;
 
 	if (!in_report_noack(buf)) { // don't ack
@@ -453,9 +428,18 @@ __PUBLF (NodeCus, void, msg_report_in) (word state, char * buf) {
 	}
 	oss_report_out (buf);
 
+	// master stacking came free
+	if (master_host != local_host) {
+		in_header(buf, rcv) = master_host;
+		send_msg (out_buf,
+			in_report_pload(out_buf) ?
+			sizeof(msgReportType) + sizeof(reportPloadType)
+			: sizeof(msgReportType));
+		in_header(buf, rcv) = local_host; // restore just in case
+	}
 }
 
-__PUBLF (NodeCus, void, msg_reportAck_in) (char * buf) {
+void msg_reportAck_in (char * buf) {
 	sint tagIndex;
 
 	if ((tagIndex = find_tags (in_reportAck(buf, tagid), 0)) < 0) {
@@ -490,8 +474,7 @@ __PUBLF (NodeCus, void, msg_reportAck_in) (char * buf) {
 	}
 }
 
-__PUBLF (NodeCus, void, msg_reportAck_out) (word state, char * buf,
-							char** out_buf) {
+void msg_reportAck_out (word state, char * buf, char** out_buf) {
 	if (*out_buf == NULL)
 		*out_buf = get_mem (state, sizeof(msgReportAckType));
 
