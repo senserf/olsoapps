@@ -6,7 +6,7 @@
 static const char ee_str[] = OPRE_APP_MENU_C "EE from %lu to %lu size %u\r\n";
 
 static const char welcome_str[] = OPRE_APP_MENU_C 
-	"*EcoNet* 1.3" OMID_CRB "Collector commands\r\n"
+	"*ILdemo*" OMID_CRB "Collector commands\r\n"
 	OPRE_APP_MENU_C 
 	"\tSet/ show:\ts [ Maj_freq [ min_freq [ rx_span [ hex:pl_vec"
 	" [ hex:c_fl ]]]]]\r\n"
@@ -36,8 +36,8 @@ static const char bad_str[] =   OPRE_APP_BAD
 
 static const char stats_str[] = OPRE_APP_STATS_C
 	"Stats for collector (%lx: %u):" OMID_CR
-	" Maj_freq %u min_freq %u rx_span %u pl %x c_fl %x" OMID_CR
-	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
+	" Mf %u mf %u rx_span %u pl %x c_fl %x" OMID_CR
+	" Uptime %lu mstats %u %u %u %u\r\n";
 
 static const char ifla_str[] = OPRE_APP_IFLA_C
 	"Flash: id %u pl %x c_fl %x Maj_freq %u min_freq %u rx_span %u\r\n";

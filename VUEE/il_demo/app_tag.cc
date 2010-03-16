@@ -46,6 +46,10 @@
 
 #define DEF_NID	85
 
+#ifndef _APP_EXPERIMENT
+#define _APP_EXPERIMENT	0
+#endif
+
 // arbitrary
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 
@@ -174,6 +178,11 @@ void sens_init () {
 void init () {
 
 	sens_init();
+
+#if _APP_EXPERIMENT
+	if (local_host % 2)
+#endif
+	       	powerdown();
 
 // put all the crap here
 
@@ -349,18 +358,21 @@ void save_ifla_t () {
 // Display node stats on UI
 void stats () {
 	char * mbuf;
-	word mmin;
-	word mem = memfree(0, &mmin);
+	word w[4];
+
+#if RADIO_TRACK_ERRORS
+	net_opt (PHYSOPT_ERROR, w);
+#else
+	w[0] = w[1] = 0;
+	w[2] = memfree (0, &w[3]);
+#endif
 
 	mbuf = form (NULL, stats_str,
 			host_id, local_host, 
 			pong_params.freq_maj, pong_params.freq_min,
 			pong_params.rx_span, pong_params.pow_levels,
 			handle_c_flags (0xFFFF), seconds(),
-			sens_data.eslot == EE_SENS_MIN &&
-			  sens_data.ee.s.f.status == SENS_FF ?
-			0 : sens_data.eslot - EE_SENS_MIN +1,
-			mem, mmin);
+			w[0], w[1], w[2], w[3]);
 	if (runstrand (oss_out, mbuf) == 0) {
 		app_diag_t (D_SERIOUS, "oss_out fork");
 		ufree (mbuf);
@@ -370,7 +382,9 @@ void stats () {
 void process_incoming (word state, char * buf, word size) {
 
   sint    	w_len;
-  
+  char * out_buf;
+  word w[4];
+
   switch (in_header(buf, msg_type)) {
 
 	case msg_setTag:
@@ -397,6 +411,40 @@ void process_incoming (word state, char * buf, word size) {
 		msg_pongAck_in (buf);
 		return;
 
+#if _APP_EXPERIMENT
+	case msg_master:
+		if ((out_buf = get_mem_t (WNONE, sizeof(msgStatsTagType))) ==
+			       	NULL) {
+			diag ("Mayday no mem");
+			return;
+		}
+
+#if RADIO_TRACK_ERRORS
+		net_opt (PHYSOPT_ERROR, w);
+#else
+		w[0] = w[1] = 0;
+		w[2] = memfree (0, &w[3]);
+#endif
+
+		in_header(out_buf, hco) = 1; // no mhopping
+		in_header(out_buf, msg_type) = msg_statsTag;
+		in_header(out_buf, rcv) = in_header(buf, snd);
+		in_statsTag(out_buf, hostid) = host_id;
+		in_statsTag(out_buf, ltime) = seconds();
+		in_statsTag(out_buf, maj) = pong_params.freq_maj;
+		in_statsTag(out_buf, min) = pong_params.freq_min;
+		in_statsTag(out_buf, span) = pong_params.rx_span;
+		in_statsTag(out_buf, pl) = pong_params.pow_levels;
+		in_statsTag(out_buf, slot) = (((lword)w[0]) << 16) | w[1];
+		in_statsTag(out_buf, mem) = w[2];
+		in_statsTag(out_buf, mmin) = w[3];
+		in_statsTag(out_buf, c_fl) = handle_c_flags (0xFFFF);
+		net_opt (PHYSOPT_TXON, NULL);
+		send_msg_t (out_buf, sizeof(msgStatsTagType));
+		net_opt (PHYSOPT_TXOFF, NULL);
+		ufree (out_buf);
+		return;
+#endif
 	default:
 		return;
   }
@@ -589,8 +637,14 @@ thread (pong)
 				send_msg_t (png_frame, sizeof(msgPongType) +
 						sizeof(pongPloadType));
 
-			} else
+			} else {
+#if _APP_EXPERIMENT
+				if (png_shift) 
+					diag ("retry %u %lu", 
+						png_shift, seconds());
+#endif
 				send_msg_t (png_frame, sizeof(msgPongType));
+			}
 
 			app_diag_t (D_DEBUG, "Pong on level %u->%u", level, w);
 			net_opt (PHYSOPT_TXOFF, NULL);
@@ -672,10 +726,11 @@ thread (pong)
 
 endthread
 
+#define BATTERY_WARN	2250
 thread (sens)
 
 	entry (SE_INIT)
-		powerup();
+		//powerup();
 		//leds (LED_R, LED_ON);
 
 		switch (sens_data.ee.s.f.status) {
@@ -715,6 +770,10 @@ thread (sens)
 #ifdef SENSOR_LIST
 	entry (SE_0)
 		read_sensor (SE_0, 0, &sens_data.ee.sval[0]);
+		if (sens_data.ee.sval[0] < BATTERY_WARN)
+			leds (LED_R, LED_BLINK);
+		else
+			leds (LED_R, LED_OFF);
 
 	entry (SE_1)
 		read_sensor (SE_1, 1,  &sens_data.ee.sval[1]);
@@ -734,6 +793,11 @@ thread (sens)
 #else
 		app_diag_t (D_WARNING, "FAKE SENSORS");
 		sens_data.ee.sval[0]++;
+		if (sens_data.ee.sval[0] % 2)
+			leds (LED_R, LED_BLINK);
+		else
+			leds (LED_R, LED_OFF);
+
 		sens_data.ee.sval[1]++;
 		sens_data.ee.sval[2]++;
 		sens_data.ee.sval[3]++;
@@ -749,9 +813,10 @@ thread (sens)
 
 		//leds (LED_R, LED_BLINK);
 		trigger (SENS_DONE);
-		powerdown();
+		//powerdown();
 		finish;
 endthread
+#undef BATTERY_WARN
 
 /*
    --------------------

@@ -16,7 +16,11 @@
 #ifndef __app_tag_data_defined__
 #define __app_tag_data_defined__
 
+#ifdef __SMURPH__
+// in hostid.cc for PicOS
 __CONST lword	host_id		__sinit (0xBACADEAD);
+#endif
+
 lword		ref_ts		__sinit (0);
 long		ref_date	__sinit (0);
 long		lh_time;
@@ -75,7 +79,7 @@ void _da (set_master_chg) (void);
 
 #else
 // PicOS
-//+++ app_diag_tag.c lib_app_tag.c msg_io_tag.c
+//+++ app_diag_tag.c lib_app_tag.c msg_io_tag.c hostid.c
 
 extern const lword     host_id;
 extern lword           ref_ts;

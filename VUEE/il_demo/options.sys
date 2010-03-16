@@ -127,3 +127,15 @@
 #define STORAGE_SDCARD 		0
 
 #define SD_KEEP_IDLE 		1
+
+#define AUTO_CLOCK_DOWN		1
+
+// we'll see
+// #define RADIO_GUARD		3
+
+// TESTING RUNS should have them set:
+#define RADIO_TRACK_ERRORS	0
+#define RADIO_DEBUG		0
+#define _APP_EXPERIMENT		0
+#define _TARP_T_LIGHT		0
+

@@ -42,4 +42,25 @@ to direct packet outging from the sink, to appropriate direction.
 
 TARP testbed & test automation: a must. Perhaps in VUEE?
 
+---100316---
+tag: RED_R blinks if battery is below 2250 (in VUEE, for odd sval[0])
+str_tag: separated :, changed sensor value formats %d->%u
+separated hostid for genihex
+No powerup is called for sensing
+Commented out the association between peg and tag's id (no check for 'id / 10')
+
+If _APP_EXPERIMENT is set, only odd local_host call powerdown()
+	on init, and a tag diag trace shows 'retry' on missing acks.
+	(Note the _TARP_T_LIGHT in tarp.c.)
+	Also, in this mode tags send stats on the master's beacon, to provide
+	periodic info about their counters and conditions. Note the crucial
+	role of rx_span here.
+
+In stats strings: slot, mem, mmin are replaced with 4 counters from
+RADIO_TRACK_ERRORS (0, 0, mem, mmin if RADIO_TRACK_ERRORS is OFF).
+Additional settings of RADIO_DEBUG, _APP_EXPERIMENT, _TARP_T_LIGHT provide 
+verbose test mode for RF and counter testing. Permanent RXON (rx_span = 1) 
+and cycle change instrument a collector for continous sensor output and 
+stats msgs (e.g. 'c <col> <agg> 4 1 1'). Be aware of rxon's impact on
+battery lifespan.
 

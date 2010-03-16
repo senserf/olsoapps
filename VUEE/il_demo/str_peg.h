@@ -6,7 +6,7 @@
 const char ee_str[] = OPRE_APP_MENU_A "EE from %lu to %lu size %u\r\n";
 
 const char welcome_str[] = OPRE_APP_MENU_A 
-	"*EcoNet* 1.3" OMID_CRB "Aggregator commands:\r\n"
+	"*ILdemo*" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
 	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
@@ -53,12 +53,12 @@ const char only_master_str[] = OPRE_APP_ILL "Only at the Master\r\n";
 const char stats_str[] = OPRE_APP_STATS_A 
 	"Stats for agg (%lx: %u):" OMID_CR
 	" Audit %u PLev %u a_fl %x Uptime %lu Mts %ld Master %u" OMID_CR
-	" Stored %lu Mem free %u min %u inp %u\r\n";
+	" mstats %u %u %u %u inp %u\r\n";
 
 const char statsCol_str[] = OPRE_APP_STATS_CA
-	"Stats for coll (%lx: %u) via %u:" OMID_CR
-	" Maj_freq %u min_freq %u rx_span %u pl %x c_fl %x" OMID_CR
-	" Uptime %lu Stored reads %lu Mem free %u min %u\r\n";
+	"Stats for coll (%lx: %u)" OMID_CR
+	" Mf %u mf %u rx_span %u pl %x c_fl %x" OMID_CR
+	" Uptime %lu mstats %u %u %u %u\r\n";
 
 const char ifla_str[] = OPRE_APP_IFLA_A
 	"Flash: id %u pl %u a_fl %x au_fr %u master %u sync_fr %u mode %u\r\n";
@@ -70,10 +70,10 @@ const char clock_str[] = OPRE_APP_T
 				"At %u-%u-%u %u:%u:%u uptime %lu\r\n";
 
 const char rep_str[] =
-	"%s  Agg %u: %u-%u-%u %u:%u:%u" OMID_CR
-	"  Col %u: %u-%u-%u %u:%u:%u%s" OMID_CR
-	"  " SENS0_DESC "%d " SENS1_DESC "%d " SENS2_DESC "%d "
-	SENS3_DESC "%d " SENS4_DESC "%d " SENS5_DESC "%d %u %lu\r\n";
+	"%s  Agg %u : %u-%u-%u %u:%u:%u" OMID_CR
+	"  Col %u : %u-%u-%u %u:%u:%u%s" OMID_CR
+	"  " SENS0_DESC "%u " SENS1_DESC "%u " SENS2_DESC "%u "
+	SENS3_DESC "%u " SENS4_DESC "%u " SENS5_DESC "%u %u %lu\r\n";
 
 const char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";
@@ -83,9 +83,9 @@ const char repNo_str[] = OPRE_APP_REP_NO
 
 const char dump_str[] = OPRE_APP_DUMP_A OMID_CR
 	"Col %u slot %lu (A: %lu) %u-%u-%u %u:%u:%u (A %u-%u-%u %u:%u:%u)"
-	OMID_CR " " SENS0_DESC "%d " SENS1_DESC "%d "
-	SENS2_DESC "%d " SENS3_DESC "%d " SENS4_DESC "%d "
-	SENS5_DESC "%d\r\n";
+	OMID_CR " " SENS0_DESC "%u " SENS1_DESC "%u "
+	SENS2_DESC "%u " SENS3_DESC "%u " SENS4_DESC "%u "
+	SENS5_DESC "%u\r\n";
 
 const char dumpmark_str[] = OPRE_APP_DMARK_A "%s %lu %u-%u-%u %u:%u:%u "
 	"%u %u %u\r\n";

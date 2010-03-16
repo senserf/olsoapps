@@ -15,7 +15,11 @@
 #ifndef __app_peg_data_defined__
 #define __app_peg_data_defined__
 
+#ifdef __SMURPH__
+// in hostid.cc for PicOS
 __CONST lword	host_id		__sinit (0xBACADEAD);
+#endif
+
 lword		master_ts	__sinit (0);
 lword		pow_ts		__sinit (0);
 lword		con_ts		__sinit (0); // these timestamps are wasteful
@@ -96,7 +100,7 @@ void _da (set_master_chg) (void);
 
 #else
 // PicOS
-//+++ app_diag_peg.c lib_app_peg.c msg_io_peg.c
+//+++ app_diag_peg.c lib_app_peg.c msg_io_peg.c hostid.c
 
 extern const lword     host_id;
 extern lword           master_ts;

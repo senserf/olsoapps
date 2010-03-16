@@ -138,18 +138,22 @@ void save_ifla () {
 // Display node stats on UI
 void stats (char * buf) {
 	char * mbuf = NULL;
-	word mmin, mem;
+	word w[4];
 
 	if (buf == NULL) {
-		mem = memfree(0, &mmin);
+
+#if RADIO_TRACK_ERRORS
+		net_opt (PHYSOPT_ERROR, w);
+#else
+		w[0] = w[1] = 0;
+		w[2] = memfree (0, &w[3]);
+#endif
+
 		mbuf = form (NULL, stats_str,
 			host_id, local_host, tag_auditFreq,
 			host_pl, handle_a_flags (0xFFFF), seconds(),
-		       	master_ts, master_host,
-			agg_data.eslot == EE_AGG_MIN &&
-			  IS_AGG_EMPTY (agg_data.ee.s.f.status) ?
-			0 : agg_data.eslot - EE_AGG_MIN +1,
-			mem, mmin, pow_sup);
+		       	master_ts, master_host, w[0], w[1], w[2], w[3],
+			pow_sup);
 	} else {
 	  switch (in_header (buf, msg_type)) {
 	    case msg_statsPeg:
@@ -158,18 +162,22 @@ void stats (char * buf) {
 			in_statsPeg(buf, audi), in_statsPeg(buf, pl),
 			in_statsPeg(buf, a_fl),
 			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
-			in_statsPeg(buf, mhost), in_statsPeg(buf, slot),
+			in_statsPeg(buf, mhost),
+		       	(word)(in_statsPeg(buf, slot) >> 16),
+			(word)in_statsPeg(buf, slot),
 			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 0);
 		break;
 
 	    case msg_statsTag:
 		mbuf = form (NULL, statsCol_str,
 			in_statsTag(buf, hostid),
-			(word)in_statsTag(buf, hostid), in_header(buf, snd),
+			(word)in_statsTag(buf, hostid),
 			in_statsTag(buf, maj), in_statsTag(buf, min),
 			in_statsTag(buf, span), in_statsTag(buf, pl),
 			in_statsTag(buf, c_fl),
-			in_statsTag(buf, ltime), in_statsTag(buf, slot),
+			in_statsTag(buf, ltime),
+		       	(word)(in_statsTag(buf, slot) >> 16),
+			(word)in_statsTag(buf, slot),
 			in_statsTag(buf, mem), in_statsTag(buf, mmin));
 		break;
 
@@ -199,10 +207,10 @@ void process_incoming (word state, char * buf, word size, word rssi) {
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
-
+#if 0
 		if (in_header(buf, snd) / 10 != local_host / 10)
 			return;
-
+#endif
 		if (in_pong_rxon(buf)) 
 			check_msg4tag (buf);
 
