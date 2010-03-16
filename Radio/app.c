@@ -137,10 +137,10 @@ static process (monitor, void)
 
   entry (MT_LOOP)
 
-	tim = mtr_time;
 	cnt = 0;
 	tot = 0;
 	utimer (&tim, YES);
+	utimer_set (tim, mtr_time);
 	while (tim) {
 		tot++;
 		if (rcvhigh)
