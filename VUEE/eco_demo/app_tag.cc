@@ -8,7 +8,7 @@
 #include "flash_stamps.h"
 
 #ifndef __SMURPH__
-#include "lhold.h"
+#include "hold.h"
 #include "board_pins.h"
 #include "sensors.h"
 #else
@@ -605,6 +605,7 @@ thread (pong)
 				next_col_time ();
 				if (lh_time <= 0)
 					proceed (PS_SENS);
+				lh_time += seconds ();
 				proceed (PS_HOLD);
 			}
 		}
@@ -620,6 +621,7 @@ thread (pong)
 		next_col_time ();
 		if (lh_time <= 0)
 			proceed (PS_SENS);
+		lh_time += seconds ();
 		//powerdown();
 
 	entry (PS_HOLD)
@@ -640,7 +642,7 @@ thread (pong)
 			}
 		}
 #endif
-		lhold (PS_HOLD, (lword *)&lh_time);
+		hold (PS_HOLD, (lword) lh_time);
 		//powerup();
 
 		// fall through

@@ -20,7 +20,7 @@
 #include "sat_cus.h"
 
 #ifndef __SMURPH__
-#include "lhold.h"
+#include "hold.h"
 #endif
 
 // elsewhere may be a better place for this:
@@ -431,7 +431,7 @@ thread (audit)
 
 		if (aud_ind-- == 0) {
 			app_diag (D_DEBUG, "Audit ends");
-			lh_time = tag_auditFreq;
+			lh_time = tag_auditFreq + seconds ();
 			proceed (AS_HOLD);
 		}
 
@@ -449,7 +449,7 @@ thread (audit)
 		proceed (AS_TAGLOOP);
 
 	entry (AS_HOLD)
-		lhold (AS_HOLD, &lh_time);
+		hold (AS_HOLD, lh_time);
 		proceed (AS_START);
 endthread
 
