@@ -54,6 +54,7 @@
     </channel>
     <nodes>
 	<defaults>
+	    <leds number="4"> <output target="socket"></output> </leds>
 	    <memory>2048 bytes</memory>
 	    <processes>16</processes>
 	    <radio>
@@ -82,14 +83,12 @@
 	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
 	</defaults>
 	<node number="0">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <pins number="12" adc="8" dac="2">
 		<output target="socket"></output>
 	    </pins>
 	    <location>1.0 1.0</location>
 	</node>
 	<node number="1">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
@@ -104,21 +103,18 @@
 	    </pins>
 	</node>
 	<node number="3">
-	    <leds number="4"> <output target="socket"></output> </leds>
 		<location>11.0 1.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
 	</node>
 	<node number="4">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <location>6.0 6.0</location>
 	    <pins number="10" adc="8">
 	    <output target="socket"></output>
 	    </pins>
 	</node>
 	<node number="5">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <uart rate="9600" bsize="12">
 		<input source="string">s 4096\r\n</input>
 	    </uart>

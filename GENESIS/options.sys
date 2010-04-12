@@ -6,4 +6,3 @@
 // uart(9), 0, 1, 2
 #define dbg_level		0x0207
 #define dbg_binary		1
-#define WATCHDOG_ENABLED	1

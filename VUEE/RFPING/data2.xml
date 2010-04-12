@@ -47,6 +47,9 @@
     </channel>
     <nodes>
 	<defaults>
+	    <leds number="4">
+		<output target="socket"></output>
+	    </leds>
 	    <memory>2048 bytes</memory>
 	    <radio>
 	    	<power>7</power>
@@ -71,9 +74,6 @@
 	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
 	</defaults>
 	<node number="0">
-	    <leds number="4">
-		<output target="socket"></output>
-	    </leds>
 	    <pins number="10" adc="8">
 		<output target="device">pins_output0.txt</output>
 		<status>1111111111</status>

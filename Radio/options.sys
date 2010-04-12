@@ -1,2 +1,0 @@
-// This one is deprecated: XEMICS should be redone
-#define RADIO_TYPE		RADIO_XEMICS

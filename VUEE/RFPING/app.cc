@@ -252,12 +252,27 @@ endthread
 
 #endif	/* PMON_NOTEVENT */
 
+thread (watchdog)
+
+    entry (WA_START)
+
+	watchdog_start ();
+
+    entry (WA_WAIT)
+
+	watchdog_clear ();
+	delay (300, WA_WAIT);
+
+endthread
+
 thread (root)
 
     entry (RS_INIT)
 
 	ibuf = (char*) umalloc (IBUFLEN);
 	ibuf [0] = 0;
+
+	runthread (watchdog);
 
 	phys_cc1100 (0, MAXPLEN);
 	// WARNING: the SMURPH model assumes that the plugin is static, i.e.,
@@ -305,6 +320,7 @@ thread (root)
 #endif
 		"S n      -> read n-th sensor\r\n"
 		"A n v    -> set n-th actuator\r\n"
+		"K        -> force watchdog reset\r\n"
 	);
 
     entry (RS_RCMDM1)
@@ -347,6 +363,10 @@ thread (root)
 #endif
 	    case 'S': proceed (RS_GETS);
 	    case 'A': proceed (RS_SETA);
+	    case 'K': {
+			killall (watchdog);
+			proceed (RS_RCMD);
+		      }
 	}
 
     entry (RS_RCMD1)

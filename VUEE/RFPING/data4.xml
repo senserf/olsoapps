@@ -51,6 +51,7 @@
     </channel>
     <nodes>
 	<defaults start="on">
+	    <leds number="4"> <output target="socket"></output> </leds>
 	    <memory>2048 bytes</memory>
 	    <radio>
 	    	<power>7</power>
@@ -81,14 +82,12 @@
 	    </sensors>
 	</defaults>
 	<node number="0">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <pins number="12" adc="8" counter="1,48,48" notifier="2,64,1600" dac="6">
 		<output target="socket"></output>
 	    </pins>
 	    <location>1.0 1.0</location>
 	</node>
 	<node number="1" start="off">
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
@@ -109,7 +108,6 @@
 		<output target="socket"></output>
 		<sensor vsize="2" delay="0.5,4.5">15</sensor>
 	    </sensors>
-	    <leds number="4"> <output target="socket"></output> </leds>
 		<location>11.0 1.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
@@ -122,14 +120,12 @@
 		<actuator vsize="2" delay="0.1">4095</actuator>
 		<sensor vsize="2"></sensor>
 	    </sensors>
-	    <leds number="4"> <output target="socket"></output> </leds>
 		<location>6.0 6.0</location>
 	    <pins number="10" adc="8">
 		<output target="socket"></output>
 	    </pins>
 	</node>
 	<node>
-	    <leds number="4"> <output target="socket"></output> </leds>
 	    <uart rate="9600" bsize="12">
 		<input source="string">s 4096\r\n</input>
 	    </uart>

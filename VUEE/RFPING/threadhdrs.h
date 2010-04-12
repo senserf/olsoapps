@@ -49,6 +49,13 @@ threadhdr (pin_monitor, Node) {
 	perform;
 };
 
+threadhdr (watchdog, Node) {
+
+	states { WA_START, WA_WAIT };
+
+	perform;
+};
+
 threadhdr (root, Node) {
 
 	char *ibuf;
@@ -137,6 +144,11 @@ static word	packet_length;
 static	word STA;
 static	long CNT, CMP;
 static	const char *MSG;
+
+// ======================================
+
+#define		WA_START	0
+#define		WA_WAIT		1
 
 // ======================================
 
