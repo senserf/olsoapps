@@ -40,6 +40,13 @@ threadhdr (rcv, NodeTag) {
 	perform;
 };
 
+threadhdr (pesens, NodeTag) {
+
+	states { PSE_LOOP, PSE_2 };
+
+	perform;
+};
+
 threadhdr (sens, NodeTag) {
 
 	states { SE_INIT, SE_0, SE_1, SE_2, SE_3, SE_4, SE_5,
@@ -95,9 +102,9 @@ threadhdr (root, NodeTag) {
 
 #include "sysio.h"
 
-int sens (word, address);
-int rxsw (word, address);
-int pong (word, address);
+procname (pesens);
+#define PSE_LOOP	0
+#define PSE_2		10
 
 procname (sens);
 #define SE_INIT		0

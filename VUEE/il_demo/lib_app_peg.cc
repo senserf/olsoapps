@@ -160,6 +160,18 @@ void check_tag (word state, word i, char** buf_out) {
 		seconds() - tagArray[i].lastTime < tag_auditFreq)
 		return;	
 
+	// do msg4tag cleanup in 1 place, even if it is a bit wasteful here:
+	// (>= instead of >, as this is called after check_msg4tag())
+	if (msg4tag.buf && in_header(msg4tag.buf, rcv) == tagArray[i].id &&
+		seconds() - msg4tag.tstamp >= ((lword)tagArray[i].freq << 1)) {
+		app_diag (D_DEBUG, "Cleared msg4tag %u ts %u",
+				tagArray[i].id, (word)msg4tag.tstamp);
+		ufree (msg4tag.buf);
+		msg4tag.buf = NULL;
+		msg4tag.tstamp = 0;
+
+	}
+
 	switch (tagArray[i].state) {
 		case newTag:
 #if 0
@@ -466,6 +478,9 @@ void check_msg4tag (char * buf) {
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) ==
 		       in_header(buf, snd)) { // msg waiting
 
+		app_diag (D_DEBUG, "Sent msg4tag %u ts %u",
+				in_header(buf, snd), (word)msg4tag.tstamp);
+
 		if (in_pong_pload(buf)) { // add ack data
 			in_setTag(msg4tag.buf, ds) = in_pongPload(buf, ds);
 			in_setTag(msg4tag.buf, refdate) = md;
@@ -576,27 +591,14 @@ void fatal_err (word err, word w1, word w2, word w3) {
 	reset();
 }
 
+// nothing allowed to change, for now
 word handle_a_flags (word a_fl) {
+
 	if (a_fl != 0xFFFF) {
-		if (a_fl & A_FL_EEW_COLL) 
-			set_eew_coll;
-		else
-			clr_eew_coll;
-
-		if (a_fl & A_FL_EEW_CONF)
-			set_eew_conf;
-		else
-			clr_eew_conf;
-
-		if (a_fl & A_FL_EEW_OVER)
-			set_eew_over;
-		else
-			clr_eew_over;
+		app_diag (D_WARNING, "No flag change allowed %d", a_fl);
 	}
 
-	return (is_eew_over ? A_FL_EEW_OVER : 0) |
-	       (is_eew_conf ? A_FL_EEW_CONF : 0) |
-	       (is_eew_coll ? A_FL_EEW_COLL : 0);
+	return app_flags;
 }
 
 sint str_cmpn (const char * s1, const char * s2, sint n) {

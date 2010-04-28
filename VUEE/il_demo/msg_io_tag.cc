@@ -146,8 +146,8 @@ void msg_setTag_in (char * buf) {
 			write_mark_t (MARK_FREQ);
 		}
 
-		if (pong_params.freq_maj != 0)
-			tmpcrap_t (1);
+		if (pong_params.freq_maj != 0 && !running(pong))
+			runthread (pong);
 	}
 
 	if (in_setTag(buf, freq_min) != 0xFFFF)
@@ -160,15 +160,16 @@ void msg_setTag_in (char * buf) {
 
 		switch (in_setTag(buf, rx_span)) {
 			case 0:
-				tmpcrap_t (2); //killall (rxsw);
+				killall (rxsw);
 				net_opt (PHYSOPT_RXOFF, NULL);
 				break;
 			case 1:
-				tmpcrap_t (2); //killall (rxsw);
+				killall (rxsw);
 				net_opt (PHYSOPT_RXON, NULL);
 				break;
 			default:
-				tmpcrap_t (0);
+				if (!running(rxsw))
+					runthread (rxsw);
 		}
 	}
 

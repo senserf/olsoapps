@@ -27,13 +27,13 @@
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
-		<sensor number="0" vsize="2" delay="0.6">10</sensor>
-		<sensor number="1" vsize="2" delay="0.6">1000</sensor>
-		<sensor number="2" vsize="2" delay="0.6">50</sensor>
-		<sensor number="3" vsize="2" delay="0.6">100</sensor>
-		<sensor number="4" vsize="2" delay="0.220">1</sensor>
-		<sensor number="5" vsize="2" delay="0.06">1</sensor>
-		<sensor number="6" vsize="2" delay="0.1">1</sensor>
+		<sensor number="0" vsize="2" delay="0.01" init="2300">2500</sensor>
+		<sensor number="1" vsize="2" delay="0.01">1000</sensor>
+		<sensor number="2" vsize="2" delay="0.01">1000</sensor>
+		<sensor number="3" vsize="2" delay="0.01">1</sensor>
+		<sensor number="4" vsize="2" delay="0.01">1</sensor>
+		<sensor number="5" vsize="2" delay="0.01">1</sensor>
+		<sensor number="6" vsize="2" delay="0.01">1</sensor>
 	    </sensors>
 	    <ptracker>
 		<output target="socket"/>

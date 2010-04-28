@@ -14,8 +14,8 @@
 #define EE_SENS_MIN	0L
 //test: #define EE_SENS_MIN (EE_SENS_MAX - 4)
 
-// check what it really is
-#define SENS_COLL_TIME	3000
+// safeguard to kill hanging collection (in ms)
+#define SENS_COLL_TIME	10
 #define NUM_SENS	6
 
 #define SENS_FF		0xF
@@ -50,8 +50,25 @@
 #define SID     (24L * 60 * 60)
 #define TIME_TOLER	2
 
-// semaphore for pongAcks
-#define ACK_IN	(&ref_ts)
+// trigger / when ids
+#define TRIGGER_BASE_ID	77
+
+// command line
+#define CMD_READER	(TRIGGER_BASE_ID +0)
+#define CMD_WRITER	(TRIGGER_BASE_ID +1)
+
+#define SENS_DONE	(TRIGGER_BASE_ID +2)
+#define OSS_DONE	(TRIGGER_BASE_ID +3)
+
+// rx switch control
+#define RX_SW_ON	(TRIGGER_BASE_ID +4)
+
+// for pongAcks
+#define ACK_IN		(TRIGGER_BASE_ID +5)
+
+#define ALRMS		(TRIGGER_BASE_ID +6)
+
+// end of trigger / when ids
 
 typedef union {
         long secs;
@@ -108,18 +125,17 @@ typedef struct sensDataStruct {
 	lword eslot;
 } sensDataType;
 
-// collector flags over OSS
-#define C_FL_EEW_COLL	1
-#define C_FL_EEW_CONF	2
-#define C_FL_EEW_OVER	4
-
-
 /* app_flags definition [default]:
    bit 0: synced (unique to tags) [0]
    bit 1: master changed (in TARP) [0]
    bit 2: ee write collected [0]
    bit 3: ee write confirmed [0]
    bit 4: ee overwrite (cyclic stack) [0]
+   bit 5:  alrms on (being reported at the moment) [0]
+
+   let's leave bits 0-7 for praxis controls and use the 2nd byte for alarms
+   bit 8:  alrm0 (motion on WARSAW_ILS) [0]
+   bit 9:  alrm1 (light on WARSAW_ILS) [0]
 */
 #define DEF_APP_FLAGS   0
 
@@ -140,5 +156,17 @@ typedef struct sensDataStruct {
 #define set_eew_over    (app_flags |= 16)
 #define clr_eew_over    (app_flags &= ~16)
 #define is_eew_over     (app_flags & 16)
+
+#define set_alrms	(app_flags |= 32)
+#define clr_alrms	(app_flags &= ~32)
+#define is_alrms	(app_flags & 32)
+
+#define set_alrm0	(app_flags |= 256)
+#define clr_alrm0	(app_flags &= ~256)
+#define is_alrm0	(app_flags & 256)
+
+#define set_alrm1	(app_flags |= 512)
+#define clr_alrm1	(app_flags &= ~512)
+#define is_alrm1	(app_flags & 512)
 
 #endif

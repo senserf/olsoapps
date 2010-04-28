@@ -102,28 +102,22 @@ word max_pwr (word p_levs) {
 }
 
 
+// only alrm0, alrm1 setable, for now
 word handle_c_flags (word c_fl) {
 
 	if (c_fl != 0xFFFF) {
-		if (c_fl & C_FL_EEW_COLL)
-			set_eew_coll;
+		if (c_fl & 256)
+			set_alrm0;
 		else
-			clr_eew_coll;
+			clr_alrm0;
 
-		if (c_fl & C_FL_EEW_CONF)
-			set_eew_conf;
+		if (c_fl & 512)
+			set_alrm1;
 		else
-			clr_eew_conf;
-
-		if (c_fl & C_FL_EEW_OVER)
-			set_eew_over;
-		else
-			clr_eew_over;
+			clr_alrm1;
 	}
 
-	return (is_eew_over ? C_FL_EEW_OVER : 0) |
-	       (is_eew_conf ? C_FL_EEW_CONF : 0) |
-	       (is_eew_coll ? C_FL_EEW_COLL : 0);
+	return app_flags;
 }
 
 void next_col_time () {

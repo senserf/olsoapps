@@ -134,17 +134,14 @@ typedef struct aggDataStruct {
 	lword eslot;
 } aggDataType;
 
-// agg flags over OSS
-#define A_FL_EEW_COLL   1
-#define A_FL_EEW_CONF   2
-#define A_FL_EEW_OVER   4
-
 /* app_flags definition [default]:
 bit 0: not used [0]
 bit 1: master changed (in TARP) [0]
 bit 2: ee write collected [0]
 bit 3: ee write confirmed [0]
 bit 4: ee overwrite (cyclic stack) [0]
+
+note that on tags the 2nd byte is used for alarms
 */
 #define DEF_APP_FLAGS   0x0
 

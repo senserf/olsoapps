@@ -200,7 +200,6 @@ void write_agg (word ti);
 void write_mark (word what);
 word r_a_d (void);
 word handle_a_flags (word a_fl);
-void tmpcrap (word);
 sint str_cmpn (const char * s1, const char * s2, sint n);
 long wall_date (long s);
 

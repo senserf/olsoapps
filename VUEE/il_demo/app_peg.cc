@@ -9,7 +9,7 @@
 #include "flash_stamps.h"
 
 #ifndef __SMURPH__
-#include "lhold.h"
+#include "hold.h"
 #endif
 
 #define __dcx_def__
@@ -404,6 +404,7 @@ thread (audit)
 					seconds() - con_ts > 3 * aud_lhtime)
 				leds (LED_B, LED_BLINK);
 
+			aud_lhtime += seconds();
 			proceed (AS_HOLD);
 		}
 
@@ -427,22 +428,10 @@ thread (audit)
 		proceed (AS_TAGLOOP);
 
 	entry (AS_HOLD)
-		lhold (AS_HOLD, &aud_lhtime);
+		hold (AS_HOLD, aud_lhtime);
 		proceed (AS_START);
 endthread
 #undef POW_FREQ_SHIFT
-
-void tmpcrap (word what) {
-	switch (what) {
-		case 0:
-			if (tag_auditFreq != 0 && !running (audit))
-				runthread (audit);
-			return;
-
-		default:
-			app_diag (D_SERIOUS, "Crap");
-	}
-}
 
 /*
    --------------------
@@ -770,13 +759,6 @@ void oss_setTag_in (word state, word tag,
 	char * set_buf = NULL;
 	sint size = sizeof(msgFwdType) + sizeof(msgSetTagType);
 
-#if 0
-       	already checked
-	if (peg == 0 || tag == 0) {
-		app_diag (D_WARNING, "set: no zeroes");
-		return;
-	}
-#endif
 	// alloc and prepare msg fwd
 	msg_fwd_out (state, &out_buf, size, tag, peg);
 	// get offset for payload - setTag msg
@@ -1112,7 +1094,7 @@ thread (root)
 				proceed (RS_UIOUT);
 			}
 
-			if (i2 <= 0)
+			if (i2 < 0)
 				i2 = local_host;
 
 			oss_setTag_in (RS_DOCMD, i1, i2, i3, i4, i5, i6, i7);

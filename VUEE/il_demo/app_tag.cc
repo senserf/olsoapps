@@ -8,7 +8,7 @@
 #include "flash_stamps.h"
 
 #ifndef __SMURPH__
-#include "lhold.h"
+#include "hold.h"
 #include "board_pins.h"
 #include "sensors.h"
 #else
@@ -53,15 +53,6 @@
 // arbitrary
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 
-// Semaphore for command line
-#define CMD_READER	(&cmd_line)
-#define CMD_WRITER	((&cmd_line)+1)
-#define SENS_DONE	(&lh_time)
-#define OSS_DONE	((&lh_time) +1)
-
-// rx switch control
-#define RX_SW_ON	(&pong_params.rx_span)
-
 #include "dconv.ch"
 
 // =============
@@ -85,25 +76,6 @@ void fatal_err_t (word err, word w1, word w2, word w3) {
 		halt();
 	}
 	reset();
-}
-
-// will go away when we can see processes from other files
-void tmpcrap_t (word what) {
-	switch (what) {
-		case 0:
-			if (!running(rxsw))
-				runthread (rxsw);
-			break;
-		case 1:
-			if (!running(pong))
-				runthread (pong);
-			break;
-		case 2:
-			killall (rxsw);
-			break;
-		default:
-			app_diag_t (D_SERIOUS, "Crap");
-	}
 }
 
 void sens_init () {
@@ -586,7 +558,7 @@ thread (pong)
 		png_shift = 0;
 
 		// not sure this is a good idea... spread pongs:
-		delay (rnd() % 5000, PS_SEND);
+		delay (rnd() % 100, PS_SEND);
 		release;
 
 	entry (PS_SEND)
@@ -663,8 +635,10 @@ thread (pong)
 			} else {
 				leds (LED_B, LED_OFF);
 				next_col_time ();
-				if (lh_time <= 0)
+				if (lh_time <= 0 || is_alrms)
 					proceed (PS_SENS);
+
+				lh_time += seconds();
 				proceed (PS_HOLD);
 			}
 		}
@@ -679,29 +653,18 @@ thread (pong)
 
 		leds (LED_B, LED_BLINK);
 		next_col_time ();
-		if (lh_time <= 0)
+		if (lh_time <= 0 || is_alrms)
 			proceed (PS_SENS);
+
+		lh_time += seconds();
 		//powerdown();
 
 	entry (PS_HOLD)
+		when (ALRMS, PS_SENS);
 
-#if 0
-	that was GLACIER:
+		// lh_time was patched over patches...
+		hold (PS_HOLD, (lword)lh_time);
 
-		while (lh_time != 0) {
-			if (lh_time > MAX_UINT) {
-				lh_time -= MAX_UINT;
-				freeze (MAX_UINT);
-			} else {
-				diag ("ifreeze %d %d", (word)seconds(),
-						(word)lh_time);
-				freeze ((word)lh_time);
-				diag ("ofreeze %d", (word)seconds());
-				lh_time = 0;
-			}
-		}
-#endif
-		lhold (PS_HOLD, (lword *)&lh_time);
 		//powerup();
 
 		// fall through
@@ -725,6 +688,44 @@ thread (pong)
 		release;
 
 endthread
+
+// for the light measurements, this has to loop frequently, no matter if alrms
+// are ON... It is unlikely to be prohibitive on pwoer budget, but we'll see.
+#define ALRM_FREQ		2050
+// arbitrary, to be set in experiments
+#define SENS_LIGHT_THOLD	10
+#define SENS_MOTION_THOLD	0
+#define ALRM_COOL		15
+thread (pesens)
+
+	entry (PSE_LOOP)
+		read_sensor (PSE_LOOP, 1, &permalrm[0]); // light
+		if (is_alrm0 && !is_alrms && permalrm[0] > SENS_LIGHT_THOLD &&
+				seconds() - alrm_ts > ALRM_COOL) {
+			alrm_ts = seconds();
+			trigger (ALRMS);
+			set_alrms;
+		}
+		if (permalrm[0] > permalrm[1])
+			permalrm[1] = permalrm[0]; // store max
+
+	 entry (PSE_2)
+		read_sensor (PSE_2, 2, &permalrm[0]); // 2nd motion
+		if (is_alrm1 && !is_alrms && permalrm[0] > SENS_MOTION_THOLD &&
+				seconds() - alrm_ts > ALRM_COOL) {
+			alrm_ts = seconds();
+			trigger (ALRMS);
+			set_alrms;
+		}
+		permalrm[2] += permalrm[0];
+
+		delay (ALRM_FREQ, PSE_LOOP);
+		release;
+endthread;
+#undef ALRM_FREQ
+#undef SENS_LIGHT_THOLD
+#undef SENS_MOTION_THOLD
+#undef ALRM_COOL
 
 #define BATTERY_WARN	2250
 thread (sens)
@@ -777,17 +778,25 @@ thread (sens)
 
 	entry (SE_1)
 		read_sensor (SE_1, 1,  &sens_data.ee.sval[1]);
+		if (sens_data.ee.sval[1] < permalrm[1])
+			sens_data.ee.sval[1] = permalrm[1];
+		permalrm[1] = 0;
 
 	entry (SE_2)
-		read_sensor (SE_2, 2,  &sens_data.ee.sval[2]);
+		read_sensor (SE_2, 2, &sens_data.ee.sval[2]);
+		sens_data.ee.sval[2] += permalrm[2];
+		permalrm[2] = 0;
 
 	entry (SE_3)
+		// analog motion - empty call
 		read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
 
 	entry (SE_4)
+		// empty call
 		read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
 
 	 entry (SE_5)
+		// empty call
 		read_sensor (SE_5, 5, &sens_data.ee.sval[5]);
 
 #else
@@ -810,6 +819,14 @@ thread (sens)
 	entry (SE_DONE)
 		sens_data.ee.s.f.status = SENS_COLLECTED;
 		sens_data.ee.s.f.mark = MARK_FF;
+
+		// kludge alert: sens[4] is app_flags, sval[5] is spare 0
+		// sooner or later, we'll clean it - not sooner than we know
+		// the praxis requirements, including the personal collector
+	        // (wrietwatch).
+		sens_data.ee.sval[4] = app_flags;
+		sens_data.ee.sval[5] = 0;	
+		clr_alrms;
 
 		//leds (LED_R, LED_BLINK);
 		trigger (SENS_DONE);
@@ -919,6 +936,7 @@ thread (root)
 
 		net_id = DEF_NID;
 		tarp_ctrl.param &= 0xFE; // routing off
+		 runthread (pesens);
 		runthread (sens);
 
 		// give sensors time & spread a bit
@@ -1062,6 +1080,7 @@ thread (root)
 		}
 
 		if (cmd_line[0] == 's') {
+
 			i1 = i2 = i3 = i4 = i5 = -1;
 
 			// Maj, min, rx_span, pow_level

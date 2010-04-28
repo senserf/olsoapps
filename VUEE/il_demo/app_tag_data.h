@@ -24,6 +24,7 @@ __CONST lword	host_id		__sinit (0xBACADEAD);
 lword		ref_ts		__sinit (0);
 long		ref_date	__sinit (0);
 long		lh_time;
+lword		alrm_ts		__sinit (0);
 
 sensDataType	sens_data;
 pongParamsType	pong_params	__sinit (60, 5, 0x7777, 2048, 0, 0);
@@ -38,6 +39,8 @@ word 		app_flags	__sinit (DEF_APP_FLAGS);
 word		plot_id		__sinit (0);
 
 word		png_shift;
+
+word		permalrm[3]	__sinit (0, 0, 0);
 
 sint		rcv_psize 	__sinit (0);
 
@@ -64,6 +67,7 @@ void _da (set_master_chg) (void);
 #define ref_ts          _daprx (ref_ts)
 #define ref_date        _daprx (ref_date)
 #define lh_time		_daprx (lh_time)
+#define alrm_ts		_daprx (alrm_ts)
 #define sens_data	_daprx (sens_data)
 #define pong_params	_daprx (pong_params)
 #define sens_dump	_daprx (sens_dump)
@@ -74,6 +78,7 @@ void _da (set_master_chg) (void);
 #define app_flags	_daprx (app_flags)
 #define plot_id         _daprx (plot_id)
 #define png_shift       _daprx (png_shift)
+#define permalrm	_daprx (permalrm)
 #define rcv_psize	_daprx (rcv_psize)
 #define png_frame	_daprx (png_frame)
 
@@ -85,6 +90,7 @@ extern const lword     host_id;
 extern lword           ref_ts;
 extern long            ref_date;
 extern long            lh_time;
+extern lword		alrm_ts;
 extern sensDataType    sens_data;
 extern pongParamsType  pong_params;
 extern sensEEDumpType  * sens_dump;
@@ -95,6 +101,7 @@ extern char	       * rcv_buf;
 extern word            app_flags;
 extern word            plot_id;
 extern word            png_shift;
+extern word		permalrm[];
 extern sint	       rcv_psize;
 extern char	       png_frame[];
 
@@ -136,7 +143,6 @@ void write_mark_t (word what);
 word r_a_d_t (void);
 void upd_on_ack (long ds, long rd, word syfr, word ackf, word pi);
 word handle_c_flags (word c_fl);
-void tmpcrap_t (word);
 long wall_date_t (long s);
 
 const char * markName_t (statu_t s);
@@ -152,6 +158,7 @@ word map_level (word l);
 	host_id		= (lword) preinit ("HID");
 	ref_ts		= 0;
 	ref_date	= 0;
+	alrm_ts		= 0;
 	pong_params.freq_maj = 60;
 	pong_params.freq_min = 5;
 	pong_params.pow_levels = 0x7777;
@@ -165,6 +172,7 @@ word map_level (word l);
 	rcv_buf		= NULL;
 	app_flags	= DEF_APP_FLAGS;
 	plot_id		= 0;
+	permalrm[0] = permalrm[1] = permalrm[2] = 0;
 	rcv_psize	= 0;
 
 #endif

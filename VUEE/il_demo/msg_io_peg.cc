@@ -145,7 +145,8 @@ void msg_setPeg_in (char * buf) {
 
 	if (in_setPeg(buf, audi) != 0xffff) {
 		tag_auditFreq = in_setPeg(buf, audi);
-		tmpcrap (0);
+		if (tag_auditFreq != 0 && !running (audit))
+			runthread (audit);
 	}
 
 	if (in_setPeg(buf, level) != 0xffff) {
@@ -205,6 +206,8 @@ void msg_fwd_in (word state, char * buf, word size) {
 		ufree (msg4tag.buf); // discard old message
 	msg4tag.buf = out_buf;
 	msg4tag.tstamp = seconds();
+	app_diag (D_DEBUG, "Stored msg4tag %u", 
+			in_fwd(buf, target));
 }
 
 void msg_fwd_out (word state, char** buf_out, word size, nid_t tag, nid_t peg) {
@@ -448,7 +451,7 @@ void msg_reportAck_in (char * buf) {
 		return;
 	}
 
-	app_diag (D_DEBUG, "Ack (in %u) for %lx in %u",
+	app_diag (D_DEBUG, "Ack (in %u) for %u in %u",
 		in_reportAck(buf, state),
 		tagArray[tagIndex].id, tagArray[tagIndex].state);
 
@@ -468,7 +471,7 @@ void msg_reportAck_in (char * buf) {
 			break;
 
 		default:
-			app_diag (D_INFO, "Ignoring Ack for %lx on %u",
+			app_diag (D_INFO, "Ignoring Ack for %u in %u",
 				tagArray[tagIndex].id,
 				tagArray[tagIndex].state);
 	}
