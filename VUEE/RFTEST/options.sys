@@ -1,0 +1,21 @@
+#define VUEE_LIB_PLUG_NULL
+
+#undef	STORAGE_AT45XXX
+#undef	CRYSTAL2_RATE
+#undef	UART_DRIVER
+#undef	UART_TCV
+#undef	RADIO_TRACK_ERRORS
+
+#define	TCV_PRESENT	1
+#define	TCV_HOOKS	0
+#define	TCV_TIMERS	0
+
+#define	UART_DRIVER	0
+#define	CODE_LONG_INTS	1
+
+#define	CC1100		1
+#define	RADIO_USE_LEDS	7
+
+#define	UART_TCV		1
+#define	UART_TCV_MODE		UART_TCV_MODE_L
+#define	RADIO_TRACK_ERRORS	1

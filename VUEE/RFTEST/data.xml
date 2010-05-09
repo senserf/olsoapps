@@ -1,0 +1,45 @@
+<network nodes="8" radio="8">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	</defaults>
+	<node number="0" start="on">
+	    <location>450.0 375.0</location>
+	    <preinit tag="HID" type="lword">0x07000010</preinit>
+	</node>
+	<node number="1" start="on">
+	    <location>305.0 285.0</location>
+	    <preinit tag="HID" type="lword">0x07000011</preinit>
+	</node>
+        <node number="2" start="on">
+            <location>390.0 290.0</location>
+            <preinit tag="HID" type="lword">0x07000012</preinit>
+        </node>
+        <node number="3" start="on">
+            <location>475.0 305.0</location>
+            <preinit tag="HID" type="lword">0x47000013</preinit>
+        </node>
+
+	<node number="4" start="on">
+	    <location>240.0 335.0</location>
+	    <preinit tag="HID" type="lword">0x07000014</preinit>
+	</node>
+        <node number="5" type="tag" start="on">
+            <location>247.0 307.0</location>
+            <preinit tag="HID" type="lword">0x07000015</preinit>
+        </node>
+        <node number="6" type="tag" start="on">
+            <location>250.0 335.0</location>
+            <preinit tag="HID" type="lword">0x07000016</preinit>
+        </node>
+
+       <node number="7" type="tag" start="on">
+            <location>460.0 230.0</location>
+            <preinit tag="HID" type="lword">0x07000017</preinit>
+        </node>
+
+    </nodes>
+</network>
