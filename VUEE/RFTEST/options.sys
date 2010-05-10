@@ -18,4 +18,17 @@
 
 #define	UART_TCV		1
 #define	UART_TCV_MODE		UART_TCV_MODE_L
-#define	RADIO_TRACK_ERRORS	1
+#define	RADIO_OPTIONS		(0x01 + 0x04 + 0x40)
+#define	RADIO_CRC_MODE		2
+
+#if RADIO_CRC_MODE < 2
+#define	MAX_PACKET_LENGTH	62
+#else
+#define	MAX_PACKET_LENGTH	60
+#endif
+
+#ifdef BOARD_WARSAW
+#define	NUMBER_OF_SENSORS	0
+#else
+#define	NUMBER_OF_SENSORS	4
+#endif

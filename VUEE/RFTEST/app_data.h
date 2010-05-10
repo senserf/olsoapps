@@ -3,7 +3,6 @@
 #ifndef	MAX_NODES
 
 #define	MAX_NODES		8
-#define	NUMBER_OF_SENSORS	4
 
 // ============================================================================
 //
@@ -89,7 +88,6 @@
 
 // ============================================================================
 
-#define	MAX_PACKET_LENGTH	60
 #define	MIN_SEND_INTERVAL	256
 #define	UART_LINE_LENGTH	82
 #define	RF_COMMAND_SPACING	1024
@@ -124,6 +122,8 @@ word	g_pkt_mindel __sinit (1024), g_pkt_maxdel __sinit (1024), g_rep_cnt,
 	g_sen_cnt;
 
 char	*g_snd_rcmd __sinit (NULL);
+
+byte	*g_reg_suppl __sinit (NULL);
 
 address	g_rcv_ackrp __sinit (NULL), g_snd_pkt;
 
@@ -165,6 +165,7 @@ lword 	host_id;
 #define	g_flags		_daprx (g_flags)
 #define	host_id		_daprx (host_id)
 #define	g_rep_nodes	_daprx (g_rep_nodes)
+#define	g_reg_suppl	_daprx (g_reg_suppl)
 
 #else
 
@@ -176,6 +177,7 @@ extern	word	g_rep_cnt, g_snd_rnode, g_snd_sernum, g_snd_rtries, g_err_stat,
 		g_snd_rcode, g_flags;
 extern	char	*g_snd_rcmd;
 extern	noded_t	g_rep_nodes [];
+extern	byte	*g_reg_suppl;
 
 #endif
 
@@ -206,6 +208,7 @@ g_snd_sernum = 1;
 g_snd_rnode = g_snd_count = g_flags = 0;
 g_snd_rcmd = NULL;
 g_rcv_ackrp = NULL;
+g_reg_suppl = NULL;
 memset (g_rep_nodes, 0, sizeof (g_rep_nodes));
 host_id = (lword) preinit ("HID");
 

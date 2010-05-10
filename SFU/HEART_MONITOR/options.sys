@@ -13,11 +13,6 @@
 
 
 
-// These options are for testing only, feel free to remove
-
-#undef	RADIO_GUARD
-#define	RADIO_GUARD	1
-
 #undef	CRC_ISO3309
 #define	CRC_ISO3309	1
 

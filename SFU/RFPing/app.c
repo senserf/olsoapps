@@ -249,7 +249,6 @@ int snd_stop (void) {
 #define	RS_RCMD		10
 #define	RS_SND		20
 #define RS_RCV		30
-#define	RS_PAR		40
 #define	RS_QRCV		50
 #define	RS_QXMT		60
 #define	RS_QUIT		70
@@ -280,7 +279,6 @@ process (root, int)
 		"Commands:\r\n"
 		"s intvl  -> start/reset sending interval (2 secs default)\r\n"
 		"r        -> start receiver\r\n"
-		"d i v    -> change phys parameter i to v\r\n"
 		"o        -> stop receiver\r\n"
 		"t        -> stop transmitter\r\n"
 		"q        -> stop both\r\n"
@@ -296,8 +294,6 @@ process (root, int)
 		proceed (RS_SND);
 	if (ibuf [0] == 'r')
 		proceed (RS_RCV);
-	if (ibuf [0] == 'd')
-		proceed (RS_PAR);
 	if (ibuf [0] == 'q')
 		proceed (RS_QUIT);
 	if (ibuf [0] == 'o')
@@ -362,22 +358,6 @@ process (root, int)
 
 	proceed (RS_RCMD);
 
-  entry (RS_PAR)
-
-	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 2)
-		proceed (RS_RCMD+1);
-
-	if (p [0] > 5)
-		proceed (RS_RCMD+1);
-
-	tcv_control (sfd, PHYSOPT_SETPARAM, p);
-
-  entry (RS_PAR+1)
-
-	ser_outf (RS_PAR+1, "Parameter %u set to %u\r\n", p [0], p [1]);
-
-	proceed (RS_RCMD);
-
   entry (RS_SSID)
 
 	n1 = 0;
@@ -391,7 +371,6 @@ endprocess (1)
 #undef	RS_RCMD
 #undef	RS_SND
 #undef 	RS_RCV
-#undef	RS_PAR
 #undef	RS_QRCV
 #undef	RS_QXMT
 #undef	RS_QUIT

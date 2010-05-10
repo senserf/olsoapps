@@ -130,12 +130,10 @@
 
 #define AUTO_CLOCK_DOWN		1
 
-// we'll see
-// #define RADIO_GUARD		3
+// TESTING RUNS should have this set (see cc1100.h):
+#define	RADIO_OPTIONS		0
+// #define RADIO_OPTIONS	(1+4)
 
-// TESTING RUNS should have them set:
-#define RADIO_TRACK_ERRORS	0
-#define RADIO_DEBUG		0
 #define _APP_EXPERIMENT		0
 #define _TARP_T_LIGHT		0
 

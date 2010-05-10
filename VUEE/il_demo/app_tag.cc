@@ -332,7 +332,7 @@ void stats () {
 	char * mbuf;
 	word w[4];
 
-#if RADIO_TRACK_ERRORS
+#if (RADIO_OPTIONS & 0x04)
 	net_opt (PHYSOPT_ERROR, w);
 #else
 	w[0] = w[1] = 0;
@@ -391,7 +391,7 @@ void process_incoming (word state, char * buf, word size) {
 			return;
 		}
 
-#if RADIO_TRACK_ERRORS
+#if (RADIO_OPTIONS & 0x04)
 		net_opt (PHYSOPT_ERROR, w);
 #else
 		w[0] = w[1] = 0;

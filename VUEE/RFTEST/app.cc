@@ -19,7 +19,22 @@
 #include "sensors.h"
 #endif
 
+static const char *skip_blk (const char *cb) {
+//
+// Skip blanks
+//
+	while (*cb == ' ' || *cb == '\t' || *cb == ',') cb++;
+	return cb;
+}
 
+static const char *skip_del (const char *cb) {
+//
+// Skip through a delimiter
+//
+	while (*cb != ' ' && *cb != '\t' && *cb != '\0' && *cb != ',') cb++;
+	return skip_blk (cb);
+}
+	
 void confirm (word sender, word sernum, word code) {
 //
 // Send an ACK
@@ -156,8 +171,8 @@ word do_command (const char *cb, word sender, word sernum) {
 		if (g_snd_rcmd != NULL || g_snd_rnode != 0)
 			// Busy
 			return 3;
-		cb++;
-		while (*cb == ' ' || *cb == '\t') cb++;
+
+		cb = skip_blk (++cb);
 		// This must be a digit
 		if (*cb < '0' || *cb > '9')
 			return 4;
@@ -168,9 +183,7 @@ word do_command (const char *cb, word sender, word sernum) {
 			return 4;	// Format error
 
 		// Skip the number
-		while (*cb != ' ' && *cb != '\t' && *cb != '\0') cb++;
-		// And following blanks
-		while (*cb == ' ' || *cb == '\t') cb++;
+		cb = skip_del (cb);
 
 		if ((sl = strlen (cb)) == 0) {
 			g_snd_rnode = 0;
@@ -290,8 +303,87 @@ word do_command (const char *cb, word sender, word sernum) {
 
 		g_flags &= ~0x4000;
 		return 0;
-	}
 
+	    case 'm': {
+
+		// Modify CC1100 register
+
+		word n, v;
+		const char *cq;
+		byte *rs;
+
+		// Count the values
+		n = 0;
+		cq = cb + 1;
+
+		while (1) {
+			cq = skip_blk (cq);
+			if (*cq == '\0')
+				break;
+			n++;
+			cq = skip_del (cq);
+		}
+
+		if (n == 0) {
+			// This means remove previous table
+			if (g_reg_suppl) {
+				rs = NULL;
+CDiff:
+				// ufree (NULL) is legal
+				ufree (g_reg_suppl);
+				g_reg_suppl = rs;
+				tcv_control (g_fd_rf, PHYSOPT_RESET,
+					(address)g_reg_suppl);
+			}
+		} else {
+			if (n & 1)
+				return 4;
+			if ((rs = (byte*) umalloc (n + 1)) == NULL)
+				return 5;
+			// Collect the numbers
+			cq = cb + 1;
+			n = 0;
+			while (1) {
+				cq = skip_blk (cq);
+				if (*cq == '\0')
+					break;
+				v = WNONE;
+				scan (cq, "%x", &v);
+				if (v > 0xff) {
+					ufree (rs);
+					return 4;
+				}
+				rs [n++] = (byte) v;
+				cq = skip_del (cq);
+			}
+
+			rs [n] = 0xff;
+
+			// Check if this is a different table
+			if (!g_reg_suppl)
+				// Different, the previous one was empty
+				goto CDiff;
+
+			n = 0;
+			while (1) {
+				if (g_reg_suppl [n] != rs [n])
+					// Different
+					goto CDiff;
+				n++;
+				if (g_reg_suppl [n] != rs [n])
+					goto CDiff;
+				if (rs [n] == 0xff)
+					// The end
+					break;
+				n++;
+			}
+			// Same
+			ufree (rs);
+		}
+		// Do nothing
+		return 0;
+	    }
+	}
 	return 7;
 }
 
@@ -374,7 +466,7 @@ void update_count (word node) {
 
 void reset_count () {
 
-	g_rep_nodes [0] . Node = 0;
+	memset (g_rep_nodes,  0, sizeof (g_rep_nodes));
 	g_snd_count = 0;
 	tcv_control (g_fd_rf, PHYSOPT_ERROR, NULL);
 }
@@ -397,8 +489,6 @@ void view_packet (address p, word pl) {
 	address packet;
 	word ns;
 
-	// From: %d, XP: %d, PW: %c, SN: %d ... %d
-
 	if (pl <= POFF_SEN + 1)
 		ns = 0;
 	else
@@ -410,18 +500,17 @@ void view_packet (address p, word pl) {
 
 	ns = p [pl - 1];
 
-	// From: xxxxx, PL: xx, XP: x, RS: xxx, LQ: xxx, PW: x,
-	uart_outf (WNONE, "S: %d, L: %d, P: %d, R: %d, Q: %d, M %c"
+	uart_outf (WNONE, "S: %u, L: %u, P: %u, R: %u, Q: %u, M %c"
 #if NUMBER_OF_SENSORS > 0
-		", V: %d"
+		", V: %u"
 #if NUMBER_OF_SENSORS > 1
-		", %d"
+		", %u"
 #if NUMBER_OF_SENSORS > 2
-		", %d"
+		", %u"
 #if NUMBER_OF_SENSORS > 3
-		", %d"
+		", %u"
 #if NUMBER_OF_SENSORS > 4
-		", %d"
+		", %u"
 #endif
 #endif
 #endif
@@ -511,11 +600,11 @@ thread (thread_rreporter)
 
   entry (UF_START)
 
-	uart_outf (UF_START, "Stats of node %d:", g_rcv_ackrp [POFF_RCV]);
+	uart_outf (UF_START, "Stats of node %u:", g_rcv_ackrp [POFF_RCV]);
 
   entry (UF_FIXED)
 
-	uart_outf (UF_FIXED, "Sent: %d", g_rcv_ackrp [POFF_SENT]);
+	uart_outf (UF_FIXED, "Sent: %u", g_rcv_ackrp [POFF_SENT]);
 
 	// Use these as counters
 	g_rcv_ackrp [POFF_SND] = 0;
@@ -524,7 +613,7 @@ thread (thread_rreporter)
   entry (UF_NEXT)
 
 	if (g_rcv_ackrp [POFF_SND] < g_rcv_ackrp [POFF_NNOD]) {
-		uart_outf (UF_NEXT, "Received from %d: %d",
+		uart_outf (UF_NEXT, "Received from %u: %u",
 			g_rcv_ackrp [g_rcv_ackrp [POFF_SER]    ],
 			g_rcv_ackrp [g_rcv_ackrp [POFF_SER] + 1]);
 
@@ -535,7 +624,7 @@ thread (thread_rreporter)
 
   entry (UF_DRIV)
 
-	uart_outf (UF_DRIV, "Driver stats: %d, %d, %d, %d",
+	uart_outf (UF_DRIV, "Driver stats: %u, %u, %u, %u",
 			g_rcv_ackrp [POFF_DRVT],
 			g_rcv_ackrp [POFF_DRVC],
 			g_rcv_ackrp [POFF_DRVL],
@@ -560,13 +649,13 @@ thread (thread_ureporter)
 
   entry (RE_FIXED)
 
-	uart_outf (RE_FIXED, "Sent: %d", g_snd_count);
+	uart_outf (RE_FIXED, "Sent: %u", g_snd_count);
 	g_rep_cnt = 0;
 
   entry (RE_NEXT)
 
 	if (g_rep_cnt < MAX_NODES && g_rep_nodes [g_rep_cnt] . Node != 0) {
-		uart_outf (RE_NEXT, "Received from %d: %d",
+		uart_outf (RE_NEXT, "Received from %u: %u",
 			g_rep_nodes [g_rep_cnt] . Node,
 			g_rep_nodes [g_rep_cnt] . Count);
 		g_rep_cnt++;
@@ -576,7 +665,7 @@ thread (thread_ureporter)
   entry (RE_DRIV)
 
 	tcv_control (g_fd_rf, PHYSOPT_ERROR, errs);
-	uart_outf (RE_DRIV, "Driver stats: %d, %d, %d, %d",
+	uart_outf (RE_DRIV, "Driver stats: %u, %u, %u, %u",
 					errs [0], errs [1], errs [2], errs [3]);
 	finish;
 

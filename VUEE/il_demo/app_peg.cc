@@ -142,7 +142,7 @@ void stats (char * buf) {
 
 	if (buf == NULL) {
 
-#if RADIO_TRACK_ERRORS
+#if (RADIO_OPTIONS & 0x04)
 		net_opt (PHYSOPT_ERROR, w);
 #else
 		w[0] = w[1] = 0;
