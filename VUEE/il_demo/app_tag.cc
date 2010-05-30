@@ -699,7 +699,13 @@ endthread
 thread (pesens)
 
 	entry (PSE_LOOP)
+
+		if (running (sens)) { // don't interleave analog light & power
+			delay (ALRM_FREQ, PSE_LOOP);
+			release;
+		}
 		read_sensor (PSE_LOOP, 1, &permalrm[0]); // light
+
 		if (is_alrm0 && !is_alrms && permalrm[0] > SENS_LIGHT_THOLD &&
 				seconds() - alrm_ts > ALRM_COOL) {
 			alrm_ts = seconds();
@@ -710,7 +716,7 @@ thread (pesens)
 			permalrm[1] = permalrm[0]; // store max
 
 	 entry (PSE_2)
-		read_sensor (PSE_2, 2, &permalrm[0]); // 2nd motion
+		read_sensor (PSE_2, 2, &permalrm[0]); // motion
 		if (is_alrm1 && !is_alrms && permalrm[0] > SENS_MOTION_THOLD &&
 				seconds() - alrm_ts > ALRM_COOL) {
 			alrm_ts = seconds();

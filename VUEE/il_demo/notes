@@ -177,4 +177,8 @@ TESTING
  filtered out to show only intended user output. In larger deployment, a
  collector -> aggregator subscription mechanism is desirable (and easy).
 
- 
+---100530---
+
+- made analog power & light readings mutually exclusive in pesens, sens threads;
+- added mlakes_27_1.xml, mlakes_27_2.xml for IL deployment in units 27-29.
+
