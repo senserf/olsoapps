@@ -14,9 +14,9 @@ This is an intro to the forthcoming VUEE/PICOS compiler. Do this:
    nonsense. Note the new keywords. Praxes consisting of multiple files (with
    header files) are possible.
 
-5. Execute mkmk (just picomp) and see how things compile.
+5. Execute mkmk (e.g., mkmk WARSAW) and see how things compile.
 
-6. Execute picomp and see how things compile.
+6. Execute picomp (just picomp) and see how things compile.
 
 Note that this is just a teaser. A few loose ends have to be tied up, but we
 are slowly getting there.
