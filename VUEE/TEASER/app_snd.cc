@@ -13,8 +13,6 @@
 #define	IBUF_LENGTH		82
 
 int	sfd = -1;
-address	spkt;
-char	*ibuf;
 
 // ============================================================================
 
@@ -31,6 +29,8 @@ word plen (char *str) {
 
 fsm sender (char) {
 
+  address spkt;
+
   entry SN_SEND:
 
 	spkt = tcv_wnp (SN_SEND, sfd, plen (data));
@@ -43,6 +43,8 @@ fsm sender (char) {
 // ============================================================================
 
 fsm root {
+
+  shared char *ibuf;
 
   entry RS_INIT:
 
