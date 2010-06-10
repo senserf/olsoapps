@@ -1,0 +1,44 @@
+	    <memory>8666 bytes</memory>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
+	    <eeprom size="524288" clean="0xFF"
+		timing="0.000004,0.000006,
+			0.000004,0.000034,
+			0.000030,0.000038,
+			0.000005,0.040000"></eeprom>
+	    <iflash size="256,2"></iflash>
+	    <uart rate="9600" bsize="12">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="0" vsize="2" delay="0.01" init="2300">2500</sensor>
+		<sensor number="1" vsize="2" delay="0.01">1000</sensor>
+		<sensor number="2" vsize="2" delay="0.01">1000</sensor>
+		<sensor number="3" vsize="2" delay="0.01">1</sensor>
+		<sensor number="4" vsize="2" delay="0.01">1</sensor>
+		<sensor number="5" vsize="2" delay="0.01">1</sensor>
+		<sensor number="6" vsize="2" delay="0.01">1</sensor>
+	    </sensors>
+	    <ptracker>
+		<output target="socket"/>
+		<module id="cpu">0.3 0.0077</module>
+		<module id="radio">0.0004 16.0 30.7 30.7</module>
+		<module id="storage">0.030 0.030 10.0 15.0 17.0 16.0</module>
+		<module id="sensors">0.0 2.5</module>
+	    </ptracker>

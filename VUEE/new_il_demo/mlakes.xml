@@ -1,0 +1,61 @@
+<network nodes="12" radio="12">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	</defaults>
+	<node number="0" type="peg">
+	    <location>450.0 375.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
+	</node>
+	<node number="1" type="peg" start="on">
+	    <location>305.0 285.0</location>
+	    <preinit tag="HID" type="lword">0xBACA03f2</preinit>
+	</node>
+        <node number="2" type="peg" start="on">
+            <location>390.0 290.0</location>
+            <preinit tag="HID" type="lword">0xBACA03fc</preinit>
+        </node>
+        <node number="3" type="peg" start="on">
+            <location>475.0 305.0</location>
+            <preinit tag="HID" type="lword">0xBACA0406</preinit>
+        </node>
+
+	<node number="4" type="tag" start="on">
+	    <location>240.0 335.0</location>
+	    <preinit tag="HID" type="lword">0xBACA03f3</preinit>
+	</node>
+        <node number="5" type="tag" start="on">
+            <location>247.0 307.0</location>
+            <preinit tag="HID" type="lword">0xBACA03f4</preinit>
+        </node>
+        <node number="6" type="tag" start="on">
+            <location>250.0 335.0</location>
+            <preinit tag="HID" type="lword">0xBACA03f5</preinit>
+        </node>
+
+       <node number="7" type="tag" start="on">
+            <location>460.0 230.0</location>
+            <preinit tag="HID" type="lword">0xBACA0407</preinit>
+        </node>
+
+	<node number="8" type="tag" start="on">
+	    <location>470.0 220.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0408</preinit>
+	</node>
+        <node number="9" type="tag" start="on">
+            <location>510.0 237.0</location>
+            <preinit tag="HID" type="lword">0xBACA0409</preinit>
+        </node>
+        <node number="10" type="tag" start="on">
+            <location>502.0 227.0</location>
+            <preinit tag="HID" type="lword">0xBACA040a</preinit>
+        </node>
+        <node number="11" type="tag" start="on">
+            <location>516.0 227.0</location>
+            <preinit tag="HID" type="lword">0xBACA040b</preinit>
+        </node>
+    </nodes>
+</network>
