@@ -1,3 +1,5 @@
+#define VUEE_LIB_PLUG_NULL
+
 #define	TCV_PRESENT	1
 #define	TCV_HOOKS	0
 #define	TCV_TIMERS	0

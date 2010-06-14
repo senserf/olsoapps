@@ -8,8 +8,6 @@
 #include "app_tag.h"
 #include "tarp.h"
 
-//+++ app_diag_tag.c lib_app_tag.c msg_io_tag.c
-
 extern const lword     host_id;
 extern lword           ref_ts;
 extern long            ref_date;

@@ -8,8 +8,6 @@
 #include "app_peg.h"
 #include "tarp.h"
 
-//+++ app_diag_peg.c lib_app_peg.c msg_io_peg.c
-
 // PiComp
 //
 // I have only left those that appear to be needed (are in fact referenced
