@@ -50,24 +50,10 @@ aggDataType	agg_data;
 
 // PiComp
 //
-// This one is tricky, because it is a non-trivial (nonzero) initialization of
-// a structure; for now, we have to differentiate:
+// Compound initializers now work!!!
 //
-msgPongAckType	pong_ack =
-#ifdef __SMURPH__
-				{ pong_ack.header.msg_type = msg_pongAck; }
-#else
-				{ { msg_pongAck, 0 } , 0 }
-#endif
-				;
-// PiComp
+msgPongAckType	pong_ack = { { msg_pongAck, 0 } , 0 };
 //
-// However, I am already parsing type declarations, and it wouldn't be such a
-// big deal to parse structures and unions, so I may fix it later. There's a
-// bit of manual work involved.
-
-// Note that the initializer for VUEE (__SMURPH__) looks like a program. The
-// stuff in brackets is expanded as a sequence of instructions and executed.
 				 
 aggEEDumpType	* agg_dump;
 char		* cmd_line;

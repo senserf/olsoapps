@@ -38,20 +38,7 @@ long		lh_time;
 
 sensDataType	sens_data;
 
-pongParamsType	pong_params =
-#ifdef __SMURPH__
-			{ pong_params.freq_maj = 60;
-			  pong_params.freq_min = 5;
-			  pong_params.pow_levels = 0x7777;
-			  pong_params.rx_span = 2048; }
-#else
-// PiComp
-//
-// ... and so is this
-//
-			{ 60, 5, 0x7777, 2048, 0, 0 }
-#endif
-			;
+pongParamsType	pong_params = { 60, 5, 0x7777, 2048, 0, 0 };
 
 static char		* cmd_line;
 static sensEEDumpType	* sens_dump;
