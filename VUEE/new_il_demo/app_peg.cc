@@ -26,6 +26,8 @@
 // const lword	host_id = (lword) PREINIT (0xBACADEAD, "HID");
 //+++ host_id.cc
 
+#include "sensors.h"
+
 // PiComp
 //
 // Initialization to zero is not required. Also in VUEE, uninitialized
