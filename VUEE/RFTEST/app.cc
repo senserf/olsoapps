@@ -3,7 +3,6 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "vuee.h"
 #include "sysio.h"
 #include "form.h"
 #include "tcvphys.h"
@@ -11,13 +10,32 @@
 #include "phys_uart.h"
 #include "plug_null.h"
 
-#define	__dcx_def__
 #include "app_data.h"
-#undef	__dcx_def__
 
 #if	NUMBER_OF_SENSORS > 0
 #include "sensors.h"
 #endif
+
+//+++ hostid.cc
+
+// ============================================================================
+
+int	g_fd_rf = -1, g_fd_uart = -1, g_snd_opl,
+	g_pkt_minpl = MIN_MES_PACKET_LENGTH,
+	g_pkt_maxpl = MAX_PACKET_LENGTH;
+
+word	g_pkt_mindel = 1024, g_pkt_maxdel = 1024,
+	g_snd_count, g_snd_rnode, g_snd_rcode,
+	g_snd_sernum = 1, g_snd_rtries, g_flags = 0;
+
+char	*g_snd_rcmd;
+byte	*g_reg_suppl;
+
+address	g_rcv_ackrp;
+
+noded_t	g_rep_nodes [MAX_NODES];
+
+// ============================================================================
 
 static const char *skip_blk (const char *cb) {
 //
@@ -81,7 +99,7 @@ Bad_length:
 			goto Bad_length;
 
 
-		if (runthread (thread_rreporter) == 0) {
+		if (runfsm thread_rreporter == 0) {
 			tcv_endp (buf);
 			uart_out (WNONE, "Can't fork");
 			return;
@@ -156,7 +174,7 @@ word do_command (const char *cb, word sender, word sernum) {
 		// Local report via UART
 
 		if (!running (thread_ureporter)) {
-			runthread (thread_ureporter);
+			runfsm thread_ureporter;
 			return 0;
 		}
 
@@ -202,7 +220,7 @@ word do_command (const char *cb, word sender, word sernum) {
 
 		strcpy (g_snd_rcmd, cb);
 
-		if (runthread (thread_rfcmd) == 0) {
+		if (runfsm thread_rfcmd == 0) {
 			ufree (g_snd_rcmd);
 			g_snd_rcmd = NULL;
 			g_snd_rnode = 0;
@@ -247,7 +265,7 @@ word do_command (const char *cb, word sender, word sernum) {
 
 		killall (thread_sender);
 
-		if (runthread (thread_sender) == 0)
+		if (runfsm thread_sender == 0)
 			return 6;
 
 		return 0;
@@ -540,17 +558,17 @@ void view_packet (address p, word pl) {
 
 // ============================================================================
 
-thread (thread_rfcmd)
+fsm thread_rfcmd {
 
   word ln;
   address packet;
 
-  entry (RC_START)
+  entry RC_START:
 
 	g_snd_rtries = 0;
 	g_snd_sernum++;
 
-  entry (RC_SEND)
+  entry RC_SEND:
 
 	if (g_snd_rtries >= RF_COMMAND_RETRIES) {
 		if (g_snd_rcmd != NULL) {
@@ -591,18 +609,17 @@ thread (thread_rfcmd)
 	g_snd_rtries++;
 
 	delay (RF_COMMAND_SPACING, RC_SEND);
-
-endthread
+}
 
 // ============================================================================
 
-thread (thread_rreporter)
+fsm thread_rreporter {
 
-  entry (UF_START)
+  entry UF_START:
 
 	uart_outf (UF_START, "Stats of node %u:", g_rcv_ackrp [POFF_RCV]);
 
-  entry (UF_FIXED)
+  entry UF_FIXED:
 
 	uart_outf (UF_FIXED, "Sent: %u", g_rcv_ackrp [POFF_SENT]);
 
@@ -610,7 +627,7 @@ thread (thread_rreporter)
 	g_rcv_ackrp [POFF_SND] = 0;
 	g_rcv_ackrp [POFF_SER] = POFF_NTAB;
 
-  entry (UF_NEXT)
+  entry UF_NEXT:
 
 	if (g_rcv_ackrp [POFF_SND] < g_rcv_ackrp [POFF_NNOD]) {
 		uart_outf (UF_NEXT, "Received from %u: %u",
@@ -619,10 +636,10 @@ thread (thread_rreporter)
 
 		g_rcv_ackrp [POFF_SND]++;
 		g_rcv_ackrp [POFF_SER] += 2;
-		proceed (UF_NEXT);
+		proceed UF_NEXT;
 	}
 
-  entry (UF_DRIV)
+  entry UF_DRIV:
 
 	uart_outf (UF_DRIV, "Driver stats: %u, %u, %u, %u",
 			g_rcv_ackrp [POFF_DRVT],
@@ -634,51 +651,50 @@ thread (thread_rreporter)
 	g_rcv_ackrp = NULL;
 
 	finish;
-
-endthread
+}
 
 // ============================================================================
 
-thread (thread_ureporter)
+fsm thread_ureporter {
 
   word errs [4];
+  shared word cnt;
 
-  entry (RE_START)
+  entry RE_START:
 
 	uart_out (RE_START, "Stats:");
 
-  entry (RE_FIXED)
+  entry RE_FIXED:
 
 	uart_outf (RE_FIXED, "Sent: %u", g_snd_count);
-	g_rep_cnt = 0;
+	cnt = 0;
 
-  entry (RE_NEXT)
+  entry RE_NEXT:
 
-	if (g_rep_cnt < MAX_NODES && g_rep_nodes [g_rep_cnt] . Node != 0) {
+	if (cnt < MAX_NODES && g_rep_nodes [cnt] . Node != 0) {
 		uart_outf (RE_NEXT, "Received from %u: %u",
-			g_rep_nodes [g_rep_cnt] . Node,
-			g_rep_nodes [g_rep_cnt] . Count);
-		g_rep_cnt++;
-		proceed (RE_NEXT);
+			g_rep_nodes [cnt] . Node,
+			g_rep_nodes [cnt] . Count);
+		cnt++;
+		proceed RE_NEXT;
 	}
 
-  entry (RE_DRIV)
+  entry RE_DRIV:
 
 	tcv_control (g_fd_rf, PHYSOPT_ERROR, errs);
 	uart_outf (RE_DRIV, "Driver stats: %u, %u, %u, %u",
 					errs [0], errs [1], errs [2], errs [3]);
 	finish;
-
-endthread
+}
 
 // ============================================================================
 
-thread (thread_listener)
+fsm thread_listener {
 
   address packet;
   word pl;
 
-  entry (LI_WAIT)
+  entry LI_WAIT:
 
 	packet = tcv_rnp (LI_WAIT, g_fd_rf);
 	pl = tcv_left (packet);
@@ -706,72 +722,74 @@ thread (thread_listener)
 			handle_ack (packet, pl);
 			// handle_ack is responsible for deallocating
 			// the packet
-			proceed (LI_WAIT);
+			proceed LI_WAIT;
 		}
 	}
 
 	tcv_endp (packet);
-	proceed (LI_WAIT);
-
-endthread
+	proceed LI_WAIT;
+}
 
 // ============================================================================
 
-thread (thread_sender)
+fsm thread_sender {
 
-  entry (SN_DELAY)
+  shared word scnt;
+  shared address spkt;
+
+  entry SN_DELAY:
 
 	delay (gen_send_params (), SN_NEXT);
 	if (g_snd_opl < MIN_MES_PACKET_LENGTH)
 		g_snd_opl = MIN_MES_PACKET_LENGTH;
 	release;
 
-  entry (SN_NEXT)
+  entry SN_NEXT:
 
-	g_snd_pkt = tcv_wnp (SN_NEXT, g_fd_rf, g_snd_opl);
-	g_snd_pkt [POFF_RCV] = 0;
-	g_snd_pkt [POFF_SND] = HOST_ID;
-	g_snd_pkt [POFF_FLG] = tcv_control (g_fd_rf, PHYSOPT_GETPOWER, NULL) |
+	spkt = tcv_wnp (SN_NEXT, g_fd_rf, g_snd_opl);
+	spkt [POFF_RCV] = 0;
+	spkt [POFF_SND] = HOST_ID;
+	spkt [POFF_FLG] = tcv_control (g_fd_rf, PHYSOPT_GETPOWER, NULL) |
 		g_flags;
 
-	g_sen_cnt = 0;
+	scnt = 0;
 
-  entry (SN_NSEN)
+  entry SN_NSEN:
 
 #if NUMBER_OF_SENSORS > 0
 
-	if (g_sen_cnt < NUMBER_OF_SENSORS) {
-		read_sensor (SN_NSEN, g_sen_cnt,
-			g_snd_pkt + POFF_SEN + g_sen_cnt);
-		g_sen_cnt++;
-		proceed (SN_NSEN);
+	if (scnt < NUMBER_OF_SENSORS) {
+		read_sensor (SN_NSEN, scnt,
+			spkt + POFF_SEN + scnt);
+		scnt++;
+		proceed SN_NSEN;
 	}
 
 #endif
 
-	g_sen_cnt += POFF_SEN;
+	scnt += POFF_SEN;
 
 	// Turn into word count and remove checksum
 	g_snd_opl = (g_snd_opl - 2) >> 1;
 
-	while (g_sen_cnt < g_snd_opl)
-		g_snd_pkt [g_sen_cnt++] = (word) rnd ();
+	while (scnt < g_snd_opl)
+		spkt [scnt++] = (word) rnd ();
 
-	tcv_endp (g_snd_pkt);
+	tcv_endp (spkt);
 	g_snd_count++;
-	proceed (SN_DELAY);
-
-endthread
+	proceed SN_DELAY;
+}
 
 // ============================================================================
 		
-thread (root)
+fsm root {
 
   word scr;
   char *msg;
   address packet;
+  shared word estat;
 
-  entry (RS_INIT)
+  entry RS_INIT:
 
 	// Packet length for the PHY doesn't cover the checksum
 	phys_cc1100 (0, MAX_PACKET_LENGTH);
@@ -796,7 +814,7 @@ thread (root)
 	// c..c - the channel
 	//
 
-  entry (RS_BANNER)
+  entry RS_BANNER:
 
 	scr = NETWORK_ID | ((g_flags >> 11) & 0x7);
 	uart_outf (RS_BANNER,
@@ -823,26 +841,26 @@ thread (root)
 	if (g_flags)
 		powerdown ();
 
-  entry (RS_ON)
+  entry RS_ON:
 
 	uart_out (RS_ON, "Ready:");
 
-  entry (RS_READ)
+  entry RS_READ:
 
 	// Read a command from input
 	packet = tcv_rnp (RS_READ, g_fd_uart);
 
 	// Process the command
-	g_err_stat = do_command ((char*)packet, 0, 0);
+	estat = do_command ((char*)packet, 0, 0);
 
 	tcv_endp (packet);
 
-  entry (RS_MSG)
+  entry RS_MSG:
 
-	switch (g_err_stat) {
+	switch (estat) {
 
 		case 0:
-		case WNONE:	proceed (RS_ON);
+		case WNONE:	proceed RS_ON;
 
 		case 1:	msg = (char*)"Too much data"; break;
 		case 2:	msg = (char*)"Cannot alloc packet"; break;
@@ -857,10 +875,5 @@ thread (root)
 	}
 
 	uart_out (RS_MSG, msg);
-	proceed (RS_ON);
-
-endthread
-
-// ============================================================================
-
-praxis_starter (NodeTest);
+	proceed RS_ON;
+}

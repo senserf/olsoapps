@@ -1,8 +1,3 @@
-
-// for host_id auto-generation
-
-#ifndef __SMURPH__
 #include "sysio.h"
-const lword host_id = 0xBACADEAD;
-#endif
 
+const lword	host_id	= (lword) PREINIT (0xBACADEAD, "HID");

@@ -19,7 +19,9 @@
 #define	UART_TCV		1
 #define	UART_TCV_MODE		UART_TCV_MODE_L
 #define	RADIO_OPTIONS		(0x01 + 0x04 + 0x40)
-#define	RADIO_CRC_MODE		4
+#define	RADIO_CRC_MODE		2
+
+#define	TCV_LIMIT_XMT		8
 
 #if RADIO_CRC_MODE < 4
 #define	MAX_PACKET_LENGTH	62

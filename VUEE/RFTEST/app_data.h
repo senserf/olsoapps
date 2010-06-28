@@ -103,83 +103,9 @@ typedef struct {
 
 } noded_t;
 
-#endif
-
 // ============================================================================
 
-#ifdef __dcx_def__
-
-#ifndef	__app_data_defined__
-#define	__app_data_defined__
-
-int	g_fd_rf __sinit (-1), g_fd_uart __sinit (-1), g_snd_opl,
-	g_pkt_minpl __sinit (MIN_MES_PACKET_LENGTH),
-	g_pkt_maxpl __sinit (MAX_PACKET_LENGTH);
-
-word	g_pkt_mindel __sinit (1024), g_pkt_maxdel __sinit (1024), g_rep_cnt,
-	g_snd_count __sinit (0), g_snd_rnode __sinit (0), g_snd_rcode,
-	g_snd_sernum __sinit (1), g_snd_rtries, g_err_stat, g_flags __sinit (0),
-	g_sen_cnt;
-
-char	*g_snd_rcmd __sinit (NULL);
-
-byte	*g_reg_suppl __sinit (NULL);
-
-address	g_rcv_ackrp __sinit (NULL), g_snd_pkt;
-
-noded_t	g_rep_nodes [MAX_NODES];
-
-#ifdef __SMURPH__
-lword 	host_id;
-#endif
-
-#endif
-
-#endif
-
-// ============================================================================
-
-#ifdef __dcx_dcl__
-
-#ifdef __SMURPH__
-
-#define	g_fd_rf		_daprx (g_fd_rf)
-#define	g_fd_uart	_daprx (g_fd_uart)
-#define	host_id		_daprx (host_id)
-#define	g_snd_opl	_daprx (g_snd_opl)
-#define	g_rcv_ackrp	_daprx (g_rcv_ackrp)
-#define	g_pkt_minpl	_daprx (g_pkt_minpl)
-#define	g_pkt_maxpl	_daprx (g_pkt_maxpl)
-#define	g_pkt_mindel	_daprx (g_pkt_mindel)
-#define	g_pkt_maxdel	_daprx (g_pkt_maxdel)
-#define	g_rep_cnt	_daprx (g_rep_cnt)
-#define	g_snd_rnode	_daprx (g_snd_rnode)
-#define	g_snd_sernum	_daprx (g_snd_sernum)
-#define	g_snd_rcmd	_daprx (g_snd_rcmd)
-#define	g_snd_rtries	_daprx (g_snd_rtries)
-#define	g_snd_rcode	_daprx (g_snd_rcode)
-#define	g_snd_count	_daprx (g_snd_count)
-#define	g_snd_pkt	_daprx (g_snd_pkt)
-#define	g_sen_cnt	_daprx (g_sen_cnt)
-#define	g_err_stat	_daprx (g_err_stat)
-#define	g_flags		_daprx (g_flags)
-#define	host_id		_daprx (host_id)
-#define	g_rep_nodes	_daprx (g_rep_nodes)
-#define	g_reg_suppl	_daprx (g_reg_suppl)
-
-#else
-
-extern	int 	g_fd_rf, g_fd_uart, g_snd_opl, g_pkt_minpl, g_pkt_maxpl;
-extern	word	g_pkt_mindel, g_pkt_maxdel, g_snd_count, g_sen_cnt;
-extern	lword	host_id;
-extern	address	g_rcv_ackrp, g_snd_pkt;
-extern	word	g_rep_cnt, g_snd_rnode, g_snd_sernum, g_snd_rtries, g_err_stat,
-		g_snd_rcode, g_flags;
-extern	char	*g_snd_rcmd;
-extern	noded_t	g_rep_nodes [];
-extern	byte	*g_reg_suppl;
-
-#endif
+extern const lword host_id;
 
 word report_size ();
 void reset_count ();
@@ -194,22 +120,10 @@ void reset_count ();
 word report_size ();
 void view_packet (address, word);
 
-#endif
-
-// ============================================================================
-
-#ifdef __dcx_ini__
-
-g_fd_rf = g_fd_uart = -1;
-g_pkt_minpl = MIN_MES_PACKET_LENGTH;
-g_pkt_maxpl = MAX_PACKET_LENGTH;
-g_pkt_mindel = g_pkt_maxdel = 1024;
-g_snd_sernum = 1;
-g_snd_rnode = g_snd_count = g_flags = 0;
-g_snd_rcmd = NULL;
-g_rcv_ackrp = NULL;
-g_reg_suppl = NULL;
-memset (g_rep_nodes, 0, sizeof (g_rep_nodes));
-host_id = (lword) preinit ("HID");
+fsm thread_rfcmd;
+fsm thread_rreporter;
+fsm thread_ureporter;
+fsm thread_listener;
+fsm thread_sender;
 
 #endif
