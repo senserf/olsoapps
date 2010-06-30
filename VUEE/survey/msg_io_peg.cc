@@ -1,31 +1,18 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2010.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#ifdef __SMURPH__
-#include "globals_peg.h"
-#include "threadhdrs_peg.h"
-#endif
-
 #include "diag.h"
 #include "app_peg.h"
+#include "tcvplug.h"
 #include "msg_peg.h"
-
-#ifdef	__SMURPH__
-
-#include "node_peg.h"
-#include "stdattr.h"
-
-#else	/* PICOS */
-
 #include "net.h"
+#include "tarp.h"
+#include "app_peg_data.h"
 
-#endif
+void msg_master_out () {
 
-#include "attnames_peg.h"
-
-__PUBLF (NodePeg, void, msg_master_out) () {
 	char * buf_out = get_mem (WNONE, sizeof(msgMasterType));
 
 	if (buf_out == NULL)
@@ -41,10 +28,7 @@ __PUBLF (NodePeg, void, msg_master_out) () {
 	ufree (buf_out);
 }
 
-int m_cyc (word, address);
-int m_sil (word, address);
-
-__PUBLF (NodePeg, void, msg_master_in) (char * buf) {
+void msg_master_in (char * buf) {
 
 	if (in_master(buf, attr).w & 0x80) { // all_out kludge
 		set_all_out;
@@ -77,7 +61,8 @@ __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
 	stats (NULL);
 }
 
-__PUBLF (NodePeg, void, msg_ping_out) (char * buf, word rssi) {
+void msg_ping_out (char * buf, word rssi) {
+
 	char * buf_out;
 
 	if (buf && sattr[2].w != in_ping(buf, out_sattr).w) {
@@ -108,7 +93,7 @@ __PUBLF (NodePeg, void, msg_ping_out) (char * buf, word rssi) {
 	ufree (buf_out);
 }
 
-__PUBLF (NodePeg, void, msg_ping_in) (char * buf, word rssi) {
+void msg_ping_in (char * buf, word rssi) {
 
 	if (sstate == ST_WARM) {
 		set_state (ST_CYC);
@@ -138,7 +123,8 @@ __PUBLF (NodePeg, void, msg_ping_in) (char * buf, word rssi) {
 }
 
 // just 'i' for now, I'm not sure how useful this can be...
-__PUBLF (NodePeg, void, msg_cmd_out) (byte cmd, word dst, word a) {
+void msg_cmd_out (byte cmd, word dst, word a) {
+
 	char * buf_out = get_mem (WNONE, sizeof(msgCmdType));
 	word toff = net_opt (PHYSOPT_STATUS, NULL) & 2 ? 0 : 1;
 
@@ -161,7 +147,8 @@ __PUBLF (NodePeg, void, msg_cmd_out) (byte cmd, word dst, word a) {
 		net_opt (PHYSOPT_TXOFF, NULL);
 }
 
-__PUBLF (NodePeg, void, msg_cmd_in) (char * buf) {
+void msg_cmd_in (char * buf) {
+
 	if (in_cmd(buf, cmd) != 'i') {
 		app_diag (D_WARNING, "Unknown cmd %c", in_cmd(buf, cmd));
 		return;
@@ -174,7 +161,8 @@ __PUBLF (NodePeg, void, msg_cmd_in) (char * buf) {
 	msg_stats_out();
 }
 
-__PUBLF (NodePeg, void, msg_sil_out) () {
+void msg_sil_out () {
+
 	char * buf_out = get_mem (WNONE, sizeof(msgSilType));
 
 	if (buf_out == NULL)
@@ -187,7 +175,8 @@ __PUBLF (NodePeg, void, msg_sil_out) () {
 	ufree (buf_out);
 }
 
-__PUBLF (NodePeg, void, msg_sil_in) (char * buf) {
+void msg_sil_in (char * buf) {
+
 	if (master_host != in_header(buf, snd)) {
 		app_diag (D_WARNING, "Ignored silence: not master");
 		return;
@@ -198,7 +187,8 @@ __PUBLF (NodePeg, void, msg_sil_in) (char * buf) {
 	net_qera (TCV_DSP_RCV);
 }
 
-__PUBLF (NodePeg, void, msg_stats_out) () {
+void msg_stats_out () {
+
 	word mmin, mem;
 	word toff = net_opt (PHYSOPT_STATUS, NULL) & 2 ? 0 : 1;
 	char * buf_out = get_mem (WNONE, sizeof(msgStatsType));
@@ -231,10 +221,9 @@ __PUBLF (NodePeg, void, msg_stats_out) () {
 		net_opt (PHYSOPT_TXOFF, NULL);
 }
 
-__PUBLF (NodePeg, void, msg_stats_in) (char * buf) {
+void msg_stats_in (char * buf) {
+
 	if (!is_uart_out)
 		return
 	stats (buf);
 }
-
-

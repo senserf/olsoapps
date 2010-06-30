@@ -1,57 +1,44 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2006.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2010.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
 #include "diag.h"
 #include "app_peg.h"
 #include "msg_peg.h"
-
-#ifdef	__SMURPH__
-
-#include "node_peg.h"
-#include "stdattr.h"
-#include "threadhdrs_peg.h"
-
-#else	/* PICOS */
-
 #include "net.h"
 #include "tarp.h"
-
-#endif	/* SMURPH or PICOS */
-
-//#include "threadhdrs_peg.h"
-#include "attnames_peg.h"
+#include "app_peg_data.h"
 
 /*
  * "Virtual" stuff needed by NET & TARP =======================================
  */
-__PUBLF (NodePeg, int, tr_offset) (headerType *h) {
+idiosyncratic int tr_offset (headerType *h) {
 	// Unused ??
 	return 0;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isBind) (msg_t m) {
+idiosyncratic Boolean msg_isBind (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isTrace) (msg_t m) {
+idiosyncratic Boolean msg_isTrace (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isMaster) (msg_t m) {
+idiosyncratic Boolean msg_isMaster (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isNew) (msg_t m) {
+idiosyncratic Boolean msg_isNew (msg_t m) {
 	return NO;
 }
 
-__PUBLF (NodePeg, Boolean, msg_isClear) (byte o) {
+idiosyncratic Boolean msg_isClear (byte o) {
 	return YES;
 }
 
-__PUBLF (NodePeg, void, set_master_chg) () {
+idiosyncratic void set_master_chg () {
 	app_flags |= 2;
 }
 
@@ -59,14 +46,14 @@ __PUBLF (NodePeg, void, set_master_chg) () {
 
 #ifdef __SMURPH__
 // VUEE uses standard string funcs... FIXME
-__PUBLF (NodePeg, void, strncpy) (char *d, const char *s, sint n) {
+void strncpy (char *d, const char *s, sint n) {
 	while (n-- && (*s != '\0'))
 		*d++ = *s++;
 	*d = '\0';
 }
 #endif
 
-__PUBLF (NodePeg, char*, get_mem) (word state, int len) {
+char *get_mem (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	word mmin, mem;
 	mem = memfree(0, &mmin);
@@ -86,13 +73,15 @@ __PUBLF (NodePeg, char*, get_mem) (word state, int len) {
 	return buf;
 }
 
-__PUBLF (NodePeg, void, init) () {
+void init () {
+
 	nvm_t nvm;
 
 	if (ee_read (NVM_OSET, (byte *)&nvm, sizeof (nvm_t))) {
 		app_diag (D_SERIOUS, "Can't read eeprom");
 		halt();
 	};
+
 	if (nvm.mh == 0xFFFF) { // all defaults
 		master_host = DEF_MHOST;
 		touts.iv.b.sil = DEF_I_SIL;
@@ -123,7 +112,7 @@ __PUBLF (NodePeg, void, init) () {
 	set_rf (1);
 }
 
-__PUBLF (NodePeg, void, set_state (word s)) {
+void set_state (word s) {
 
 	if (sstate == s)
 		return;
@@ -168,7 +157,8 @@ __PUBLF (NodePeg, void, set_state (word s)) {
 	touts.ts = seconds();
 }
 
-__PUBLF (NodePeg, void, set_rf (word mode)) {
+void set_rf (word mode) {
+
 	word s = net_opt (PHYSOPT_STATUS, NULL);
 	word w;
 	net_opt (PHYSOPT_RXOFF, NULL);
@@ -196,7 +186,7 @@ __PUBLF (NodePeg, void, set_rf (word mode)) {
 		net_opt (PHYSOPT_RXON, NULL);
 }
 
-__PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
+void send_msg (char * buf, int size) {
 
 	// this shouldn't be... WARNING to see why it is needed...
 	if (in_header(buf, rcv) == local_host) {
@@ -224,7 +214,8 @@ __PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
 	}
  }
 
-__PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
+int check_msg_size (char * buf, word size, word repLevel) {
+
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial
@@ -272,4 +263,3 @@ __PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
 			in_header(buf, msg_type), size, expSize);
 	return (size - expSize);
 }
-

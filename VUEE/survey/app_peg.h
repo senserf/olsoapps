@@ -1,17 +1,13 @@
 #ifndef __app_peg_h
 #define __app_peg_h
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2010.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#define	THREADNAME(a)	a ## _peg
-
 // Content of all LibApps
 
-//+++ "lib_app_peg.c"
-//+++ "msg_io_peg.c"
-//+++ "app_diag_peg.c"
+//+++ "lib_app_peg.cc" "msg_io_peg.cc" "app_diag_peg.cc" "host_id.cc"
 
 #include "sysio.h"
 #include "msg_tarp.h"

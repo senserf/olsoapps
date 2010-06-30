@@ -3,34 +3,18 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#ifndef	__app_diag_peg_h__
-#define	__app_diag_peg_h___
-
 #include "diag.h"
 #include "app_peg.h"
 #include "msg_peg.h"
-
-#ifdef	__SMURPH__
-
-#include "node_peg.h"
-#include "stdattr.h"
-#include "attnames_peg.h"
-
-#else	/* PICOS */
-
 #include "form.h"
+#include "app_peg_data.h"
 
-#endif	/* SMURPH or PICOS */
-
-__PUBLF (NodePeg, void, app_diag) (const word level, const char * fmt, ...) {
+void app_diag (const word level, const char * fmt, ...) {
 
 	char * buf;
+	va_list	ap;
 
-#ifdef	__SMURPH__
-#define	va_par(s)	ap
-	va_list		ap;
 	va_start (ap, fmt);
-#endif
 
 	if (app_dl < level)
 		return;
@@ -38,7 +22,7 @@ __PUBLF (NodePeg, void, app_diag) (const word level, const char * fmt, ...) {
 	// compiled out if both levels are constant?
 	// if not, go by #if DIAG_MESSAGES as well
 
-	if ((buf = vform (NULL, fmt, va_par (fmt))) == NULL) {
+	if ((buf = vform (NULL, fmt, ap)) == NULL) {
 		diag ("no mem");
 		return;
 	}
@@ -46,25 +30,22 @@ __PUBLF (NodePeg, void, app_diag) (const word level, const char * fmt, ...) {
 	ufree (buf);
 }
 
-__PUBLF (NodePeg, void, net_diag) (const word level, const char * fmt, ...) {
-	char * buf;
+void net_diag (const word level, const char * fmt, ...) {
 
-#ifdef	__SMURPH__
+	char * buf;
 	va_list		ap;
+
 	va_start (ap, fmt);
-#endif
 
 	if (net_dl < level)
 		return;
 
 	// compiled out if both levels are constant?
 
-	if ((buf = vform (NULL, fmt, va_par (fmt))) == NULL) {
+	if ((buf = vform (NULL, fmt, ap)) == NULL) {
 		diag ("no mem");
 		return;
 	}
 	diag ("net_diag: %s", buf);
 	ufree (buf);
 }
-
-#endif
