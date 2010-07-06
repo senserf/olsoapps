@@ -174,7 +174,7 @@ void oss_set_in () {
 }
 
 void oss_info_in (word state) {
-	long l;
+	lint l;
 	char * buf;
 	char info;
 	word p[3];
@@ -201,25 +201,25 @@ void oss_info_in (word state) {
 	  case INFO_SYS:
 		// host_id, local_host, net_id, seconds(),  master_host,
 		// master_delta, beac_freq, cyc_ctrl, cyc_ap, cyc_sp
-		len = 1 + 3*sizeof(long) + 3*sizeof(nid_t) +5;
+		len = 1 + 3*sizeof(lint) + 3*sizeof(nid_t) +5;
 		buf = get_mem (state, len);
 		ufree (cmd_line);
 		cmd_ctrl.oplen = len -1;
 		cmd_line = buf++;
-		memcpy (buf, &host_id, sizeof(long));
-		buf += sizeof(long);
+		memcpy (buf, &host_id, sizeof(lint));
+		buf += sizeof(lint);
 		memcpy (buf, &local_host, sizeof(nid_t));
 		buf += sizeof(nid_t);
 		len = net_opt (PHYSOPT_GETSID, NULL); // crapy word reuse
 		memcpy (buf, &len, sizeof(nid_t));
 		buf += sizeof(nid_t);
 		l = seconds();
-		memcpy (buf, &l, sizeof(long));
-		buf += sizeof(long);
+		memcpy (buf, &l, sizeof(lint));
+		buf += sizeof(lint);
 		memcpy (buf, &master_host, sizeof(nid_t));
 		buf += sizeof(nid_t);
-		memcpy (buf, &master_delta, sizeof(long));
-		buf += sizeof(long);
+		memcpy (buf, &master_delta, sizeof(lint));
+		buf += sizeof(lint);
 		*buf++ = beac_freq;
 		*buf++ = cyc_ctrl;
 		*buf++ = cyc_ap;

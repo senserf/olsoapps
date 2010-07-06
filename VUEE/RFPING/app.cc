@@ -3,8 +3,16 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "globals.h"
-#include "threadhdrs.h"
+#include "sysio.h"
+#include "tcvphys.h"
+#include "ser.h"
+#include "serf.h"
+#include "form.h"
+#include "phys_cc1100.h"
+#include "plug_null.h"
+#include "pinopts.h"
+#include "sensors.h"
+#include "actuators.h"
 
 #define	MIN_PACKET_LENGTH	24
 #define	MAX_PACKET_LENGTH	46
@@ -17,6 +25,21 @@
 #define	ACK_LENGTH	12
 #define MAXPLEN		(MAX_PACKET_LENGTH + 2)
 
+heapmem {10, 90};
+
+// ============================================================================
+
+int	sfd = -1;
+lint	last_snt;
+lint	last_rcv;
+lint	last_ack;
+bool	XMTon;
+bool 	RCVon;
+bool	rkillflag;
+bool	tkillflag;
+
+// ============================================================================
+
 static word gen_packet_length (void) {
 
 #if MIN_PACKET_LENGTH >= MAX_PACKET_LENGTH
@@ -28,9 +51,11 @@ static word gen_packet_length (void) {
 
 }
 
-thread (receiver)
+fsm receiver {
 
-    entry (RC_TRY)
+    shared address packet;
+
+    entry RC_TRY:
 
 	if (rkillflag) {
 		rkillflag = NO;
@@ -39,59 +64,58 @@ thread (receiver)
 	}
 
 	when (&rkillflag, RC_TRY);
-	r_packet = tcv_rnp (RC_TRY, sfd);
+	packet = tcv_rnp (RC_TRY, sfd);
 
-	if (r_packet [1] == PKT_ACK) {
-		last_ack = ntowl (((lword*)r_packet) [1]);
-		proceed (RC_ACK);
+	if (packet [1] == PKT_ACK) {
+		last_ack = ntowl (((lword*)packet) [1]);
+		proceed RC_ACK;
 	}
 
 	// Data packet
-	last_rcv = ntowl (((lword*)r_packet) [1]);
+	last_rcv = ntowl (((lword*)packet) [1]);
 
-    entry (RC_DATA)
+    entry RC_DATA:
 
 	ser_outf (RC_DATA, "RCV: [%x] %lu (len = %d), pow = %d qua = %d\r\n",
-		r_packet [1],
-		last_rcv, tcv_left (r_packet) - 2,
-		((byte*)r_packet) [tcv_left (r_packet) - 1],
-		((byte*)r_packet) [tcv_left (r_packet) - 2]
+		packet [1],
+		last_rcv, tcv_left (packet) - 2,
+		((byte*)packet) [tcv_left (packet) - 1],
+		((byte*)packet) [tcv_left (packet) - 2]
 	);
 
-	tcv_endp (r_packet);
+	tcv_endp (packet);
 
 	// Acknowledge it
 
-    entry (RC_SACK)
+    entry RC_SACK:
 
 	if (XMTon) {
-		r_packet = tcv_wnp (RC_SACK, sfd, ACK_LENGTH);
-		r_packet [0] = 0;
-		r_packet [1] = PKT_ACK;
-		((lword*)r_packet) [1] = wtonl (last_rcv);
+		packet = tcv_wnp (RC_SACK, sfd, ACK_LENGTH);
+		packet [0] = 0;
+		packet [1] = PKT_ACK;
+		((lword*)packet) [1] = wtonl (last_rcv);
 
-		r_packet [4] = (word) (entropy);
-		tcv_endp (r_packet);
+		packet [4] = (word) (entropy);
+		tcv_endp (packet);
 	}
-	proceed (RC_TRY);
+	proceed RC_TRY;
 
-    entry (RC_ACK)
+    entry RC_ACK:
 
 	ser_outf (RC_ACK, "ACK: %lu (len = %d)\r\n", last_ack,
-		tcv_left (r_packet));
+		tcv_left (packet));
 
-	tcv_endp (r_packet);
+	tcv_endp (packet);
 	trigger (&last_ack);
-	proceed (RC_TRY);
-
-endthread
+	proceed RC_TRY;
+}
 
 int rcv_start () {
 
 	rkillflag = 0;
 	tcv_control (sfd, PHYSOPT_RXON, NULL);
 	if (!RCVon) {
-		runthread (receiver);
+		runfsm receiver;
 		RCVon = YES;
 		return 1;
 	}
@@ -110,14 +134,20 @@ int rcv_stop () {
 	return 0;
 }
 
-strand (sender, word)
+fsm sender (word) {
 
     word pl;
     int  pp;
 
-#define tdelay	((word)data)
+// FIXME: boy, this sucks, and sucks, and never stops! And it will blow up
+// again on Nick's 64-bit system, for sure. One more solid reason for moving
+// on to the proper way of handling this in PiComp.
+#define tdelay	((word)(int)data)
 
-    entry (SN_SEND)
+    shared address packet;
+    shared word packet_length;
+
+    entry SN_SEND:
 
 	if (tkillflag) {
 Finish:
@@ -142,36 +172,35 @@ Finish:
 	else if (packet_length > MAX_PACKET_LENGTH)
 		packet_length = MAX_PACKET_LENGTH;
 
-	proceed (SN_NEXT);
+	proceed SN_NEXT;
 
-    entry (SN_NEXT)
+    entry SN_NEXT:
 
 	if (tkillflag)
 		goto Finish;
 
 	when (&tkillflag, SN_SEND);
 
-	x_packet = tcv_wnp (SN_NEXT, sfd, packet_length + 2);
+	packet = tcv_wnp (SN_NEXT, sfd, packet_length + 2);
 
-	x_packet [0] = 0;
-	x_packet [1] = PKT_DAT;
+	packet [0] = 0;
+	packet [1] = PKT_DAT;
 
 	// In words
 	pl = packet_length / 2;
-	((lword*)x_packet)[1] = wtonl (last_snt);
+	((lword*)packet)[1] = wtonl (last_snt);
 
 	for (pp = 4; pp < pl; pp++)
-		x_packet [pp] = (word) (entropy);
+		packet [pp] = (word) (entropy);
 
-	tcv_endp (x_packet);
+	tcv_endp (packet);
 
-    entry (SN_NEXT1)
+    entry SN_NEXT1:
 
 	ser_outf (SN_NEXT1, "SND %lu, len = %d\r\n", last_snt,
 		packet_length);
-	proceed (SN_SEND);
-
-endstrand
+	proceed SN_SEND;
+}
 
 int snd_start (int del) {
 
@@ -180,7 +209,7 @@ int snd_start (int del) {
 	tcv_control (sfd, PHYSOPT_TXON, NULL);
 
 	if (!XMTon) {
-		runstrand (sender, del);
+		runfsm sender ((word*)del);
 		XMTon = 1;
 		return 1;
 	}
@@ -201,37 +230,41 @@ int snd_stop () {
 
 #ifdef	PMON_NOTEVENT
 
-thread (pin_monitor)
+fsm pin_monitor {
 
-    entry (PM_START)
+    shared lint CNT, CMP;
+    shared word STA;
+    shared const char *MSG;
+
+    entry PM_START:
 
 	if (pmon_pending_not ()) {
 		MSG = "NOTIFIER PENDING\r\n";
-		proceed (PM_OUT);
+		proceed PM_OUT;
 	}
 	if (pmon_pending_cmp ()) {
 		MSG = "COUNTER PENDING\r\n";
-		proceed (PM_OUT);
+		proceed PM_OUT;
 	}
 	when (PMON_NOTEVENT, PM_NOTIFIER);
 	when (PMON_CNTEVENT, PM_COUNTER);
 	release;
 
-  entry (PM_OUT)
+  entry PM_OUT:
 
 	ser_out (PM_OUT, MSG);
-	proceed (PM_START);
+	proceed PM_START;
 
-  entry (PM_NOTIFIER)
+  entry PM_NOTIFIER:
 
 	MSG = "NOTIFIER EVENT\r\n";
-	proceed (PM_EVENT);
+	proceed PM_EVENT;
 
-  entry (PM_COUNTER)
+  entry PM_COUNTER:
 
 	MSG = "COUNTER EVENT\r\n";
 
-  entry (PM_EVENT)
+  entry PM_EVENT:
 
 	ser_out (PM_EVENT, MSG);
 
@@ -239,40 +272,45 @@ thread (pin_monitor)
 	CNT = pmon_get_cnt ();
 	CMP = pmon_get_cmp ();
 
-  entry (PM_EVENT1)
+  entry PM_EVENT1:
 
 	ser_outf (PM_EVENT1, "STATE: %x, CNT: %lu, CMP: %lu\r\n",
 		STA, CNT, CMP);
 	pmon_pending_cmp ();
 	pmon_pending_not ();
 
-	proceed (PM_START);
-
-endthread
+	proceed PM_START;
+}
 
 #endif	/* PMON_NOTEVENT */
 
-thread (watchdog)
+fsm watchdog {
 
-    entry (WA_START)
+    entry WA_START:
 
 	watchdog_start ();
 
-    entry (WA_WAIT)
+    entry WA_WAIT:
 
 	watchdog_clear ();
 	delay (300, WA_WAIT);
+}
 
-endthread
+fsm root {
 
-thread (root)
+    shared char *ibuf;
+    shared sint k, n1;
+    shared const char *fmt;
+    shared char obuf [32];
+    shared word p [2];
+    shared lint lp;
 
-    entry (RS_INIT)
+    entry RS_INIT:
 
 	ibuf = (char*) umalloc (IBUFLEN);
 	ibuf [0] = 0;
 
-	runthread (watchdog);
+	runfsm watchdog;
 
 	phys_cc1100 (0, MAXPLEN);
 	// WARNING: the SMURPH model assumes that the plugin is static, i.e.,
@@ -289,7 +327,7 @@ thread (root)
 		halt ();
 	}
 
-    entry (RS_RCMDM2)
+    entry RS_RCMDM2:
 
 	ser_out (RS_RCMDM2,
 		"\r\nRF Ping Test\r\n"
@@ -323,13 +361,13 @@ thread (root)
 		"K        -> force watchdog reset\r\n"
 	);
 
-    entry (RS_RCMDM1)
+    entry RS_RCMDM1:
 
 	if ((unsigned char) ibuf [0] == 0xff)
 		ser_out (RS_RCMDM1,
 			"No command in 10 seconds -> start s 1024, r\r\n"
 				);
-    entry (RS_RCMD)
+    entry RS_RCMD:
 
 	if ((unsigned char) ibuf [0] == 0xff)
 		delay (1024*10, RS_AUTOSTART);
@@ -337,44 +375,44 @@ thread (root)
 	k = ser_in (RS_RCMD, ibuf, IBUFLEN-1);
 
 	switch (ibuf [0]) {
-	    case 's': proceed (RS_SND);
-	    case 'r': proceed (RS_RCV);
-	    case 'd': proceed (RS_PAR);
-	    case 'x': proceed (RS_SETP);
-	    case 'y': proceed (RS_GETP);
-	    case 'o': proceed (RS_QRCV);
-	    case 't': proceed (RS_QXMT);
-	    case 'q': proceed (RS_QUIT);
-	    case 'i': proceed (RS_SSID);
-	    case 'z': proceed (RS_RES);
-	    case 'p': proceed (RS_RPIN);
-	    case 'u': proceed (RS_SPIN);
-	    case 'a': proceed (RS_RANA);
-	    case 'w': proceed (RS_WANA);
+	    case 's': proceed RS_SND;
+	    case 'r': proceed RS_RCV;
+	    case 'd': proceed RS_PAR;
+	    case 'x': proceed RS_SETP;
+	    case 'y': proceed RS_GETP;
+	    case 'o': proceed RS_QRCV;
+	    case 't': proceed RS_QXMT;
+	    case 'q': proceed RS_QUIT;
+	    case 'i': proceed RS_SSID;
+	    case 'z': proceed RS_RES;
+	    case 'p': proceed RS_RPIN;
+	    case 'u': proceed RS_SPIN;
+	    case 'a': proceed RS_RANA;
+	    case 'w': proceed RS_WANA;
 #ifdef PMON_NOTEVENT
-	    case 'C': proceed (RS_PSCN);
-	    case 'P': proceed (RS_PSCM);
-	    case 'G': proceed (RS_PGCN);
-	    case 'D': proceed (RS_PQCN);
-	    case 'N': proceed (RS_PSNT);
-	    case 'M': proceed (RS_PQNT);
-	    case 'X': proceed (RS_PSMT);
-	    case 'Y': proceed (RS_PQMT);
+	    case 'C': proceed RS_PSCN;
+	    case 'P': proceed RS_PSCM;
+	    case 'G': proceed RS_PGCN;
+	    case 'D': proceed RS_PQCN;
+	    case 'N': proceed RS_PSNT;
+	    case 'M': proceed RS_PQNT;
+	    case 'X': proceed RS_PSMT;
+	    case 'Y': proceed RS_PQMT;
 #endif
-	    case 'S': proceed (RS_GETS);
-	    case 'A': proceed (RS_SETA);
+	    case 'S': proceed RS_GETS;
+	    case 'A': proceed RS_SETA;
 	    case 'K': {
 			killall (watchdog);
-			proceed (RS_RCMD);
+			proceed RS_RCMD;
 		      }
 	}
 
-    entry (RS_RCMD1)
+    entry RS_RCMD1:
 
 	ser_out (RS_RCMD1, "Illegal command or parameter\r\n");
-	proceed (RS_RCMDM2);
+	proceed RS_RCMDM2;
 
-    entry (RS_SND)
+    entry RS_SND:
 
 	/* Default */
 	n1 = 2048;
@@ -383,27 +421,27 @@ thread (root)
 		n1 = 16;
 	snd_start (n1);
 
-    entry (RS_SND1)
+    entry RS_SND1:
 
 	ser_outf (RS_SND1, "Sender rate: %d\r\n", n1);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_RCV)
+    entry RS_RCV:
 
 	rcv_start ();
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_QRCV)
+    entry RS_QRCV:
 
 	rcv_stop ();
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_QXMT)
+    entry RS_QXMT:
 
 	snd_stop ();
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_QUIT)
+    entry RS_QUIT:
 
 	strcpy (obuf, "");
 	if (rcv_stop ())
@@ -418,186 +456,183 @@ thread (root)
 	else
 		fmt = "No process stopped\r\n";
 
-    entry (RS_QUIT1)
+    entry RS_QUIT1:
 
 	ser_outf (RS_QUIT1, fmt, obuf);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PAR)
+    entry RS_PAR:
 
 	p [1] = 0;
 	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 1)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
 	k = tcv_control (sfd, *(p+0), p+1);
 
-    entry (RS_PAR1)
+    entry RS_PAR1:
 
 	ser_outf (RS_PAR1, "Completed: %d %u\r\n", k, p [1]);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_SSID)
+    entry RS_SSID:
 
 	n1 = 0;
 	scan (ibuf + 1, "%d", &n1);
 	tcv_control (sfd, PHYSOPT_SETSID, (address) &n1);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_AUTOSTART)
+    entry RS_AUTOSTART:
 	  
 	snd_start (1024);
   	rcv_start ();
 	finish;
 
-    entry (RS_RES)
+    entry RS_RES:
 
 	reset ();
 	// We should be killed past this
 
-    entry (RS_RPIN)
+    entry RS_RPIN:
 
 	if (scan (ibuf + 1, "%u", p+0) < 1)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
 	p [1] = pin_read (p [0]);
 
-    entry (RS_RPIN1)
+    entry RS_RPIN1:
 
 	ser_outf (RS_RPIN1, "P[%u] = %u\r\n", p [0], p [1]);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_SPIN)
+    entry RS_SPIN:
 
 	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 2)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
 	pin_write (p [0], p [1]);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_RANA)
+    entry RS_RANA:
 
 	if (scan (ibuf + 1, "%u %u %u", p+0, &k, p+1) < 3)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
-    entry (RS_RANA1)
+    entry RS_RANA1:
 
 	n1 = pin_read_adc (RS_RANA1, p [0], k, p [1]);
 
-    entry (RS_RANA2)
+    entry RS_RANA2:
 
 	ser_outf (RS_RANA2, "A[%u] = %d\r\n", p [0], n1);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_WANA)
+    entry RS_WANA:
 
 	if (scan (ibuf + 1, "%u %u %u", p+0, &k, p+1) < 3)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
 	pin_write_dac (p [0], k, p [1]);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
 #ifdef PMON_NOTEVENT
 
-    entry (RS_PSCN)
+    entry RS_PSCN:
 
 	k = 0;
 	lp = 0;
 	scan (ibuf + 1, "%lu %u", &lp, &k);
 	pmon_start_cnt (lp, (Boolean) k);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PSCM)
+    entry RS_PSCM:
 
 	if (scan (ibuf + 1, "%lu", &lp) < 1)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
 	pmon_set_cmp (lp);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PGCN)
+    entry RS_PGCN:
 
 	lp = pmon_get_cnt ();
 
-    entry (RS_PGCN1)
+    entry RS_PGCN1:
 
 	ser_outf (RS_PGCN1, "Counter = %lu\r\n", lp);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PQCN)
+    entry RS_PQCN:
 
 	pmon_stop_cnt ();
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PSNT)
+    entry RS_PSNT:
 
 	k = 0;
 	scan (ibuf + 1, "%u", &k);
 	pmon_start_not ((Boolean) k);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PQNT)
+    entry RS_PQNT:
 
 	pmon_stop_not ();
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PSMT)
+    entry RS_PSMT:
 
 	if (running (pin_monitor))
-		proceed (RS_PSMT1);
+		proceed RS_PSMT1;
 
-	runthread (pin_monitor);
-	proceed (RS_RCMD);
+	runfsm pin_monitor;
+	proceed RS_RCMD;
 
-    entry (RS_PSMT1)
+    entry RS_PSMT1:
 
 	ser_out (RS_PSMT1, "Already running!\r\n");
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_PQMT)
+    entry RS_PQMT:
 
 	killall (pin_monitor);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
 #endif /* PMON_NOTEVENT */
 
-    entry (RS_SETP)
+    entry RS_SETP:
 
 	if (scan (ibuf + 1, "%u", p+0) < 1)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
 	tcv_control (sfd, PHYSOPT_SETPOWER, p);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_GETP)
+    entry RS_GETP:
 
 	ser_outf (RS_GETP, "P = %d\r\n",
 		tcv_control (sfd, PHYSOPT_GETPOWER, NULL));
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_GETS)
+    entry RS_GETS:
 
 	if (scan (ibuf + 1, "%u", p+0) < 1)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
-    entry (RS_GETS1)
+    entry RS_GETS1:
 	// Assume these sensors handle 2-byte values
 	read_sensor (RS_GETS1, p [0], p + 1);
 
-    entry (RS_GETS2)
+    entry RS_GETS2:
 
 	ser_outf (RS_GETS2, "V = %u\r\n", p [1]);
-	proceed (RS_RCMD);
+	proceed RS_RCMD;
 
-    entry (RS_SETA)
+    entry RS_SETA:
 
 	if (scan (ibuf + 1, "%u %u", p+0, p+1) < 1)
-		proceed (RS_RCMD1);
+		proceed RS_RCMD1;
 
-    entry (RS_SETA1)
+    entry RS_SETA1:
 
 	write_actuator (RS_SETA1, p [0], p + 1);
-	proceed (RS_RCMD);
-
-endthread
-
-praxis_starter (Node);
+	proceed RS_RCMD;
+}

@@ -29,10 +29,10 @@ __PUBLF (NodeTag, void, msg_pongAck_in) (char * buf) {
 			in_pongAck(buf, plotid));
 }
 
-__PUBLF (NodeTag, void, upd_on_ack) (long ds, long rd, word syfr, word ackf,
+__PUBLF (NodeTag, void, upd_on_ack) (lint ds, lint rd, word syfr, word ackf,
 		word pi) {
 
-	long dd;
+	lint dd;
 	word what = MARK_FF;
 
 	if (sens_data.ee.s.f.status != SENS_COLLECTED ||

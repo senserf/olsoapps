@@ -467,7 +467,7 @@ __PUBLF (NodePeg, void, write_agg) (word ti) {
 
 __PUBLF (NodePeg, void, check_msg4tag) (char * buf) {
 	// do NOT send down your own date unless you're the Master
-	long md = master_ts != 0 || local_host == master_host ?
+	lint md = master_ts != 0 || local_host == master_host ?
 		wall_date (0) : 0;
 
 	if (msg4tag.buf && in_header(msg4tag.buf, rcv) ==
@@ -617,8 +617,8 @@ __PUBLF (NodePeg, sint, str_cmpn) (const char * s1, const char * s2, sint n) {
 	return (n == -1 ? 0 : -1);
 }
 
-__PUBLF (NodePeg, long, wall_date) (long s) {
-        long x = seconds() - master_ts - s;
+__PUBLF (NodePeg, lint, wall_date) (lint s) {
+        lint x = seconds() - master_ts - s;
 
         x = master_date < 0 ? master_date - x : master_date + x;
         return x;

@@ -7,7 +7,7 @@
 #include "msg_rtag.h"
 #include "tarp.h"
 
-extern long master_delta;
+extern lint master_delta;
 
 void msg_master_in (char * buf) {
 	in_master(buf, mtime) = ntowl(in_master(buf, mtime));

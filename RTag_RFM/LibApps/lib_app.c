@@ -15,7 +15,7 @@
 
 // on the lib_app_if interface:
 lword	host_id = 0xBACA;
-long   master_delta = 0;
+lint   master_delta = 0;
 appCountType app_count = {0, 0, 0};
 id_t	net_id  = 7;
 word   pow_level = DEF_PLEV;

@@ -24,7 +24,7 @@ char * cmd_line  = NULL;
 extern tarpCountType tarp_count;
 extern tarpParamType tarp_param;
 
-long  master_delta = 0;
+lint  master_delta = 0;
 lword last_read = 0;
 word  count_read = 0;
 bool  from_remote = NO;

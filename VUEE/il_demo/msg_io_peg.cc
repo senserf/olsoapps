@@ -226,7 +226,7 @@ sint mbeacon (word, address);
 #endif
 
 void msg_master_in (char * buf) {
-	long dd = 0;
+	lint dd = 0;
 	word mark = MARK_EMPTY;
 
 	if (master_host != in_header(buf, snd)) {

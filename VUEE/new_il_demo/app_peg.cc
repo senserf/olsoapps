@@ -44,7 +44,7 @@ lword		master_ts;	// Initialization to zero not required
 //
 static lword	pow_ts, con_ts;
 
-long		master_date;
+lint		master_date;
 
 wroomType	msg4tag;	// This one is not used, I guess (PG)
 wroomType	msg4ward;

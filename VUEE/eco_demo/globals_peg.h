@@ -35,7 +35,7 @@ char	*ui_ibuf	= NULL,
 lword	master_ts	= 0;
 word	app_flags 		= DEF_APP_FLAGS;
 word	tag_auditFreq 		= 59;	// in seconds
-long 	master_date		= 0;
+lint 	master_date		= 0;
 lword	pow_ts			= 0;
 word	pow_sup			= 0;
 

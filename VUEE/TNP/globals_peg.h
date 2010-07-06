@@ -31,7 +31,7 @@ lword	host_passwd		= 0;
 word	host_pl			= 9;
 
 word	app_flags 		= 0;
-long   	master_delta 		= 0;
+lint   	master_delta 		= 0;
 word	tag_auditFreq 		= 10240; 	// in bin msec
 word	tag_eventGran		= 10; 		// in seconds
 

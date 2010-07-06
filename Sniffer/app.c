@@ -22,7 +22,7 @@ heapmem {10, 90};
 static int efd;
 static address packet;
 static word firstw, nwords;
-static unsigned long npackets = 0;
+static unsigned lint npackets = 0;
 static char lcd_buf [33] = "                                " ;
 /*                          01234567890123456789012345678901 */
 

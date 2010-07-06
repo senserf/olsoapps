@@ -14,7 +14,7 @@ nid_t   net_id;
 
 // on the lib_app_if interface:
 const lword	host_id = 0xBACA0001;
-long	master_delta = 0;
+lint	master_delta = 0;
 appCountType app_count = {0, 0, 0};
 //nid_t	net_id  = 7;
 word	app_flags = DEFAULT_APP_FLAGS;

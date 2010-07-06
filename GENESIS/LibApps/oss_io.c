@@ -307,7 +307,7 @@ void oss_set_in () {
 }
 
 void oss_get_in (word state) {
-	long l;
+	lint l;
 	word p, p1;
 
 	if (cmd_ctrl.oplen != 1) {

@@ -34,8 +34,8 @@
 //+++ host_id.cc
 
 lword		ref_ts;
-long		ref_date;
-long		lh_time;
+lint		ref_date;
+lint		lh_time;
 
 sensDataType	sens_data;
 

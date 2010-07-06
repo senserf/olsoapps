@@ -12,7 +12,7 @@
 //+++ "app_tarp.c" "lib_app.c" "msg_io.c" "oss_io.c"
 
 extern id_t net_id;
-extern long master_delta;
+extern lint master_delta;
 extern word beac_freq;
 
 extern char * cmd_line;

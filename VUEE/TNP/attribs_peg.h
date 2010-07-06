@@ -11,7 +11,7 @@ __EXTERN __CONST lword _da (host_id);
 __EXTERN lword _da (host_password);
 __EXTERN word _da (host_pl);
 __EXTERN appCountType _da (app_count);
-__EXTERN long _da (master_delta);
+__EXTERN lint _da (master_delta);
 __EXTERN wroomType _da (msg4tag);
 __EXTERN wroomType _da (msg4ward);
 __EXTERN tagDataType _da (tagArray) [tag_lim];

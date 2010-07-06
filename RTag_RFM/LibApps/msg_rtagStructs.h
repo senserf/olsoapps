@@ -11,7 +11,7 @@ typedef struct msgInfoStruct {
 	headerType      header;
 	lword		ltime;
 	lword		host_id;
-	long		m_delta;
+	lint		m_delta;
 	id_t		m_host;
 	word		pl;
 } msgInfoType;

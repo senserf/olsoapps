@@ -416,7 +416,7 @@ __PUBLF (NodeCus, void, write_agg) (word ti) {
 
 // likely not needed for Custodian
 __PUBLF (NodeCus, void, check_msg4tag) (char * buf) {
-	long md = master_ts != 0 ? wall_date (0) : 0;
+	lint md = master_ts != 0 ? wall_date (0) : 0;
        	// do NOT send down your own date unless you're the Master
 
 diag ("WHY in check_msg4tag()??");
@@ -559,8 +559,8 @@ __PUBLF (NodeCus, sint, str_cmpn) (const char * s1, const char * s2, sint n) {
 	return (n == -1 ? 0 : -1);
 }
 
-__PUBLF (NodeCus, long, wall_date) (long s) {
-	long x = seconds() - master_ts - s;
+__PUBLF (NodeCus, lint, wall_date) (lint s) {
+	lint x = seconds() - master_ts - s;
 
 	x = master_date < 0 ? master_date - x : master_date + x;
 	return x;

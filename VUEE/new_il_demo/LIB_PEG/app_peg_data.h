@@ -15,7 +15,7 @@
 //
 extern const lword     host_id;
 extern lword           master_ts;
-extern long            master_date;
+extern lint            master_date;
 extern wroomType       msg4tag;
 extern wroomType       msg4ward;
 extern tagDataType     tagArray [];
@@ -77,7 +77,7 @@ void write_agg (word ti);
 void write_mark (word what);
 word handle_a_flags (word a_fl);
 sint str_cmpn (const char * s1, const char * s2, sint n);
-long wall_date (long s);
+lint wall_date (lint s);
 
 char * locatName (word id, word rssi);
 

@@ -24,7 +24,7 @@ lword		master_ts	__sinit (0);
 lword		pow_ts		__sinit (0);
 lword		con_ts		__sinit (0); // these timestamps are wasteful
 						// ...if we care
-long		master_date	__sinit (0);
+lint		master_date	__sinit (0);
 
 lword		aud_lhtime;
 
@@ -106,7 +106,7 @@ extern const lword     host_id;
 extern lword           master_ts;
 extern lword           pow_ts;
 extern lword	       con_ts;
-extern long            master_date;
+extern lint            master_date;
 extern lword           aud_lhtime;
 extern wroomType       msg4tag;
 extern wroomType       msg4ward;
@@ -201,7 +201,7 @@ void write_mark (word what);
 word r_a_d (void);
 word handle_a_flags (word a_fl);
 sint str_cmpn (const char * s1, const char * s2, sint n);
-long wall_date (long s);
+lint wall_date (lint s);
 
 word map_rssi (word r);
 //char * stateName (unsigned state);

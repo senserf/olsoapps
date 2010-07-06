@@ -9,7 +9,7 @@
 
 typedef struct msgMasterStruct {
 	headerType	header;
-	long		mdate;
+	lint		mdate;
 	word		syfreq;
 	word		plotid;
 } msgMasterType;
@@ -18,7 +18,7 @@ typedef struct msgMasterStruct {
 
 typedef struct msgReportStruct {
 	headerType	header;
-	long		tStamp;
+	lint		tStamp;
 
 	word		tagid;
 	word		rssi:8;
@@ -71,7 +71,7 @@ typedef struct msgStatsPegStruct {
 	headerType      header;
 	lword		hostid;
 	lword		ltime;
-	long		mts;
+	lint		mts;
 	lword		slot;
 	word		audi;
 	word		pl  :4;
@@ -86,7 +86,7 @@ typedef struct msgStatsPegStruct {
 
 typedef struct reportPloadStruct {
 	pongPloadType ppload;
-	long	ds;
+	lint	ds;
 	lword	eslot;
 } reportPloadType;
 #define in_reportPload(buf, field) (((reportPloadType *)(buf + \

@@ -34,7 +34,7 @@ char	*ui_ibuf	= NULL,
 	*cmd_line	= NULL;
 
 word	app_flags 		= 0;
-long   	master_delta 		= 0;
+lint   	master_delta 		= 0;
 word	tag_auditFreq 		= 2048; //10240; 	// in bin msec
 word	tag_eventGran		= 2; //10; 		// in seconds
 

@@ -4,7 +4,7 @@
 __EXTERN __CONST lword _da (host_id);
 __EXTERN word _da (host_pl);
 __EXTERN lword _da (master_ts);
-__EXTERN long _da (master_date);
+__EXTERN lint _da (master_date);
 __EXTERN wroomType _da (msg4tag);
 __EXTERN wroomType _da (msg4ward);
 __EXTERN tagDataType _da (tagArray) [tag_lim];
@@ -77,7 +77,7 @@ void	_da (tmpcrap) (word);
 sint	_da (str_cmpn) (const char * s1, const char * s2, sint n);
 void	_da (sat_rep) (char * b);
 void	_da (sat_out) (char * buf);
-long	_da (wall_date) (long s);
+lint	_da (wall_date) (lint s);
 
 // Expected by NET and TARP
 

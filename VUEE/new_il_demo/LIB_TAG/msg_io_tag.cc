@@ -19,9 +19,9 @@ void msg_pongAck_in (char * buf) {
 			in_pongAck(buf, plotid));
 }
 
-void upd_on_ack (long ds, long rd, word syfr, word ackf, word pi) {
+void upd_on_ack (lint ds, lint rd, word syfr, word ackf, word pi) {
 
-	long dd;
+	lint dd;
 	word what = MARK_FF;
 
 	if (sens_data.ee.s.f.status != SENS_COLLECTED ||

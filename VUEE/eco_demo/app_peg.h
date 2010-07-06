@@ -70,7 +70,7 @@ typedef enum {
 } tagStateType;
 
 typedef union {
-	long secs;
+	lint secs;
 	struct {
 		word f  :1;
 		word yy :5;
@@ -120,8 +120,8 @@ typedef struct wroomStruct {
 typedef struct aggEEDataStruct {
 	statu_t s; // 1st 2 bytes in ee slot
 	word	tag;
-	long ds;
-	long t_ds;
+	lint ds;
+	lint t_ds;
 	lword t_eslot;
 	word sval [NUM_SENS];
 } aggEEDataType; // 16 + NUM_SENS * 2

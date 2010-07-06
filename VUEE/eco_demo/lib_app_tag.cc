@@ -143,8 +143,8 @@ __PUBLF (NodeTag, void, next_col_time) () {
 	}
 }
 
-__PUBLF (NodeTag, long, wall_date) (long s) {
-        long x = seconds() - ref_ts - s;
+__PUBLF (NodeTag, lint, wall_date) (lint s) {
+        lint x = seconds() - ref_ts - s;
 
         x = ref_date < 0 ? ref_date - x : ref_date + x;
         return x;

@@ -9,7 +9,7 @@
 
 
 // on the lib_app_if interface:
-long	master_delta = 0;
+lint	master_delta = 0;
 id_t	net_id  = 0;
 word    beac_freq = 15;
 char * 	cmd_line  = NULL;

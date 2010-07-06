@@ -25,7 +25,7 @@ extern word max_pwr (word p_levs);
 extern void send_msg (char * buf, int size);
 
 /*
-extern long master_delta;
+extern lint master_delta;
 extern lword master_host;
 extern wroomType msg4tag;
 extern wroomType msg4ward;

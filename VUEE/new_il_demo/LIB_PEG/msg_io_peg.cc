@@ -213,7 +213,7 @@ void msg_fwd_out (word state, char** buf_out, word size, nid_t tag, nid_t peg) {
 }
 
 void msg_master_in (char * buf) {
-	long dd = 0;
+	lint dd = 0;
 	word mark = MARK_EMPTY;
 
 	if (master_host != in_header(buf, snd)) {

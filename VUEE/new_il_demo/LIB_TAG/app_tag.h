@@ -71,7 +71,7 @@
 // end of trigger / when ids
 
 typedef union {
-        long secs;
+        lint secs;
         struct {
                 word f  :1;
                 word yy :5;
@@ -105,7 +105,7 @@ typedef struct pongParamsStruct {
 typedef struct sensEEDataStruct {
 	statu_t	s; // keep it bytes 0,1 of the ee slot
 	word sval [NUM_SENS];
-	long ds;
+	lint ds;
 } sensEEDataType; // 6 + NUM_SENS * 2 (+2 if misaligned)
 
 typedef struct sensEEDumpStruct {

@@ -14,7 +14,7 @@
 extern appCountType app_count;
 extern lword host_id;
 extern id_t net_id;
-extern long master_delta;
+extern lint master_delta;
 extern word pow_level;
 extern word beac_freq;
 

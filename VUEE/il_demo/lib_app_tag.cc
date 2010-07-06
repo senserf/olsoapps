@@ -134,8 +134,8 @@ void next_col_time () {
 	}
 }
 
-long wall_date_t (long s) {
-        long x = seconds() - ref_ts - s;
+lint wall_date_t (lint s) {
+        lint x = seconds() - ref_ts - s;
 
         x = ref_date < 0 ? ref_date - x : ref_date + x;
         return x;

@@ -18,7 +18,7 @@ const lword	host_id = 0xBACA0001;
 extern nid_t	net_id;
 extern nid_t	local_host;
 extern nid_t   master_host;
-long   master_delta = 0;
+lint   master_delta = 0;
 word	host_pl = 9;
 word	tag_auditFreq = 10240; // in bin msec
 word	tag_eventGran = 10; // in seconds

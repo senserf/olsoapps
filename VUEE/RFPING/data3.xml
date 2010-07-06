@@ -78,9 +78,6 @@
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
-	    <preinit tag="TEST1" type="word">13</preinit>
-	    <preinit tag="TEST2" type="lword">0xaaaaaaaa</preinit>
-	    <preinit tag="TEST3" type="string">pocaluj mnie w dupe</preinit>
 	</defaults>
 	<node number="0">
 	    <pins number="12" adc="8" dac="2">

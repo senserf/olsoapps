@@ -15,8 +15,8 @@ typedef struct msgSetTagStruct {
 	word		rx_span;
 	word		c_fl;
 	word		plotid;
-	long		ds;
-	long		refdate;
+	lint		ds;
+	lint		refdate;
 	word		syfreq;
 	word		ackflags;
 } msgSetTagType;
@@ -59,7 +59,7 @@ typedef struct msgPongStruct {
 #define in_pong_rxperm(buf)	(((msgPongType *)(buf))->flags & PONG_RXPERM)
 
 typedef struct pongPloadStruct {
-	long 	ds; 
+	lint 	ds; 
 	lword	eslot;
 	word	sval[6];	// NUM_SENS
 } pongPloadType;
@@ -69,8 +69,8 @@ typedef struct pongPloadStruct {
 
 typedef struct msgPongAckStruct {
 	headerType	header;
-	long		ds;
-	long		refdate;
+	lint		ds;
+	lint		refdate;
 	word		syfreq;
 	word		ackflags;
 	word		plotid;

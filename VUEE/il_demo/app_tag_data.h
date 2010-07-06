@@ -22,8 +22,8 @@ __CONST lword	host_id		__sinit (0xBACADEAD);
 #endif
 
 lword		ref_ts		__sinit (0);
-long		ref_date	__sinit (0);
-long		lh_time;
+lint		ref_date	__sinit (0);
+lint		lh_time;
 lword		alrm_ts		__sinit (0);
 
 sensDataType	sens_data;
@@ -88,8 +88,8 @@ void _da (set_master_chg) (void);
 
 extern const lword     host_id;
 extern lword           ref_ts;
-extern long            ref_date;
-extern long            lh_time;
+extern lint            ref_date;
+extern lint            lh_time;
 extern lword		alrm_ts;
 extern sensDataType    sens_data;
 extern pongParamsType  pong_params;
@@ -141,9 +141,9 @@ void sens_init (void);
 void fatal_err_t (word err, word w1, word w2, word w3);
 void write_mark_t (word what);
 word r_a_d_t (void);
-void upd_on_ack (long ds, long rd, word syfr, word ackf, word pi);
+void upd_on_ack (lint ds, lint rd, word syfr, word ackf, word pi);
 word handle_c_flags (word c_fl);
-long wall_date_t (long s);
+lint wall_date_t (lint s);
 
 const char * markName_t (statu_t s);
 const char * statusName (statu_t s);

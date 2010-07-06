@@ -7,7 +7,7 @@
 #include "app.h"
 
 extern appCountType app_count;
-extern long master_delta;
+extern lint master_delta;
 extern nid_t master_host;
 extern nid_t local_host;
 extern wroomType msg4tag;

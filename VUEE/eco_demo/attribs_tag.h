@@ -4,7 +4,7 @@
 __EXTERN __CONST lword _da (host_id);
 
 __EXTERN lword	 _da (ref_ts);
-__EXTERN long	 _da (ref_date);
+__EXTERN lint	 _da (ref_date);
 
 __EXTERN pongParamsType _da (pong_params);
 
@@ -12,7 +12,7 @@ __EXTERN word	_da (app_flags);
 __EXTERN char	*_da (ui_ibuf), *_da (ui_obuf), *_da (cmd_line);
 
 __EXTERN sensDataType	_da (sens_data);
-__EXTERN long		_da (lh_time);
+__EXTERN lint		_da (lh_time);
 __EXTERN sensEEDumpType *_da (sens_dump);
 __EXTERN word		_da (plot_id);
 
@@ -39,10 +39,10 @@ void	_da (fatal_err) (word err, word w1, word w2, word w3);
 void	_da (sens_init) ();
 void	_da (init) ();
 word	_da (r_a_d) (void);
-void	_da (upd_on_ack) (long ds, long rd, word syfr, word ackf, word pi);
+void	_da (upd_on_ack) (lint ds, lint rd, word syfr, word ackf, word pi);
 word	_da (handle_c_flags) (word c_fl);
 void	_da (tmpcrap) (word);
-long	_da (wall_date) (long s);
+lint	_da (wall_date) (lint s);
 void	_da (write_mark) (word what);
 
 // Expected by NET and TARP

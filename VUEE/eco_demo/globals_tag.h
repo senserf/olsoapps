@@ -23,7 +23,7 @@
 heapmem {80, 20}; // how to find out a good ratio?
 
 lword	 ref_ts   = 0;
-long	 ref_date = 0;
+lint	 ref_date = 0;
 
 char * ui_ibuf 	= NULL;
 char * ui_obuf 	= NULL;
@@ -44,7 +44,7 @@ pongParamsType	pong_params = {	60,	// freq_maj in sec, max 63K
 };
 
 sensDataType	sens_data;
-long		lh_time;
+lint		lh_time;
 sensEEDumpType	*sens_dump = NULL;
 #endif
 
