@@ -35,9 +35,9 @@ static trueconst char bad_str[] =   OPRE_APP_BAD
 				"Bad or failed command (%s)[%d]\r\n";
 
 static trueconst char stats_str[] = OPRE_APP_STATS_C
-	"Stats for collector (%lx: %u):" OMID_CR
+	"Stats for collector (%u: %u):" OMID_CR
 	" Mf %u mf %u rx_span %u pl %x c_fl %x" OMID_CR
-	" Uptime %lu mstats %u %u %u %u\r\n";
+	" Uptime %lu vtstats %u %u %u %u %u %u\r\n";
 
 static trueconst char ifla_str[] = OPRE_APP_IFLA_C
 	"Flash: id %u pl %x c_fl %x Maj_freq %u min_freq %u rx_span %u\r\n";

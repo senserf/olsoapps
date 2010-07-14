@@ -8,6 +8,9 @@
 #include "hold.h"
 #include "app_peg_data.h"
 
+// we need that if we track power on pegs / aggregators
+// #include "sensors.h"
+
 // PiComp
 //
 // Note: this is still how you declare which program files belong to
@@ -25,8 +28,6 @@
 //
 // const lword	host_id = (lword) PREINIT (0xBACADEAD, "HID");
 //+++ host_id.cc
-
-#include "sensors.h"
 
 // PiComp
 //
@@ -117,6 +118,10 @@ idiosyncratic void set_master_chg (void);
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
 #define DEF_NID			85
 #define DEF_MHOST		1
+
+#ifndef _APP_EXPERIMENT
+#define _APP_EXPERIMENT 0
+#endif
 
 // Semaphores
 #define CMD_READER	(&cmd_line)
@@ -249,47 +254,52 @@ static void save_ifla () {
 static void stats (char * buf) {
 
 	char * mbuf = NULL;
-	word w[4];
+	word w[6];
 
 	if (buf == NULL) {
 
 #if (RADIO_OPTIONS & 0x04)
 		net_opt (PHYSOPT_ERROR, w);
 #else
-		w[0] = w[1] = 0;
-		w[2] = memfree (0, &w[3]);
+		memset (&w, 0, 8);
 #endif
+		w[4] = memfree (0, &w[5]);
 
 		mbuf = form (NULL, stats_str,
-			host_id, local_host, tag_auditFreq,
+			(word)host_id, local_host, tag_auditFreq,
 			host_pl, handle_a_flags (0xFFFF), seconds(),
-		       	master_ts, master_host, w[0], w[1], w[2], w[3],
+		       	master_host, w[0], w[1], w[2], w[3], w[4], w[5],
 			pow_sup);
 	} else {
 	  switch (in_header (buf, msg_type)) {
 	    case msg_statsPeg:
 		mbuf = form (NULL, stats_str,
-			in_statsPeg(buf, hostid), in_header(buf, snd),
+			in_statsPeg(buf, lhid), in_header(buf, snd),
 			in_statsPeg(buf, audi), in_statsPeg(buf, pl),
-			in_statsPeg(buf, a_fl),
-			in_statsPeg(buf, ltime), in_statsPeg(buf, mts),
-			in_statsPeg(buf, mhost),
-		       	(word)(in_statsPeg(buf, slot) >> 16),
-			(word)in_statsPeg(buf, slot),
-			in_statsPeg(buf, mem), in_statsPeg(buf, mmin), 0);
+			in_statsPeg(buf, a_fl), in_statsPeg(buf, ltime),
+			in_statsPeg(buf, mhost), 
+		       	in_statsPeg(buf, vpstats[0]),
+			in_statsPeg(buf, vpstats[1]),
+			in_statsPeg(buf, vpstats[2]),
+			in_statsPeg(buf, vpstats[3]),
+			in_statsPeg(buf, vpstats[4]),
+			in_statsPeg(buf, vpstats[5]),
+			in_statsPeg(buf, inp));
 		break;
 
 	    case msg_statsTag:
 		mbuf = form (NULL, statsCol_str,
-			in_statsTag(buf, hostid),
-			(word)in_statsTag(buf, hostid),
+			in_statsTag(buf, lhid), in_statsTag(buf, clh),
 			in_statsTag(buf, maj), in_statsTag(buf, min),
 			in_statsTag(buf, span), in_statsTag(buf, pl),
 			in_statsTag(buf, c_fl),
 			in_statsTag(buf, ltime),
-		       	(word)(in_statsTag(buf, slot) >> 16),
-			(word)in_statsTag(buf, slot),
-			in_statsTag(buf, mem), in_statsTag(buf, mmin));
+			in_statsTag(buf, vtstats[0]),
+			in_statsTag(buf, vtstats[1]),
+			in_statsTag(buf, vtstats[2]),
+			in_statsTag(buf, vtstats[3]),
+			in_statsTag(buf, vtstats[4]),
+			in_statsTag(buf, vtstats[5]));
 		break;
 
 	    default:
@@ -339,6 +349,9 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 
 	case msg_master:
 		msg_master_in (buf);
+#if _APP_EXPERIMENT
+		stats (NULL);
+#endif
 		return;
 
 	case msg_findTag:
@@ -517,7 +530,10 @@ fsm audit {
 
 		if (local_host == master_host && (pow_ts == 0 ||
 	(word)(seconds() - pow_ts) >= (tag_auditFreq << POW_FREQ_SHIFT))) {
+#if 0
 			read_sensor (AS_START, 0, &pow_sup);
+#endif
+			pow_sup++;
 			pow_ts = seconds();
 			stats (NULL);
 		}
