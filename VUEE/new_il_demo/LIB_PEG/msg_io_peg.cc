@@ -128,7 +128,7 @@ void msg_findTag_out (word state, char** buf_out, nid_t tag, nid_t peg) {
 }
 
 void msg_setPeg_in (char * buf) {
-	word mmin, mem;
+	word w[6];
 	char * out_buf = get_mem (WNONE, sizeof(msgStatsPegType));
 
 	if (out_buf == NULL)
@@ -144,29 +144,30 @@ void msg_setPeg_in (char * buf) {
 		host_pl = in_setPeg(buf, level);
 		net_opt (PHYSOPT_SETPOWER, &host_pl);
 	}
+#if (RADIO_OPTIONS & 0x04)
+	net_opt (PHYSOPT_ERROR, w);
+#else
+	memset (&w, 0, 8);
+#endif
+	w[4] = memfree (0, &w[5]);
 
-	mem = memfree (0, &mmin);
 	in_header(out_buf, msg_type) = msg_statsPeg;
 	in_header(out_buf, hco) = 0;
 	in_header(out_buf, rcv) = in_header(buf, snd);
-	in_statsPeg(out_buf, hostid) = host_id;
+	in_statsPeg(out_buf, lhid) = (word)host_id;
 	in_statsPeg(out_buf, ltime) = seconds();
-	in_statsPeg(out_buf, mts) = master_ts;
-
-	//in_statsPeg(out_buf, slot) is really # of entries
-	if (agg_data.eslot == EE_AGG_MIN &&
-			IS_AGG_EMPTY (agg_data.ee.s.f.status))
-		in_statsPeg(out_buf, slot) = 0;
-	else
-		in_statsPeg(out_buf, slot) = agg_data.eslot -
-			EE_AGG_MIN +1;
 
 	in_statsPeg(out_buf, audi) = tag_auditFreq;
 	in_statsPeg(out_buf, pl) = host_pl;
-	in_statsPeg(out_buf, inp) = local_host == master_host ? pow_sup : 0;
+	in_statsPeg(out_buf, inp) = pow_sup;
 	in_statsPeg(out_buf, mhost) = master_host;
-	in_statsPeg(out_buf, mem) = mem;
-	in_statsPeg(out_buf, mmin) = mmin;
+	in_statsPeg(out_buf, vpstats[0]) = w[0];
+	in_statsPeg(out_buf, vpstats[1]) = w[1];
+	in_statsPeg(out_buf, vpstats[2]) = w[2];
+	in_statsPeg(out_buf, vpstats[3]) = w[3];
+	in_statsPeg(out_buf, vpstats[4]) = w[4];
+	in_statsPeg(out_buf, vpstats[5]) = w[5];
+
 	in_statsPeg(out_buf, a_fl) = handle_a_flags (in_setPeg(buf, a_fl));
 	send_msg (out_buf, sizeof(msgStatsPegType));
 	ufree (out_buf);

@@ -25,16 +25,15 @@ typedef struct msgSetTagStruct {
 
 typedef struct msgStatsTagStruct {
 	headerType	header;
-	lword		hostid;
 	lword		ltime;
-	lword		slot;
+	word		lhid;
+	word		clh;
 	word		maj;
 	word		min;
 	word		span;
 	word		pl;
-	word		mem;
-	word		mmin;
 	word		c_fl;
+	word		vtstats[6];
 	word		spare;
 } msgStatsTagType;
 

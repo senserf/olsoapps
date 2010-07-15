@@ -57,14 +57,14 @@ static trueconst char not_in_maint_str[] = OPRE_APP_ILL "Not in Maint\r\n";
 static trueconst char only_master_str[] = OPRE_APP_ILL "Only at the Master\r\n";
 
 static trueconst char stats_str[] = OPRE_APP_STATS_A 
-	"Stats for agg (%lx: %u):" OMID_CR
-	" Audit %u PLev %u a_fl %x Uptime %lu Mts %ld Master %u" OMID_CR
-	" mstats %u %u %u %u inp %u\r\n";
+	"Stats for agg (%u: %u):" OMID_CR
+	" Audit %u PLev %u a_fl %x Uptime %lu Master %u" OMID_CR
+	" vpstats %u %u %u %u %u %u inp %u\r\n";
 
 static trueconst char statsCol_str[] = OPRE_APP_STATS_CA
 	"Stats for coll (%lx: %u)" OMID_CR
 	" Mf %u mf %u rx_span %u pl %x c_fl %x" OMID_CR
-	" Uptime %lu mstats %u %u %u %u\r\n";
+	" Uptime %lu vtstats %u %u %u %u %u %u\r\n";
 
 static trueconst char ifla_str[] = OPRE_APP_IFLA_A
 	"Flash: id %u pl %u a_fl %x au_fr %u master %u sync_fr %u mode %u\r\n";
