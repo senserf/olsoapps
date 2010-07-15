@@ -4,7 +4,7 @@
 /* ==================================================================== */
 
 static  void s2d (mdate_t * in) {
-	long l1;
+	lint l1;
 	word w1, w2;
 
 	if (in->secs < 0) {
@@ -135,7 +135,7 @@ Fin:
 }
 
 static  void d2s (mdate_t * in) {
-  long l1 = 365L * in->dat.yy - 365 + (in->dat.yy >> 2) +
+  lint l1 = 365L * in->dat.yy - 365 + (in->dat.yy >> 2) +
 	  in->dat.dd + 30 * in->dat.mm - 30; // days
 
   if (in->dat.yy % 4 == 0 && in->dat.mm < 3)

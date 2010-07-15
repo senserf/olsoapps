@@ -137,3 +137,5 @@
 #define _APP_EXPERIMENT		0
 #define _TARP_T_LIGHT		0
 
+#define RADIO_CRC_MODE		4
+
