@@ -186,10 +186,7 @@ static void init () {
 
 	sens_init();
 
-#if _APP_EXPERIMENT
-	if (local_host % 2)
-#endif
-	       	powerdown();
+	powerdown();
 
 // put all the crap here
 
@@ -368,21 +365,20 @@ static void save_ifla_t () {
 static void stats () {
 
 	char * mbuf;
-	word w[4];
-
+	word w[6];
 #if (RADIO_OPTIONS & 0x04)
 	net_opt (PHYSOPT_ERROR, w);
 #else
-	w[0] = w[1] = 0;
-	w[2] = memfree (0, &w[3]);
+	memset (&w, 0, 8);
 #endif
+	w[4] = memfree (0, &w[5]);
 
 	mbuf = form (NULL, stats_str,
-			host_id, local_host, 
+			(word)host_id, local_host, 
 			pong_params.freq_maj, pong_params.freq_min,
 			pong_params.rx_span, pong_params.pow_levels,
 			handle_c_flags (0xFFFF), seconds(),
-			w[0], w[1], w[2], w[3]);
+			w[0], w[1], w[2], w[3], w[4], w[5]);
 	if (runfsm oss_out (mbuf) == 0) {
 		app_diag_t (D_SERIOUS, "oss_out fork");
 		ufree (mbuf);
@@ -428,26 +424,29 @@ void process_incoming (word state, char * buf, word size) {
 			diag ("Mayday no mem");
 			return;
 		}
-
 #if (RADIO_OPTIONS & 0x04)
 		net_opt (PHYSOPT_ERROR, w);
 #else
-		w[0] = w[1] = 0;
-		w[2] = memfree (0, &w[3]);
+		memset (&w, 0, 8);
 #endif
+		w[4] = memfree (0, &w[5]);
 
 		in_header(out_buf, hco) = 1; // no mhopping
 		in_header(out_buf, msg_type) = msg_statsTag;
 		in_header(out_buf, rcv) = in_header(buf, snd);
-		in_statsTag(out_buf, hostid) = host_id;
+		in_statsTag(out_buf, lhid) = (word)host_id;
+	        in_statsTag(out_buf, clh) = local_host;
 		in_statsTag(out_buf, ltime) = seconds();
 		in_statsTag(out_buf, maj) = pong_params.freq_maj;
 		in_statsTag(out_buf, min) = pong_params.freq_min;
 		in_statsTag(out_buf, span) = pong_params.rx_span;
 		in_statsTag(out_buf, pl) = pong_params.pow_levels;
-		in_statsTag(out_buf, slot) = (((lword)w[0]) << 16) | w[1];
-		in_statsTag(out_buf, mem) = w[2];
-		in_statsTag(out_buf, mmin) = w[3];
+		in_statsTag(out_buf, vtstats[0]) = w[0];
+		in_statsTag(out_buf, vtstats[1]) = w[1];
+		in_statsTag(out_buf, vtstats[2]) = w[2];
+		in_statsTag(out_buf, vtstats[3]) = w[3];
+		in_statsTag(out_buf, vtstats[4]) = w[4];
+		in_statsTag(out_buf, vtstats[5]) = w[5];
 		in_statsTag(out_buf, c_fl) = handle_c_flags (0xFFFF);
 		net_opt (PHYSOPT_TXON, NULL);
 		send_msg_t (out_buf, sizeof(msgStatsTagType));
@@ -840,15 +839,16 @@ fsm sens {
 
 	entry SE_3:
 		// analog motion - empty call
-		read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
+		// read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
+		sens_data.ee.sval[3]++;
 
 	entry SE_4:
 		// empty call
-		read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
+		// read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
 
 	entry SE_5:
-		// empty call
-		read_sensor (SE_5, 5, &sens_data.ee.sval[5]);
+		// empty call
+		// read_sensor (SE_5, 5, &sens_data.ee.sval[5]);
 
 #else
 		app_diag_t (D_WARNING, "FAKE SENSORS");
@@ -874,7 +874,7 @@ fsm sens {
 		// kludge alert: sens[4] is app_flags, sval[5] is spare 0
 		// sooner or later, we'll clean it - not sooner than we know
 		// the praxis requirements, including the personal collector
-	        // (wrietwatch).
+	        // (wristwatch).
 		sens_data.ee.sval[4] = app_flags;
 		sens_data.ee.sval[5] = 0;	
 		clr_alrms;

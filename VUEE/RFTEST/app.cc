@@ -455,7 +455,9 @@ word gen_send_params () {
 		g_snd_opl = g_pkt_minpl;
 	else
 		g_snd_opl = ((word)(rnd () % (g_pkt_maxpl - g_pkt_minpl + 1)) +
-			g_pkt_minpl) & 0xfe;
+			g_pkt_minpl);
+
+	g_snd_opl &= 0xfe;
 
 	if (g_pkt_mindel >= g_pkt_maxdel)
 		return g_pkt_mindel;

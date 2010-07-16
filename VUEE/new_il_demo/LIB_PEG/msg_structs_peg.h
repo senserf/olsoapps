@@ -69,17 +69,15 @@ typedef struct msgSetPegStruct {
 
 typedef struct msgStatsPegStruct {
 	headerType      header;
-	lword		hostid;
 	lword		ltime;
-	lint		mts;
-	lword		slot;
+	word		lhid;
 	word		audi;
 	word		pl  :4;
 	word		inp :12;
 	word		mhost;
-	word		mem;
-	word		mmin;
 	word		a_fl;
+	word		vpstats[6];
+	word		spare;
 } msgStatsPegType;
 
 #define in_statsPeg(buf, field)   (((msgStatsPegType *)(buf))->field)

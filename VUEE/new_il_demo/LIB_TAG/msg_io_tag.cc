@@ -104,7 +104,7 @@ void upd_on_ack (lint ds, lint rd, word syfr, word ackf, word pi) {
 }
 
 void msg_setTag_in (char * buf) {
-	word w[4];
+	word w[6];
 	char * out_buf = get_mem_t (WNONE, sizeof(msgStatsTagType));
 
 	if (out_buf == NULL)
@@ -168,14 +168,15 @@ void msg_setTag_in (char * buf) {
 #if (RADIO_OPTIONS & 0x04)
 	net_opt (PHYSOPT_ERROR, w);
 #else
-	w[0] = w[1] = 0;
-	w[2] = memfree (0, &w[3]);
+	memset (&w, 0, 8);
 #endif
+	w[4] = memfree (0, &w[5]);
 
 	in_header(out_buf, hco) = 1; // no mhopping
 	in_header(out_buf, msg_type) = msg_statsTag;
 	in_header(out_buf, rcv) = in_header(buf, snd);
-	in_statsTag(out_buf, hostid) = host_id;
+	in_statsTag(out_buf, lhid) = (word)host_id;
+	in_statsTag(out_buf, clh) = local_host;
 	in_statsTag(out_buf, ltime) = seconds();
 	in_statsTag(out_buf, c_fl) = handle_c_flags (in_setTag(buf, c_fl));
 
@@ -183,9 +184,12 @@ void msg_setTag_in (char * buf) {
 	in_statsTag(out_buf, min) = pong_params.freq_min;
 	in_statsTag(out_buf, span) = pong_params.rx_span;
 	in_statsTag(out_buf, pl) = pong_params.pow_levels;
-	in_statsTag(out_buf, slot) = (((lword)w[0]) << 16) | w[1];
-	in_statsTag(out_buf, mem) = w[2];
-	in_statsTag(out_buf, mmin) = w[3];
+	in_statsTag(out_buf, vtstats[0]) = w[0];
+	in_statsTag(out_buf, vtstats[1]) = w[1];
+	in_statsTag(out_buf, vtstats[2]) = w[2];
+	in_statsTag(out_buf, vtstats[3]) = w[3];
+	in_statsTag(out_buf, vtstats[4]) = w[4];
+	in_statsTag(out_buf, vtstats[5]) = w[5];
 
 	// should be SETPOWER here... FIXME?
     	net_opt (PHYSOPT_TXON, NULL);
