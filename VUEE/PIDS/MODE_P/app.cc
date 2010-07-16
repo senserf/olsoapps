@@ -42,7 +42,7 @@ strandhdr (sjoiner, Node) {
 
 	void *data;
 
-	states { SJ_START, SJ_JOINED, SJ_NONE };
+	states { SJ_START, SJ_JOINED };
 
 	void savedata (void *d) { data = d; };
 	void setup (void *d) { savedata (d); };
@@ -79,7 +79,6 @@ threadhdr (root, Node) {
 
 #define	SJ_START	0
 #define	SJ_JOINED	1
-#define	SJ_NONE		2
 
 #define	AJ_START	0
 #define	AJ_WAIT 	1
@@ -147,20 +146,12 @@ strand (sjoiner, void)
 	// Send the initial message
 	pidmess (SJ_START, ORD_R_PI);
 
-	if (join (vtoi (data), SJ_JOINED) == 0)
-		// Nothing to join to
-		proceed (SJ_NONE);
-
+	join (vtoi (data), SJ_JOINED);
 	release;
 
   entry (SJ_JOINED)
 
 	pidmess (SJ_JOINED, ORD_R_JO);
-	finish;
-
-  entry (SJ_NONE)
-
-	pidmess (SJ_NONE, ORD_R_TE);
 	finish;
 
 endstrand
