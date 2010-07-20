@@ -20,7 +20,7 @@
         </node>
         <node number="3" start="on">
             <location>475.0 305.0</location>
-            <preinit tag="HID" type="lword">0x47000013</preinit>
+            <preinit tag="HID" type="lword">0x07000013</preinit>
         </node>
 
 	<node number="4" start="on">

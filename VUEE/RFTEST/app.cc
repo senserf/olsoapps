@@ -28,6 +28,12 @@ word	g_pkt_mindel = 1024, g_pkt_maxdel = 1024,
 	g_snd_count, g_snd_rnode, g_snd_rcode,
 	g_snd_sernum = 1, g_snd_rtries, g_flags = 0;
 
+byte	g_last_rssi, g_last_qual;
+
+word	g_pat_peer, g_pat_cnt, g_pat_cntr;
+lword	g_pat_acc;
+byte	g_pat_cset [] = { 0x3e, 0, 255 }, g_pat_cred;
+
 char	*g_snd_rcmd;
 byte	*g_reg_suppl;
 
@@ -68,14 +74,13 @@ void confirm (word sender, word sernum, word code) {
 	}
 }
 
-void handle_ack (address buf, word len) {
+void handle_ack (address buf, word pl) {
 //
 // Handles a received ACK; note that we are passsed a packet buffer, which we
 // are expected to deallocate
 //
-	word pl;
-
-	if (len > MIN_ACK_LENGTH) {
+	// The length is in words
+	if (pl > MIN_ACK_LENGTH/2) {
 		// This looks like a report
 		if (g_rcv_ackrp) {
 			// Still doing the previous one
@@ -84,7 +89,6 @@ void handle_ack (address buf, word len) {
 			return;
 		}
 
-		pl = len >> 1;	// Packet length in words
 		if (pl < POFF_NTAB + 1) {
 			// At least this much needed to make sense
 Bad_length:
@@ -291,6 +295,8 @@ word do_command (const char *cb, word sender, word sernum) {
 
 		// Stop transmitting
 		killall (thread_sender);
+		// To terminate the PATABLE thread, if running
+		trigger (&g_pat_cred);
 		return 0;
 
 	    case 'd':
@@ -322,6 +328,23 @@ word do_command (const char *cb, word sender, word sernum) {
 		g_flags &= ~0x4000;
 		return 0;
 
+	    case 't':
+
+		// PATABLE test
+		if (running (thread_patable))
+			// One at a time
+			return 8;
+
+		g_pat_cnt = 16;
+		scan (cb + 1, "%u %u", &g_pat_peer, &g_pat_cnt);
+
+		if (g_pat_cnt == 0)
+			g_pat_cnt = 1;
+
+		if (runfsm thread_patable == 0)
+			return 6;
+		return 0;
+		
 	    case 'm': {
 
 		// Modify CC1100 register
@@ -400,6 +423,59 @@ CDiff:
 		}
 		// Do nothing
 		return 0;
+	    }
+
+	    // Two special commands used by PATABLE tester
+
+	    case '+': {
+
+		address packet;
+
+		// Respond with RSSI reading
+
+		if (sender == 0)
+			// Must be remote
+			return 9;
+
+		// Command size (fixed)
+		packet = tcv_wnp (WNONE, g_fd_rf, (POFF_CMD + 4 + 1) * 2);
+		if (packet == NULL)
+			// Quietly ignore
+			return WNONE;
+
+		packet [POFF_RCV] = sender;
+		packet [POFF_SND] = HOST_ID;
+		packet [POFF_SER] = sernum;	// identifies the setting
+		form ((char*)&(packet [POFF_CMD]), "- %x", g_last_rssi);
+		tcv_endp (packet);
+
+		return WNONE;
+	    }
+
+	    case '-': {
+
+		sint pid;
+		word val;
+
+		if ((pid = running (thread_patable)) == 0)
+			// No PATABLE thread
+			return WNONE;
+
+		if ((byte)sernum != g_pat_cset [1])
+			// Obsolete reading
+			return WNONE;
+
+		val = WNONE;
+		cb = skip_blk (++cb);
+		scan (cb, "%x", &val);
+
+		if (val > 255)
+			// Illegal
+			return WNONE;
+
+		g_pat_cred = (byte) val;
+		ptrigger (pid, &g_pat_cred);
+		return WNONE;
 	    }
 	}
 	return 7;
@@ -518,8 +594,6 @@ void view_packet (address p, word pl) {
 		// Something wrong
 		return;
 
-	ns = p [pl - 1];
-
 	uart_outf (WNONE, "S: %u, L: %u, P: %u, R: %u, Q: %u, M %c"
 #if NUMBER_OF_SENSORS > 0
 		", V: %u"
@@ -537,7 +611,7 @@ void view_packet (address p, word pl) {
 #endif
 #endif
 		, p [POFF_SND], pl << 1, p [POFF_FLG] & 0x07,
-			(ns >> 8) & 0xff, ns & 0xff,
+			g_last_rssi, g_last_qual,
 			(p [POFF_FLG] & 0x8000) ? 'D' : 'U'
 
 #if NUMBER_OF_SENSORS > 0
@@ -556,6 +630,97 @@ void view_packet (address p, word pl) {
 #endif
 #endif
 		);
+}
+
+// ============================================================================
+
+fsm thread_patable {
+
+  shared word ntries, spow;
+  address packet;
+
+  entry PA_START:
+
+	// Preserve the original power setting
+	tcv_control (g_fd_rf, PHYSOPT_GETPOWER, &spow);
+	ntries = 0;
+	// Select PATABLE [0]
+	tcv_control (g_fd_rf, PHYSOPT_SETPOWER, &ntries);
+	// Starting value
+	g_pat_cset [1] = 0;
+
+  entry PA_CSET:
+
+	tcv_control (g_fd_rf, PHYSOPT_RESET, (address)&g_pat_cset);
+	g_pat_cntr = 0;
+	g_pat_acc = 0;
+	delay (10, PA_RUN);
+	ntries = 0;
+	release;
+
+  entry PA_RUN:
+
+	// Issue a command
+	if (g_pat_cnt == 0)
+		// Aborted
+		proceed PA_DONE;
+		
+	packet = tcv_wnp (PA_RUN, g_fd_rf, (POFF_CMD + 1 + 1) * 2);
+	packet [POFF_RCV] = g_pat_peer;
+	packet [POFF_SND] = HOST_ID;
+	packet [POFF_SER] = (word) (g_pat_cset [1]);
+	strcpy ((char*)(packet+POFF_CMD), "+");
+	tcv_endp (packet);
+
+	// Wait for a signal or a timeout
+	delay (PATABLE_REPLY_DELAY, PA_TMOUT);
+	when (&g_pat_cred, PA_NEWVAL);
+	release;
+
+  entry PA_TMOUT:
+
+	if (ntries > PATABLE_MAX_TRIES)
+		proceed PA_NEXT;
+
+	ntries++;
+	proceed PA_RUN;
+
+  entry PA_NEWVAL:
+
+	if (g_pat_cnt == 0)
+		// Aborted
+		proceed PA_DONE;
+
+	g_pat_acc += g_pat_cred;
+	g_pat_cntr++;
+
+	if (g_pat_cntr < g_pat_cnt) {
+		// Need more samples
+		ntries = 0;
+		proceed PA_RUN;
+	}
+
+  entry PA_NEXT:
+
+	uart_outf (PA_NEXT, "PA: %x, %d, %d", g_pat_cset [1],
+		(word) (g_pat_cntr > 1 ? g_pat_acc / g_pat_cntr : g_pat_acc),
+		g_pat_cntr);
+
+	// Next value
+	if (g_pat_cset [1] != 255) {
+		g_pat_cset [1] ++;
+		proceed PA_CSET;
+	}
+
+	// All done
+
+  entry PA_DONE:
+
+	uart_outf (PA_DONE, "All done");
+	// Resume previous settings
+	tcv_control (g_fd_rf, PHYSOPT_RESET, (address)g_reg_suppl);
+	tcv_control (g_fd_rf, PHYSOPT_SETPOWER, &spow);
+	finish;
 }
 
 // ============================================================================
@@ -694,21 +859,25 @@ fsm thread_ureporter {
 fsm thread_listener {
 
   address packet;
-  word pl;
+  word pl, tr;
 
   entry LI_WAIT:
 
 	packet = tcv_rnp (LI_WAIT, g_fd_rf);
-	pl = tcv_left (packet);
-
-	if (pl >= MIN_ANY_PACKET_LENGTH) {
+	// Packet length in words
+	pl = (tcv_left (packet) >> 1);
+	tr = packet [pl - 1];
+	g_last_rssi = (byte)(tr >> 8);
+	g_last_qual = (byte) tr      ;
+	
+	if (pl >= MIN_ANY_PACKET_LENGTH/2) {
 
 		if (packet [POFF_RCV] == 0) {
 			// This is one of the packets to be counted;
 			// packet [2] is the node number of the sender
 			update_count (packet [POFF_SND]);
 			if ((g_flags & 0x4000))
-				view_packet (packet, pl >> 1);
+				view_packet (packet, pl);
 		} else if (packet [POFF_RCV] == HOST_ID &&
 			    packet [POFF_SND] != 0) {
 				// This is a command addressed to us
@@ -832,10 +1001,10 @@ fsm root {
 
 	tcv_control (g_fd_rf, PHYSOPT_TXON, NULL);
 	tcv_control (g_fd_rf, PHYSOPT_RXON, NULL);
-	runthread (thread_listener);
+	runfsm thread_listener;
 
 	if (g_flags & 0x4000)
-		runthread (thread_sender);
+		runfsm thread_sender;
 
 	// Only this one stays
 	g_flags &= 0x8000;
@@ -871,6 +1040,8 @@ fsm root {
 		case 5:	msg = (char*)"No memory"; break;
 		case 6:	msg = (char*)"Too many threads"; break;
 		case 7:	msg = (char*)"No such command"; break;
+		case 8: msg = (char*)"Already in progress"; break;
+		case 9: msg = (char*)"Command must be remote"; break;
 
 		default:
 			msg = (char*)"Unknown error";

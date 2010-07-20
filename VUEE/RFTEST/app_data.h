@@ -82,12 +82,14 @@
 // FLG is xmit power level with 0x8000 or'red in, if the node operates in PD
 // mode.
 
-#define	MIN_ANY_PACKET_LENGTH	((POFF_FLG + 2) * 2)
+#define	MIN_ANY_PACKET_LENGTH	((POFF_FLG + 2)*2)
 #define	MIN_ACK_LENGTH		12
 #define	MIN_MES_PACKET_LENGTH	((POFF_FLG + 2 + NUMBER_OF_SENSORS) * 2)
 
 // ============================================================================
 
+#define	PATABLE_MAX_TRIES	16
+#define	PATABLE_REPLY_DELAY	1024
 #define	MIN_SEND_INTERVAL	256
 #define	UART_LINE_LENGTH	82
 #define	RF_COMMAND_SPACING	1024
@@ -125,5 +127,6 @@ fsm thread_rreporter;
 fsm thread_ureporter;
 fsm thread_listener;
 fsm thread_sender;
+fsm thread_patable;
 
 #endif
