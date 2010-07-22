@@ -125,6 +125,9 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 	// This is also why we don't have to set sec or bounds: the caller
 	// (tcvphy_rcv) will not get to actually using them, as we do its
 	// job
+
+	// Copy the payload
+	memcpy (ap, p, len);
 	
 	// diag ("RCV DAT %u %u", psernum (p), NFreeHooks);
 
