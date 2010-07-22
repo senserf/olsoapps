@@ -93,11 +93,11 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 	if (len == ACK_LENGTH && ptype (p) == PTYPE_ACK) {
 		// This is an ACK: search the hooks for a matching data
 		// packet
-		// diag ("RCV ACK %u %u", psernum (p), NFreeHooks);
+		// diag ("R-A %u %u", psernum (p), NFreeHooks);
 		for (i = 0; i < N_HOOKS; i++) {
 			if ((ap = hooks [i]) != NULL &&
 			    psernum (ap) == psernum (p)) {
-				// diag ("ACK PKT FND %x AT %u", ap, i);
+				// diag ("A-F %x %u", ap, i);
 				// Drop the data packet as it has been
 				// acknowledged
 				tcv_drop (ap);
@@ -119,7 +119,7 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 	// this:
 	if ((ap = tcvp_new (len, TCV_DSP_RCV, desc)) == NULL) {
 		// No room, no reception, no ACK
-		// diag ("RCV DROP %u %u", psernum (p), NFreeHooks);
+		// diag ("R-D %u %u", psernum (p), NFreeHooks);
 		return TCV_DSP_DROP;
 	}
 	// This is also why we don't have to set sec or bounds: the caller
@@ -129,18 +129,21 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 	// Copy the payload
 	memcpy (ap, p, len);
 	
-	// diag ("RCV DAT %u %u", psernum (p), NFreeHooks);
+	// diag ("R-U %x %u %u", ap, psernum (p), NFreeHooks);
 
 	// Create an ACK (quietly ignore, if no room)
 	if ((ap = tcvp_new (ACK_LENGTH, TCV_DSP_XMTU, desc)) != NULL) {
-		// diag ("RCV ACKING %x %u", ap, psernum (p));
+		// diag ("R-K %x %u", ap, psernum (p));
 		ptype (ap) = PTYPE_ACK;
 		psernum (ap) = psernum (p);
 		// Note that the disposition code, transmit urgent, is set by
 		// tcvp_new, so we don't have to say anything else
+	} else {
+		// diag ("R-N %u", psernum (p));
+		CNOP;
 	}
 	
-	// Done, the disposition code says the there is nothing more to be done
+	// Done, the disposition code says there is nothing more to be done
 	// about the packet
 	return TCV_DSP_DROP;
 }
@@ -166,21 +169,21 @@ static int tcv_xmt_ack (address p) {
 
 	if (tcvp_length (p) == ACK_LENGTH && ptype (p) == PTYPE_ACK) {
 		// This is an ACK, just drop it, nothing more to be done
-		// diag ("XMT ACK %x %d", p, psernum (p));
+		// diag ("X-A %x %d", p, psernum (p));
 		return TCV_DSP_DROP;
 	}
 
 	// This is a data packet
-	// diag ("XMT DAT %x %d", p, psernum (p));
+	// diag ("X-U %x %d", p, psernum (p));
 
 	for (i = 0; i < N_HOOKS; i++) {
 		// Check if pointed to by a hook
 		if (hooks [i] == p) {
 			// Found, check how many times transmitted so far
-			// diag ("XMT RETR %d", rtimes [i]);
+			// diag ("X-R %d", rtimes [i]);
 			if (rtimes [i] == MAX_RTIMES) {
 				// Max reached, remove from hooks and drop
-				// diag ("XMT RETR MAX DRP");
+				// diag ("X-M");
 				// Note that the hooks entry will be cleared
 				// automatically by TCV
 				trigger (&NFreeHooks);
@@ -191,7 +194,7 @@ static int tcv_xmt_ack (address p) {
 			rtimes [i]++;	// Increment retransmission count
 HoldIt:
 			// Set the timer (the packet goes into the timer queue)
-			// diag ("XMT SETT %x", p);
+			// diag ("X-S %x", p);
 			tcvp_settimer (p, RETR_DELAY);
 			// Detach
 			return TCV_DSP_PASS;
@@ -199,11 +202,11 @@ HoldIt:
 	}
 
 	// Not found in hooks, first time, find a free entry
-	// diag ("XMT FIRST %d", NFreeHooks);
+	// diag ("X-N %d", NFreeHooks);
 	for (i = 0; i < N_HOOKS; i++) {
 		if (hooks [i] == NULL) {
 			// Got it
-			// diag ("XMT HOOKED %x AT %d", p, i);
+			// diag ("X-H %x %d", p, i);
 			// This hooks the packet (and sets the hook value)
 			hooks [i] = p;
 			// Initialize retransmission counter
@@ -213,7 +216,7 @@ HoldIt:
 			goto HoldIt;
 		}
 	}
-	// diag ("XMT NO HOOKS %x", p);
+	// diag ("X-O %x", p);
 	
 	// No room in hooks, the packet is dropped
 	return TCV_DSP_DROP;
@@ -224,6 +227,6 @@ static int tcv_tmt_ack (address p) {
 // Called when the packet's timer goes off; very simple: retransmit at high
 // priority
 //
-	// diag ("XMT TIMOUT %x", p);
+	// diag ("X-T %x", p);
 	return TCV_DSP_XMTU;
 }

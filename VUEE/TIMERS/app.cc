@@ -65,18 +65,20 @@ static void radio_switch (Boolean on) {
 fsm receiver {
 
     shared address packet;
+    shared word mem [2];
 
     entry RC_TRY:
 
 	packet = tcv_rnp (RC_TRY, sfd);
+	mem [0] = memfree (0, mem + 1);
 
     entry RC_DATA:
 
-	ser_outf (RC_DATA, "RCV: [%x] %lu (len = %d), pow = %d qua = %d\r\n",
+	ser_outf (RC_DATA, "R: [%x] %lu (len = %u), p = %d m = [%u %u]\r\n",
 		packet [1], ((lword*)packet) [1],
 		tcv_left (packet) - 2,
 		((byte*)packet) [tcv_left (packet) - 1],
-		((byte*)packet) [tcv_left (packet) - 2]
+		mem [0], mem [1]
 	);
 
 	tcv_endp (packet);
@@ -90,7 +92,7 @@ fsm sender {
 
     shared lint last_snt = 0;
     shared address packet;
-    shared word packet_length;
+    shared word packet_length, mem [2];
 
     entry SN_SEND:
 
@@ -126,11 +128,12 @@ fsm sender {
 		packet [pp] = (word) (entropy);
 
 	tcv_endp (packet);
+	mem [0] = memfree (0, mem + 1);
 
     entry SN_OUTM:
 
-	ser_outf (SN_OUTM, "SND %lu, len = %u, fhooks = %u\r\n",
-		last_snt, packet_length, NFreeHooks);
+	ser_outf (SN_OUTM, "S: %lu (len = %u), h = %u, m = [%u %u]\r\n",
+		last_snt, packet_length, NFreeHooks, mem [0], mem [1]);
 	last_snt++;
 	delay (tdelay, SN_SEND);
 }
@@ -147,13 +150,15 @@ int rcv_start () {
 
 int rcv_stop () {
 
-	if (running (receiver)) {
+	int res;
+
+	if ((res = running (receiver)))
 		killall (receiver);
-		return 1;
-	}
+
 	if (!running (sender))
 		radio_switch (NO);
-	return 0;
+
+	return res;
 }
 
 int snd_start (int del) {
@@ -170,13 +175,15 @@ int snd_start (int del) {
 
 int snd_stop () {
 
-	if (running (sender)) {
+	int res;
+
+	if ((res = running (sender)))
 		killall (sender);
-		return 1;
-	}
+
 	if (!running (receiver))
 		radio_switch (NO);
-	return 0;
+
+	return res;
 }
 
 #ifdef	PMON_NOTEVENT
