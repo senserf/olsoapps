@@ -3,7 +3,7 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-// Uncomment diags to see exactly what happens !!!
+// Uncomment diags to see what happens !!!
 
 #include "tcvplug.h"
 #include "plug_ack.h"

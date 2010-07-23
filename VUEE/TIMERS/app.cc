@@ -74,11 +74,11 @@ fsm receiver {
 
     entry RC_DATA:
 
-	ser_outf (RC_DATA, "R: [%x] %lu (len = %u), p = %d m = [%u %u]\r\n",
+	ser_outf (RC_DATA, "R: [%x] %lu (%u) RS:%d [%u %u %u]\r\n",
 		packet [1], ((lword*)packet) [1],
 		tcv_left (packet) - 2,
 		((byte*)packet) [tcv_left (packet) - 1],
-		mem [0], mem [1]
+		mem [0], mem [1], NFreeHooks
 	);
 
 	tcv_endp (packet);
@@ -132,8 +132,8 @@ fsm sender {
 
     entry SN_OUTM:
 
-	ser_outf (SN_OUTM, "S: %lu (len = %u), h = %u, m = [%u %u]\r\n",
-		last_snt, packet_length, NFreeHooks, mem [0], mem [1]);
+	ser_outf (SN_OUTM, "S: %lu (%u) [%u %u %u]\r\n",
+		last_snt, packet_length, mem [0], mem [1], NFreeHooks);
 	last_snt++;
 	delay (tdelay, SN_SEND);
 }
@@ -261,7 +261,7 @@ fsm root {
     shared const char *fmt;
     shared char obuf [32];
     shared word p [3];
-    shared lint lp;
+    shared lword lp;
 
     entry RS_INIT:
 
@@ -305,6 +305,7 @@ fsm root {
 		"a n r d  -> read ADC pin\r\n"
 		"w n v r  -> write DAC pin\r\n"
 		"m        -> memory stat\r\n"
+		"l n      -> RND test\r\n"
 #ifdef PMON_NOTEVENT
 		"C c e    -> start cnt\r\n"
 		"P c      -> set cmp\r\n"
@@ -349,6 +350,7 @@ fsm root {
 	    case 'a': proceed RS_RANA;
 	    case 'w': proceed RS_WANA;
 	    case 'm': proceed RS_MEMO;
+	    case 'l': proceed RS_RNDT;
 #ifdef PMON_NOTEVENT
 	    case 'C': proceed RS_PSCN;
 	    case 'P': proceed RS_PSCM;
@@ -600,6 +602,37 @@ fsm root {
 
 	p [0] = memfree (0, p + 1);
 	p [2] = stackfree ();
+
+    entry RS_RNDT:
+
+	lp = 1;
+	p [0] = 0;
+	scan (ibuf + 1, "%lu %u", &lp, p + 0);
+
+	if (p [0] == 0) {
+		while (lp--)
+			diag ("%x", rnd ());
+		proceed RS_RCMD;
+	}
+
+    entry RS_RNDT1:
+
+	if (lp == 0)
+		proceed RS_RNDT3;
+	lp--;
+
+	p [1] = rnd ();
+
+    entry RS_RNDT2:
+
+	ser_outf (RS_RNDT2, "%x\r\n", p [1]);
+	delay (p [0], RS_RNDT1);
+	release;
+
+    entry RS_RNDT3:
+
+	ser_out (RS_RNDT3, "Done\r\n");
+	proceed RS_RCMD;
 
     entry RS_MEMO1:
 

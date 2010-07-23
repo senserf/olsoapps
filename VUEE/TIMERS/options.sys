@@ -53,6 +53,6 @@
 #define	CODE_LONG_INTS	1
 #define	DIAG_MESSAGES	2
 
-#define RADIO_OPTIONS	(1)
+#define RADIO_OPTIONS	(0x01 + 0x80)
 
 #endif
