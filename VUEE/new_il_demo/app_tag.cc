@@ -388,8 +388,10 @@ static void stats () {
 void process_incoming (word state, char * buf, word size) {
 
   sint w_len;
+#if _APP_EXPERIMENT
   char * out_buf;
   word w[4];
+#endif
 
   switch (in_header(buf, msg_type)) {
 
