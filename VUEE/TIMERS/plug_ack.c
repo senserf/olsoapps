@@ -66,8 +66,6 @@ static byte rtimes [N_HOOKS];	// Retransmission counters (per hook)
 
 static int tcv_ope_ack (int phy, int fd, va_list plid) {
 
-	int i;
-
 	if (desc != NONE)
 		return ERROR;
 
