@@ -78,7 +78,7 @@ fsm receiver {
 		packet [1], ((lword*)packet) [1],
 		tcv_left (packet) - 2,
 		((byte*)packet) [tcv_left (packet) - 1],
-		mem [0], mem [1], NFreeHooks
+		mem [0], mem [1], n_free_hooks ()
 	);
 
 	tcv_endp (packet);
@@ -108,9 +108,9 @@ fsm sender {
 
 	// We control congestion in the transmission queue via a simple
 	// handshake with the plugin
-	if (NFreeHooks == 0) {
+	if (n_free_hooks () == 0) {
 		// The plugin has run out of hooks, wait until one is freed
-		when (&NFreeHooks, SN_NEXT);
+		delay (256, SN_NEXT);
 		release;
 	}
 
@@ -133,7 +133,7 @@ fsm sender {
     entry SN_OUTM:
 
 	ser_outf (SN_OUTM, "S: %lu (%u) [%u %u %u]\r\n",
-		last_snt, packet_length, mem [0], mem [1], NFreeHooks);
+		last_snt, packet_length, mem [0], mem [1], n_free_hooks ());
 	last_snt++;
 	delay (tdelay, SN_SEND);
 }

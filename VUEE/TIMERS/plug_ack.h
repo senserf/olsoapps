@@ -10,7 +10,8 @@
 //+++ "plug_ack.c"
 
 extern trueconst tcvplug_t plug_ack;
-extern word NFreeHooks;
+
+word n_free_hooks ();
 
 //
 // The first two bytes of a packet (folowing the network ID), mean this:

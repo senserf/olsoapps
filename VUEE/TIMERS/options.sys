@@ -6,9 +6,15 @@
 #undef 	TCV_TIMERS
 #endif
 
+#ifdef	TCV_HOOKS
+#undef 	TCV_HOOKS
+#endif
+
 #define	TCV_PRESENT	1
 #define	TCV_TIMERS	1
-#define	TCV_LIMIT_RCV	6
+#define	TCV_HOOKS	1
+//#define	TCV_LIMIT_RCV	6
+
 // XMT limit is taken care of by the plugin
 
 #ifdef	__SMURPH__
@@ -52,6 +58,7 @@
 #define	RADIO_USE_LEDS	7
 #define	CODE_LONG_INTS	1
 #define	DIAG_MESSAGES	2
+#define	DUMP_MEMORY	1
 
 #define RADIO_OPTIONS	(0x01 + 0x80)
 
