@@ -139,3 +139,16 @@
 
 #define RADIO_CRC_MODE		4
 
+#define TARP_RTR	2
+#define _TARP_T_RTR	1
+
+#ifdef TCV_TIMERS
+#undef TCV_TIMERS
+#endif
+
+#ifdef TCV_HOOKS
+#undef TCV_HOOKS
+#endif
+
+#define TCV_TIMERS	1
+#define TCV_HOOKS	1
