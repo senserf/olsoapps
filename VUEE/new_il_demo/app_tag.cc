@@ -57,6 +57,8 @@ idiosyncratic Boolean msg_isBind (msg_t m), msg_isTrace (msg_t m),
 
 idiosyncratic void set_master_chg (void);
 
+idiosyncratic word guide_rtr (headerType * b);
+
 #include "diag.h"
 #include "str_tag.h"
 #include "ser.h"
@@ -388,8 +390,10 @@ static void stats () {
 void process_incoming (word state, char * buf, word size) {
 
   sint w_len;
+#if _APP_EXPERIMENT
   char * out_buf;
   word w[4];
+#endif
 
   switch (in_header(buf, msg_type)) {
 

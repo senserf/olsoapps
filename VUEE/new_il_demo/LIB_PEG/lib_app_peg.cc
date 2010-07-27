@@ -41,6 +41,16 @@ idiosyncratic Boolean msg_isMaster (msg_t m) {
 	return (m == msg_master);
 }
 
+/*
+1 - not this msg
+2 - handle
+(0 - don't pay attention even to dummy acks)
+*/
+idiosyncratic word  guide_rtr (headerType *  b) {
+	return (b->rcv == 0 || b->msg_type  == msg_pong || 
+			b->msg_type == msg_pongAck) ? 1 : 2;
+}
+
 idiosyncratic Boolean msg_isNew (msg_t m) {
 	return NO;
 }

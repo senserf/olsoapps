@@ -139,3 +139,18 @@
 
 #define RADIO_CRC_MODE		4
 
+#define TARP_RTR	2
+
+// this is for retry testing / debugging - in tarp.c
+#define _TARP_T_RTR	0
+
+#ifdef TCV_TIMERS
+#undef TCV_TIMERS
+#endif
+
+#ifdef TCV_HOOKS
+#undef TCV_HOOKS
+#endif
+
+#define TCV_TIMERS	1
+#define TCV_HOOKS	1

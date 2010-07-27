@@ -91,6 +91,8 @@ idiosyncratic Boolean msg_isBind (msg_t m), msg_isTrace (msg_t m),
 
 idiosyncratic void set_master_chg (void);
 
+idiosyncratic word guide_rtr (headerType * b);
+
 #include "diag.h"
 #include "str_peg.h"
 

@@ -38,7 +38,9 @@ idiosyncratic Boolean msg_isNew (msg_t m) {
 idiosyncratic Boolean msg_isClear (byte o) {
 	return YES;
 }
-
+idiosyncratic word guide_rtr (headerType * b) {
+	return 0; // don't at all (pegs return 1, 2)
+}
 idiosyncratic void set_master_chg () {
 	app_flags |= 2;
 }
