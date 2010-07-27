@@ -28,7 +28,7 @@
 //	NID RCV SND SER [... response ...] CHK
 //
 // except that RCV <-> SND are interchanged, i.e., the first four words look
-// the command being acknowledged. The role of SER (serial number) is to 
+// like the command being acknowledged. The role of SER (serial number) is to 
 // match ACKs to commands.
 //
 // A simple ACK response consists of a single word - the command status: zero
@@ -36,19 +36,13 @@
 // response means a packet count report which looks like this:
 //
 //	SENT DRVT DRVC DRVL DRVS NNOD [Node Count]*N
+//	SENT RERR-6 NNOD [Node Count]*NNOD
 //
 // where:
 //
 //	SENT	is the total number of measurement packets sent by the node
 //
-//	DRVT	is the total number of reception attempts reported by the
-//		driver
-//
-//	DRVC	is the total number of checksum errors reported by the driver
-//
-//	DRVL	is the total number of length errors reported by the driver
-//
-//	DRVS	is the total number of wrong NETIDs reported by the driver
+//	RERR	is the 6-word PHYSOPT_ERROR table of the sending node
 //
 //	NNOD	is the number of nodes <= 8 from which the node received
 //		measurement packets; this is followed by that many pairs
@@ -57,19 +51,16 @@
 //
 
 #define	POFF_SENT	(POFF_SER+1)
-#define	POFF_DRVT	(POFF_SER+2)
-#define	POFF_DRVC	(POFF_SER+3)
-#define	POFF_DRVL	(POFF_SER+4)
-#define	POFF_DRVS	(POFF_SER+5)
-#define	POFF_NNOD	(POFF_SER+6)
-#define	POFF_NTAB	(POFF_SER+7)
+#define	POFF_RERR	(POFF_SER+2)
+#define	POFF_NNOD	(POFF_SER+8)
+#define	POFF_NTAB	(POFF_SER+9)
 
-// POFF_NTAB == 10, i.e., 10 words so far, i.e., 20 bytes, which leaves us 
-// 60 - 20 - 2 [CHS] = 38 bytes for NTAB, limiting MAX_NODES to 9 (presently
-// set at 8 for a round limit).
+// POFF_NTAB == 12, i.e., 12 words so far, i.e., 24 bytes, which leaves us 
+// 60 - 24 - 2 [CHS] = 34 bytes for NTAB, limiting MAX_NODES to 8 (with two
+// spare bytes)
 //
 // Note that driver reports refer to all packets that the node tried to
-// receive, not only measurement packates, and possibly some stray packets
+// receive, not only measurement packets, and possibly some stray packets
 // from unrelated devices.
 //
 // Measurement packets (the ones to be counted) look like this:

@@ -76,7 +76,7 @@ void confirm (word sender, word sernum, word code) {
 
 void handle_ack (address buf, word pl) {
 //
-// Handles a received ACK; note that we are passsed a packet buffer, which we
+// Handles a received ACK; note that we are passed a packet buffer, which we
 // are expected to deallocate
 //
 	// The length is in words
@@ -93,13 +93,11 @@ void handle_ack (address buf, word pl) {
 			// At least this much needed to make sense
 Bad_length:
 			tcv_endp (buf);
-			uart_out (WNONE, "Inconsistent report");
+			uart_out (WNONE, "Bad report");
 			return;
 		}
 
 		if (pl < buf [POFF_NNOD] * 2 + POFF_NTAB + 1)
-			// This is more or less exact requirement factoring
-			// in the node reports
 			goto Bad_length;
 
 
@@ -144,7 +142,7 @@ word do_command (const char *cb, word sender, word sernum) {
 			ps = (POFF_NTAB + (rs = report_size ()) * 2 + 1) * 2;
 
 			if (ps > MAX_PACKET_LENGTH) {
-				uart_out (WNONE, "Report doesn't fit");
+				uart_out (WNONE, "Report too large");
 				return 1;
 			}
 
@@ -159,8 +157,7 @@ word do_command (const char *cb, word sender, word sernum) {
 			packet [POFF_SER] = sernum;
 
 			packet [POFF_SENT] = g_snd_count;
-			tcv_control (g_fd_rf, PHYSOPT_ERROR,
-				packet + POFF_DRVT);
+			tcv_control (g_fd_rf, PHYSOPT_ERROR, packet+POFF_RERR);
 			packet [POFF_NNOD] = rs;
 
 			ps = POFF_NTAB;
@@ -808,11 +805,13 @@ fsm thread_rreporter {
 
   entry UF_DRIV:
 
-	uart_outf (UF_DRIV, "Driver stats: %u, %u, %u, %u",
-			g_rcv_ackrp [POFF_DRVT],
-			g_rcv_ackrp [POFF_DRVC],
-			g_rcv_ackrp [POFF_DRVL],
-			g_rcv_ackrp [POFF_DRVS]);
+	uart_outf (UF_DRIV, "Driver stats: %u, %u, %u, %u, %u, %u",
+			g_rcv_ackrp [POFF_RERR  ],
+			g_rcv_ackrp [POFF_RERR+1],
+			g_rcv_ackrp [POFF_RERR+2],
+			g_rcv_ackrp [POFF_RERR+3],
+			g_rcv_ackrp [POFF_RERR+4],
+			g_rcv_ackrp [POFF_RERR+5] );
 
 	tcv_endp (g_rcv_ackrp);
 	g_rcv_ackrp = NULL;
@@ -824,7 +823,7 @@ fsm thread_rreporter {
 
 fsm thread_ureporter {
 
-  word errs [4];
+  word errs [6];
   shared word cnt;
 
   entry RE_START:
@@ -849,8 +848,8 @@ fsm thread_ureporter {
   entry RE_DRIV:
 
 	tcv_control (g_fd_rf, PHYSOPT_ERROR, errs);
-	uart_outf (RE_DRIV, "Driver stats: %u, %u, %u, %u",
-					errs [0], errs [1], errs [2], errs [3]);
+	uart_outf (RE_DRIV, "Driver stats: %u, %u, %u, %u, %u, %u",
+		errs [0], errs [1], errs [2], errs [3], errs [4], errs [5]);
 	finish;
 }
 
