@@ -23,8 +23,8 @@
 #endif
 #define UART_RATE	9600
 
-#undef LBT_THRESHOLD
-#define LBT_THRESHOLD		33
+#undef RADIO_LBT_THRESHOLD
+#define RADIO_LBT_THRESHOLD		33
 
 #define dbg_level		7
 //#define dbg_level		0xffff
