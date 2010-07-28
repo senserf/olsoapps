@@ -61,6 +61,8 @@ void msg_fwd_in (word state, char * buf, word size);
 void msg_fwd_out (word state, char** buf_out, word size, nid_t tag, nid_t peg);
 void copy_fwd_msg (word state, char** buf_out, char * buf, word size);
 void msg_setPeg_in (char * buf);
+word msg_trace_out (word t, word dir, word hlim);
+void msg_trace_in (char * buf, word rssi);
 
 void oss_findTag_in (word state, nid_t tag, nid_t peg);
 void oss_setTag_in (word state, word tag, nid_t peg,
@@ -68,6 +70,7 @@ void oss_setTag_in (word state, word tag, nid_t peg,
 void oss_setPeg_in (word state, nid_t peg, word audi, word pl, word a_fl);
 void oss_master_in (word state, nid_t peg);
 void oss_report_out (char * buf);
+void oss_traceAck_out (char * buf, word rssi);
 
 void send_msg (char * buf, sint size);
 
