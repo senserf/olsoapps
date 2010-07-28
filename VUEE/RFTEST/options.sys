@@ -4,7 +4,6 @@
 #undef	CRYSTAL2_RATE
 #undef	UART_DRIVER
 #undef	UART_TCV
-#undef	RADIO_TRACK_ERRORS
 
 #define	TCV_PRESENT	1
 #define	TCV_HOOKS	0
@@ -20,6 +19,8 @@
 #define	UART_TCV_MODE		UART_TCV_MODE_L
 #define	RADIO_OPTIONS		(0x01 + 0x04 + 0x40 + 0x80)
 #define	RADIO_CRC_MODE		0
+#define	RADIO_LBT_RETRY_LIMIT	8
+#define	RADIO_LBT_RETRY_STAGED	3
 
 #define	TCV_LIMIT_XMT		8
 
