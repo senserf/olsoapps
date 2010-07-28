@@ -154,3 +154,5 @@
 
 #define TCV_TIMERS	1
 #define TCV_HOOKS	1
+
+#define PURE_FORWARDERS 0

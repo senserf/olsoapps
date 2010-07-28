@@ -331,7 +331,16 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
+#ifndef PURE_FORWARDERS
+#define PURE_FORWARDERS 0
+#endif
+#if PURE_FORWARDERS
+		if (local_host < 100)
+			return;
+#endif
+
 #if 0
+		//however kludgy, that may be a very good idea
 		if (in_header(buf, snd) / 10 != local_host / 10)
 			return;
 #endif
@@ -530,14 +539,19 @@ fsm audit {
 
 	entry AS_START:
 
-		if (local_host == master_host && (pow_ts == 0 ||
-	(word)(seconds() - pow_ts) >= (tag_auditFreq << POW_FREQ_SHIFT))) {
+		if (pow_ts == 0 || (word)(seconds() - pow_ts) >= 
+				(tag_auditFreq << POW_FREQ_SHIFT)) {
 #if 0
 			read_sensor (AS_START, 0, &pow_sup);
 #endif
 			pow_sup++;
 			pow_ts = seconds();
+
+		    if (local_host == master_host)
 			stats (NULL);
+		    else
+			msg_setPeg_in (NULL); // faked but good and cheap
+
 		}
 
 		if (buf) {

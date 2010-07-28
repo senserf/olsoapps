@@ -134,16 +134,22 @@ void msg_setPeg_in (char * buf) {
 	if (out_buf == NULL)
 		return;
 
-	if (in_setPeg(buf, audi) != 0xffff) {
+	if (buf != NULL) {
+	  if (in_setPeg(buf, audi) != 0xffff) {
 		tag_auditFreq = in_setPeg(buf, audi);
 		if (tag_auditFreq != 0 && !running (audit))
 			runthread (audit);
-	}
+	  }
 
-	if (in_setPeg(buf, level) != 0xffff) {
+	  if (in_setPeg(buf, level) != 0xffff) {
 		host_pl = in_setPeg(buf, level);
 		net_opt (PHYSOPT_SETPOWER, &host_pl);
+	  }
+	} else { // where to?
+		if (master_host == 0)
+			return;
 	}
+
 #if (RADIO_OPTIONS & 0x04)
 	net_opt (PHYSOPT_ERROR, w);
 #else
@@ -153,7 +159,7 @@ void msg_setPeg_in (char * buf) {
 
 	in_header(out_buf, msg_type) = msg_statsPeg;
 	in_header(out_buf, hco) = 0;
-	in_header(out_buf, rcv) = in_header(buf, snd);
+	in_header(out_buf, rcv) = buf ? in_header(buf, snd) : master_host;
 	in_statsPeg(out_buf, lhid) = (word)host_id;
 	in_statsPeg(out_buf, ltime) = seconds();
 
@@ -168,7 +174,9 @@ void msg_setPeg_in (char * buf) {
 	in_statsPeg(out_buf, vpstats[4]) = w[4];
 	in_statsPeg(out_buf, vpstats[5]) = w[5];
 
-	in_statsPeg(out_buf, a_fl) = handle_a_flags (in_setPeg(buf, a_fl));
+	in_statsPeg(out_buf, a_fl) = buf ?
+		handle_a_flags (in_setPeg(buf, a_fl)) :
+		handle_a_flags (0xFFFF);
 	send_msg (out_buf, sizeof(msgStatsPegType));
 	ufree (out_buf);
 }
@@ -324,7 +332,7 @@ void msg_pong_in (word state, char * buf, word rssi) {
 				if (is_eew_coll) {
 					write_agg ((word)tagIndex);
 				} else {
-					app_diag (D_INFO, "Unconfirmed %d",
+					app_diag (D_DEBUG, "Unconfirmed %d",
 						tagArray[tagIndex].id);
 				}
 			}
