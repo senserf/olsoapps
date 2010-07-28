@@ -438,11 +438,13 @@ void msg_report_in (word state, char * buf) {
 	}
 }
 
+#define DONT_SHOW_LATE_ACKS 1
 void msg_reportAck_in (char * buf) {
 	sint tagIndex;
 
 	if ((tagIndex = find_tags (in_reportAck(buf, tagid), 0)) < 0) {
-		app_diag (D_INFO, "Ack for a goner %u",
+		app_diag (DONT_SHOW_LATE_ACKS ? D_DEBUG : D_INFO, 
+				"Ack for a goner %u",
 			       in_reportAck(buf, tagid));
 		return;
 	}
@@ -467,11 +469,13 @@ void msg_reportAck_in (char * buf) {
 			break;
 
 		default:
-			app_diag (D_INFO, "Ignoring Ack for %u in %u",
+			app_diag (DONT_SHOW_LATE_ACKS ? D_DEBUG : D_INFO, 
+				"Ignoring Ack for %u in %u",
 				tagArray[tagIndex].id,
 				tagArray[tagIndex].state);
 	}
 }
+#undef DONT_SHOW_LATE_ACKS
 
 void msg_reportAck_out (word state, char * buf, char** out_buf) {
 	if (*out_buf == NULL)
@@ -483,5 +487,72 @@ void msg_reportAck_out (word state, char * buf, char** out_buf) {
 	in_header(*out_buf, rcv) = in_header(buf, snd);
 	in_reportAck(*out_buf, tagid) = in_report(buf, tagid);
 	in_reportAck(*out_buf, state) = in_report(buf, state);
+}
+
+word msg_trace_out (word t, word dir, word hlim) {
+	char * b = get_mem (WNONE, sizeof(msgTraceType));
+
+	if (b == NULL)
+		return 1;
+
+	memset (b, 0, sizeof(msgTraceType));
+
+	switch (dir) {
+		case 0:
+			in_header(b, msg_type) = msg_traceB;
+			break;
+		case 1:
+			in_header(b, msg_type) = msg_traceF;
+			break;
+		default:
+			in_header(b, msg_type) = msg_trace;
+	}
+	in_header(b, rcv) = t;
+	in_header(b, hco) = hlim;
+	send_msg (b, sizeof(msgTraceType));
+	ufree (b);
+	return 0;
+}
+
+void msg_trace_in (char * buf, word rssi) {
+	char * b;
+	word len;
+
+	if (in_header(buf, msg_type) != msg_traceB)
+		len = sizeof(msgTraceAckType) +
+			(in_header(buf, hoc) & 0x7F) * 2;
+	else
+		len = sizeof(msgTraceAckType) + 2;
+
+	b = get_mem (WNONE, len);
+	memset (b, 0, len);
+
+	switch (in_header(buf, msg_type)) {
+		case msg_traceF:
+			in_header(b, msg_type) = msg_traceFAck;
+			break;
+		case msg_traceB:
+			in_header(b, msg_type) = msg_traceBAck;
+			break;
+		default:
+			in_header(b, msg_type) = msg_traceAck;
+	}
+
+	in_header (b, rcv) = in_header (buf, snd);
+	// hco is 0
+	in_traceAck(b, fcount) = in_header(buf, hoc) & 0x7F;
+
+	// fwd part
+	if (in_header(buf, msg_type) != msg_traceB &&
+			(in_header(buf, hoc) & 0x7F) > 1)
+		memcpy (b + sizeof(msgTraceAckType),
+				buf + sizeof(msgTraceType),
+				2 * ((in_header(buf, hoc) & 0x7F) -1));
+
+	// note that this node is counted in hoc, but is not appended yet, so:
+	 *(b + len - 2) = (byte)local_host;
+	 *(b + len - 1) = (byte)rssi;
+	 send_msg (b, len);
+	 ufree (b);
 }
 

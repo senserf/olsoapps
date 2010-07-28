@@ -91,4 +91,14 @@ typedef struct reportPloadStruct {
 				sizeof(msgReportType)))->field)
 #define in_rpload(frm, field) (((reportPloadType *)(buf))->field)
 
+typedef struct msgTraceStruct {
+        headerType      header;
+} msgTraceType;
+
+typedef struct msgTraceAckStruct {
+        headerType      header;
+        word            fcount;
+} msgTraceAckType;
+#define in_traceAck(buf, field)  (((msgTraceAckType *)(buf))->field)
+
 #endif

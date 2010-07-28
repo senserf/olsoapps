@@ -47,7 +47,9 @@ static trueconst char welcome_str[] = OPRE_APP_MENU_A
 	OPRE_APP_MENU_A 
 	"\tFind collector:\tf col_id [ agg_id ]]\r\n"
 	OPRE_APP_MENU_A
-	"\tPlot Id:\tP [id]\r\n";
+	"\tPlot Id:\tP [id]\r\n"
+	OPRE_APP_MENU_A
+	"\tTrace:\tt [id [dir [hops]]]\r\n";
 
 static trueconst char ill_str[] =	OPRE_APP_ILL 
 				"Illegal command (%s)\r\n";

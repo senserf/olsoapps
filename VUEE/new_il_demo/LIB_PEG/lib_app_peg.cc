@@ -25,8 +25,15 @@
 // that because they are supposed to override virtual methods.
 //
 idiosyncratic int tr_offset (headerType *h) {
-	// Unused ??
-	return 0;
+	sint i;
+	if (h->msg_type == msg_trace || h->msg_type == msg_traceF) // fwd dir
+		return 2 + sizeof(msgTraceType) + 2 *
+			((h->hoc & 0x7F) -1);
+	i = 2 + sizeof(msgTraceAckType) + 2 * (h->hoc & 0x7F);
+	if (h->msg_type == msg_traceAck) // birectional
+		i += 2 * (((msgTraceAckType *)h)->fcount -1);
+
+	return i;
 }
 
 idiosyncratic Boolean msg_isBind (msg_t m) {
@@ -34,7 +41,9 @@ idiosyncratic Boolean msg_isBind (msg_t m) {
 }
 
 idiosyncratic Boolean msg_isTrace (msg_t m) {
-	return NO;
+	m &= 0x3F;
+	return (m == msg_trace || m == msg_traceAck || m == msg_traceF ||
+			m == msg_traceBAck);
 }
 
 idiosyncratic Boolean msg_isMaster (msg_t m) {
@@ -366,6 +375,12 @@ sint check_msg_size (char * buf, word size, word repLevel) {
 		// if it's needed, can be done... who cares now
 		case msg_fwd:
 		case msg_rpc:
+		case msg_trace:
+		case msg_traceF:
+		case msg_traceB:
+		case msg_traceAck:
+		case msg_traceFAck:
+		case msg_traceBAck:
 			return 0;
 
 		case msg_setPeg:

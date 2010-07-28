@@ -416,6 +416,18 @@ smells a bit...
 		trigger (CMD_READER);
 		return;
 
+	case msg_trace:
+	case msg_traceF:
+	case msg_traceB:
+		msg_trace_in (buf, rssi);
+		return;
+
+	case msg_traceAck:
+	case msg_traceFAck:
+	case msg_traceBAck:
+		oss_traceAck_out (buf);
+		return;
+
 	default:
 		app_diag (D_SERIOUS, "Got ?(%u)", in_header(buf, msg_type));
 
@@ -683,6 +695,30 @@ static char * locatName (word id, word rssi) {
 	// should be more... likely a number with  distance?
 }
 #endif
+
+void oss_traceAck_out (char * buf) {
+	// for now...
+	sint num = 0;
+	char * ptr = buf + sizeof (msgTraceAckType);
+
+	if (in_header(buf, msg_type) != msg_traceBAck)
+		num = in_traceAck(buf, fcount);
+	if (in_header(buf, msg_type) != msg_traceFAck)
+		num += in_header(buf, hoc) & 0x7F;
+	if (in_header(buf, msg_type) == msg_traceAck)
+		num--; // dst counted twice
+
+	diag ("trace(%u) %u %u %u:", in_header(buf, snd),
+			in_header(buf, msg_type), 
+			in_traceAck(buf, fcount),
+			in_header(buf, hoc) & 0x7F);
+
+	while (num--) {
+		// shit diag ("trel %u %u", *ptr++, *ptr++);
+		diag ("trel %u %u", *ptr, *(ptr +1));
+		ptr += 2;
+	}
+}
 
 void oss_report_out (char * buf) {
 
@@ -1281,7 +1317,16 @@ fsm root {
 
 			oss_setTag_in (RS_DOCMD, i1, i2, i3, i4, i5, i6, i7);
 			proceed RS_FREE;
-		
+	
+		case 't':
+			i1 = i2 = i3 = 0;
+			if (scan (cmd_line+1, "%u %u %u", &i1, &i2, &i3) < 1 ||
+					msg_trace_out (i1, i2, i3)) {
+				form (obuf, bad_str, cmd_line, 0);
+				proceed RS_UIOUT;
+			}
+			proceed RS_FREE;
+
 		case 'a':
 			i1 = i2 = i3 = i4 = -1;
 			if (scan (cmd_line+1, "%d %d %d %x", &i1, &i2, &i3, &i4)
