@@ -20,12 +20,14 @@
 
 // ============================================================================
 
+lword	g_lrs;
+
 int	g_fd_rf = -1, g_fd_uart = -1, g_snd_opl,
 	g_pkt_minpl = MIN_MES_PACKET_LENGTH,
 	g_pkt_maxpl = MAX_PACKET_LENGTH;
 
 word	g_pkt_mindel = 1024, g_pkt_maxdel = 1024,
-	g_snd_count, g_snd_rnode, g_snd_rcode,
+	g_snd_count, g_snd_rnode, g_snd_rcode, g_chsec,
 	g_snd_sernum = 1, g_snd_rtries, g_flags = 0;
 
 byte	g_last_rssi, g_last_qual;
@@ -422,6 +424,35 @@ CDiff:
 		return 0;
 	    }
 
+	    case 'C': {
+
+		// Switch channel for the prescribed number of seconds
+		word ch, sc;
+
+		ch = WNONE;
+		sc = 10;
+
+		scan (cb + 1, "%u %u", &ch, &sc);
+
+		if (ch > 255) 
+			return 10;
+
+		if (ch == 0 || !sender) {
+			// Ground channel or local command
+			killall (thread_chguard);
+		} else {
+			if (!running (thread_chguard))
+				if (runfsm thread_chguard == 0)
+					return 6;
+			g_chsec = sc;
+		}
+
+		tcv_control (g_fd_rf, PHYSOPT_SETCHANNEL, &ch);
+
+		// Never confirm
+		return WNONE;
+	    }
+
 	    // Two special commands used by PATABLE tester
 
 	    case '+': {
@@ -631,6 +662,18 @@ void view_packet (address p, word pl) {
 
 // ============================================================================
 
+fsm thread_chguard {
+
+  entry CG_START:
+
+	if (seconds () > g_lrs + g_chsec)
+		reset ();
+
+	delay (5 * 1024, CG_START);
+}
+
+// ============================================================================
+
 fsm thread_patable {
 
   shared word ntries, spow;
@@ -828,7 +871,8 @@ fsm thread_ureporter {
 
   entry RE_START:
 
-	uart_out (RE_START, "Stats:");
+	tcv_control (g_fd_rf, PHYSOPT_GETCHANNEL, &cnt);
+	uart_outf (RE_START, "Stats (local, ch = %u):", cnt);
 
   entry RE_FIXED:
 
@@ -863,6 +907,7 @@ fsm thread_listener {
   entry LI_WAIT:
 
 	packet = tcv_rnp (LI_WAIT, g_fd_rf);
+	g_lrs = seconds ();
 	// Packet length in words
 	pl = (tcv_left (packet) >> 1);
 	tr = packet [pl - 1];
@@ -1041,6 +1086,7 @@ fsm root {
 		case 7:	msg = (char*)"No such command"; break;
 		case 8: msg = (char*)"Already in progress"; break;
 		case 9: msg = (char*)"Command must be remote"; break;
+		case 10: msg = (char*)"Illegal arguments"; break;
 
 		default:
 			msg = (char*)"Unknown error";

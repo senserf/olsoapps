@@ -119,5 +119,6 @@ fsm thread_ureporter;
 fsm thread_listener;
 fsm thread_sender;
 fsm thread_patable;
+fsm thread_chguard;
 
 #endif
