@@ -425,7 +425,7 @@ smells a bit...
 	case msg_traceAck:
 	case msg_traceFAck:
 	case msg_traceBAck:
-		oss_traceAck_out (buf);
+		oss_traceAck_out (buf, rssi);
 		return;
 
 	default:
@@ -696,7 +696,7 @@ static char * locatName (word id, word rssi) {
 }
 #endif
 
-void oss_traceAck_out (char * buf) {
+void oss_traceAck_out (char * buf, word rssi) {
 	// for now...
 	sint num = 0;
 	char * ptr = buf + sizeof (msgTraceAckType);
@@ -718,6 +718,7 @@ void oss_traceAck_out (char * buf) {
 		diag ("trel %u %u", *ptr, *(ptr +1));
 		ptr += 2;
 	}
+	diag ("trel %u %u", local_host, rssi);
 }
 
 void oss_report_out (char * buf) {

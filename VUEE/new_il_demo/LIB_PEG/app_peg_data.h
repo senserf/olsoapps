@@ -70,7 +70,7 @@ void oss_setTag_in (word state, word tag, nid_t peg,
 void oss_setPeg_in (word state, nid_t peg, word audi, word pl, word a_fl);
 void oss_master_in (word state, nid_t peg);
 void oss_report_out (char * buf);
-void oss_traceAck_out (char * buf);
+void oss_traceAck_out (char * buf, word rssi);
 
 void send_msg (char * buf, sint size);
 
