@@ -81,7 +81,7 @@
 
 #define	PATABLE_MAX_TRIES	16
 #define	PATABLE_REPLY_DELAY	1024
-#define	MIN_SEND_INTERVAL	256
+#define	MIN_SEND_INTERVAL	8
 #define	UART_LINE_LENGTH	82
 #define	RF_COMMAND_SPACING	1024
 #define	RF_COMMAND_RETRIES	5
@@ -120,5 +120,6 @@ fsm thread_listener;
 fsm thread_sender;
 fsm thread_patable;
 fsm thread_chguard;
+fsm thread_pcmnder;
 
 #endif

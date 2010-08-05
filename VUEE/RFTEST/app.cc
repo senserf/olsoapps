@@ -9,6 +9,7 @@
 #include "phys_cc1100.h"
 #include "phys_uart.h"
 #include "plug_null.h"
+#include "hold.h"
 
 #include "app_data.h"
 
@@ -17,6 +18,8 @@
 #endif
 
 //+++ hostid.cc
+
+heapmem { 50, 50 };
 
 // ============================================================================
 
@@ -27,7 +30,7 @@ int	g_fd_rf = -1, g_fd_uart = -1, g_snd_opl,
 	g_pkt_maxpl = MAX_PACKET_LENGTH;
 
 word	g_pkt_mindel = 1024, g_pkt_maxdel = 1024,
-	g_snd_count, g_snd_rnode, g_snd_rcode, g_chsec,
+	g_snd_count, g_snd_rnode, g_snd_rcode, g_chsec, g_pcmd_del,
 	g_snd_sernum = 1, g_snd_rtries, g_flags = 0;
 
 byte	g_last_rssi, g_last_qual;
@@ -36,7 +39,7 @@ word	g_pat_peer, g_pat_cnt, g_pat_cntr;
 lword	g_pat_acc;
 byte	g_pat_cset [] = { 0x3e, 0, 255 }, g_pat_cred;
 
-char	*g_snd_rcmd;
+char	*g_snd_rcmd, *g_pcmd_cmd;
 byte	*g_reg_suppl;
 
 address	g_rcv_ackrp;
@@ -44,6 +47,30 @@ address	g_rcv_ackrp;
 noded_t	g_rep_nodes [MAX_NODES];
 
 // ============================================================================
+
+static char *emess (word estat) {
+
+	switch (estat) {
+
+		case 0:
+		case WNONE:	return NULL;
+
+		case 1:	return (char*)"Too much data"; break;
+		case 2:	return (char*)"Cannot alloc packet"; break;
+		case 3:	return (char*)"Busy with previous"; break;
+		case 4:	return (char*)"Format error"; break;
+		case 5:	return (char*)"No memory"; break;
+		case 6:	return (char*)"Too many threads"; break;
+		case 7:	return (char*)"No such command"; break;
+		case 8: return (char*)"Already in progress"; break;
+		case 9: return (char*)"Command must be remote"; break;
+		case 10: return (char*)"Illegal arguments"; break;
+		case 11: return (char*)"Illegal remotely"; break;
+
+		default:
+			return (char*)"Unknown error";
+	}
+}
 
 static const char *skip_blk (const char *cb) {
 //
@@ -128,9 +155,13 @@ word do_command (const char *cb, word sender, word sernum) {
 //
 	switch (*cb) {
 
-	    case 'r':
+	    case 'r': {
 
 		// Report
+		word clear;
+
+		clear = 0;
+		scan (cb + 1, "%u", &clear);
 
 		if (sender) {
 
@@ -160,6 +191,9 @@ word do_command (const char *cb, word sender, word sernum) {
 
 			packet [POFF_SENT] = g_snd_count;
 			tcv_control (g_fd_rf, PHYSOPT_ERROR, packet+POFF_RERR);
+			if (clear)
+				tcv_control (g_fd_rf, PHYSOPT_ERROR, NULL);
+
 			packet [POFF_NNOD] = rs;
 
 			ps = POFF_NTAB;
@@ -177,11 +211,12 @@ word do_command (const char *cb, word sender, word sernum) {
 		// Local report via UART
 
 		if (!running (thread_ureporter)) {
-			runfsm thread_ureporter;
+			runfsm thread_ureporter ((address)clear);
 			return 0;
 		}
 
 		return 3;	// Busy
+	    }
 
 	    case 'S': {
 
@@ -273,6 +308,19 @@ word do_command (const char *cb, word sender, word sernum) {
 
 		return 0;
 	    }
+
+	    case 'f':
+
+		if (sender)
+			return 11;
+
+		tcv_control (g_fd_rf, PHYSOPT_RXOFF, NULL);
+		return 0;
+
+	    case 'g':
+
+		tcv_control (g_fd_rf, PHYSOPT_RXON, NULL);
+		return 0;
 
 	    case 'p': {
 
@@ -453,6 +501,54 @@ CDiff:
 		return WNONE;
 	    }
 
+	    case 'P': {
+
+		// Issue a command periodically
+
+		word sl;
+
+		if (running (thread_pcmnder))
+			// Busy
+			return 3;
+
+		ufree (g_pcmd_cmd);
+		g_pcmd_cmd = NULL;
+
+		cb = skip_blk (++cb);
+		if (*cb < '0' || *cb > '9')
+			return 4;
+
+		g_pcmd_del = 10;
+		scan (cb, "%u", &g_pcmd_del);
+		if (g_pcmd_del == 0)
+			g_pcmd_del = 1;
+
+		cb = skip_del (cb);
+
+		if ((sl = strlen (cb)) == 0)
+			return 4;
+
+		if ((g_pcmd_cmd = (char*) umalloc (sl + 1)) == NULL)
+			return 5;
+
+		strcpy (g_pcmd_cmd, cb);
+
+		if (runfsm thread_pcmnder == 0) {
+			ufree (g_pcmd_cmd);
+			g_pcmd_cmd = NULL;
+			return 6;
+		}
+		return 0;
+	    }
+
+	    case 'Q': {
+
+		killall (thread_pcmnder);
+		ufree (g_pcmd_cmd);
+		g_pcmd_cmd = NULL;
+		return 0;
+	    }
+			
 	    // Two special commands used by PATABLE tester
 
 	    case '+': {
@@ -662,6 +758,37 @@ void view_packet (address p, word pl) {
 
 // ============================================================================
 
+fsm thread_pcmnder {
+
+  shared lword until;
+  shared word estat;
+  char *msg;
+
+  entry PC_START:
+
+	until = seconds () + g_pcmd_del;
+
+  entry PC_WAIT:
+
+	hold (PC_WAIT, until);
+
+  entry PC_NEXT:
+
+	uart_outf (PC_NEXT, "CMD: [%lu] %s", seconds (), g_pcmd_cmd);
+	estat = do_command (g_pcmd_cmd, 0, 0);
+
+  entry PC_MSG:
+
+	msg = emess (estat);
+	if (msg == NULL)
+		proceed PC_START;
+
+	uart_out (PC_MSG, msg);
+	proceed PC_START;
+}
+
+// ============================================================================
+
 fsm thread_chguard {
 
   entry CG_START:
@@ -864,7 +991,7 @@ fsm thread_rreporter {
 
 // ============================================================================
 
-fsm thread_ureporter {
+fsm thread_ureporter (word) {
 
   word errs [6];
   shared word cnt;
@@ -872,7 +999,13 @@ fsm thread_ureporter {
   entry RE_START:
 
 	tcv_control (g_fd_rf, PHYSOPT_GETCHANNEL, &cnt);
-	uart_outf (RE_START, "Stats (local, ch = %u):", cnt);
+	uart_outf (RE_START, "Stats (local) ch = %u):", cnt);
+
+  entry RE_MEM:
+
+	errs [0] = memfree (0, errs + 1);
+	errs [2] = stackfree ();
+	uart_outf (RE_MEM, "Mem: %u %u %u" , errs [0], errs [1], errs [2]);
 
   entry RE_FIXED:
 
@@ -892,6 +1025,8 @@ fsm thread_ureporter {
   entry RE_DRIV:
 
 	tcv_control (g_fd_rf, PHYSOPT_ERROR, errs);
+	if (data)
+		tcv_control (g_fd_rf, PHYSOPT_ERROR, NULL);
 	uart_outf (RE_DRIV, "Driver stats: %u, %u, %u, %u, %u, %u",
 		errs [0], errs [1], errs [2], errs [3], errs [4], errs [5]);
 	finish;
@@ -1072,25 +1207,9 @@ fsm root {
 
   entry RS_MSG:
 
-	switch (estat) {
-
-		case 0:
-		case WNONE:	proceed RS_ON;
-
-		case 1:	msg = (char*)"Too much data"; break;
-		case 2:	msg = (char*)"Cannot alloc packet"; break;
-		case 3:	msg = (char*)"Busy with previous"; break;
-		case 4:	msg = (char*)"Format error"; break;
-		case 5:	msg = (char*)"No memory"; break;
-		case 6:	msg = (char*)"Too many threads"; break;
-		case 7:	msg = (char*)"No such command"; break;
-		case 8: msg = (char*)"Already in progress"; break;
-		case 9: msg = (char*)"Command must be remote"; break;
-		case 10: msg = (char*)"Illegal arguments"; break;
-
-		default:
-			msg = (char*)"Unknown error";
-	}
+	msg = emess (estat);
+	if (msg == NULL)
+		proceed RS_ON;
 
 	uart_out (RS_MSG, msg);
 	proceed RS_ON;

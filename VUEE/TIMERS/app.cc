@@ -110,7 +110,7 @@ fsm sender {
 	// handshake with the plugin
 	if (n_free_hooks () == 0) {
 		// The plugin has run out of hooks, wait until one is freed
-		delay (256, SN_NEXT);
+		delay (16, SN_NEXT);
 		release;
 	}
 
@@ -379,8 +379,8 @@ fsm root {
 	/* Default */
 	n1 = 2048;
 	scan (ibuf + 1, "%d", &n1);
-	if (n1 < 16)
-		n1 = 16;
+	if (n1 < 8)
+		n1 = 8;
 	snd_start (n1);
 
     entry RS_SND1:

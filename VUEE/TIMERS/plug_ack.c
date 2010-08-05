@@ -106,7 +106,13 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 				Diag ("A-F %x %u", ap, i);
 				// Drop the data packet as it has been
 				// acknowledged
-				tcv_drop (ap);
+				if (tcvp_issettimer (ap) || tcvp_isqueued (ap))
+					// Can drop
+					tcv_drop (ap);
+				else
+					// Being processed, make sure for the
+					// last time
+					rtimes [i] = MAX_RTIMES;
 				// There is no need to do this:
 				// hooks [i] = NULL;
 				break;

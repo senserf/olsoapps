@@ -5,6 +5,11 @@
 #undef	UART_DRIVER
 #undef	UART_TCV
 
+#undef	RESET_ON_MALLOC
+#undef	RESET_ON_SYSERR
+#define	RESET_ON_MALLOC			0
+#define	RESET_ON_SYSERR			0
+
 #define	TCV_PRESENT	1
 #define	TCV_HOOKS	0
 #define	TCV_TIMERS	0
@@ -21,8 +26,10 @@
 #define	RADIO_CRC_MODE		0
 #define	RADIO_LBT_RETRY_LIMIT	8
 #define	RADIO_LBT_RETRY_STAGED	3
+#define	RADIO_LBT_BACKOFF_EXP	6
+#define	RADIO_LBT_BACKOFF_RX	2
 
-#define	TCV_LIMIT_XMT		8
+#define	TCV_LIMIT_XMT		16
 
 #if RADIO_CRC_MODE < 4
 #define	MAX_PACKET_LENGTH	62
