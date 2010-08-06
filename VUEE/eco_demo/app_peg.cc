@@ -41,7 +41,7 @@
 // =============
 // OSS reporting
 // =============
-strand (oss_out, char)
+strand (oss_out, char*)
 	char * b;
 	sint len;
 
@@ -75,7 +75,7 @@ strand (oss_out, char)
 		finish;
 endstrand
 
-strand (satcmd_out, char)
+strand (satcmd_out, char*)
 	entry (SCO_TRY)
 		ser_out (SCO_TRY, data);
 		sat_rep (data);

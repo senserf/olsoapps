@@ -19,12 +19,12 @@ extern tarpCountType tarp_count;
 #if UART_DRIVER && UART_OUTPUT
 
 #define OO_RETRY 00
-process (oss_out, char)
+process (oss_out, char*)
 	entry (OO_RETRY)
 		ser_out (OO_RETRY, data);
 		ufree (data);
 		finish;
-endprocess (0)
+endprocess
 #undef  OO_RETRY
 
 #endif

@@ -17,11 +17,11 @@ extern tarpCtrlType tarp_ctrl;
 #if UART_DRIVER
 
 #define OO_RETRY 00
-process (oss_out, char)
+process (oss_out, char*)
 	entry (OO_RETRY)
 		app_ser_out (OO_RETRY, data, NO);
 		finish;
-endprocess (0)
+endprocess
 #undef  OO_RETRY
 
 #endif

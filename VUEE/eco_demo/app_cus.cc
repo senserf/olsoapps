@@ -55,7 +55,7 @@
    pass to the PDT only content of msg_satest. Therefore, all other calls to
    oss_out() are voided, with all consequences.
 */
-strand (oss_out, char)
+strand (oss_out, char*)
        entry (OO_RETRY)
 		if (data == NULL)
 			app_diag (D_SERIOUS, "NULL in oss_out");

@@ -105,7 +105,7 @@ word plen (char *str) {
 	return (k + 6) & 0xfe;
 }
 
-strand (sender, char)
+strand (sender, char*)
 
   entry (SN_SEND)
 

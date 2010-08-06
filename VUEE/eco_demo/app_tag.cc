@@ -53,7 +53,7 @@
 // =============
 // OSS reporting
 // =============
-strand (oss_out, char)
+strand (oss_out, char*)
     entry (OO_RETRY)
 	ser_outb (OO_RETRY, data);
 	trigger (OSS_DONE);

@@ -134,15 +134,12 @@ int rcv_stop () {
 	return 0;
 }
 
-fsm sender (word) {
+fsm sender (int) {
 
     word pl;
     int  pp;
 
-// FIXME: boy, this sucks, and sucks, and never stops! And it will blow up
-// again on Nick's 64-bit system, for sure. One more solid reason for moving
-// on to the proper way of handling this in PiComp.
-#define tdelay	((word)(int)data)
+#define tdelay	data
 
     shared address packet;
     shared word packet_length;
@@ -209,7 +206,7 @@ int snd_start (int del) {
 	tcv_control (sfd, PHYSOPT_TXON, NULL);
 
 	if (!XMTon) {
-		runfsm sender ((word*)del);
+		runfsm sender (del);
 		XMTon = 1;
 		return 1;
 	}

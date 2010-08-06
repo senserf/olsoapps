@@ -281,7 +281,7 @@ thread (cyc_man)
 		proceed (CYS_ACT);
 endthread
 
-strand (beacon, char)
+strand (beacon, char*)
 	entry (BS_ITER)
 		when (BEAC_TRIG, BS_ACT);
 		delay (beac_freq << 10, BS_ACT);

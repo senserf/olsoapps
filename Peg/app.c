@@ -214,7 +214,7 @@ static word map_rssi (word r) {
 #define RS_MSG	10
 
 // In this model, a single rcv is forked once, and runs / sleeps all the time
-process (rcv, void)
+process (rcv, void*)
 	static int packet_size	= 0;
 	static char * buf_ptr	= NULL;
 	static word rssi	= 0;
@@ -253,7 +253,7 @@ process (rcv, void)
 		app_count.rcv++;
 		proceed (RS_TRY);
 
-endprocess (1)
+endprocess
 
 #undef RS_TRY
 #undef RS_MSG
@@ -267,7 +267,7 @@ endprocess (1)
 */
 #define AS_START	00
 #define AS_TAGLOOP	10
-process  (audit, void)
+process  (audit, void*)
 	static char * buf_ptr = NULL;
 	static word ind;
 	nodata;
@@ -305,7 +305,7 @@ process  (audit, void)
 		}
 		proceed (AS_TAGLOOP);
 
-endprocess (1)
+endprocess
 #undef AS_START
 #undef AS_TAGLOOP
 
@@ -319,7 +319,7 @@ endprocess (1)
 #define CS_IN	10
 #define CS_WAIT 20
 
-process (cmd_in, void)
+process (cmd_in, void*)
 	nodata;
 
 	entry (CS_INIT)
@@ -341,7 +341,7 @@ process (cmd_in, void)
 		strcpy (cmd_line, ui_ibuf);
 		trigger (CMD_READER);
 		proceed (CS_IN);
-endprocess (1)
+endprocess
 
 #undef CS_INIT
 #undef CS_IN
@@ -362,7 +362,7 @@ endprocess (1)
 #define RS_UIOUT	50
 
 
-process (root, void)
+process (root, void*)
 	static lword	in_tag, in_pass, in_npass;
 	static nid_t	in_peg;
 	static word	in_rssi, in_pl, in_maj, in_min, in_span;
@@ -537,7 +537,7 @@ process (root, void)
 		ui_out (RS_UIOUT, ui_obuf);
 		proceed (RS_FREE);
 
-endprocess (0) /* ganz egal? is (1) somehow better? */
+endprocess
 #undef RS_INIT
 #undef RS_FREE
 #undef RS_MEM

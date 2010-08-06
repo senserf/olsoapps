@@ -211,7 +211,7 @@ word do_command (const char *cb, word sender, word sernum) {
 		// Local report via UART
 
 		if (!running (thread_ureporter)) {
-			runfsm thread_ureporter ((address)clear);
+			runfsm thread_ureporter (clear);
 			return 0;
 		}
 

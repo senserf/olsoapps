@@ -52,7 +52,7 @@ extern void app_leds (const word act);
 #define SRS_BR		30
 #define SRS_FIN		70
 #define ST_REP_BOOT_DELAY	100
-process (st_rep, void)
+process (st_rep, void*)
 
 	entry (SRS_INIT)
 		if (shared_left == -1)
@@ -94,7 +94,7 @@ process (st_rep, void)
 		wait (ST_REPTRIG, SRS_ITER);
 		ldelay (br_ctrl.rep_freq >> 1, SRS_ITER);
 		release;
-endprocess (1)
+endprocess
 #undef SRS_INIT
 #undef SRS_DEL
 #undef SRS_ITER
@@ -104,7 +104,7 @@ endprocess (1)
 #define DRS_INIT	0
 #define DRS_REP		10
 #define DRS_FIN		20
-process (dat_rep, void)
+process (dat_rep, void*)
 	nodata;
 
 	entry (DRS_INIT)
@@ -131,14 +131,14 @@ process (dat_rep, void)
 		if (is_cmdmode)
 			fork (st_rep, NULL);
 		finish;
-endprocess (1)
+endprocess
 #undef DRS_INIT
 #undef DRS_REP
 #undef DRS_FIN
 
 #define IBS_ITER        0
 #define IBS_HOLD	10
-process (io_back, void)
+process (io_back, void*)
 	static lword htime;
 
 	entry (IBS_ITER)
@@ -149,7 +149,7 @@ process (io_back, void)
 	entry (IBS_HOLD)
 		lhold (IBS_HOLD, &htime);
 		proceed (IBS_ITER);
-endprocess (1)
+endprocess
 #undef IBS_ITER
 #undef IBS_HOLD
 
@@ -158,7 +158,7 @@ endprocess (1)
 #define IRS_IRUPT	20
 #define IRS_REP		30
 #define IRS_FIN		40
-process (io_rep, void)
+process (io_rep, void*)
 	static int left;
 	lword lw;
 	nodata;
@@ -219,7 +219,7 @@ process (io_rep, void)
 		io_pload = 0xFFFFFFFF;
 		proceed (IRS_ITER);
 
-endprocess (1)
+endprocess
 #undef IRS_INIT
 #undef IRS_ITER
 #undef IRS_IRUPT
@@ -241,7 +241,7 @@ extern void hstat (word); // kludge from phys_dm2200.c
 #define CS_INIT         00
 #define CS_ACT          10
 #define CS_HOLD		20
-process (cyc_man, void)
+process (cyc_man, void*)
 	word a;
 	nodata;
 
@@ -336,14 +336,14 @@ process (cyc_man, void)
 			cyc_left = 0;
 		}
 		proceed (CS_ACT);
-endprocess (1)
+endprocess
 #undef CS_INIT
 #undef CS_ACT
 #undef CS_HOLD
 
 #define BS_ITER 00
 #define BS_ACT  10
-process (beacon, char)
+process (beacon, char*)
 	entry (BS_ITER)
 		wait (BEAC_TRIG, BS_ACT);
 		delay (beac_freq << 10, BS_ACT);
@@ -383,14 +383,14 @@ process (beacon, char)
 			freqs &= 0xFF00;
 		}
 		proceed (BS_ITER);
-endprocess (1)
+endprocess
 #undef  BS_ITER 
 #undef  BS_ACT 
 
 #define CS_INIT	00
 #define CS_ITER	10
 #define CS_ACT	20
-process (con_man, void)
+process (con_man, void*)
 
 	entry (CS_INIT)
 		fastblink (0);
@@ -418,7 +418,7 @@ process (con_man, void)
 		else if (con_miss >= con_warn)
 			app_leds (LED_BLINK);
 		proceed (CS_ITER);
-endprocess (1)
+endprocess
 #undef  CS_INIT
 #undef	CS_ITER
 #undef	CS_ACT

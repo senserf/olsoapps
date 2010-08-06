@@ -54,7 +54,7 @@ static word gen_packet_length (void) {
 
 }
 
-process (receiver, void)
+process (receiver, void*)
 
 	static address packet;
 
@@ -111,7 +111,7 @@ process (receiver, void)
 	trigger ((word)&last_ack);
 	proceed (RC_TRY);
 
-endprocess (1)
+endprocess
 
 int rcv_start (void) {
 
@@ -151,7 +151,7 @@ static	int	tdelay, tkillflag = 0;
 #define	SN_SEND		00
 #define	SN_NEXT		01
 
-process (sender, void)
+process (sender, void*)
 
 	static address packet;
 	static word packet_length = 12;
@@ -208,7 +208,7 @@ process (sender, void)
 	ser_outf (SN_NEXT+1, "SND %lu, len = %d\r\n", last_snt, packet_length);
 	proceed (SN_SEND);
 
-endprocess (1)
+endprocess
 
 int snd_start (int del) {
 
@@ -365,7 +365,7 @@ process (root, int)
 	tcv_control (sfd, PHYSOPT_SETSID, (address) &n1);
 	proceed (RS_RCMD);
 
-endprocess (1)
+endprocess
 
 #undef	RS_INIT	
 #undef	RS_RCMD

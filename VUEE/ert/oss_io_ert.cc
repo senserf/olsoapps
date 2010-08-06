@@ -16,7 +16,7 @@
 
 #if UART_DRIVER || UART_TCV
 
-strand (oss_out, char)
+strand (oss_out, char*)
 	entry (OO_RETRY)
 		app_ser_out (OO_RETRY, data, NO);
 		finish;

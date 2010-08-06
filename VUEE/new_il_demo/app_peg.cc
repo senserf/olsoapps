@@ -134,7 +134,7 @@ idiosyncratic word guide_rtr (headerType * b);
 // OSS reporting
 // =============
 
-fsm oss_out (char) {
+fsm oss_out (char*) {
 // PiComp
 //
 //

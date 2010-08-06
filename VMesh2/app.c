@@ -118,7 +118,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 #define RS_MSG	10
 
 // In this model, a single rcv is forked once, and runs / sleeps all the time
-process (rcv, void)
+process (rcv, void*)
 	static int packet_size	= 0;
 	static char * buf_ptr	= NULL;
 	static word rssi	= 0;
@@ -150,7 +150,7 @@ process (rcv, void)
 		process_incoming (RS_MSG, buf_ptr, packet_size, rssi);
 		proceed (RS_TRY);
 
-endprocess (1)
+endprocess
 
 #undef RS_TRY
 #undef RS_MSG
@@ -230,7 +230,7 @@ static void sensor_in (word state) {
 #define CS_READ_BODY	50
 #define CS_DONE_R	60
 #define CS_WAIT 	70
-process (cmd_in, void)
+process (cmd_in, void*)
 	word quant;
 	nodata;
 
@@ -315,7 +315,7 @@ process (cmd_in, void)
 		trigger (CMD_READER);
 		proceed (CS_IN);
 
-endprocess (1)
+endprocess
 #undef CS_START
 #undef CS_TOUT
 #undef CS_IN
@@ -330,7 +330,7 @@ endprocess (1)
 #define DS_IN		20
 #define DS_READ_START	30
 #define DS_READ		40
-process (dat_in, void)
+process (dat_in, void*)
 	nodata;
 
 	entry (DS_START)
@@ -365,7 +365,7 @@ process (dat_in, void)
 		}
 		uart_oset++;
 		proceed (DS_READ);
-endprocess (1)
+endprocess
 #undef DS_START
 #undef DS_TOUT
 #undef DS_IN
@@ -660,7 +660,7 @@ static bool valid_input () {
 #define INFO_PHYS_	INFO_PHYS_CC1100
 #endif
 
-process (root, void)
+process (root, void*)
 
 	nodata;
 
@@ -745,7 +745,7 @@ process (root, void)
 		oss_ret_out (RS_RETOUT);
 		proceed (RS_FREE);
 
-endprocess (0)
+endprocess
 #undef RS_INIT
 #undef RS_FREE
 #undef RS_RCMD

@@ -95,7 +95,7 @@ void pidmess (int st, const char *m) {
 
 // ============================================================================
 
-strand (spinner, void)
+strand (spinner, void*)
 
   entry (SP_START)
 
@@ -111,7 +111,7 @@ strand (spinner, void)
 
 endstrand
 
-strand (sjoiner, void) 
+strand (sjoiner, void*) 
 
   entry (SJ_START)
 

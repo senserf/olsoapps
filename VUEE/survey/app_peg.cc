@@ -204,7 +204,7 @@ static word map_rssi (word r) {
 // =============
 // OSS reporting
 // =============
-fsm oss_out (char) {
+fsm oss_out (char*) {
 
 	entry OO_INIT:
 

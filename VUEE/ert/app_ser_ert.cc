@@ -12,7 +12,7 @@
 #if UART_DRIVER || UART_TCV
 
 #if UART_DRIVER
-strand (app_outserial, char)
+strand (app_outserial, char*)
 
 	sint quant;
 
@@ -41,7 +41,7 @@ endstrand
 #else
 
 // UART_TCV
-strand (app_outserial, char)
+strand (app_outserial, char*)
 
 	entry (OM_INIT)
 		// +3: add 0x00 <len> ... 0x04

@@ -7,9 +7,9 @@
 
 word when [10];
 
-process (sleeper, word)
+process (sleeper, int)
 
-#define	PNUM	((int)data)
+#define	PNUM	data
 
 	word	dd, ns;
 
@@ -27,9 +27,9 @@ process (sleeper, word)
 		diag ("%u: [%d] wake up %u", ns, PNUM, when [PNUM]);
 		proceed (0);
 
-endprocess (0)
+endprocess
 
-process (root, void)
+process (root, void*)
 
 	int i;
 
@@ -50,4 +50,4 @@ process (root, void)
 		diag ("Unfreezing");
 		proceed (1);
 
-endprocess (0)
+endprocess

@@ -21,7 +21,7 @@ char 	dbuffer [34], enc [8];
 
 #define	DS_INIT		00
 
-process (display, void)
+process (display, void*)
 
   static char enc [8];
 
@@ -52,7 +52,7 @@ process (display, void)
 
 	delay (interval, DS_INIT);
 
-endprocess (1)
+endprocess
 
 void stop_adc (void) {
 
@@ -81,7 +81,7 @@ void start_adc (int ma, int del) {
 #define	RS_DISPLAY	40
 #define	RS_STOP		50
 
-process (root, void)
+process (root, void*)
 /* =========================================== */
 /* This is the main program of the application */
 /* =========================================== */
@@ -168,4 +168,4 @@ process (root, void)
 	stop_adc ();
 	proceed (RS_RCMD);
 
-endprocess (1)
+endprocess

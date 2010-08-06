@@ -29,7 +29,7 @@ word plen (char *str) {
 
 #define	SN_SEND		0
 
-strand (sender, char)
+strand (sender, char*)
 
   entry (SN_SEND)
 

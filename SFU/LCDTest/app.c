@@ -24,7 +24,7 @@
 
 #define	FS_LOOP	0
 
-process (flasheur, void)
+process (flasheur, void*)
 
   word pos, led, sta;
 
@@ -48,7 +48,7 @@ process (flasheur, void)
 
 	delay (1024, FS_LOOP);
 
-endprocess (1)
+endprocess
 	
 process (root, int)
 
@@ -132,4 +132,4 @@ process (root, int)
 
 	nodata;
 
-endprocess (1)
+endprocess

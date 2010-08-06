@@ -167,7 +167,7 @@ static void process_incoming (word state, char * buf, word size) {
 
 // In this model, a single rcv is forked once, and runs / sleeps all the time
 // Toggling rx happens in the rxsw process, driven from the pong process.
-process (rcv, void)
+process (rcv, void*)
 	static int packet_size	= 0;
 	static char * buf_ptr	= NULL;
 
@@ -199,7 +199,7 @@ process (rcv, void)
 		app_count.rcv++;
 		proceed (RS_TRY);
 
-endprocess (1)
+endprocess
 
 #undef RS_TRY
 #undef RS_MSG
@@ -212,7 +212,7 @@ endprocess (1)
 #define RS_OFF	00
 #define RS_ON	10
 	
-process (rxsw, void)
+process (rxsw, void*)
 	nodata;
 
 	entry (RS_OFF)
@@ -227,7 +227,7 @@ process (rxsw, void)
 		delay ( pong_params.rx_span, RS_OFF);
 		release;
 
-endprocess (1)
+endprocess
 
 #undef RS_OFF
 #undef RS_ON
@@ -278,7 +278,7 @@ static word map_level (word l) {
 #define PS_INIT         00
 #define PS_NEXT         10
 #define PS_SEND		20
-process (pong, void)
+process (pong, void*)
 
 	// have it static -- the only regular activity: send it
 	static char	 	frame[sizeof(msgPongType)];
@@ -339,7 +339,7 @@ process (pong, void)
 		}
 		proceed (PS_NEXT);
 
-endprocess (1)
+endprocess
 
 #undef PS_INIT
 #undef PS_NEXT
@@ -355,7 +355,7 @@ endprocess (1)
 #define CS_IN	10
 #define CS_WAIT 20
 
-process (cmd_in, void)
+process (cmd_in, void*)
 	nodata;
 
 	entry (CS_INIT)
@@ -378,7 +378,7 @@ process (cmd_in, void)
 		strcpy (cmd_line, ui_ibuf);
 		trigger (CMD_READER);
 		proceed (CS_IN);
-endprocess (1)
+endprocess
 
 #undef CS_INIT
 #undef CS_IN
@@ -398,7 +398,7 @@ endprocess (1)
 #define RS_UIOUT	50
 
 
-process (root, void)
+process (root, void*)
 
 	// input (s command)
 	word in_lh, in_pl, in_maj, in_min, in_span;
@@ -495,7 +495,7 @@ process (root, void)
 		ui_out (RS_UIOUT, ui_obuf);
 		proceed (RS_FREE);
 
-endprocess (0) // ganz egal? is (1) somehow more efficient? 
+endprocess
 #undef RS_INIT
 #undef RS_FREE
 #undef RS_RCMD

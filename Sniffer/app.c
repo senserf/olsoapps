@@ -58,7 +58,7 @@ static void lcd_encl (int pos, int nd, lword n) {
 
 #define	MS_RUN 00
 
-static process (memstat, void)
+static process (memstat, void*)
 
 	static word rc = 0;
 	word failures;
@@ -84,14 +84,14 @@ static process (memstat, void)
 
 	delay (1024, MS_RUN);
 
-endprocess (1)
+endprocess
 
 #define	RC_TRY		00
 #define	RC_OUT		10
 #define	RC_LF		20
 #define	RC_ENP		30
 
-static process (sniffer, void)
+static process (sniffer, void*)
 
 	static word np, length;
 	char c;
@@ -144,7 +144,7 @@ static process (sniffer, void)
 	tcv_endp (packet);
 	proceed (RC_TRY);
 
-endprocess (1)
+endprocess
 
 #undef	RC_TRY
 #undef	RC_OUT
@@ -253,4 +253,4 @@ process (root, int)
 
 	nodata;
 
-endprocess (1)
+endprocess

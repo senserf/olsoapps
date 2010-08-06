@@ -33,7 +33,7 @@
 // =============
 // OSS reporting
 // =============
-strand (oss_out, char)
+strand (oss_out, char*)
         entry (OO_RETRY)
 		if (data == NULL)
 			app_diag (D_SERIOUS, "NULL in oss_out");

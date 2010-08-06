@@ -75,7 +75,7 @@ static void complete () {
 	dsp_lcd (thefile, YES);
 }
 
-process (root, void)
+process (root, void*)
 
 	nodata;
 
@@ -172,4 +172,4 @@ process (root, void)
 
 	proceed (RF_WAITFILE);
 
-endprocess (1)
+endprocess

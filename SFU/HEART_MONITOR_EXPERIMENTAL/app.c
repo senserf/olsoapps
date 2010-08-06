@@ -909,7 +909,7 @@ endthread
 #define	LI_GETCMD	2
 #define	LI_PERSTAT	3
 
-#define	MYFD	((int)data)
+#define	MYFD	data
 
 strand (listener, int)
 

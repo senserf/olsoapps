@@ -96,7 +96,7 @@ idiosyncratic word guide_rtr (headerType * b);
 // =============
 // OSS reporting
 // =============
-fsm oss_out (char) {
+fsm oss_out (char*) {
     entry OO_RETRY:
 	ser_outb (OO_RETRY, data);
 	trigger (OSS_DONE);

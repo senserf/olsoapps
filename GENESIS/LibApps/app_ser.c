@@ -7,7 +7,7 @@
 
 #define	OM_INIT		00
 #define	OM_WRITE	10
-process (app_outserial, char)
+process (app_outserial, char*)
 
 	static char *ptr;
 	static int len;
@@ -28,7 +28,7 @@ process (app_outserial, char)
 	}
 	proceed (OM_WRITE);
 
-endprocess (1)
+endprocess
 #undef 	OM_INIT
 #undef	OM_WRITE
 

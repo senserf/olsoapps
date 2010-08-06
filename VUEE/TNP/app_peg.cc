@@ -291,7 +291,7 @@ endthread
 // OSS reporting
 // =============
 
-strand (oss_out, char)
+strand (oss_out, char*)
 
 	entry (OO_RETRY)
 

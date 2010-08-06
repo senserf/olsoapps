@@ -44,7 +44,7 @@ word	sample [8];
 #define	RC_NAK		1
 #define	RC_ACK		2
 
-process (receiver, void)
+process (receiver, void*)
 
   address packet;
 
@@ -130,11 +130,11 @@ End:
 	tcv_endp (packet);
 	proceed (RC_NEX);
 
-endprocess (1);
+endprocess
 
 #define	MO_UPD		0
 
-process (monitor, void)
+process (monitor, void*)
 
   entry (MO_UPD)
 
@@ -153,7 +153,7 @@ process (monitor, void)
 	delay (MONITOR_INTERVAL, MO_UPD);
 	wait (UPDATE_EVENT, MO_UPD);
 
-endprocess (1);
+endprocess
 
 
 #define	RS_INIT		0
@@ -212,4 +212,4 @@ process (root, int)
 	ser_outf (RS_DON, "Done\r\n");
 	proceed (RS_RCMD);
 
-endprocess (1);
+endprocess

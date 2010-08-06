@@ -38,13 +38,13 @@
 // =============
 // OSS reporting
 // =============
-strand (oss_out, char)
+strand (oss_out, char*)
     entry (OO_RETRY)
 	ser_outb (OO_RETRY, data);
 	finish;
 endstrand
 
-strand (info_in, word)
+strand (info_in, address)
 	word dela;
 
     entry (II_INIT)

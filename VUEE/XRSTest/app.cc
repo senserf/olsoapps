@@ -94,7 +94,7 @@ void uart_init () {
 
 // ============================================================================
 
-strand (outlines, const char)
+strand (outlines, const char*)
 
   const char *cc;
   word nc;

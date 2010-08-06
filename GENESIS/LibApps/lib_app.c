@@ -39,7 +39,7 @@ extern word  svec[];
 #define SRS_NEXT	60
 #define SRS_FIN		70
 #define ST_REP_BOOT_DELAY 100
-process (st_rep, void)
+process (st_rep, void*)
 
 	static int left; 
 
@@ -125,7 +125,7 @@ process (st_rep, void)
 		wait (ST_REPTRIG, SRS_ITER);
 		ldelay (br_ctrl.rep_freq >> 1, SRS_ITER);
 		release;
-endprocess (1)
+endprocess
 #undef SRS_ITER
 #undef SRS_BR
 #undef SRS_CONT
@@ -135,7 +135,7 @@ endprocess (1)
 
 #define BS_ITER 00
 #define BS_ACT  10
-process (beacon, char)
+process (beacon, char*)
 	entry (BS_ITER)
 		wait (BEAC_TRIG, BS_ACT);
 		delay (beac_freq << 10, BS_ACT);
@@ -175,14 +175,14 @@ process (beacon, char)
 			freqs &= 0xFF00;
 		}
 		proceed (BS_ITER);
-endprocess (1)
+endprocess
 #undef  BS_ITER 
 #undef  BS_ACT 
 
 #define CS_INIT	00
 #define CS_ITER	10
 #define CS_ACT	20
-process (con_man, void)
+process (con_man, void*)
 
 	entry (CS_INIT)
 		fastblink (0);
@@ -210,7 +210,7 @@ process (con_man, void)
 		else if (con_miss >= con_warn)
 			leds (CON_LED, LED_BLINK);
 		proceed (CS_ITER);
-endprocess (1)
+endprocess
 #undef  CS_INIT
 #undef	CS_ITER
 #undef	CS_ACT

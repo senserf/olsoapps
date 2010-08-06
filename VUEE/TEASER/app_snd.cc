@@ -27,7 +27,7 @@ word plen (char *str) {
 	return (k + 6) & 0xfe;
 }
 
-fsm sender (char) {
+fsm sender (char*) {
 
   address spkt;
 

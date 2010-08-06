@@ -41,7 +41,7 @@ extern void msg_master_out (word state, char** buf_out, nid_t rcv);
 #define CS_INIT 	00
 #define CS_ACT		10
 #define CS_SLEEP	20
-process (cyc_man, void)
+process (cyc_man, void*)
 	word align4;
 	nodata;
 
@@ -82,14 +82,14 @@ process (cyc_man, void)
 			delay (cyc_sp << 10, CS_ACT);
 		release;
 
-endprocess (1)
+endprocess
 #undef CS_INIT
 #undef CS_ACT
 #undef CS_SLEEP
 
 #define BS_ITER 00
 #define BS_SEND 10
-process (beacon, char)
+process (beacon, char*)
 
 	entry (BS_ITER)
 		if (beac_freq == 0) {
@@ -118,7 +118,7 @@ process (beacon, char)
 			beac_freq = 0;
 		}
 		proceed (BS_ITER);
-endprocess (1)
+endprocess
 #undef	BS_ITER
 #undef	BS_SEND
 

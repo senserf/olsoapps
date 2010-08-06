@@ -24,7 +24,7 @@ extern void msg_master_out (word state, char** buf_out, id_t rcv);
 
 #define BS_ITER 00
 #define BS_SEND 10
-process (beacon, char)
+process (beacon, char*)
 	static word len = 0;
 
 	entry (BS_ITER)
@@ -62,7 +62,7 @@ process (beacon, char)
 			beac_freq = 0;
 		}
 		proceed (BS_ITER);
-endprocess (1)
+endprocess
 #undef	BS_ITER
 #undef	BS_SEND
 

@@ -90,7 +90,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 #define RS_MSG	10
 
 // In this model, a single rcv is forked once, and runs / sleeps all the time
-process (rcv, void)
+process (rcv, void*)
 	static int packet_size	= 0;
 	static char * buf_ptr	= NULL;
 	static word rssi	= 0;
@@ -113,7 +113,7 @@ process (rcv, void)
 		}
 		proceed (RS_TRY);
 
-endprocess (1)
+endprocess
 
 #undef RS_TRY
 #undef RS_MSG
@@ -128,7 +128,7 @@ endprocess (1)
 #define CS_WAIT 10
 #define UI_INLEN 64
 
-process (cmd_in, void)
+process (cmd_in, void*)
 	// could as well be malloced
 	static unsigned char ui_ibuf[UI_INLEN];
 	nodata;
@@ -150,7 +150,7 @@ process (cmd_in, void)
 		trigger (CMD_READER);
 		proceed (CS_IN);
 
-endprocess (1)
+endprocess
 
 #undef CS_IN
 #undef CS_WAIT
@@ -169,7 +169,7 @@ endprocess (1)
 #define RS_DOCMD	30
 
 
-process (root, void)
+process (root, void*)
 
 	// input (s command)
 	id_t in_lh;
@@ -260,7 +260,7 @@ process (root, void)
 		diag (ill_str, cmd_line);
 		proceed (RS_FREE);
 
-endprocess (1)
+endprocess
 #undef RS_INIT
 #undef RS_FREE
 #undef RS_RCMD
