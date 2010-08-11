@@ -1,0 +1,4 @@
+#define VUEE_LIB_PLUG_NULL
+
+#define	UART_DRIVER	1
+#define	CODE_LONG_INTS	1
