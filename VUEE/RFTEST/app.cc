@@ -760,9 +760,8 @@ void view_packet (address p, word pl) {
 
 fsm thread_pcmnder {
 
-  shared lword until;
-  shared word estat;
-  char *msg;
+  lword until;
+  word estat;
 
   entry PC_START:
 
@@ -778,6 +777,8 @@ fsm thread_pcmnder {
 	estat = do_command (g_pcmd_cmd, 0, 0);
 
   entry PC_MSG:
+
+  	char *msg;
 
 	msg = emess (estat);
 	if (msg == NULL)
@@ -803,8 +804,7 @@ fsm thread_chguard {
 
 fsm thread_patable {
 
-  shared word ntries, spow;
-  address packet;
+  word ntries, spow;
 
   entry PA_START:
 
@@ -826,6 +826,8 @@ fsm thread_patable {
 	release;
 
   entry PA_RUN:
+
+  	address packet;
 
 	// Issue a command
 	if (g_pat_cnt == 0)
@@ -894,15 +896,15 @@ fsm thread_patable {
 
 fsm thread_rfcmd {
 
-  word ln;
-  address packet;
-
   entry RC_START:
 
 	g_snd_rtries = 0;
 	g_snd_sernum++;
 
   entry RC_SEND:
+
+  	word ln;
+  	address packet;
 
 	if (g_snd_rtries >= RF_COMMAND_RETRIES) {
 		if (g_snd_rcmd != NULL) {
@@ -991,10 +993,9 @@ fsm thread_rreporter {
 
 // ============================================================================
 
-fsm thread_ureporter (word) {
+fsm thread_ureporter (word clear) {
 
-  word errs [6];
-  shared word cnt;
+  word cnt;
 
   entry RE_START:
 
@@ -1003,9 +1004,11 @@ fsm thread_ureporter (word) {
 
   entry RE_MEM:
 
-	errs [0] = memfree (0, errs + 1);
-	errs [2] = stackfree ();
-	uart_outf (RE_MEM, "Mem: %u %u %u" , errs [0], errs [1], errs [2]);
+  	word vals [3];
+
+	vals [0] = memfree (0, vals + 1);
+	vals [2] = stackfree ();
+	uart_outf (RE_MEM, "Mem: %u %u %u" , vals [0], vals [1], vals [2]);
 
   entry RE_FIXED:
 
@@ -1024,8 +1027,10 @@ fsm thread_ureporter (word) {
 
   entry RE_DRIV:
 
+	word errs [6];
+
 	tcv_control (g_fd_rf, PHYSOPT_ERROR, errs);
-	if (data)
+	if (clear)
 		tcv_control (g_fd_rf, PHYSOPT_ERROR, NULL);
 	uart_outf (RE_DRIV, "Driver stats: %u, %u, %u, %u, %u, %u",
 		errs [0], errs [1], errs [2], errs [3], errs [4], errs [5]);
@@ -1036,10 +1041,10 @@ fsm thread_ureporter (word) {
 
 fsm thread_listener {
 
-  address packet;
-  word pl, tr;
-
   entry LI_WAIT:
+
+  	address packet;
+  	word pl, tr;
 
 	packet = tcv_rnp (LI_WAIT, g_fd_rf);
 	g_lrs = seconds ();
@@ -1084,8 +1089,8 @@ fsm thread_listener {
 
 fsm thread_sender {
 
-  shared word scnt;
-  shared address spkt;
+  word scnt;
+  address spkt;
 
   entry SN_DELAY:
 
@@ -1134,10 +1139,7 @@ fsm thread_sender {
 		
 fsm root {
 
-  word scr;
-  char *msg;
-  address packet;
-  shared word estat;
+  word estat;
 
   entry RS_INIT:
 
@@ -1165,6 +1167,8 @@ fsm root {
 	//
 
   entry RS_BANNER:
+
+  	word scr;
 
 	scr = NETWORK_ID | ((g_flags >> 11) & 0x7);
 	uart_outf (RS_BANNER,
@@ -1197,6 +1201,8 @@ fsm root {
 
   entry RS_READ:
 
+	address packet;
+
 	// Read a command from input
 	packet = tcv_rnp (RS_READ, g_fd_uart);
 
@@ -1206,6 +1212,8 @@ fsm root {
 	tcv_endp (packet);
 
   entry RS_MSG:
+
+  	char *msg;
 
 	msg = emess (estat);
 	if (msg == NULL)

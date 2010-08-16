@@ -474,20 +474,11 @@ fsm rcv {
 
 	// PiComp
 	//
-	// Here we see another feature: "shared" means "to be seen by this
-	// process only", but permanent (static), i.e., surviving state
-	// transitions, and de facto global.
+	// Local variables in an FSM are now static/shared automatically. You
+	// should declare them at states, if they are state-local.
 	//
-	// Why "shared" and not "local", for example? Because it isn't local:
-	// it is in fact shared by all instances of the fsm. I was tempted
-	// to implement "local", but it would require a revision of the
-	// concept of the process's data (which at present is supposed to
-	// succinctly represent the "local" stuff). While such a revision may
-	// make sense (and I think I know how to do it), we will wait with that
-	// (for one thing, what I have in mind will not be downward compatible).
-	//
-	shared char *buf;
-	shared word psize, rssi;
+	char *buf;
+	word psize, rssi;
 
 	entry RC_TRY:
 
@@ -545,9 +536,9 @@ fsm rcv {
 
 fsm audit {
 
-	shared char *buf;
-	shared word ind;
-	shared lword lhtime;
+	char *buf;
+	word ind;
+	lword lhtime;
 
 	entry AS_START:
 
@@ -625,7 +616,7 @@ fsm audit {
 */
 fsm cmd_in {
 
-	shared char *ibuf;
+	char *ibuf;
 
 	entry CS_INIT:
 
@@ -1023,11 +1014,7 @@ void oss_setPeg_in (word state, nid_t peg,
 
 fsm root {
 
-	shared char *obuf;
-
-	mdate_t md;
-
-	sint	i1, i2, i3, i4, i5, i6, i7;
+	char *obuf;
 
 	entry RS_INIT:
 		obuf = get_mem (RS_INIT, UI_BUFLEN);
@@ -1157,6 +1144,9 @@ fsm root {
 		}
 
 	  switch (cmd_line[0]) {
+
+		mdate_t md;
+		sint	i1, i2, i3, i4, i5, i6, i7;
 
 		case ' ': proceed RS_FREE; // ignore if starts with blank
 

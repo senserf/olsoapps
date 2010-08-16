@@ -27,15 +27,15 @@ word plen (char *str) {
 	return (k + 6) & 0xfe;
 }
 
-fsm sender (char*) {
-
-  address spkt;
+fsm sender (char *msg) {
 
   entry SN_SEND:
 
-	spkt = tcv_wnp (SN_SEND, sfd, plen (data));
+  	address spkt;
+
+	spkt = tcv_wnp (SN_SEND, sfd, plen (msg));
 	spkt [0] = 0;
-	strcpy ((char*)(spkt + 1), data);
+	strcpy ((char*)(spkt + 1), msg);
 	tcv_endp (spkt);
 	finish;
 }
@@ -44,7 +44,7 @@ fsm sender (char*) {
 
 fsm root {
 
-  shared char *ibuf;
+  char *ibuf;
 
   entry RS_INIT:
 

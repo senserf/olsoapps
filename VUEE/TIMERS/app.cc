@@ -64,8 +64,8 @@ static void radio_switch (Boolean on) {
 
 fsm receiver {
 
-    shared address packet;
-    shared word mem [2];
+    address packet;
+    word mem [2];
 
     entry RC_TRY:
 
@@ -87,12 +87,9 @@ fsm receiver {
 
 fsm sender {
 
-    word pl;
-    int  pp;
-
-    shared lint last_snt = 0;
-    shared address packet;
-    shared word packet_length, mem [2];
+    lint last_snt = 0;
+    address packet;
+    word packet_length, mem [2];
 
     entry SN_SEND:
 
@@ -105,6 +102,9 @@ fsm sender {
 
 
     entry SN_NEXT:
+
+    	word pl;
+    	int  pp;
 
 	// We control congestion in the transmission queue via a simple
 	// handshake with the plugin
@@ -190,9 +190,9 @@ int snd_stop () {
 
 fsm pin_monitor {
 
-    shared lint CNT, CMP;
-    shared word STA;
-    shared const char *MSG;
+    lint CNT, CMP;
+    word STA;
+    const char *MSG;
 
     entry PM_START:
 
@@ -256,12 +256,12 @@ fsm watchdog {
 
 fsm root {
 
-    shared char *ibuf;
-    shared sint k, n1;
-    shared const char *fmt;
-    shared char obuf [32];
-    shared word p [3];
-    shared lword lp;
+    char *ibuf;
+    sint k, n1;
+    const char *fmt;
+    char obuf [32];
+    word p [3];
+    lword lp;
 
     entry RS_INIT:
 

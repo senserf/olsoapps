@@ -113,13 +113,7 @@ void reset_count ();
 word report_size ();
 void view_packet (address, word);
 
-fsm thread_rfcmd;
-fsm thread_rreporter;
-fsm thread_ureporter;
-fsm thread_listener;
-fsm thread_sender;
-fsm thread_patable;
-fsm thread_chguard;
-fsm thread_pcmnder;
+fsm thread_rfcmd, thread_rreporter, thread_ureporter (word), thread_listener,
+	thread_sender, thread_patable, thread_chguard, thread_pcmnder;
 
 #endif

@@ -2,4 +2,4 @@
 
 #define	UART_DRIVER		1
 #define	CODE_LONG_INTS		1
-#define MALLOC_SINGLEPOOL	1
+#define	MALLOC_SINGLEPOOL	1

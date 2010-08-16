@@ -474,8 +474,8 @@ void process_incoming (word state, char * buf, word size) {
 // Toggling rx happens in the rxsw process, driven from the pong process.
 fsm rcv {
 
-	shared char *buf;
-	shared sint psize;
+	char *buf;
+	sint psize;
 
 	entry RC_TRY:
 
@@ -582,9 +582,8 @@ static word map_level (word l) {
 
 fsm pong {
 
-	word   level, w;
-	shared word shift;
-	shared char frame [sizeof (msgPongType) + sizeof (sensDataType)];
+	word shift;
+	char frame [sizeof (msgPongType) + sizeof (sensDataType)];
 
 	entry PS_INIT:
 
@@ -606,6 +605,8 @@ fsm pong {
 		release;
 
 	entry PS_SEND:
+
+		word   level, w;
 
 		level = ((pong_params.pow_levels >> shift) & 0x000f);
 		// pong with this power if data collected (and not confirmed)
@@ -742,7 +743,7 @@ fsm pong {
 #define ALRM_COOL		15
 fsm pesens {
 
-	shared lword alrm_ts;
+	lword alrm_ts;
 
 	entry PSE_LOOP:
 
@@ -899,7 +900,7 @@ fsm sens {
 
 fsm cmd_in {
 
-	shared char *ibuf;
+	char *ibuf;
 
 	entry CS_INIT:
 
@@ -935,8 +936,7 @@ fsm cmd_in {
 
 fsm root {
 
-	shared char *obuf;
-	sint i1, i2, i3, i4, i5;
+	char *obuf;
 
 	entry RS_INIT:
 		obuf = get_mem_t (RS_INIT, UI_BUFLEN);
@@ -1044,6 +1044,8 @@ fsm root {
 		}
 
 	entry RS_DOCMD:
+
+		sint i1, i2, i3, i4, i5;
 
 		if (cmd_line[0] == ' ') // ignore if starts with blank
 			proceed RS_FREE;

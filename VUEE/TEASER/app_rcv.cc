@@ -29,7 +29,7 @@ void show (word st, address pkt) {
 
 fsm receiver {
 
-  shared address rpkt;
+  address rpkt;
 
   entry RC_TRY:
 

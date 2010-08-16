@@ -2,6 +2,8 @@
 #include "ser.h"
 #include "serf.h"
 
+fsm output (const char*), root;
+
 fsm output (const char *msg) {
 	state WRITE_MSG:
 		ser_out (WRITE_MSG, "I am ready!!\r\n");

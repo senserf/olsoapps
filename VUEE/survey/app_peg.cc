@@ -393,9 +393,9 @@ void stats (char * buf) {
 // In this model, a single rcv is forked once, and runs / sleeps all the time
 fsm rcv {
 
-	shared int packet_size;
-	shared char *buf_ptr;
-	shared word rssi;
+	int packet_size;
+	char *buf_ptr;
+	word rssi;
 
 	entry RC_INIT:
 
@@ -476,7 +476,7 @@ fsm rcv {
 */
 fsm cmd_in {
 
-	shared char *ui_ibuf = NULL;
+	char *ui_ibuf = NULL;
 
 	entry CS_INIT:
 
@@ -542,10 +542,7 @@ void oss_ping_out (char * buf, word rssi) {
 
 fsm root {
 
-	shared char *ui_obuf = NULL;
-
-	sint	i1, i2, i3, i4, i5;
-	nvm_t	nvm;
+	char *ui_obuf = NULL;
 
 	entry RS_INIT:
 
@@ -609,6 +606,8 @@ fsm root {
 		}
 
 	entry RS_SETS:
+
+		sint	i1, i2, i3, i4, i5;
 
 		if ((i1 = strlen (cmd_line)) != 1 && sstate != ST_INIT) {
 			app_diag (D_WARNING, "Careful: not in INIT state (%d)",
@@ -693,6 +692,8 @@ fsm root {
 		proceed RS_FREE;
 
 	entry RS_OPERS:
+
+		nvm_t	nvm;
 
 		switch (cmd_line [1]) {
 

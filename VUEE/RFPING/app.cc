@@ -53,7 +53,7 @@ static word gen_packet_length (void) {
 
 fsm receiver {
 
-    shared address packet;
+    address packet;
 
     entry RC_TRY:
 
@@ -134,15 +134,10 @@ int rcv_stop () {
 	return 0;
 }
 
-fsm sender (int) {
+fsm sender (int tdelay) {
 
-    word pl;
-    int  pp;
-
-#define tdelay	data
-
-    shared address packet;
-    shared word packet_length;
+    address packet;
+    word packet_length;
 
     entry SN_SEND:
 
@@ -172,6 +167,9 @@ Finish:
 	proceed SN_NEXT;
 
     entry SN_NEXT:
+
+    	word pl;
+    	int  pp;
 
 	if (tkillflag)
 		goto Finish;
@@ -229,9 +227,9 @@ int snd_stop () {
 
 fsm pin_monitor {
 
-    shared lint CNT, CMP;
-    shared word STA;
-    shared const char *MSG;
+    lint CNT, CMP;
+    word STA;
+    const char *MSG;
 
     entry PM_START:
 
@@ -295,12 +293,12 @@ fsm watchdog {
 
 fsm root {
 
-    shared char *ibuf;
-    shared sint k, n1;
-    shared const char *fmt;
-    shared char obuf [32];
-    shared word p [2];
-    shared lint lp;
+    char *ibuf;
+    sint k, n1;
+    const char *fmt;
+    char obuf [32];
+    word p [2];
+    lint lp;
 
     entry RS_INIT:
 
