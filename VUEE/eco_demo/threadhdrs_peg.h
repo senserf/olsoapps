@@ -73,7 +73,7 @@ threadhdr (root, NodePeg) {
 
 #else	/* PICOS */
 
-int mbeacon (word, address);
+procname (mbeacon);
 
 // ========================================= rcv
 

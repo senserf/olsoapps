@@ -101,7 +101,7 @@ process (sender, void)
 
 	delay (RF_RTIMEOUT, SE_ANP);
 	packet = tcv_rnp (SE_WAK, sfd);
-	unwait (WNONE);
+	unwait ();
 
 	if ((packet [1] & 0xff00) != (RF_MSTYPE_AK << 8)) {
 		tcv_endp (packet);

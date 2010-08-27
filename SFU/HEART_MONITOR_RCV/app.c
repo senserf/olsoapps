@@ -54,7 +54,7 @@ process (receiver, void*)
 		delay (RF_PTIMEOUT, RC_NAK);
 
 	packet = tcv_rnp (RC_NEX, sfd);
-	unwait (WNONE);
+	unwait ();
 
 	switch (packet [1] & 0xff00) {
 

@@ -69,9 +69,9 @@ threadhdr (root, NodeTag) {
 
 #else	/* PICOS */
 
-int sens (word, address);
-int rxsw (word, address);
-int pong (word, address);
+procname (sens);
+procname (rxsw);
+procname (pong);
 
 // ========================================= sens
 

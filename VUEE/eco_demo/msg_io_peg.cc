@@ -228,7 +228,7 @@ __PUBLF (NodePeg, void, msg_fwd_out) (word state, char** buf_out, word size,
 }
 
 #ifndef __SMURPH__
-sint mbeacon (word, address);
+procname (mbeacon);
 #endif
 
 __PUBLF (NodePeg, void, msg_master_in) (char * buf) {
