@@ -1,5 +1,7 @@
 #define VUEE_LIB_PLUG_NULL
 
+#define	MAX_TASKS	0
+
 #undef	STORAGE_AT45XXX
 #undef	CRYSTAL2_RATE
 #undef	UART_DRIVER
