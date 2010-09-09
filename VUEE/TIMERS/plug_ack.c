@@ -55,8 +55,7 @@ trueconst tcvplug_t plug_ack =
 //
 // Assumes there is never more than one session (at a time); our old wisdom
 // tells us to use an array here, but I am presently in the mood of eliminating
-// features that have never been used; one thing that will probably go is the
-// plugin ID (like 0x0011 above); has anybody ever used them for anything?
+// features that have never been used
 //
 static int desc = NONE, phys = NONE;
 
@@ -84,8 +83,7 @@ static int tcv_clo_ack (int phy, int fd) {
 	return 0;
 }
 
-static int tcv_rcv_ack (int phy, address p, int len, int *ses,
-							     tcvadp_t *bounds) {
+static int tcv_rcv_ack (int phy, address p, int len, int *ses, tcvadp_t *bnd) {
 //
 // Called at packet reception
 //
@@ -106,15 +104,18 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 				Diag ("A-F %x %u", ap, i);
 				// Drop the data packet as it has been
 				// acknowledged
-				if (tcvp_issettimer (ap) || tcvp_isqueued (ap))
-					// Can drop
-					tcv_drop (ap);
-				else
-					// Being processed, make sure for the
-					// last time
+				if (tcvp_isdetached (ap))
+					// This means that the packet is being
+					// processed (has been removed from the
+					// queue, including the timer queue);
+					// in such a case, we cannot drop it,
+					// but we can make sure that it is
+					// being processed for the last time
 					rtimes [i] = MAX_RTIMES;
-				// There is no need to do this:
-				// hooks [i] = NULL;
+				else
+					// Just drop it; note that drop removes
+					// the hook
+					tcv_drop (ap);
 				break;
 			}
 		}
@@ -150,11 +151,9 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses,
 		// tcvp_new, so we don't have to say anything more
 	} else {
 		Diag ("R-N %u", psernum (p));
-		CNOP;
 	}
 	
-	// Done, the disposition code says there is nothing more to be done
-	// about the packet
+	// We have handled the packet, nothing more to do for the caller
 	return TCV_DSP_DROP;
 }
 
@@ -178,7 +177,7 @@ static int tcv_xmt_ack (address p) {
 	word i;
 
 	if (tcvp_length (p) == ACK_LENGTH && ptype (p) == PTYPE_ACK) {
-		// This is an ACK, just drop it, nothing more to be done
+		// This is an ACK, just drop it, that's it
 		Diag ("X-A %x %d", p, psernum (p));
 		return TCV_DSP_DROP;
 	}
@@ -187,7 +186,7 @@ static int tcv_xmt_ack (address p) {
 	Diag ("X-U %x %d", p, psernum (p));
 
 	for (i = 0; i < N_HOOKS; i++) {
-		// Check if pointed to by a hook
+		// Check if pointed to by an existing hook
 		if (hooks [i] == p) {
 			// Found, check how many times transmitted so far
 			Diag ("X-R %d", rtimes [i]);
@@ -195,7 +194,8 @@ static int tcv_xmt_ack (address p) {
 				// Max reached, remove from hooks and drop
 				Diag ("X-M");
 				// Note that the hooks entry will be cleared
-				// automatically by TCV
+				// automatically by TCV when it honors the
+				// disposition code
 				return TCV_DSP_DROP;
 			}
 			rtimes [i]++;	// Increment retransmission count
@@ -223,14 +223,13 @@ HoldIt:
 	}
 	Diag ("X-O %x", p);
 	
-	// No room in hooks, the packet is dropped
+	// No room in hooks, drop
 	return TCV_DSP_DROP;
 }
 
 static int tcv_tmt_ack (address p) {
 //
-// Called when the packet's timer goes off; very simple: retransmit at high
-// priority
+// Called when the packet's timer goes off: retransmit at high priority
 //
 	Diag ("X-T %x", p);
 	return TCV_DSP_XMTU;

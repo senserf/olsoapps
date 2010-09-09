@@ -17,6 +17,12 @@
 
 // XMT limit is taken care of by the plugin
 
+#ifdef	RESET_ON_SYSERR
+#undef	RESET_ON_SYSERR
+#endif
+
+#define	RESET_ON_SYSERR	0
+
 #ifdef	__SMURPH__
 
 #define	UART_DRIVER	1
