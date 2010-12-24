@@ -221,10 +221,6 @@ void msg_fwd_out (word state, char** buf_out, word size, nid_t tag, nid_t peg) {
 	in_fwd(*buf_out, target) = tag;
 }
 
-#ifndef __SMURPH__
-sint mbeacon (word, address);
-#endif
-
 void msg_master_in (char * buf) {
 	lint dd = 0;
 	word mark = MARK_EMPTY;
