@@ -23,37 +23,37 @@
             <preinit tag="HID" type="lword">0xBACA0406</preinit>
         </node>
 
-	<node number="4" type="tag" start="on">
+	<node number="4" type="col" start="on">
 	    <location>448.0 200.0</location>
 	    <preinit tag="HID" type="lword">0xBACA03f3</preinit>
 	</node>
-        <node number="5" type="tag" start="on">
+        <node number="5" type="col" start="on">
             <location>455.0 201.0</location>
             <preinit tag="HID" type="lword">0xBACA03f4</preinit>
         </node>
-        <node number="6" type="tag" start="on">
+        <node number="6" type="col" start="on">
             <location>462.0 202.0</location>
             <preinit tag="HID" type="lword">0xBACA03f5</preinit>
         </node>
 
-       <node number="7" type="tag" start="on">
+       <node number="7" type="col" start="on">
             <location>460.0 230.0</location>
             <preinit tag="HID" type="lword">0xBACA0407</preinit>
         </node>
 
-	<node number="8" type="tag" start="on">
+	<node number="8" type="col" start="on">
 	    <location>470.0 220.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0408</preinit>
 	</node>
-        <node number="9" type="tag" start="on">
+        <node number="9" type="col" start="on">
             <location>510.0 237.0</location>
             <preinit tag="HID" type="lword">0xBACA0409</preinit>
         </node>
-        <node number="10" type="tag" start="on">
+        <node number="10" type="col" start="on">
             <location>502.0 227.0</location>
             <preinit tag="HID" type="lword">0xBACA040a</preinit>
         </node>
-        <node number="11" type="tag" start="on">
+        <node number="11" type="col" start="on">
             <location>516.0 227.0</location>
             <preinit tag="HID" type="lword">0xBACA040b</preinit>
         </node>

@@ -42,8 +42,8 @@ static trueconst char welcome_str[] = OPRE_APP_MENU_A
 	OPRE_APP_MENU_A 
 	"\tSend master msg\tm [ peg ]" OMID_CR "\r\n"
 	OPRE_APP_MENU_A 
-	"\tCol set / show:\tc id agg_id [ Maj_freq [ min_freq [ rx_span "
-	"[ hex:pl [ hex:c_fl]]]]]\r\n"
+	"\tCol set / show:\tc id agg_id [ hex:ev [Maj_freq [ min_freq "
+	"[ rx_span [ hex:pl [ hex:c_fl]]]]]]\r\n"
 	OPRE_APP_MENU_A 
 	"\tFind collector:\tf col_id [ agg_id ]]\r\n"
 	OPRE_APP_MENU_A
@@ -64,7 +64,7 @@ static trueconst char stats_str[] = OPRE_APP_STATS_A
 	" vpstats %u %u %u %u %u %u inp %u\r\n";
 
 static trueconst char statsCol_str[] = OPRE_APP_STATS_CA
-	"Stats for coll (%lx: %u)" OMID_CR
+	"Stats for coll (%u: %u)" OMID_CR
 	" Mf %u mf %u rx_span %u pl %x c_fl %x" OMID_CR
 	" Uptime %lu vtstats %u %u %u %u %u %u\r\n";
 
@@ -81,7 +81,7 @@ static trueconst char rep_str[] =
 	"%s  Agg %u : %u-%u-%u %u:%u:%u" OMID_CR
 	"  Col %u : %u-%u-%u %u:%u:%u%s" OMID_CR
 	"  " SENS0_DESC "%u " SENS1_DESC "%u " SENS2_DESC "%u "
-	SENS3_DESC "%u " SENS4_DESC "%u " SENS5_DESC "%u %u %lu\r\n";
+	SENS3_DESC "%x " SENS4_DESC "%x " SENS5_DESC "%u %u %lu\r\n";
 
 static trueconst char repSum_str[] = OPRE_APP_REP_SUM
 	"Agg %u handles %u collectors\r\n";

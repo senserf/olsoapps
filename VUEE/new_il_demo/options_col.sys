@@ -1,0 +1,141 @@
+#ifdef	__SMURPH__
+
+// Note: this is just define or not, no value
+#define	VUEE_LIB_PLUG_TARP
+#define	VUEE_LIB_PLUG_NULL
+
+#define	TCV_PRESENT			1
+#define	TCV_HOOKS			0
+#define	TCV_TIMERS			0
+
+#define	UART_DRIVER			1
+
+#define CC1100 1
+
+#define	dbg_0(c)	do { } while (0)
+#define	dbg_1(c)	do { } while (0)
+#define	dbg_2(c)	do { } while (0)
+#define	dbg_3(c)	do { } while (0)
+#define	dbg_4(c)	do { } while (0)
+#define	dbg_5(c)	do { } while (0)
+#define	dbg_6(c)	do { } while (0)
+#define	dbg_7(c)	do { } while (0)
+#define	dbg_8(c)	do { } while (0)
+#define	dbg_9(c)	do { } while (0)
+#define	dbg_a(c)	do { } while (0)
+#define	dbg_b(c)	do { } while (0)
+#define	dbg_c(c)	do { } while (0)
+#define	dbg_d(c)	do { } while (0)
+#define	dbg_e(c)	do { } while (0)
+#define	dbg_f(c)	do { } while (0)
+#endif
+
+#ifdef UART_INPUT_BUFFER_LENGTH
+#undef UART_INPUT_BUFFER_LENGTH
+#endif
+
+#ifdef DIAG_MESSAGES
+#undef DIAG_MESSAGES
+#endif
+
+#ifdef BOARD_CHRONOS
+#define UART_INPUT_BUFFER_LENGTH 4
+#define DIAG_MESSAGES	0
+#else
+#define UART_INPUT_BUFFER_LENGTH 76
+#define DIAG_MESSAGES 2
+#endif
+
+#ifdef CODE_LONG_INTS
+#undef CODE_LONG_INTS
+#endif
+#define CODE_LONG_INTS 1
+
+#ifdef RANDOM_NUMBER_GENERATOR
+#undef RANDOM_NUMBER_GENERATOR
+#endif
+#define RANDOM_NUMBER_GENERATOR 2
+
+#ifdef RADIO_USE_LEDS
+#undef RADIO_USE_LEDS
+#endif
+#define RADIO_USE_LEDS 0
+
+#ifdef LEDS_DRIVER
+#undef LEDS_DRIVER
+#endif
+#define LEDS_DRIVER     1
+
+#ifdef LEDS_BLINKING
+#undef LEDS_BLINKING
+#endif
+#define LEDS_BLINKING   1
+
+#define INFO_FLASH	1
+
+#ifndef  __SMURPH__
+#ifdef GLACIER
+#undef GLACIER
+#endif
+#define GLACIER 0
+#endif
+
+#ifndef SENS0_DESC
+#define SENS0_DESC ""
+#endif
+
+#ifndef SENS1_DESC
+#define SENS1_DESC ""
+#endif
+ 
+#ifndef SENS2_DESC
+#define SENS2_DESC ""
+#endif
+ 
+#ifndef SENS3_DESC
+#define SENS3_DESC ""
+#endif
+ 
+#ifndef SENS4_DESC
+#define SENS4_DESC ""
+#endif
+
+#ifndef SENS5_DESC
+#define SENS5_DESC ""
+#endif
+
+// #define OSS_FMT	FMT_TERM
+
+#ifdef UART_RATE
+#undef UART_RATE
+#endif
+#define UART_RATE 9600
+
+#ifdef CRYSTAL2_RATE
+#undef CRYSTAL2_RATE
+#endif
+#define CRYSTAL2_RATE 0
+
+#define	PID_VER_TYPE	0
+
+// TESTING RUNS should have this set (see cc1100.h):
+//#define	RADIO_OPTIONS		0
+#define RADIO_OPTIONS	(1+4)
+
+#define _APP_EXPERIMENT		0
+#define _TARP_T_LIGHT		0
+
+#define RADIO_CRC_MODE		4
+#define EE_ERASE_ON_NEW_FLASH	0
+
+// for static collectors on WARSAW_ILS: no eeprom, SD
+#ifdef STORAGE_SDCARD
+#undef STORAGE_SDCARD
+#endif
+#define STORAGE_SDCARD        0
+ 
+#ifdef STORAGE_AT45XXX
+#undef STORAGE_AT45XXX
+#endif
+#define STORAGE_AT45XXX       0
+

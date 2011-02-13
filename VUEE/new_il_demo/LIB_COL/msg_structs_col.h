@@ -1,7 +1,7 @@
-#ifndef __msg_structs_tag_h__
-#define __msg_structs_tag_h__
+#ifndef __msg_structs_col_h__
+#define __msg_structs_col_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2011.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 

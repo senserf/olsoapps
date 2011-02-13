@@ -1,7 +1,7 @@
-#ifndef __app_tag_h__
-#define __app_tag_h__
+#ifndef __app_col_h__
+#define __app_col_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2010                    */
+/* Copyright (C) Olsonet Communications, 2002 - 2011                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -9,13 +9,9 @@
 #include "msg_tarp.h"
 #include "storage.h"
 
-#define EE_SENS_SIZE	sizeof(sensEEDataType)
-#define EE_SENS_MAX	(lword)(ee_size (NULL, NULL) / EE_SENS_SIZE -1)
-#define EE_SENS_MIN	0L
-//test: #define EE_SENS_MIN (EE_SENS_MAX - 4)
-
 // safeguard to kill hanging collection (in ms)
-#define SENS_COLL_TIME	10
+// dupa SENS_COLL_TIME 100 is not enough on CHRONOS (10 is enough on W_ILS)
+#define SENS_COLL_TIME	1000
 #define NUM_SENS	6
 
 #define SENS_FF		0xF
@@ -68,6 +64,8 @@
 
 #define ALRMS		(TRIGGER_BASE_ID +6)
 
+#define CHRONOS_BUT	(TRIGGER_BASE_ID +7)
+
 // end of trigger / when ids
 
 typedef union {
@@ -102,35 +100,18 @@ typedef struct pongParamsStruct {
 	word pload_lev:8;
 } pongParamsType;
 
-typedef struct sensEEDataStruct {
-	statu_t	s; // keep it bytes 0,1 of the ee slot
-	word sval [NUM_SENS];
+typedef struct sensDatumStruct {
 	lint ds;
-} sensEEDataType; // 6 + NUM_SENS * 2 (+2 if misaligned)
-
-typedef struct sensEEDumpStruct {
-	sensEEDataType ee;
-	lword   fr;
-	lword   to;
-	lword   ind;
-	lword   cnt;
-	word    upto;
-	statu_t s;
-	word    dfin   :1;
-	word	spare  :7;
-} sensEEDumpType;
-
-typedef struct sensDataStruct {
-	sensEEDataType ee;
-	lword eslot;
-} sensDataType;
+	word sval [NUM_SENS];
+	word stat;
+} sensDatumType; // 6 + NUM_SENS * 2 (+2 if misaligned)
 
 /* app_flags definition [default]:
    bit 0: synced (unique to tags) [0]
    bit 1: master changed (in TARP) [0]
-   bit 2: ee write collected [0]
-   bit 3: ee write confirmed [0]
-   bit 4: ee overwrite (cyclic stack) [0]
+   bit 2: ee write collected [0] (not in _col)
+   bit 3: ee write confirmed [0] (not in _col)
+   bit 4: ee overwrite (cyclic stack) [0] (not in _col)
    bit 5:  alrms on (being reported at the moment) [0]
    bits 6-7: board id (0 - ROOM; 1 - CHRONOS)
 
@@ -138,7 +119,11 @@ typedef struct sensDataStruct {
    bit 8:  alrm0 (motion on WARSAW_ILS) [0]
    bit 9:  alrm1 (light on WARSAW_ILS) [0]
 */
-#define DEF_APP_FLAGS   0
+#ifdef BOARD_CHRONOS
+#define DEF_APP_FLAGS   64
+#else
+#define DEF_APP_FLAGS	0
+#endif
 
 #define set_synced	(app_flags |= 1)
 #define clr_synced	(app_flags &= ~1)
@@ -146,17 +131,7 @@ typedef struct sensDataStruct {
 
 // master_chg not used, but needed for TARP
 
-#define set_eew_coll    (app_flags |= 4)
-#define clr_eew_coll    (app_flags &= ~4)
-#define is_eew_coll     (app_flags & 4)
-
-#define set_eew_conf    (app_flags |= 8)
-#define clr_eew_conf    (app_flags &= ~8)
-#define is_eew_conf     (app_flags & 8)
-
-#define set_eew_over    (app_flags |= 16)
-#define clr_eew_over    (app_flags &= ~16)
-#define is_eew_over     (app_flags & 16)
+// 4, 8, 16 were used for eeprom, see _tag
 
 #define set_alrms	(app_flags |= 32)
 #define clr_alrms	(app_flags &= ~32)

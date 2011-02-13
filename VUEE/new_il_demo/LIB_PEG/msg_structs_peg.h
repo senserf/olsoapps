@@ -5,7 +5,7 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "msg_tarp.h"
-#include "msg_structs_tag.h"
+#include "msg_structs_col.h"
 
 typedef struct msgMasterStruct {
 	headerType	header;

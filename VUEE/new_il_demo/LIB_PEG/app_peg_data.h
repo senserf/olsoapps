@@ -65,7 +65,7 @@ word msg_trace_out (word t, word dir, word hlim);
 void msg_trace_in (char * buf, word rssi);
 
 void oss_findTag_in (word state, nid_t tag, nid_t peg);
-void oss_setTag_in (word state, word tag, nid_t peg,
+void oss_setTag_in (word state, word tag, nid_t peg, word ev,
 		word maj, word min, word span, word pl, word c_fl);
 void oss_setPeg_in (word state, nid_t peg, word audi, word pl, word a_fl);
 void oss_master_in (word state, nid_t peg);

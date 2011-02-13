@@ -321,12 +321,16 @@ void msg_pong_in (word state, char * buf, word rssi) {
 		else
 			tagArray[tagIndex].rxperm = 0;
 
-		tagArray[tagIndex].freq = in_pong(buf, freq);
-		tagArray[tagIndex].rssi = rssi;
-		tagArray[tagIndex].pl = in_pong(buf, level);
-
 		if (in_pong_pload(buf) && tagArray[tagIndex].rpload.ppload.ds !=
 				in_pongPload(buf, ds)) {
+
+			tagArray[tagIndex].freq = in_pong(buf, freq);
+
+			// the 1st pong with a given ds should be the lowest
+			// (most interesting anyway). No point checking the
+			// level(?)
+			tagArray[tagIndex].rssi = rssi;
+			tagArray[tagIndex].pl = in_pong(buf, level);
 
 			if (tagArray[tagIndex].state == reportedTag) {
 				if (is_eew_coll) {

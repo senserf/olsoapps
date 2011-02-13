@@ -3,10 +3,10 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "msg_tag.h"
+#include "msg_col.h"
 #include "flash_stamps.h"
 #include "hold.h"
-#include "app_tag_data.h"
+#include "app_col_data.h"
 
 #ifndef __SMURPH__
 // I don't think you need (I mean REALLY need) this (PG)
@@ -22,7 +22,7 @@
 // Note: this is still how you declare which program files belong to
 // the set; can be here or in an included header
 
-//+++ app_diag_tag.cc "lib_app_tag.cc" <msg_io_tag.cc>
+//+++ app_diag_col.cc "lib_app_col.cc" <msg_io_col.cc>
 
 #include "sensors.h"
 
@@ -37,17 +37,22 @@ lword		ref_ts;
 lint		ref_date;
 lint		lh_time;
 
-sensDataType	sens_data;
+sensDatumType	sens_data;
 
-pongParamsType	pong_params = { 60, 5, 0x7777, 2048, 0, 0 };
+#ifdef BOARD_CHRONOS
+pongParamsType	pong_params = { 30, 5, 0x7531, 2048, 0, 0 };
+#else
+pongParamsType  pong_params = { 60, 5, 0x7777, 2048, 0, 0 };
+#endif
 
 static char		* cmd_line;
-static sensEEDumpType	* sens_dump;
-static word		permalrm [3];
+static word		permalrm [2];
+static word		workalrm [3];
 
 word 			app_flags = DEF_APP_FLAGS;
 word			plot_id;
 
+word			buttons;
 
 idiosyncratic int tr_offset (headerType*);
 
@@ -60,8 +65,20 @@ idiosyncratic void set_master_chg (void);
 idiosyncratic word guide_rtr (headerType * b);
 
 #include "diag.h"
-#include "str_tag.h"
+#include "str_col.h"
+
+/*
+   On CHRONOS, no UART and related functionlity, added true hw i/f.
+   Elsewhere, VUEE uncluded, i/o as was, plus faked lcd & buttons.
+*/
+#ifdef BOARD_CHRONOS
+#define ser_out(a, b)	CNOP
+#define ser_outb(a,b)	ufree(b)
+#include "chro_col.h"
+#else
 #include "ser.h"
+#endif
+
 #include "form.h"
 #include "net.h"
 
@@ -116,81 +133,19 @@ void fatal_err_t (word err, word w1, word w2, word w3) {
 	reset();
 }
 
-static void sens_init () {
-	lword l, u, m; 
-	byte b; 
-
-	if (ee_read (EE_SENS_MIN * EE_SENS_SIZE, &b, 1)) {
-		// nothing helps, better halt
-		//ee_close();
-		//reset();
-		fatal_err_t (ERR_EER, 0, 0, 1);
-	}
-
-	memset (&sens_data, 0, sizeof (sensDataType));
-	if (b == 0xFF) { // normal operations (empty eeprom)
-		sens_data.eslot = EE_SENS_MIN;
-		sens_data.ee.s.f.status = SENS_FF;
-		sens_data.ee.s.f.mark = MARK_FF;
-		sens_data.ee.s.f.mark = MARK_FF;
-		return;
-	}
-
-	l = EE_SENS_MIN; u = EE_SENS_MAX;
-	while ((u - l) > 1) {
-		m = l + ((u -l) >> 1);
-		if (ee_read (m * EE_SENS_SIZE, &b, 1))
-			fatal_err_t (ERR_EER, (word)((m * EE_SENS_SIZE) >> 16),
-				(word)(m * EE_SENS_SIZE), 1);
-
-		if (b == 0xFF)
-			u = m;
-		else
-			l = m;
-	}
-
-	if (ee_read (u * EE_SENS_SIZE, &b, 1))
-		fatal_err_t (ERR_EER, (word)((u * EE_SENS_SIZE) >> 16),
-			(word)(u * EE_SENS_SIZE), 1);
-
-	if (b == 0xFF) {
-		if (l < u) {
-
-			if (ee_read (l * EE_SENS_SIZE, &b, 1))
-				fatal_err_t (ERR_EER,
-				       (word)((l * EE_SENS_SIZE) >> 16),
-				       (word)(l * EE_SENS_SIZE), 1);
-
-			if (b == 0xFF)
-				fatal_err_t (ERR_SLOT, (word)(l >> 16),
-					(word)l, 0);
-
-			sens_data.eslot = l;
-		}
-	} else
-		sens_data.eslot = u;
-
-	// collectors start sensing 1st, so don't read and point at 1st empty
-	sens_data.eslot++;
-	sens_data.ee.s.f.status = SENS_FF;
-	sens_data.ee.s.f.mark = MARK_FF;
-	sens_data.ee.s.f.mark = MARK_FF;
-#if 0
-	if (ee_read (sens_data.eslot * EE_SENS_SIZE, (byte *)&sens_data.ee,
-			EE_SENS_SIZE))
-		fatal_err_t (ERR_EER,
-			(word)((sens_data.eslot * EE_SENS_SIZE) >> 16),
-			(word)(sens_data.eslot * EE_SENS_SIZE), EE_SENS_SIZE);
-#endif
-}
-
 static void init () {
-
-	sens_init();
-
+#ifdef BOARD_CHRONOS
+	cma_3000_on (0); // for now, we'll see if low sensitivity is enough
+	ezlcd_init ();
+	ezlcd_on ();
+	chro_lo ("ILIAD");
+	chro_nn (1, local_host);
+#else
+	diag ("CHRO (%u, ILIAD)", local_host);
+#endif
+	memset (&sens_data, 0, sizeof (sensDatumType));
+	sens_data.stat = SENS_FF;
 	powerdown();
-
-// put all the crap here
 
 }
 
@@ -218,103 +173,6 @@ static const char * statusName (statu_t s) {
 	}
 	app_diag_t (D_SERIOUS, "unexpected eeprom %x", s);
 	return "????";
-}
-
-static word r_a_d_t () {
-	char * lbuf = NULL;
-	mdate_t md;
-
-	if (sens_dump->dfin) // delayed Finish 
-		goto ThatsIt;
-
-	if (ee_read (sens_dump->ind * EE_SENS_SIZE, (byte *)&sens_dump->ee,
-				EE_SENS_SIZE)) {
-		app_diag_t (D_SERIOUS, "Failed ee_read");
-		goto Finish; 
-	}
-
-	if (sens_dump->ee.s.f.status == SENS_FF) {
-		if (sens_dump->fr <= sens_dump->to) {
-			goto Finish;
-		} else {
-			goto Continue;
-		}
-	}
-
-	if (sens_dump->s.f.status == SENS_ALL ||
-			sens_dump->s.f.status == sens_dump->ee.s.f.status ||
-			sens_dump->ee.s.f.status == SENS_ALL) {
-
-	    md.secs = sens_dump->ee.ds;
-	    s2d (&md);
-
-	    if (sens_dump->ee.s.f.status == SENS_ALL) { // mark
-		lbuf = form (NULL, dumpmark_str, markName_t (sens_dump->ee.s),
-			sens_dump->ind,
-
-			md.dat.f ? 2009 + md.dat.yy : 1001 + md.dat.yy,
-			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
-
-			sens_dump->ee.sval[0],
-			sens_dump->ee.sval[1],
-			sens_dump->ee.sval[2]);
-	    } else { // sensors
-
-		lbuf = form (NULL, dump_str,
-			statusName (sens_dump->ee.s), sens_dump->ind,
-
-			md.dat.f ? 2009 + md.dat.yy : 1001 + md.dat.yy,
-			md.dat.mm, md.dat.dd, md.dat.h, md.dat.m, md.dat.s,
-
-			sens_dump->ee.sval[0],
-			sens_dump->ee.sval[1],
-			sens_dump->ee.sval[2],
-			sens_dump->ee.sval[3],
-			sens_dump->ee.sval[4], sens_dump->ee.sval[5]);
-	    }
-
-	    if (runfsm oss_out (lbuf) == 0 ) {
-			app_diag_t (D_SERIOUS, "oss_out failed");
-			ufree (lbuf);
-	   }
-
-	    sens_dump->cnt++;
-
-	    if (sens_dump->upto != 0 && sens_dump->upto <= sens_dump->cnt)
-			goto Finish;
-	}
-
-Continue:
-	if (sens_dump->fr <= sens_dump->to) {
-		if (sens_dump->ind >= sens_dump->to)
-			goto Finish;
-		else
-			sens_dump->ind++;
-	} else {
-		if (sens_dump->ind <= sens_dump->to)
-			goto Finish;
-		else
-			sens_dump->ind--;
-	}
-	return 1;
-
-Finish:
-	// ser_out tends to switch order... delay the output
-	sens_dump->dfin = 1;
-	return 1;
-
-ThatsIt:
-	sens_dump->dfin = 0; // just in case
-	lbuf = form (NULL, dumpend_str,
-			local_host, sens_dump->fr, sens_dump->to,
-			statusName (sens_dump->s), 
-			sens_dump->upto, sens_dump->cnt);
-
-	if (runfsm oss_out (lbuf) == 0 ) {
-		app_diag_t (D_SERIOUS, "oss_out sum failed");
-		ufree (lbuf);
-	}
-	return 0;
 }
 
 static void show_ifla_t () {
@@ -387,7 +245,7 @@ static void stats () {
 	}
 }
 
-void process_incoming (word state, char * buf, word size) {
+void process_incoming (word state, char * buf, word size, word rssi) {
 
   sint w_len;
 #if _APP_EXPERIMENT
@@ -398,7 +256,7 @@ void process_incoming (word state, char * buf, word size) {
   switch (in_header(buf, msg_type)) {
 
 	case msg_setTag:
-		msg_setTag_in (buf);
+		msg_setTag_in (buf, rssi);
 		return;
 
 	case msg_rpc:
@@ -418,7 +276,7 @@ void process_incoming (word state, char * buf, word size) {
 		return;
 
 	case msg_pongAck:
-		msg_pongAck_in (buf);
+		msg_pongAck_in (buf, rssi);
 		return;
 
 #if _APP_EXPERIMENT
@@ -476,6 +334,7 @@ fsm rcv {
 
 	char *buf;
 	sint psize;
+	word rssi;
 
 	entry RC_TRY:
 
@@ -484,7 +343,7 @@ fsm rcv {
 			buf = NULL;
 			psize = 0;
 		}
-		psize = net_rx (RC_TRY, &buf, NULL, 0);
+		psize = net_rx (RC_TRY, &buf, &rssi, 0);
 		if (psize <= 0) {
 			app_diag_t (D_SERIOUS, "net_rx failed (%d)", psize);
 			proceed RC_TRY;
@@ -500,7 +359,8 @@ fsm rcv {
 
 	entry RC_MSG:
 
-		process_incoming (RC_MSG, buf, psize);
+		process_incoming (RC_MSG, buf, psize,
+				(rssi & 0xff00) ? (rssi >> 8) : 1);
 		proceed RC_TRY;
 }
 
@@ -508,15 +368,17 @@ fsm rxsw {
 
 	entry RX_OFF:
 
+		// dupa CHRONOS chokes with RXOFF - MUST be investigated
 		net_opt (PHYSOPT_RXOFF, NULL);
-		net_diag_t (D_DEBUG, "Rx off %x", net_opt (PHYSOPT_STATUS, NULL));
+		net_diag_t (D_DEBUG, "Rx off %x",
+				net_opt (PHYSOPT_STATUS, NULL));
 		when (RX_SW_ON, RX_ON);
 		release;
 
 	entry RX_ON:
 
 		net_opt (PHYSOPT_RXON, NULL);
-		net_diag_t (D_DEBUG, "Rx on %x", net_opt (PHYSOPT_STATUS, NULL));
+		net_diag_t (D_DEBUG, "Rx on %x", net_opt(PHYSOPT_STATUS, NULL));
 		if (pong_params.rx_span == 0) {
 			app_diag_t (D_SERIOUS, "Bad rx span");
 			proceed RX_OFF;
@@ -583,7 +445,7 @@ static word map_level (word l) {
 fsm pong {
 
 	word shift;
-	char frame [sizeof (msgPongType) + sizeof (sensDataType)];
+	char frame [sizeof (msgPongType) + sizeof (pongPloadType)];
 
 	entry PS_INIT:
 
@@ -610,7 +472,7 @@ fsm pong {
 
 		level = ((pong_params.pow_levels >> shift) & 0x000f);
 		// pong with this power if data collected (and not confirmed)
-		if (level > 0 && sens_data.ee.s.f.status == SENS_COLLECTED) {
+		if (level > 0 && sens_data.stat == SENS_COLLECTED) {
 			net_opt (PHYSOPT_TXON, NULL);
 			net_diag_t (D_DEBUG, "Tx on %x",
 					net_opt (PHYSOPT_STATUS, NULL));
@@ -627,7 +489,6 @@ fsm pong {
 			    ((w = running (rxsw)) ||
 			     pong_params.rx_span == 1)) {
 				in_pong (frame, flags) |= PONG_RXON;
-				
 				if (w) // means running (rxsw)
 					trigger (RX_SW_ON);
 			
@@ -642,14 +503,14 @@ fsm pong {
 			if (pong_params.pload_lev == 0 ||
 					level == pong_params.pload_lev) {
 				in_pong (frame, pstatus) =
-					sens_data.ee.s.f.status;
+					sens_data.stat;
 				memcpy (in_pongPload (frame, sval),
-						sens_data.ee.sval,
+						sens_data.sval,
 						NUM_SENS << 1);
 				in_pongPload (frame, ds) =
-					sens_data.ee.ds;
+					sens_data.ds;
 				in_pongPload (frame, eslot) =
-					sens_data.eslot;
+					0; // sens_data.eslot;
 				in_pong (frame, flags) |= PONG_PLOAD;
 				send_msg_t (frame, sizeof(msgPongType) +
 						sizeof(pongPloadType));
@@ -674,9 +535,9 @@ fsm pong {
 			if (level == 0)
 				app_diag_t (D_DEBUG, "skip level");
 
-			if (sens_data.ee.s.f.status != SENS_CONFIRMED) {
+			if (sens_data.stat != SENS_CONFIRMED) {
 				app_diag_t (D_DEBUG, "sens not ready %u",
-						sens_data.ee.s.f.status);
+						sens_data.stat);
 			} else {
 				leds (LED_B, LED_OFF);
 				next_col_time ();
@@ -697,6 +558,11 @@ fsm pong {
 			proceed PS_SEND;
 
 		leds (LED_B, LED_BLINK);
+#ifdef BOARD_CHRONOS
+		chro_lo ("RONIN");
+#else
+		diag ("CHRO LO RONIN");
+#endif
 		next_col_time ();
 		if (lh_time <= 0 || is_alrms)
 			proceed PS_SENS;
@@ -735,7 +601,7 @@ fsm pong {
 }
 
 // for the light measurements, this has to loop frequently, no matter if alrms
-// are ON... It is unlikely to be prohibitive on pwoer budget, but we'll see.
+// are ON... It is unlikely to be prohibitive on power budget, but we'll see.
 #define ALRM_FREQ		2050
 // arbitrary, to be set in experiments
 #define SENS_LIGHT_THOLD	10
@@ -751,26 +617,32 @@ fsm pesens {
 			delay (ALRM_FREQ, PSE_LOOP);
 			release;
 		}
-		read_sensor (PSE_LOOP, 1, &permalrm[0]); // light
 
-		if (is_alrm0 && !is_alrms && permalrm[0] > SENS_LIGHT_THOLD &&
+#ifndef BOARD_CHRONOS
+		read_sensor (PSE_LOOP, 1, workalrm); // light
+
+		if (is_alrm0 && !is_alrms && workalrm[0] > SENS_LIGHT_THOLD &&
 				seconds() - alrm_ts > ALRM_COOL) {
 			alrm_ts = seconds();
 			trigger (ALRMS);
 			set_alrms;
 		}
-		if (permalrm[0] > permalrm[1])
-			permalrm[1] = permalrm[0]; // store max
-
+		if (workalrm[0] > permalrm[0])
+			permalrm[0] = workalrm[0]; // store max
+#endif
 	 entry PSE_2:
-		read_sensor (PSE_2, 2, &permalrm[0]); // motion
-		if (is_alrm1 && !is_alrms && permalrm[0] > SENS_MOTION_THOLD &&
+#ifdef BOARD_CHRONOS
+		read_sensor (PSE_2, 1, workalrm); // motion
+#else
+		read_sensor (PSE_2, 2, workalrm); // motion
+#endif
+		if (is_alrm1 && !is_alrms && workalrm[0] > SENS_MOTION_THOLD &&
 				seconds() - alrm_ts > ALRM_COOL) {
 			alrm_ts = seconds();
 			trigger (ALRMS);
 			set_alrms;
 		}
-		permalrm[2] += permalrm[0];
+		permalrm[1] += workalrm[0];
 
 		delay (ALRM_FREQ, PSE_LOOP);
 		release;
@@ -789,99 +661,85 @@ fsm sens {
 		//powerup();
 		//leds (LED_R, LED_ON);
 
-		switch (sens_data.ee.s.f.status) {
+		switch (sens_data.stat) {
 		  case SENS_IN_USE:
 			app_diag_t (D_SERIOUS, "Sens in use");
 			break;
 
 		  case SENS_COLLECTED:
 			app_diag_t (D_INFO, "Not confirmed");
-			if (is_eew_coll) {
-		 	  if (ee_write (WNONE, sens_data.eslot * EE_SENS_SIZE,
-				  (byte *)&sens_data.ee, EE_SENS_SIZE)) {
-				  app_diag_t (D_SERIOUS, "ee_write failed %x %x",
-						  (word)(sens_data.eslot >> 16),
-						  (word)sens_data.eslot);
-			  } else {
-				  sens_data.eslot++;
-			  }
-			}
-			break;
-
-		  case SENS_CONFIRMED:
-			sens_data.eslot++;
 		}
-                // now we should be at the slot to write to
 
-		// there will be options on eeprom operations... later
-		 if (sens_data.eslot >= EE_SENS_MAX) {
-			 sens_data.eslot = EE_SENS_MAX -1;
-			 app_diag_t (D_SERIOUS, "EEPROM FULL");
-		 }
+		sens_data.stat = SENS_IN_USE;
 
-		sens_data.ee.s.f.status = SENS_IN_USE;
-
-		sens_data.ee.ds = wall_date_t (0);
+		sens_data.ds = wall_date_t (0);
 		lh_time = seconds();
 #ifdef SENSOR_LIST
-	entry SE_0:
-		read_sensor (SE_0, 0, &sens_data.ee.sval[0]);
-		if (sens_data.ee.sval[0] < BATTERY_WARN)
+	entry SE_0: // battery
+		read_sensor (SE_0, 0, &sens_data.sval[0]);
+		if (sens_data.sval[0] < BATTERY_WARN)
 			leds (LED_R, LED_BLINK);
 		else
 			leds (LED_R, LED_OFF);
 
-	entry SE_1:
-		read_sensor (SE_1, 1,  &sens_data.ee.sval[1]);
-		if (sens_data.ee.sval[1] < permalrm[1])
-			sens_data.ee.sval[1] = permalrm[1];
+	entry SE_1: // CHRONOS - temp; WAW_ILS - light
+#ifdef BOARD_CHRONOS
+		// pressure, temp
+		read_sensor (SE_1, 2,  workalrm);
+		sens_data.sval[1] = workalrm[2]; // temp
+#else
+		read_sensor (SE_1, 1,  &sens_data.sval[1]);
+		if (sens_data.sval[1] < permalrm[0])
+			sens_data.sval[1] = permalrm[0];
+		permalrm[0] = 0;
+#endif
+	entry SE_2: // motion
+#ifdef BOARD_CHRONOS
+		read_sensor (SE_2, 1, workalrm);
+		sens_data.sval[2] = workalrm[0];
+#else
+		read_sensor (SE_2, 2, &sens_data.sval[2]);
+#endif
+		sens_data.sval[2] += permalrm[1];
 		permalrm[1] = 0;
-
-	entry SE_2:
-		read_sensor (SE_2, 2, &sens_data.ee.sval[2]);
-		sens_data.ee.sval[2] += permalrm[2];
-		permalrm[2] = 0;
 
 	entry SE_3:
 		// analog motion - empty call
-		// read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
-		sens_data.ee.sval[3]++;
+		// read_sensor (SE_3, 3, &sens_data.sval[3]);
 
 	entry SE_4:
 		// empty call
-		// read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
+		// read_sensor (SE_4, 4, &sens_data.sval[4]);
 
 	entry SE_5:
 		// empty call
-		// read_sensor (SE_5, 5, &sens_data.ee.sval[5]);
+		// read_sensor (SE_5, 5, &sens_data.sval[5]);
 
 #else
 		app_diag_t (D_WARNING, "FAKE SENSORS");
-		sens_data.ee.sval[0]++;
-		if (sens_data.ee.sval[0] % 2)
+		sens_data.sval[0]++;
+		if (sens_data.sval[0] % 2)
 			leds (LED_R, LED_BLINK);
 		else
 			leds (LED_R, LED_OFF);
 
-		sens_data.ee.sval[1]++;
-		sens_data.ee.sval[2]++;
-		sens_data.ee.sval[3]++;
-		sens_data.ee.sval[4]++;
-		sens_data.ee.sval[5]++;
+		sens_data.sval[1]++;
+		sens_data.sval[2]++;
+		sens_data.sval[3]++;
+		sens_data.sval[4]++;
+		sens_data.sval[5]++;
 
 		delay (SENS_COLL_TIME, SE_DONE);
 		release;
 #endif
 	entry SE_DONE:
-		sens_data.ee.s.f.status = SENS_COLLECTED;
-		sens_data.ee.s.f.mark = MARK_FF;
+		sens_data.stat = SENS_COLLECTED;
 
-		// kludge alert: sens[4] is app_flags, sval[5] is spare 0
-		// sooner or later, we'll clean it - not sooner than we know
-		// the praxis requirements, including the personal collector
-	        // (wristwatch).
-		sens_data.ee.sval[4] = app_flags;
-		sens_data.ee.sval[5] = 0; // min pow lev will be reported here
+		// kludge alert: sens[3] - buttons, sens[4] - app_flags,
+       		// sval[5] will have plev correspnding to reported rssi
+		sens_data.sval[3] = buttons;
+		sens_data.sval[4] = app_flags;
+		sens_data.sval[5] = 0;	
 		clr_alrms;
 
 		//leds (LED_R, LED_BLINK);
@@ -891,6 +749,89 @@ fsm sens {
 }
 #undef BATTERY_WARN
 
+// b < 5 <-> button, else b is event
+void do_butt (word b) {
+	// button to event translation: don't allow button #0 with acc-meter
+	// in 'full events' sent from the master
+	word ev = b < 5 ? (1 << b) : b & 0xfffe;
+
+	// sleep / reset button #4
+	if (ev & (1 << 4)) {
+#ifdef BOARD_CHRONOS
+		chro_xx (1, ev);
+#endif
+		if (buttons & (1 << 4)) {
+#ifdef BOARD_CHRONOS
+			chro_lo ("RESET");
+#else
+			diag ("CHRO (%x,RESET)", ev);
+#endif
+			reset();
+		}
+#ifdef BOARD_CHRONOS
+		chro_lo ("SLEEP");
+		cma_3000_off ();
+		//ezlcd_off (); // dupa
+#else
+		diag ("CHRO (%x,SLEEP)", ev);
+#endif
+		net_opt (PHYSOPT_RXOFF, NULL);
+		net_opt (PHYSOPT_TXOFF, NULL);
+		buttons = ev;
+
+		killall (rxsw);
+		killall (pong);
+		killall (pesens);
+		killall (sens);
+		killall (pong);
+		killall (rcv); // keep last: this fsm can call do_butt()!!
+
+		return;
+	}
+
+	if (ev & 1) {
+		if (buttons & 1)
+#ifdef BOARD_CHRONOS
+			cma_3000_on (0);
+		else
+			cma_3000_on (1);
+#else
+			diag ("CMA LO");
+		else
+			diag ("CMA HI");
+#endif
+	}
+
+	if (ev > (1<<4)) { // external event: note that we always trigger alrm
+		if (buttons & 0x1F & ev) {
+#ifdef BOARD_CHRONOS
+			chro_lo ("IGNOR");
+#else
+			diag ("CHRO LO IGNOR");
+#endif
+		} else {
+			buttons = ev;
+		}
+
+	} else { // button (internal or external)
+		//flip
+		buttons = buttons & ev ? 
+			buttons & ~ev : buttons | ev;
+	}
+
+	if (!(buttons & 0x1F)) // all buttons 0-4 cleared
+		buttons = 0; // clear events
+	trigger (ALRMS);
+	set_alrms;
+#ifdef BOARD_CHRONOS
+	chro_xx (1, buttons);
+	chro_xx (0, ev);
+#else
+	diag ("CHRO (%x,%x)", buttons, ev);
+#endif
+}
+
+#ifndef BOARD_CHRONOS
 /*
    --------------------
    cmd_in process
@@ -907,8 +848,9 @@ fsm cmd_in {
 		if (ibuf == NULL)
 			ibuf = get_mem_t (CS_INIT, UI_BUFLEN);
 
-	entry CS_IN:
+		memset (ibuf, 0, UI_BUFLEN);
 
+	entry CS_IN:
 		// hangs on the uart_a interrupt or polling
 		ser_in (CS_IN, ibuf, UI_BUFLEN);
 		if (strlen(ibuf) == 0) // CR on empty line does it
@@ -926,6 +868,7 @@ fsm cmd_in {
 		trigger (CMD_READER);
 		proceed CS_IN;
 }
+#endif
 
 /*
    --------------------
@@ -940,15 +883,6 @@ fsm root {
 
 	entry RS_INIT:
 		obuf = get_mem_t (RS_INIT, UI_BUFLEN);
-		if (ee_open ()) {
-			leds (LED_B, LED_BLINK);
-			leds (LED_R, LED_ON);
-			app_diag_t (D_FATAL, "HALT ee_open failed");
-			halt();
-		}
-
-		form (obuf, ee_str, EE_SENS_MIN, EE_SENS_MAX -1,
-			EE_SENS_SIZE);
 
 		if (if_read (IFLASH_SIZE -1) != 0xFFFF)
 			leds (LED_R, LED_BLINK);
@@ -960,9 +894,7 @@ fsm root {
 #endif
 #endif
 		if (is_flash_new) {
-			diag (OPRE_APP_ACK "Init eprom erase");
-			if (ee_erase (WNONE, 0, 0))
-				app_diag_t (D_SERIOUS, "erase failed");
+			diag (OPRE_APP_ACK "Init erase");
 			break_flash;
 		} else {
 			delay (5000, RS_INIT1);
@@ -983,8 +915,10 @@ fsm root {
 				if_read (IFLASH_SIZE -2),
 				if_read (IFLASH_SIZE -3),
 				if_read (IFLASH_SIZE -4));
+#ifndef BOARD_CHRONOS
 			if (!running (cmd_in))
 				runfsm cmd_in;
+#endif
 			stats();
 			proceed RS_RCMD;
 		}
@@ -995,7 +929,9 @@ fsm root {
 
 		net_id = DEF_NID;
 		tarp_ctrl.param &= 0xFE; // routing off
-		 runfsm pesens;
+#ifdef SENSOR_LIST
+		runfsm pesens;
+#endif
 		runfsm sens;
 
 		// give sensors time & spread a bit
@@ -1012,7 +948,6 @@ fsm root {
 		net_opt (PHYSOPT_TXOFF, NULL);
 
 		runfsm rcv;
-		runfsm cmd_in;
 		switch (pong_params.rx_span) {
 			case 0:
 			case 2:
@@ -1026,8 +961,12 @@ fsm root {
 
 		if (local_host)
 			runfsm pong;
-
-		write_mark_t (MARK_BOOT);
+#ifdef BOARD_CHRONOS
+		buttons_action (do_butt);
+		finish;
+#else
+		runfsm cmd_in;
+#endif
 		proceed RS_RCMD;
 
 	entry RS_FREE:
@@ -1058,52 +997,6 @@ fsm root {
 		if (cmd_line[0] == 'q')
 			reset();
 
-		if (cmd_line[0] == 'D') {
-			sens_dump = (sensEEDumpType *)
-				get_mem_t (WNONE, sizeof(sensEEDumpType));
-
-			if (sens_dump == NULL)
-				proceed RS_FREE;
-
-			memset (sens_dump, 0, sizeof(sensEEDumpType));
-			i1 = 0;
-			sens_dump->fr = EE_SENS_MIN;
-			sens_dump->to = sens_data.eslot;
-
-			scan (cmd_line+1, "%lu %lu %u %u",
-					&sens_dump->fr, &sens_dump->to,
-					&i1, &sens_dump->upto);
-			switch (i1) {
-				case 1:
-					sens_dump->s.f.status = SENS_CONFIRMED;
-					break;
-				case 2:
-					sens_dump->s.f.status = SENS_COLLECTED;
-					break;
-				case 3:
-					sens_dump->s.f.status = SENS_IN_USE;
-					break;
-				default: // including 0
-					sens_dump->s.f.status = SENS_ALL;
-			}
-
-			if (sens_dump->fr > sens_data.eslot)
-				sens_dump->fr = sens_data.eslot;
-
-			if (sens_dump->fr < EE_SENS_MIN)
-				sens_dump->fr = EE_SENS_MIN;
-
-			if (sens_dump->to > sens_data.eslot)
-				sens_dump->to = sens_data.eslot; // EE_SENS_MAX
-
-			if (sens_dump->to < EE_SENS_MIN)
-				sens_dump->to = EE_SENS_MIN;
-
-			sens_dump->ind = sens_dump->fr;
-
-			proceed RS_DUMP;
-		}
-
 		if (cmd_line[0] == 'M') {
 			if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 				diag (OPRE_APP_ACK "Already in maintenance");
@@ -1114,15 +1007,6 @@ fsm root {
 			// will reset
 		}
 
-		if (cmd_line[0] == 'E') {
-			diag (OPRE_APP_ACK "erasing eeprom...");	
-			if (ee_erase (WNONE, 0, 0))
-				app_diag_t (D_SERIOUS, "erase failed");
-			else
-				diag (OPRE_APP_ACK "eeprom erased");
-			reset();
-		}
-
 		if (cmd_line[0] == 'F') {
 			if_erase (IFLASH_SIZE -1);
 			break_flash;
@@ -1131,9 +1015,6 @@ fsm root {
 		}
 
 		if (cmd_line[0] == 'Q') {
-			diag (OPRE_APP_ACK "erasing all...");
-			if (ee_erase (WNONE, 0, 0))
-				app_diag_t (D_SERIOUS, "ee_erase failed");
 			if_erase (-1);
 			break_flash;
 			diag (OPRE_APP_ACK "all erased");
@@ -1219,6 +1100,16 @@ fsm root {
 			proceed RS_FREE;
 		}
 
+		if (cmd_line[0] == 'B') {
+			i1 = -1;
+			scan (cmd_line +1, "%d", &i1);
+			if (i1 >= 0)
+				do_butt (i1);
+			else
+				diag ("BUTTONS: %x", buttons);
+		}
+		proceed RS_FREE;
+
 		form (obuf, ill_str, cmd_line);
 
 	entry RS_UIOUT:
@@ -1226,17 +1117,4 @@ fsm root {
 		ser_out (RS_UIOUT, obuf);
 		proceed RS_FREE;
 
-	entry RS_DUMP:
-		if (running (oss_out)) {
-			delay (50, RS_DUMP);
-			when (OSS_DONE, RS_DUMP);
-			release;
-		}
-
-		if (r_a_d_t ())
-			proceed RS_DUMP;
-
-		ufree (sens_dump);
-		sens_dump = NULL;
-		proceed RS_FREE;
 }

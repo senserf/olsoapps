@@ -11,45 +11,45 @@
 	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
 	</node>
 
-	<node number="1" type="tag" start="on">
+	<node number="1" type="col" start="on">
 	    <location>5.0 10.0</location>
 	    <preinit tag="HID" type="lword">0xBACA03f3</preinit>
 	</node>
-        <node number="2" type="tag" start="on">
+        <node number="2" type="col" start="on">
             <location>5.0 25.0</location>
             <preinit tag="HID" type="lword">0xBACA03f4</preinit>
         </node>
-        <node number="3" type="tag" start="on">
+        <node number="3" type="col" start="on">
             <location>5.0 50.0</location>
             <preinit tag="HID" type="lword">0xBACA03f5</preinit>
         </node>
 
-	<node number="4" type="tag" start="on">
+	<node number="4" type="col" start="on">
 	    <location>5.0 75.0</location>
 	    <preinit tag="HID" type="lword">0xBACA03fd</preinit>
 	</node>
-       <node number="5" type="tag" start="on">
+       <node number="5" type="col" start="on">
             <location>5.0 105.0</location>
             <preinit tag="HID" type="lword">0xBACA03fe</preinit>
         </node>
-       <node number="6" type="tag" start="on">
+       <node number="6" type="col" start="on">
             <location>10.0 5.0</location>
             <preinit tag="HID" type="lword">0xBACA03ff</preinit>
         </node>
 
-	<node number="7" type="tag" start="on">
+	<node number="7" type="col" start="on">
 	    <location>25.0 5.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0407</preinit>
 	</node>
-        <node number="8" type="tag" start="on">
+        <node number="8" type="col" start="on">
             <location>50.0 5.0</location>
             <preinit tag="HID" type="lword">0xBACA0408</preinit>
         </node>
-        <node number="9" type="tag" start="on">
+        <node number="9" type="col" start="on">
             <location>75.0 5.0</location>
             <preinit tag="HID" type="lword">0xBACA0409</preinit>
         </node>
-        <node number="10" type="tag" start="on">
+        <node number="10" type="col" start="on">
             <location>105.0 5.0</location>
             <preinit tag="HID" type="lword">0xBACA040a</preinit>
         </node>

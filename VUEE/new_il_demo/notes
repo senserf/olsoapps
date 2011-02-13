@@ -213,3 +213,156 @@ The sensors:
 109  - rssi
 210  - master's uptime
 
+---110213---
+
+This update is driven by the CHRONOS addition. It introduces the 'col'
+program - for WARSAW_ILS a functional mirror of 'tag' less eeprom / sd 
+operations. 'Tag' is preserved as a trustworthy (tested) functionality, for
+comparative troubleshooting, and for possible extensions with eeprom or SD,
+although this functionality is well preserved in eco_demo. Likely, 'tag' will
+disappear (and 'col' will be renamed back 'tag' - a trivial operation).
+
+Minor changes to 'peg' accommodate 'events' introduced for bidirectional
+communication with CHRONOS nodes and their buttons, but may prove useful if
+the stationary collector's target hardware contains signalling i/f (LEDs,
+small LCD, buttons, etc.).
+
+'Col' nodes built for CHRONOS retain most of the stationary collector functions,
+with the UI specific for the wristwatch. In particular, buttons are handled as
+alarms generated in stationary collectors. Also, they are handy for CHRONOS
+testing on WARSAW_ILS nodes, with 'B' command, and diag (CHRO ...) output 
+mimicing the LCD.
+
+VUEE runs on a 'generic board', in our case equivalent to all programs built
+for WARSAW_ILS.  (Note that VUEE version must be built with 'picomp -i'.)
+
+Peg (and Tag, if needed) are built with:
+mkmk WARSAW_ILS; make;
+Images _peg, _tag, _col can be used, although _col links-in unnecessary eprom
+libraries.
+
+Col is built with:
+mkmk WARSAW_ILS col; make -f Makefile_col;
+or
+mkmk CHRONOS col; make -f Makefile_col;
+
+depending on the target hardware.
+
+I replaced all 'tag' with 'col' in xml model descs, but 'tags' may be
+put back if needed for troubleshooting.
+
+There are two open issues, marked 'dupa' in the code:
+- CHRONOS seems to die after 3-80 minutes if RXOFF in app_col.cc:368
+  is operational. Since it is necessary for power budget, we must find 
+  the cause.
+- While for WARSAW_ILS sensors 10ms is enough to finish collection, for
+  CHRONOS 100ms is too short. SENS_COLL_TIME is set to 1000, for now. This is
+  a minor issue, as we trigger end of collection, but it would be nice to
+  understand the cause (e.g., power budget impact?).
+
+The UI on CHRONOS will surely change, when we know user's demands. For now,
+placeholders mixed with complex and half-cooked event functionality let us
+perform elaborate tests with little regard for (unknown) true user's needs.
+
+Default power level vector is 0x7531 for CHRONOS and preserved 0x7777 for
+WARSAW_ILS (and VUEE). This should be taken care of if WARSAW_ILS boxes are
+used for testing or location tracking. Similarly for major freq. -
+30 for CHRONOS, 60 for WARSAW_ILS.
+
+BUTTONS
+-------
+
+In general, clicks toggle the pressed button's state clear -> set -> clear ...
+
+Additional functions:
+
+* (0)	- if clear, set acc-meter to high sensitivity, else to low.
+# (1)	- just toggle (signal alarm)
+Up (2)  - just toggle (signal alarm)
+Dn (3)  - just toggle (signal alarm)
+Li (4)  - if clear, put the node to deep sleep, else reset.
+
+Buttons are extended to Events on the Peg's UI. These are 16b words, with bits
+0..4 mapped to Buttons 0..4. (In fact, the opposite is true in the code - see
+do_butt() in app_col.cc.) The (truly opportunistic) idea is to have a draft
+for bi-dirrestional communication between CHRONOS nodes and the Master. That
+leads as to the LCD (hi-line: 4 chars, lo-line: 5 chars).
+
+LCD
+---
+
+In WARSAW_ILS nodes (or VUEE models) the 2 lines are mimic'ed with diags():
+CHRO (... , ...) - (hi, lo) lines are changing.
+CHRO LO ...      - low line is changing. (I don't think there is CHRO HI now.)
+
+In this (clear) spirit, let's list the LCD output, all coded in do_butt():
+
+("CHRO (%u, ILIAD)", local_host) - at boot.
+("CHRO LO RONIN") - no ack from an egg. for the whole cycle (up to 4 attempts).
+("CHRO (%x,SLEEP)", ev) - going to deep sleep because of the 'ev' (with but #4).
+("CHRO (%x,RESET)", ev) - reset (from sleep), also because 'ev' contains #4.
+("CHRO (%x,%x)", buttons, ev) - after a button / event trigger.
+("CHRO LO IGNOR") - a bow to Seawolf: external events can be blocked if the
+                    Buttons they embed are set. It is better than is sounds.
+("CHRO (%x,%x)" - with events / buttons cleared, it shows HI node id and
+                  LO rssi of the last ack - the node shows that it is not
+		  stranded (RONIN shows it is).
+There are also ("CMA LO"), ("CMA HI") diag output. On CHRONOS, button #0 set
+implies HI. Note that ("CHRO LO IGNOR") is hardly visible on the LCD, bu they
+can be traced in the overwriting ("CHRO (%x,%x)", buttons, ev). Also WARSAW_ILS
+(and VUEE) -only is ("BUTTONS: %x", buttons) after the 'B' command.
+
+All this becomes clear after a little exercise with VUEE models followed with
+button punching on CHRONOS. Talkative Master is a must to grasp (somehwat lame)
+Button -> Events idea.
+
+Peg's output has unchanged number of items; however, teo of them are hex (this
+is easy to change if the OSS has problems handling them). Here is the report 
+content (what used to be sensor portion) from a CHRONOS node:
+
+2650 400 2 0000 0040 1 140 200
+ |    |  |  |    |   |  |   |
+ |    |  |  |    |   |  |   master's uptime (unchanged)
+ |    |  |  |    |   |  |
+ |    |  |  |    |   |  rssi with wich the msg was received (the 1st / lowest
+ |    |  |  |    |   |       pow. level is recorded and reported)
+ |    |  |  |    |   power level corresponding to the reported rssi
+ |    |  |  |    c_flags (hex) now include board type on bits 2^6, 2^7. So far:
+ |    |  |  |            0-ROOM, 1-CHRONOS
+ |    |  |  buttons
+ |    |  cma_3000 (acc-meter)
+ |    temperature
+ battery
+
+E.g.: 
+ 
+2535 498 0 0001 0060 1 145 1099
+shows pressed button 0 (acc-meter hi) and the fact that the alarm was generated
+(we recall that alarms set c_flag 2^5)
+
+Toggling back the button generates
+2540 496 189 0000 0060 1 144 1112 - note high acc-meter reading.
+
+Sending to CHRONOS: c 10 1 aaa7 will generate this, after the node wakes up in
+its cycle:
+2409 439 0 AAA6 0060 1 144 1743 - note that the button 0 was cleared (one of the
+		little hacks we need to converse with CHRONOS)
+If we try to send the same msg or, say, aaa4, it will be ignored by the node,
+   with LCD showing HI AAA6 and LO AAA4, the failed attempt. Events to be
+   reported on the col node can't match any of the bits 0-4 set - we have
+   a humble group filtering.
+
+After button 1 is pressed, the LCD HI updates to AAA4,  with the buttons
+(AAA4) duly reported to the Master. Pressing button 2 (the last one set) clears
+the set event (0000), with another alarm triggered. We have a mechanism to
+signal back (e.g. confirm, reject) on event notifications.
+
+Note that the event with 2^5 unconditionally and immediately puts the node to
+sleep. Only pressing button 4 will bring it back, through reset.
+
+This is just a first draft of LCD / buttons and event interactions, meant just
+to show bidirectional communication and potential for location tracking. It'll
+be greatly improved when we know what we're doing.
+
+-----
+

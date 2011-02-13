@@ -511,15 +511,11 @@ void check_msg4tag (char * buf) {
 			in_setTag(msg4tag.buf, refdate) = md;
 			in_setTag(msg4tag.buf, syfreq) = sync_freq;
 			in_setTag(msg4tag.buf, plotid) = plot_id;
-			in_setTag(msg4tag.buf, ackflags) =
-			       	(is_eew_conf &&
-				  agg_data.eslot >= EE_AGG_MAX -1) ? 1 : 0;
 		} else {
 			in_setTag(msg4tag.buf, refdate) = 0;
 			in_setTag(msg4tag.buf, ds) = 0; 
 			in_setTag(msg4tag.buf, syfreq) = 0;
 			in_setTag(msg4tag.buf, plotid) = 0;
-			in_setTag(msg4tag.buf, ackflags) = 0;
 		}
 
 		send_msg (msg4tag.buf, sizeof(msgSetTagType));
@@ -535,9 +531,6 @@ void check_msg4tag (char * buf) {
 			pong_ack.refdate = md;
 			pong_ack.syfreq = sync_freq;
 			pong_ack.plotid = plot_id;
-			pong_ack.ackflags =
-				(is_eew_conf &&
-				  agg_data.eslot >= EE_AGG_MAX -1) ? 1 : 0;
 			send_msg ((char *)&pong_ack, sizeof(msgPongAckType));
 		}
 	}

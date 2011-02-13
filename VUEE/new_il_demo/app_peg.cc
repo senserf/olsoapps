@@ -457,7 +457,6 @@ static word map_rssi (word r) {
 	return 1;
 #endif
 #endif
-
 	return (r & 0xff00) ? (r >> 8) : 1;
 }
 
@@ -478,7 +477,8 @@ fsm rcv {
 	// should declare them at states, if they are state-local.
 	//
 	char *buf;
-	word psize, rssi;
+	sint psize;
+	word rssi;
 
 	entry RC_TRY:
 
@@ -749,7 +749,9 @@ void oss_report_out (char * buf) {
 		in_reportPload(buf, ppload.sval[2]),
 		in_reportPload(buf, ppload.sval[3]),
 		in_reportPload(buf, ppload.sval[4]),
-		in_reportPload(buf, ppload.sval[5]), (word)in_report(buf, rssi),
+		// in_reportPload(buf, ppload.sval[5]),
+		(word)in_report(buf, pl),
+	       	(word)in_report(buf, rssi),
 		seconds()); // eoform
 
     } else if (in_report(buf, state) == sumTag) {
@@ -960,7 +962,7 @@ void oss_master_in (word state, nid_t peg) {
 }
 
 void oss_setTag_in (word state, word tag,
-	       	nid_t peg, word maj, word min, 
+	       	nid_t peg, word ev, word maj, word min, 
 		word span, word pl, word c_fl) {
 
 	char * out_buf = NULL;
@@ -980,6 +982,7 @@ void oss_setTag_in (word state, word tag,
 	in_setTag(set_buf, freq_min) = min;
 	in_setTag(set_buf, rx_span) = span;
 	in_setTag(set_buf, c_fl) = c_fl;
+	in_setTag(set_buf, ev) = ev;
 	if (peg == local_host || peg == 0)
 		// put it in the wroom
 		msg_fwd_in(state, out_buf, size);
@@ -1146,7 +1149,7 @@ fsm root {
 	  switch (cmd_line[0]) {
 
 		mdate_t md;
-		sint	i1, i2, i3, i4, i5, i6, i7;
+		sint	i1, i2, i3, i4, i5, i6, i7, i8;
 
 		case ' ': proceed RS_FREE; // ignore if starts with blank
 
@@ -1292,13 +1295,13 @@ fsm root {
 			proceed RS_FREE;
 
 		case 'c':
-			i1 = i2 = i3 = i4 = i5 = i6 = i7 = -1;
+			i1 = i2 = i3 = i4 = i5 = i6 = i7 = i8 = -1;
 			
-			// tag peg fM fm span pl
-			scan (cmd_line+1, "%d %d %d %d %d %x %x",
-				&i1, &i2, &i3, &i4, &i5, &i6, &i7);
+			// tag peg ev fM fm span pl c_fl
+			scan (cmd_line+1, "%d %d %x %d %d %x %x",
+				&i1, &i2, &i3, &i4, &i5, &i6, &i7, &i8);
 			
-			if (i1 <= 0 || i3 < -1 || i4 < -1 || i5 < -1) {
+			if (i1 <= 0 || i4 < -1 || i5 < -1 || i6 < -1) {
 				form (obuf, bad_str, cmd_line, 0);
 				proceed RS_UIOUT;
 			}
@@ -1306,7 +1309,8 @@ fsm root {
 			if (i2 < 0)
 				i2 = local_host;
 
-			oss_setTag_in (RS_DOCMD, i1, i2, i3, i4, i5, i6, i7);
+			oss_setTag_in (RS_DOCMD,
+				       	i1, i2, i3, i4, i5, i6, i7, i8);
 			proceed RS_FREE;
 	
 		case 't':
