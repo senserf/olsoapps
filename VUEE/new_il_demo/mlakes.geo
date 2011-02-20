@@ -1,7 +1,7 @@
 <geometry>
 	<root>=(10,30)</root>
 
-	<roamer image="../../PICOS/Apps/VUEE/il_demo/mlakes.jpg"
+	<roamer image="../../PICOS/Apps/VUEE/new_il_demo/mlakes.jpg"
 		width="800.0" display="yes">=(200,200)
 	</roamer>
 
