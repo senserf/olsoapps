@@ -1,4 +1,4 @@
-<network nodes="2">
+<network nodes="8">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
     <channel>
@@ -53,21 +53,35 @@
 	    <leds number="4">
 		<output target="socket"></output>
 	    </leds>
-	</defaults>
-	<node number="0">
-	    <pins number="10" adc="8">
-		<output target="device">pins_output0.txt</output>
+	    <pins number="6">
+		<output target="socket"></output>
 		<status>1111111111</status>
 		<values>0000000000</values>
-		<voltage>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</voltage>
 	    </pins>
-	    <location>1.0 4.0</location>
+	</defaults>
+	<node number="0">
+	    <location>1.0 1.0</location>
 	</node>
 	<node number="1">
-	    <pins number="10" adc="8">
-		<output target="socket"></output>
-	    </pins>
-	    <location>1.0 10.0</location>
+	    <location>2.0 1.0</location>
+	</node>
+	<node number="2">
+	    <location>3.0 1.0</location>
+	</node>
+	<node number="3">
+	    <location>4.0 1.0</location>
+	</node>
+	<node number="4">
+	    <location>1.0 2.0</location>
+	</node>
+	<node number="5">
+	    <location>2.0 2.0</location>
+	</node>
+	<node number="6">
+	    <location>3.0 2.0</location>
+	</node>
+	<node number="7">
+	    <location>4.0 2.0</location>
 	</node>
     </nodes>
 </network>

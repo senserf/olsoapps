@@ -1,8 +1,11 @@
 <geometry>
 	<root>=(10,30)</root>
 
-	<roamer image="../../PICOS/Apps/VUEE/new_il_demo/mlakes.jpg"
-		width="800.0" display="yes">=(200,200)
+	<roamer image="mlakes.jpg" width="800.0" display="yes">
+		=(200,200)
+		<nodecolor type="peg">tomato1</nodecolor>
+		<nodecolor type="col">lightblue</nodecolor>
+		<nodecolor type="tag">green</nodecolor>
 	</roamer>
 
 	<leds display="yes">
