@@ -13,9 +13,9 @@
 			2=(#333333,#ff00ff)
 		</nodecolor>
 		<nodecolor id="3">
-			0=(#ffffff,#ff0000)
-			1=(#ffff00,#0000ff)
-			2=(#333333,#ff00ff)
+			l0=(#ffffff,#ff0000)
+			l1=(#ffff00,#0000ff)
+			l2=(#333333,#ff00ff)
 			3=(#001244,#ff4422)
 		</nodecolor>
 		<nodecolor id="4-5">lightblue</nodecolor>
