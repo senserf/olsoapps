@@ -8,7 +8,11 @@
 #define	TCV_HOOKS			0
 #define	TCV_TIMERS			0
 
+#ifdef BOARD_WARSAW_BLUE
+#define UART_DRIVER			2
+#else
 #define	UART_DRIVER			1
+#endif
 
 #define CC1100 1
 
@@ -155,4 +159,4 @@
 #define TCV_TIMERS	1
 #define TCV_HOOKS	1
 
-#define PURE_FORWARDERS 1
+#define PURE_FORWARDERS 0

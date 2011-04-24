@@ -1,6 +1,7 @@
 #ifdef	__SMURPH__
 
 #define	VUEE_LIB_PLUG_NULL
+#define VUEE_LIB_PLUG_TARP
 
 #define	TCV_PRESENT			1
 #define	TCV_HOOKS			0
@@ -68,4 +69,5 @@
 #endif
 #define LEDS_DRIVER 1
 
-
+// if defined, output for a 'presentation device'
+#define PD_FMT

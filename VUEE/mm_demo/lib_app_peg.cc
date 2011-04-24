@@ -256,7 +256,9 @@ __PUBLF (NodePeg, int, insert_mon) (word id, char * s) {
 	return -1;
 }
 
-int mbeacon (word, address);
+void mbeacon (word);
+//int mbeacon (word, address);
+//fsm mbeacon;
 
 __PUBLF (NodePeg, void, check_tag) (word i) {
 
