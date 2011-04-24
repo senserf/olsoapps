@@ -1022,6 +1022,10 @@ fsm root {
 	entry RS_INIT:
 		obuf = get_mem (RS_INIT, UI_BUFLEN);
 
+#ifdef BOARD_WARSAW_BLUE
+		ser_select (1);
+#endif
+
 	entry RS_INIEE:
 		if (ee_open ()) {
 			leds (LED_B, LED_BLINK);

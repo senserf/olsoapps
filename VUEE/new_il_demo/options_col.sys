@@ -41,9 +41,14 @@
 #ifdef BOARD_CHRONOS
 #define UART_INPUT_BUFFER_LENGTH 4
 #define DIAG_MESSAGES	0
+// for testing:
+//#define DIAG_MESSAGES 2
+//#define DIAG_IMPLEMENTATION 2
 #else
 #define UART_INPUT_BUFFER_LENGTH 76
-#define DIAG_MESSAGES 2
+#define DIAG_MESSAGES	0
+// for testing:
+//#define DIAG_MESSAGES 2
 #endif
 
 #ifdef CODE_LONG_INTS

@@ -981,16 +981,16 @@ thread (root)
 		rt_ind = 0;
 		switch (cmd_line[1]) {
 		  case 'z':
-			ser_out (RS_LISTS, "NBuzz imports:\r\n");
+			ser_out (RS_LISTS, nb_imp_str);
 			proceed (RS_L_NBU);
 		  case 't':
-			ser_out (RS_LISTS, "Current tags:\r\n");
+			ser_out (RS_LISTS, cur_tag_str);
 			proceed (RS_L_TAG);
 		  case 'i':
-			ser_out (RS_LISTS, "Being ignored:\r\n");
+			ser_out (RS_LISTS, be_ign_str);
 			proceed (RS_L_IGN);
 		  case 'm':
-			ser_out (RS_LISTS, "Being monitored:\r\n");
+			ser_out (RS_LISTS, be_mon_str);
 			proceed (RS_L_MON);
 		  default:
 			form (ui_obuf, bad_str, cmd_line);
@@ -1023,7 +1023,7 @@ thread (root)
 
 	entry (RS_L_IGN)
 		if (ignArray[rt_ind].id != 0)
-			ser_outf (RS_L_IGN, " %u %s\r\n", ignArray[rt_ind].id,
+			ser_outf (RS_L_IGN, be_ign_el_str, ignArray[rt_ind].id,
 				ignArray[rt_ind].nick);
 
 		if (++rt_ind < LI_MAX)
@@ -1035,7 +1035,7 @@ thread (root)
 		if (nbuArray[rt_ind].id != 0) {
 			nbuVec (s1, nbuArray[rt_ind].vect);
 			s1[8] = '\0';
-			ser_outf (RS_L_NBU, " %c %u dh(%u) %s %s",
+			ser_outf (RS_L_NBU, nb_imp_el_str,
 				nbuArray[rt_ind].what ? '+' : '-',
 				nbuArray[rt_ind].id,
 				nbuArray[rt_ind].dhook, s1,
@@ -1049,7 +1049,7 @@ thread (root)
 
 	entry (RS_L_MON)
 		if (monArray[rt_ind].id != 0)
-			ser_outf (RS_L_MON, " %u %s\r\n", monArray[rt_ind].id,
+			ser_outf (RS_L_MON, be_mon_el_str, monArray[rt_ind].id,
 				monArray[rt_ind].nick);
 
 		if (++rt_ind < LI_MAX)
@@ -1059,8 +1059,7 @@ thread (root)
 
 	entry (RS_Z_HELP)
 		if (rt_id & (1 << rt_ind))
-			ser_outf (RS_Z_HELP, " noombuzz %u\t%s\r\n", rt_ind,
-					d_nbu[rt_ind]);
+			ser_outf (RS_Z_HELP, hz_str, rt_ind, d_nbu[rt_ind]);
 		if (rt_ind == 0)
 			proceed (RS_FREE);
 		rt_ind--;
@@ -1068,8 +1067,7 @@ thread (root)
 
 	entry (RS_E_HELP)
 		if (rt_id & (1 << rt_ind))
-			ser_outf (RS_E_HELP, " event %u\t%s\r\n", rt_ind,
-					d_event[rt_ind]);
+			ser_outf (RS_E_HELP, he_str, rt_ind, d_event[rt_ind]);
 		if (rt_ind == 0)
 			proceed (RS_FREE);
 		rt_ind--;
