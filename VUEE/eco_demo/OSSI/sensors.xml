@@ -1,38 +1,32 @@
 <!-- This is the network map file -->
 <map>
 
+<!-- Commented out for tests (PG); note that sensor labels (in <sensormap>
+     are now numeric (just their order of appearance on the line produced
+     by the aggregator) as Wlodek has eliminated the symbolic labels (and
+     rightfully so.
+
     <database name="econet">
 	<user>econet_admin</user>
 	<!-- Not extremely secret, is it? -->
 	<password>2aWba#</password>
 	<host>warburg.cs.ualberta.ca</host>
 	<!-- Sensor numbers derived from labels (see below) for database operations -->
-	<sensormap> S1=1 S2=2 S3=3 S0=4 </sensormap>
+	<sensormap> 1=1 2=2 3=3 0=4 </sensormap>
     </database>
 
     <operator>
 	<!-- Who receives e-mail alerts -->
 	<email>pawel@cs.ualberta.ca</email>
     </operator>
+-->
 
     <aggregators>
-	<node id="10" power="7" frequency="300"></node>
+	<node id="10" power="7" frequency="30"></node>
     </aggregators>
 
     <collectors>
-
-	<!-- These are the 2 light sensors -->
-	<node id="128" power="7" frequency="300" rxspan="2">South Wall</node>
-	<node id="129" power="7" frequency="300" rxspan="2">West  Wall</node>
-
-	<!--These are the regular nodes with temp and humidity -->
-	<node id="131" power="7" frequency="300" rxspan="2">Above Door</node>
-	<node id="133" power="7" frequency="300" rxspan="2">S.W. Corner</node>
-
-	<!-- These two have moisture sensors -->
-	<node id="134" power="7" frequency="300" rxspan="2">Center Tree</node>
-	<node id="135" power="7" frequency="300" rxspan="2">East Wall</node>
-
+	<node id="101" power="7" frequency="30" rxspan="2">South Wall</node>
     </collectors>
 
     <ossi id="10"></ossi>
@@ -76,29 +70,14 @@
     </converters>
 
     <sensors>
+	<!-- Same here: label is just the serial number (in the order of
+	     appearance at the node. Perhaps the whole thing should be re-
+	     organized now, but we shall worry when there is a more serious
+	     project -->
 
-	<sensor name="PAR 128" label="S0" node="128" emu="0/0-1024"></sensor>
-	<sensor name="TMP 128" label="S1" node="128" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 128" label="S2" node="128" emu="2/1000-3000"></sensor>
-
-	<sensor name="PAR 129" label="S0" node="129" emu="0/0-1024"></sensor>
-	<sensor name="TMP 129" label="S1" node="129" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 129" label="S2" node="129" emu="2/1000-3000"></sensor>
-
-
-	<sensor name="TMP 131" label="S1" node="131" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 131" label="S2" node="131" emu="2/1000-3000"></sensor>
-
-	<sensor name="TMP 133" label="S1" node="133" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 133" label="S2" node="133" emu="2/1000-3000"></sensor>
-
-	<sensor name="TMP 134" label="S1" node="134" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 134" label="S2" node="134" emu="2/1000-3000"></sensor>
-	<sensor name="E05 134" label="S3" node="134" emu="3/0-2000"></sensor>
-
-	<sensor name="TMP 135" label="S1" node="135" emu="1/5500-6500"></sensor>
-	<sensor name="HUM 135" label="S2" node="135" emu="2/1000-3000"></sensor>
-	<sensor name="E20 135" label="S3" node="135" emu="3/0-2000"></sensor>
+	<sensor name="PAR 101" label="0" node="101" emu="0/0-1024"></sensor>
+	<sensor name="TMP 101" label="1" node="101" emu="1/5500-6500"></sensor>
+	<sensor name="HUM 101" label="2" node="101" emu="2/1000-3000"></sensor>
     </sensors>
 
 </map>

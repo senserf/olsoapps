@@ -9,7 +9,6 @@ exec tclsh "$0" "$@"
 ##################################################################
 
 ##################################################################
-##################################################################
 
 proc msource { f } {
 #
@@ -44,10 +43,15 @@ proc msource { f } {
 msource xml.tcl
 msource log.tcl
 
-###############################################################################
-
 package require xml 1.0
 package require log 1.0
+
+##################################################################
+#
+# Run isource ossi.tcl my_ossi.tct (see README.txt) to create a
+# location-independent version of this script
+#
+##################################################################
 
 if [catch { package require mysqltcl } ] {
 	set SQL_present 0
@@ -58,8 +62,8 @@ if [catch { package require mysqltcl } ] {
 # how to locate the relevant values in OSSI input #############################
 
 set VL(AVRP)	{
-			{ "agg" d } { "slot:" d } { "ts:" s } { "col" d }
-			{ "slot:" d } { "ts:" s }
+			{ "agg" d } { "slot" d } { "" s } { "" s } { "col" d }
+			{ "slot" d } { "" s } { "" s }
 			{ "" a }
 		}
 
@@ -73,7 +77,7 @@ set VL(CSTS)	{
 #			{ "c_fl" x }
 
 set VL(ASTS)	{
-			{ ":" d } { "freq" d } { "plev" x }
+			{ ":" d } { "audit" d } { "plev" x }
 		}
 ## a_fl removed for now, for compatibility with the old version
 #			{ ":" d } { "freq" d } { "plev" x } { "a_fl" x }
@@ -260,17 +264,17 @@ proc abinI { s l } {
 	append str [binary format I $l]
 }
 
-proc dbinB { s } {
+proc dbinQ { s } {
 #
-# decode one binary byte from string s
+# decode return code from string s
 #
 	upvar $s str
 	if { $str == "" } {
 		return -1
 	}
-	binary scan $str c val
-	set str [string range $str 1 end]
-	return [expr ($val & 0x000000ff)]
+	binary scan $str I val
+	set str [string range $str 4 end]
+	return [expr $val & 0xff]
 }
 
 proc uart_tmout { } {
@@ -312,7 +316,7 @@ proc uart_sokin { } {
 
 	uart_ctmout
 
-	if { [catch { read $Uart(TS) 1 } res] || $res == "" } {
+	if { [catch { read $Uart(TS) 4 } res] || $res == "" } {
 		# disconnection
 		catch { close $Uart(TS) }
 		set Uart(TS) ""
@@ -320,7 +324,7 @@ proc uart_sokin { } {
 		return
 	}
 
-	set code [dbinB res]
+	set code [dbinQ res]
 
 	if { $code != 129 } {
 		catch { close $Uart(TS) }
@@ -834,7 +838,7 @@ proc read_map { } {
 		set snames($sn) ""
 		# just the index
 		lappend sl $si
-		# this is where we stroe full sensor record
+		# this is where we store full sensor record
 		set sbn($no) $sl
 
 		# add to the global list; the index is equal to the sensor's
@@ -1385,8 +1389,8 @@ proc input_avrp { inp } {
 	update_report_interval $aid
 
 	set asl [lindex $res 1]
-	set ats [lindex $res 2]
-	set cid [lindex $res 3]
+	set ats "[lindex $res 2] [lindex $res 3]"
+	set cid [lindex $res 4]
 
 	# dynamic parameters; for now, we only store the slot number
 	set dp [lindex $ag 3]
@@ -1418,8 +1422,8 @@ proc input_avrp { inp } {
         # update collector report interval
         update_report_interval $cid
 
-	set csl [lindex $res 4]
-	set cts [lindex $res 5]
+	set csl [lindex $res 5]
+	set cts "[lindex $res 6] [lindex $res 7]"
 
 	# dynamic parameters
 	set dp [lindex $co 3]
@@ -1439,26 +1443,26 @@ proc input_avrp { inp } {
 	assoc_agg $aid $cid
 
 	# extract sensor values
-	set inp [lindex $res 6]
+	set inp [lindex $res 8]
 	set uc 0
-
 	while 1 {
 
-		if ![regexp -nocase "(\[a-z\]\[a-z0-9\]*): +(\[0-9\]+)"\
-		    $inp mat sl value] {
+		set inp [string trimleft $inp]
+		if ![regexp "\[0-9\]+" $inp value] {
 			# all done
 			break
 		}
 
 		# remove from the string
-		set ix [expr [string first $mat $inp] + [string length $mat]]
+		set ix [expr [string first $value $inp] + \
+			[string length $value]]
 		set inp [string range $inp $ix end]
 
 		# locate the sensor
 		set nf 1
 		foreach s $SBN($cid) {
 			set se [lindex $Sensors $s]
-			if { [lindex $se 1] == $sl } {
+			if { [lindex $se 1] == $uc } {
 				# found
 				set nf 0
 				break
@@ -1466,7 +1470,6 @@ proc input_avrp { inp } {
 		}
 
 		if $nf {
-			msg "sensor $sl at collector $cid not found, ignored"
 			continue
 		}
 
@@ -1493,9 +1496,9 @@ proc input_avrp { inp } {
 		# the value is ready
 		value_update $s $value
 		# database
-		data_out_db $cid $sl $value
+		data_out_db $cid $uc $value
 		# log
-		data_out $cid $sl $sn $value
+		data_out $cid $uc $sn $value
 
 		incr uc
 	}
@@ -1849,9 +1852,9 @@ set DBFlag ""
 
 while { $argv != "" } {
 
-	set fg [lindex $argv 0]
+	set fg [string trim [lindex $argv 0]]
 	set argv [lrange $argv 1 end]
-	set va [lindex $argv 0]
+	set va [string trim [lindex $argv 0]]
 	if { $va == "" || [string index $va 0] == "-" } {
 		set va ""
 	} else {
@@ -1902,7 +1905,7 @@ while { $argv != "" } {
 			bad_usage
 		}
 		if { $va != "" } {
-			if [napin va] {
+			if [nannin va] {
 				bad_usage
 			}
 			set Uart(NODE) $va
@@ -1974,6 +1977,14 @@ while { $argv != "" } {
 		continue
 	}
 
+	if { $fg == "-v" } {
+		if [info exists Files(SVAL)] {
+			bad_usage
+		}
+		set Files(SVAL) $va
+		continue
+	}
+
 	if { $va == "" } {
 		bad_usage
 	}
@@ -1994,14 +2005,6 @@ while { $argv != "" } {
 		continue
 	}
 
-	if { $fg == "-v" } {
-		if [info exists Files(SVAL)] {
-			bad_usage
-		}
-		set Files(SVAL) $va
-		continue
-	}
-
 	if { $fg == "-c" } {
 		if [info exists Files(ECMD)] {
 			bad_usage
@@ -2009,6 +2012,7 @@ while { $argv != "" } {
 		set Files(ECMD) $va
 		continue
 	}
+	bad_usage
 }
 
 if { $Uart(MODE) == "" } {
@@ -2054,7 +2058,7 @@ if ![info exists Files(SMAP)] {
 if ![info exists Files(SVAL)] {
 	set Files(SVAL) ""
 } elseif { $Files(SVAL) == "" } {
-	set FIles(SVAL) "values"
+	set Files(SVAL) "values"
 }
 
 if ![info exists Files(ECMD)] {

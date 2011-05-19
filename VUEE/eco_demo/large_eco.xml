@@ -52,7 +52,7 @@
 	    <location>275.0 105.0</location>
 	    <preinit tag="HID" type="lword">0xBACA0075</preinit>
 	</node>
-	<node number="8" type="tag" start="off">
+	<node number="8" type="tag" start="on">
 	    <location>120.0 50.0</location>
 	    <preinit tag="HID" type="lword">0xBACA00D0</preinit>
 	</node>

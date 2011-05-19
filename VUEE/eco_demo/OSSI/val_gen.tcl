@@ -3,7 +3,6 @@
 exec tclsh "$0" "$@"
 
 set	Files(SMAP)		"sensors.xml"
-
 set	Agent(DPORT)		4443
 set	Agent(DEV)		"localhost:4443"
 
@@ -140,17 +139,17 @@ proc abinI { s l } {
 	append str [binary format I $l]
 }
 
-proc dbinB { s } {
+proc dbinQ { s } {
 #
-# decode one binary byte from string s
+# decode return code from string s
 #
 	upvar $s str
 	if { $str == "" } {
 		return -1
 	}
-	binary scan $str c val
-	set str [string range $str 1 end]
-	return [expr ($val & 0x000000ff)]
+	binary scan $str I val
+	set str [string range $str 4 end]
+	return [expr $val & 0xff]
 }
 
 proc agent_tmout { } {
@@ -191,7 +190,7 @@ proc agent_sokin { } {
 
 	agent_ctmout
 
-	if [catch { read $Agent(FD) 1 } res] {
+	if [catch { read $Agent(FD) 4 } res] {
 		# disconnection
 		abt "connection failed: $res"
 	}
@@ -200,7 +199,7 @@ proc agent_sokin { } {
 		abt "connection closed by VUEE"
 	}
 
-	set code [dbinB res]
+	set code [dbinQ res]
 
 	if { $code != 129 } {
 		abt "connection rejected by VUEE, code $code"
@@ -549,6 +548,18 @@ proc update { nn } {
 	}
 
 	puts "updated node $vn"
+}
+
+set fg [string trim [lindex $argv 0]]
+set fn [string trim [lindex $argv 1]]
+
+if { $fg != "" } {
+	if { $fg != "-s" || $fn == "" } {
+		bad_usage
+	}
+	set Files(SMAP) $fn
+	unset fn
+	unset fg
 }
 
 read_map

@@ -27,10 +27,10 @@
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
-		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
-		<sensor number="1" vsize="2" delay="0.6">2047</sensor>
-		<sensor number="2" vsize="2" delay="0.6">1024</sensor>
-		<sensor number="3" vsize="2" delay="0.6">1024</sensor>
+		<sensor number="0" vsize="2" delay="0.6">1024</sensor>
+		<sensor number="1" vsize="2" delay="0.6">8000</sensor>
+		<sensor number="2" vsize="2" delay="0.6">2700</sensor>
+		<sensor number="3" vsize="2" delay="0.6">2400</sensor>
 		<sensor number="4" vsize="2" delay="0.220">16483</sensor>
 		<sensor number="5" vsize="2" delay="0.06">3339</sensor>
 		<sensor number="6" vsize="2" delay="0.1">2000</sensor>

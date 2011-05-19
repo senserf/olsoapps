@@ -1,0 +1,151 @@
+<!-- This network map file matches large_eco.xml from the directory above -->
+<map>
+
+<!-- Commented out for tests (PG); note that sensor labels (in <sensormap>
+     are now numeric (just their order of appearance on the line produced
+     by the aggregator) as Wlodek has eliminated the symbolic labels (and
+     rightfully so.
+
+    <database name="econet">
+
+	<user>econet_admin</user>
+
+	<!-- Not extremely secret, is it? -->
+	<password>2aWba#</password>
+
+	<host>warburg.cs.ualberta.ca</host>
+
+	<!-- Sensor numbers derived from labels (see below) for database
+	     operations. The idea is that, e.g., 0=4 means that the sensor
+	     with label="0" will be mapped to sensor number 4 in the database.
+	     The respective database op is:
+	     	INSERT INTO observations (NID, SID, time, value) VALUES
+			(coll-id, sens-id, timestamp, value),
+	     where sens-id is the mapped sensor label. Note that not all
+	     sensors have to be mapped. Unmapped sensors, i.e., those not
+	     mentioned in <sensormap> will not have their values stored in
+	     the database. -->
+	<sensormap> 1=1 2=2 3=3 0=4 </sensormap>
+    </database>
+
+    <operator>
+	<!-- Who receives e-mail alerts -->
+	<email>pawel@cs.ualberta.ca</email>
+    </operator>
+-->
+
+    <aggregators>
+	<node id="10" power="7" frequency="30"></node>
+	<node id="11" power="7" frequency="30"></node>
+    </aggregators>
+
+    <collectors>
+	<node id="102" power="7" frequency="30" rxspan="2">Collector one</node>
+	<node id="103" power="7" frequency="30" rxspan="2">Collector one</node>
+	<node id="104" power="7" frequency="30" rxspan="2">Collector one</node>
+	<node id="115" power="7" frequency="30" rxspan="2">Collector one</node>
+	<node id="116" power="7" frequency="30" rxspan="2">Collector one</node>
+	<node id="117" power="7" frequency="30" rxspan="2">Collector one</node>
+	<node id="208" power="7" frequency="30" rxspan="2">Collector one</node>
+    </collectors>
+
+    <!-- The master node ID -->
+    <ossi id="10"></ossi>
+
+    <converters>
+	<snippet sensors="PAR">
+		set value [expr $value * 1.47]
+	</snippet>
+	<snippet sensors="TMP">
+		<!-- This is the official formula for SHT -->
+		set value [expr -39.62 + 0.01 * $value]
+
+	</snippet>
+	<snippet sensors="HUM">
+		<!-- Another official formula for SHT -->
+		set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * \
+			$value]
+		if { $value < 0.0 } {
+			set value 0.0
+		} elseif { $value > 100.0 } {
+			set value 100.0
+		}
+	</snippet>
+	<snippet sensors="E05">
+		<!-- I have calculated these based on voltage measurements and sensor manuals -->
+		set value [expr $value * 0.09246 - 40.1]
+		if { $value < 0.0 } {
+			set value 0.0
+		} elseif { $value > 100.0 } {
+			set value 100.0
+		}
+	</snippet>
+	<snippet sensors="E20">
+		set value [expr $value * 0.0532 - 26.0]
+		if { $value < 0.0 } {
+			set value 0.0
+		} elseif { $value > 100.0 } {
+			set value 100.0
+		}
+	</snippet>
+    </converters>
+
+    <sensors>
+
+	<!-- The name attribute is supposed to uniquely tag (in some
+	     meaningful way) all sensors in the system, but it is also
+	     used to identify sensor types, e.g., for the conversion.
+	     The identification is carried out by matching the "sensors"
+	     attributes of snippets (treated as regexps) to the sensor
+	     names. -->
+
+	<!-- Now, label is just the serial number (in the order of
+	     appearance at the node. It used to be symbolic - matched to a
+	     piece of text appearing in the node's report, but Wlodek has
+	     eliminated those strings (quite rightfully).
+	     Perhaps the whole thing should be reorganized, but we shall
+	     worry about it when the project gets more serious. -->
+
+	<!-- The "emu" attribute is ignored by the ossi script. Its role is
+	     to be used by a value generator script assigning random values
+	     to the sensors in a VUEE model. -->
+
+	<sensor name="PAR 102" label="0" node="102" emu="0/0-1024"></sensor>
+	<sensor name="TMP 102" label="1" node="102" emu="1/0-8000"></sensor>
+	<sensor name="HUM 102" label="2" node="102" emu="2/0-2700"></sensor>
+	<sensor name="E20 102" label="3" node="102" emu="3/0-3400"></sensor>
+
+	<sensor name="PAR 103" label="0" node="103" emu="0/0-1024"></sensor>
+	<sensor name="TMP 103" label="1" node="103" emu="1/0-8000"></sensor>
+	<sensor name="HUM 103" label="2" node="103" emu="2/0-2700"></sensor>
+	<sensor name="E20 103" label="3" node="103" emu="3/0-3400"></sensor>
+
+	<sensor name="PAR 104" label="0" node="104" emu="0/0-1024"></sensor>
+	<sensor name="TMP 104" label="1" node="104" emu="1/0-8000"></sensor>
+	<sensor name="HUM 104" label="2" node="104" emu="2/0-2700"></sensor>
+	<sensor name="E20 104" label="3" node="104" emu="3/0-3400"></sensor>
+
+	<sensor name="PAR 115" label="0" node="115" emu="0/0-1024"></sensor>
+	<sensor name="TMP 115" label="1" node="115" emu="1/0-8000"></sensor>
+	<sensor name="HUM 115" label="2" node="115" emu="2/0-2700"></sensor>
+	<sensor name="E20 115" label="3" node="115" emu="3/0-3400"></sensor>
+
+	<sensor name="PAR 116" label="0" node="116" emu="0/0-1024"></sensor>
+	<sensor name="TMP 116" label="1" node="116" emu="1/0-8000"></sensor>
+	<sensor name="HUM 116" label="2" node="116" emu="2/0-2700"></sensor>
+	<sensor name="E20 116" label="3" node="116" emu="3/0-3400"></sensor>
+
+	<sensor name="PAR 117" label="0" node="117" emu="0/0-1024"></sensor>
+	<sensor name="TMP 117" label="1" node="117" emu="1/0-8000"></sensor>
+	<sensor name="HUM 117" label="2" node="117" emu="2/0-2700"></sensor>
+	<sensor name="E20 117" label="3" node="117" emu="3/0-3400"></sensor>
+
+	<!-- For illustration, collector 208 has a different configuration
+	     of sensors: TMP+HUM, i.e., just the SHT combo. -->
+
+	<sensor name="TMP 208" label="1" node="208" emu="1/0-8000"></sensor>
+	<sensor name="HUM 208" label="2" node="208" emu="2/0-2700"></sensor>
+
+    </sensors>
+
+</map>
