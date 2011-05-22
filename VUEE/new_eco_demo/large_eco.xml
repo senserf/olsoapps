@@ -1,0 +1,60 @@
+<network nodes="9" radio="9">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="collector.xml"/>
+	</defaults>
+	<node number="0" type="peg">
+	    <sensors>
+	    	<input source="socket"></input>
+	    	<sensor number="0" vsize="2" delay="0.01" init="2030">
+			2047
+		</sensor>
+	    </sensors>
+	    <location>65.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
+	    <preinit tag="MHOST" type="word">10</preinit>
+	</node>
+	<node number="1" type="peg">
+	    <sensors>
+	    	<input source="socket"></input>
+	    	<sensor number="0" vsize="2" delay="0.01" init="2028">
+			2047
+		</sensor>
+	    </sensors>
+	    <location>205.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
+	    <preinit tag="MHOST" type="word">10</preinit>
+	</node>
+	<node number="2" type="tag" start="on">
+	    <location>5.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0066</preinit>
+	</node>
+	<node number="3" type="tag" start="on">
+	    <location>5.0 55.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0067</preinit>
+	</node>
+	<node number="4" type="tag" start="on">
+	    <location>5.0 105.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0068</preinit>
+	</node>
+	<node number="5" type="tag" start="on">
+	    <location>275.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0073</preinit>
+	</node>
+	<node number="6" type="tag" start="on">
+	    <location>275.0 55.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0074</preinit>
+	</node>
+	<node number="7" type="tag" start="on">
+	    <location>275.0 105.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0075</preinit>
+	</node>
+	<node number="8" type="tag" start="on">
+	    <location>120.0 50.0</location>
+	    <preinit tag="HID" type="lword">0xBACA00D0</preinit>
+	</node>
+    </nodes>
+</network>

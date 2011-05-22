@@ -1,0 +1,11 @@
+#error **********************************
+#error
+#error cp options.tag options.sys
+#error for tags or all non-sat.
+#error
+#error cp options.satpeg options.sys
+#error for pegs and custs with sat. i/f
+#error
+#error remember about mkmk; make; genihex
+#error
+#error **********************************
