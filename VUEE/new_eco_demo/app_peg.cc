@@ -16,6 +16,12 @@
 #include "sat_peg.h"
 #include "hold.h"
 
+#ifdef __SMURPH__
+#define	SENSOR_LIST	present
+#else
+#include "sensors.h"
+#endif
+
 #include "app_peg_data.h"
 
 heapmem {80, 20}; // how to find out a good ratio?
@@ -526,7 +532,9 @@ fsm audit {
 
 		if (local_host == master_host && (pow_ts == 0 ||
 	(word)(seconds() - pow_ts) >= (tag_auditFreq << POW_FREQ_SHIFT))) {
+#ifdef SENSOR_LIST
 			read_sensor (AS_START, 0, &pow_sup);
+#endif
 			pow_ts = seconds();
 			stats (NULL);
 		}

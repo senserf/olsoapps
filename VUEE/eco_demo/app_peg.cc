@@ -10,6 +10,9 @@
 
 #ifndef __SMURPH__
 #include "hold.h"
+#include "sensors.h"
+#else
+#define	SENSOR_LIST	present
 #endif
 
 // elsewhere may be a better place for this:
@@ -461,7 +464,9 @@ thread (audit)
 	entry (AS_START)
 		if (local_host == master_host && (pow_ts == 0 ||
 	(word)(seconds() - pow_ts) >= (tag_auditFreq << POW_FREQ_SHIFT))) {
+#ifdef SENSOR_LIST
 			read_sensor (AS_START, 0, &pow_sup);
+#endif
 			pow_ts = seconds();
 			stats (NULL);
 		}

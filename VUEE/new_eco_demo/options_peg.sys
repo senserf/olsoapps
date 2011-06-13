@@ -124,10 +124,11 @@
 
 #define EE_ERASE_ON_NEW_FLASH	0
 
-#ifdef STORAGE_SDCARD
-#undef STORAGE_SDCARD
-#endif
-#define STORAGE_SDCARD	 	1
+// Do not override the BOARD
+//#ifdef STORAGE_SDCARD
+//#undef STORAGE_SDCARD
+//#endif
+//#define STORAGE_SDCARD	 	1
 #define SD_KEEP_IDLE		1
 
 #define BCAST_SATEST_MSG 	1
