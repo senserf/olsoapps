@@ -1158,6 +1158,10 @@ fsm root {
 	entry RS_INIT:
 
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
+#ifdef BOARD_WARSAW_BLUE
+		// Use UART 2 via Bluetooth
+		ser_select (1);
+#endif
 
 	entry RS_INIEE:
 
