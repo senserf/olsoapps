@@ -7,6 +7,11 @@
 #include "sensors.h"
 #include "board_pins.h"
 
+#ifdef	__pi_cma_3000_bring_up
+#include "cma_3000.h"
+#define	CMA3000
+#endif
+
 heapmem {10, 90};
 
 #include "ser.h"
@@ -62,6 +67,10 @@ fsm root {
 	ser_out (RS_BANNER,
 		"\r\nSensor Test\r\n"
 		"Commands:\r\n"
+#ifdef CMA3000
+		"C n      -> CMA3000 on, mode n\r\n"
+		"F        -> CMA3000 off\r\n"
+#endif
 		"s n      -> set sensor value length (words)\r\n"
 		"r s      -> read value of sensor s\r\n"
 		"c s d    -> read value of sensor s continually at d int\r\n"
@@ -77,6 +86,10 @@ fsm root {
 	ser_in (RS_RCMD, ibuf, IBUFLEN);
 
 	switch (ibuf [0]) {
+#ifdef CMA3000
+		case 'C' : proceed RS_CMO;
+		case 'F' : proceed RS_CMF;
+#endif
 		case 's' : proceed RS_SVAL;
 		case 'r' : proceed RS_GSEN;
 		case 'c' : proceed RS_CSEN;
@@ -146,6 +159,22 @@ fsm root {
   state RS_CTSE:
 
 	SENSOR_TEST_END;
+	proceed RS_RCMD;
+
+#endif
+
+#ifdef CMA3000
+
+  state RS_CMO:
+
+	v = 0;
+	scan (ibuf + 1, "%u", &v);
+	cma_3000_on (v);
+	proceed RS_RCMD;
+
+  state RS_CMF:
+
+	cma_3000_off ();
 	proceed RS_RCMD;
 
 #endif
