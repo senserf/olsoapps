@@ -1,3 +1,2 @@
 #!/bin/sh
 cleanapp
-cp options.nogood options.sys

@@ -23,5 +23,3 @@
 
 #undef	DIAG_MESSAGES
 #define	DIAG_MESSAGES	2
-
-#define	SHTXX_CLOCK_DELAY	10
