@@ -1,0 +1,185 @@
+{\rtf1\ansi\ansicpg1250\deff0{\fonttbl{\f0\fnil\fcharset238{\*\fname Courier New;}Courier New CE;}{\f1\fnil\fcharset0 Courier New;}}
+{\*\generator Msftedit 5.41.15.1515;}\viewkind4\uc1\pard\lang1045\f0\fs20\par
+\lang1033\f1 Szersza a\lang1045\f0 plikacja \lang1033\f1 (EcoNet) \lang1045\f0 jest tu zaprezentowana w uproszczonej formie, dla instalacji z\'b3o\'bfonej z pojedynczego kolektora z pod\'b3\'b9czonymi czujnikami SHT (T/RH) i pojedynczego agregatora, zarazem "mastera" sieci, pod\'b3\'b9czonego przez USB do peceta z Windows.\lang1033\f1  Kolektor, gdy nie dostanie potwierdzenia od agregatora (\lang1045\f0 dwa razy pr\'f3buje wys\'b3a\'e6 pakiet), zapisuje odczyty sensor\'f3w w EEPROM, z kt\'f3rego mo\'bfna je przeczyta\'e6 pod\'b3\'b9czaj\'b9c kolektor do peceta.\par
+\par
+Jasne jest, \'bfe dostepne funkcje systemu sa bardziej rozleg\'b3e; na ich omawianie przyjdzie czas, gdy oka\'bf\'b9 sie potrzebne rozszerzenia czy to na wi\'eaksze sieci, czy na liczne instalacje dla innych, mniej do\'9cwiadczonych u\'bfytkownik\'f3w.\par
+\par
+Pe\'b3ny OSS (web-serwer, baza danych, etc.) jest dost\'eapny, lecz niepotrzebny dla inicjuj\'b9cej instalacji opisanej tutaj. Zainteresowani mog\'b9 zerkn\'b9\'e6 na (te\'bf uproszczon\'b9) namiastk\'ea <http://www.comip.ca/eco/demo/>.\par
+\par
+Zak\'b3adamy pecet w\'b3a\'9cciwie skonfigurowany (patrz poni\'bfej). Eksploatacja systemu odbywa si\'ea w dw\'f3ch trybach, umownie nazwanych "on-line" i "off-line".\par
+\par
+W "on-line" kolektor z pod\'b3\'b9czonymi sensorami (do 5 podw\'f3jnych senor\'f3w T/RH) znajduje si\'ea w serwerowni, z sensorami we w\'b3a\'9cciwych miejscach (kable maja 6m d\'b3ugo\'9cci). Aggregator pod\'b3\'b9czony do peceta przez USB znajduje si\'ea w zasi\'eagu CC1100 (oko\'b3o 150m na otwartym terenie, w budynku to mocno zale\'bfy od struktur, materia\'b3\'f3w, etc., konieczny jest sprawdzian dla konkretnej instalacji). Za\'b3\'b9czony program (piter) wy\'9cwietla i loguje dane. System przechodzi w "off-line" automatycznie, gdy kolektor poczuje si\'ea osamotniony, b\'b9d\'bf to dla sporadycznych zaburze\'f1 RF, b\'b9d\'bf w\'f3wczas gdy agregator zostanie wy\'b3\'b9czony. Podobnie, system przechodzi w "on-line" natychmiast jak agregator i kolektor s\'b9 w zasi\'eagu.\par
+\par
+Po (dowolnej ilo\'9cci) sesji "off-line" kolektor mo\'bfna pod\'b3aczy\'e6 bezpo\'9crednio do peceta i zrzuci\'e6 zawarto\'9c\'e6 epromu. U\'bfytkownik sam zdecyduje, kiedy nale\'bfy dane "off-line" zczytywa\'bf, kiedy kasowa\'e6 zawarto\'9cc EPROM, etc. W\'b3a\'9cciwa rutyna pojawi si\'ea sama, tym szybciej im bardziej u\'bfytkownik "wie co robi" ;-)\par
+\par
+\b Przyk\'b3adowy "on-line":\par
+\b0\par
+- Pod\'b3\'b9czamy rs232-usb (ftdi), powiedzmy COM9.\par
+- W DOS windows, we w\'b3a\'9cciwym dyrektoriacie: piter -p 9 -F log1\par
+- <- T 2011 9 17 9 19 0        /* 17 wrze\'9cnia 2011, 9:19:0 rano */\par
+\par
+- Obserwujemy dane co minut\'ea (\'b3atwo mo\'bfna zmieni\'e6 cz\'easto\'9c\'e6 pomiar\'f3w). Format jak poni\'bfej.\par
+- W dowolnej chwili filtrujemy i formatujemy zawarto\'9c\'e6 log1 wo\'b3aj\'b9c: filfor log1 outf1 (outf1 mo\'bfna bezpo\'9crednio otwiera\'e6 w Excel, etc.)\par
+\par
+- Sesj\'ea ko\'f1czymy przez wy\'b3\'b9czenie peceta, od\'b3\'b9czenie lub wy\'b3\'b9czenie agregatora. UWAGA: w\'b3\'b9czony agregator bez pracuj\'b9cego interfejsu (piter) spowoduje utrate odczyt\'f3w (kolektor uzna, \'bfe dane s\'b9 odebrane i nie zapisze ichdo EPROM).\par
+\par
+\par
+\b Przyk\'b3adowy "off-line":\par
+\b0\par
+- Przynosimy pecet do kolektora lub od\'b3\'b9czamy kolektor od sensor\'f3w (trywialna operacja) i niesiemy go do peceta.\par
+- Pod\'b3\'b9czamy pracuj\'b9cy na bateriach kolektor. UWAGA: wy\'b3\'b9czenie kolektora powoduje utrat\'ea do 9 ostatnich odczyt\'f3w.\par
+- W DOS windows, we w\'b3a\'9cciwym dyrektoriacie: piter -p 9 -F dump1\par
+- <- M (sp\'b3uka bufory EPROM, zresetuje kolektor do "maintenance mode")\par
+- Nale\'bfy, cho\'e6 nie jest to konieczne, przerzuci\'e6 prze\'b3\'b9cznik kolektora z 'baterie' na 'usb'. Szczeg\'f3lnie dla du\'bfych ilo\'9cci danych. To prze\'b3\'b9cznie mo\'bfe, cho\'e6 nie musi, spowodowa\'e6 reset kolektora, bez skutk\'f3w ubocznych. \par
+- <- D (dane b\'ead\'b9 na ekranie i w 'dump1')\par
+- <- F (reset do zbierania danych) Zale\'bfnie od przyj\'eatej praktyki, 'Q' zamiast 'F' wyczy\'9cci EPROM, tak \'bfe zrzucone dane nie pojawi\'b9 si\'ea w kolejnych sesjach "off-line".\par
+- Od\'b3\'b9czamy kolektor.\par
+\par
+<Notka o drajwerach (tylko w xp?)>\par
+\par
+<Sekcja o piterze>\lang1033\f1\par
+\par
+\lang1045\f0 <Sekcja o filfor (filter and format)>\par
+\lang1033\f1\par
+\par
+\lang1045\b\f0 U\'bfyteczne komendy agregatora:\par
+\b0\par
+\b h\b0  (help / pomoc) podpowiada ca\'b3y zestaw, na przyk\'b3ad:\lang1033\f1\par
+\par
+\b <- h\b0\par
+PicOS v3.3/PG110815A-WARSAW_10SHT, (C) Olsonet Communications, 2002-2010\par
+Leftover RAM: 8334 bytes\par
+1001 EE from 0 to 13795 size 38\par
+1001 *EcoNet* 1.3 Aggregator commands:\par
+1001 \tab Agg set / show:\tab a id [ audit_freq [ p_lev [ hex:a_fl ]]]\par
+1001 \tab Master Time:\tab T [ y-m-d h:m:s ]\par
+1001 \tab Disp data:\tab D [ from [ to [ col_id [ limit ]]]]\par
+1001 \tab Maint:\tab M (* No collection until F *)\par
+1001 \tab Eprom erase:\tab E (* deletes agg data *)\par
+1001 \tab Flash erase:\tab F (* clears special conditions *)\par
+1001 \tab Clean reset:\tab Q (* to factory defaults (E+F) *)\par
+1001 \tab ID set / show:\tab I[D id]  (* CAREFUL Host ID *)\par
+1001 \tab ID master set:\tab IM id    (* CAREFUL Master ID *)\par
+1001 \tab Save(d) sys:  \tab S[A]     (* Show, SAve iFLASH *)\par
+1001 \tab Sync coll:    \tab Y [freq] (* Sync at freq *)\par
+1001 \tab Quit (reset)\tab q\par
+1001 \tab Help:\tab\tab h\par
+1001 \tab Send master msg\tab m [ peg ]\par
+1001 \tab Col set / show:\tab c id agg_id [ Maj_freq [ min_freq [ rx_span [ hex:pl [ hex:c_fl]]]]]\par
+1001 \tab Find collector:\tab f col_id [ agg_id ]]\par
+1001 \tab Plot Id:\tab P [id]\par
+1001 \tab Sat mode:\tab s!!!|+++|---\par
+\par
+\lang1045\b\f0 T\b0  ustawia czas propagowany do wszystkich nod\'f3w, na przyk\'b3ad:\par
+\lang1033\b\f1 <- T 2011 8 26 13 14 0\par
+\b0 1009 At 2011-8-26 13:14:0 uptime 19\par
+\lang1045\f0\par
+\par
+\lang1033\f1\par
+\lang1045\b\f0 U\'bfyteczne komendy kolektora:\lang1033\f1\par
+\b0\par
+\lang1045\b\f0 h\b0  (help / pomoc) podpowiada ca\'b3y zestaw, na przyk\'b3ad:\lang1033\f1\par
+\par
+\b <- h\par
+\b0 2001 *EcoNet* 1.3 Collector commands\par
+2001 \tab Set/ show:\tab s [ Maj_freq [ min_freq [ rx_span [ hex:pl_vec [ hex:c_fl ]]]]]\par
+2001 \tab Display data:\tab D [ from [ to [ status [ limit ]]]]\par
+2001 \tab Maintenance:\tab M (*** No collection until F      ***)\par
+2001 \tab Eprom erase:\tab E (*** deletes all collected data ***)\par
+2001 \tab Flash erase:\tab F (*** clears special conditions  ***)\par
+2001 \tab Clean reset:\tab Q (*** to factory defaults (E+F)  ***)\par
+2001 \tab ID set / show:\tab I[D id]    (*** CAREFUL Host ID   ***)\par
+2001 \tab Save(d) sys:  \tab S[A]       (*** Show, SAve iFLASH ***)\par
+2001 \tab Quit (reset)\tab q\par
+2001 \tab Help:\tab\tab h\par
+\par
+\lang1045\b\f0 D\b0  (display / dump / wylistuj) dane z EPROM. Komenda przyjmuje szereg opcjonalnych parametr\'f3w, tutaj nieistotnych.\lang1033\f1\par
+\par
+\b <- D\par
+\b0 2011 BOOT 0 1001-1-1 0:0:8 0 0 60\par
+2011 PLOT 1 2011-8-26 13:16:45 10 0 60\par
+2007 COLLECTED slot 2 2011-8-26 13:27:38 2481 5916 1999 -1 -1 -1 -1 -1 -1 5946 1949\par
+2007 COLLECTED slot 3 2011-8-26 13:28:38 2480 5913 2003 -1 -1 -1 -1 -1 -1 5938 1959\par
+2007 COLLECTED slot 4 2011-8-26 13:29:38 2481 5908 2008 -1 -1 -1 -1 -1 -1 5933 1969\par
+2007 COLLECTED slot 5 2011-8-26 13:30:38 2480 5906 2011 -1 -1 -1 -1 -1 -1 5930 1973\par
+\lang1045\f0 ...\par
+\lang1033\f1 2007 COLLECTED slot 70 2011-8-26 14:35:42 2483 6418 1401 -1 -1 -1 -1 -1 -1 6402 1416\par
+2007 COLLECTED slot 71 2011-8-26 14:36:42 2483 6449 1418 -1 -1 -1 -1 -1 -1 6418 1439\par
+2007 COLLECTED slot 72 2011-8-26 14:37:42 2483 6459 1361 -1 -1 -1 -1 -1 -1 6419 1377\par
+2008 Collector 1 direct dump: slots 0 -> 73 status ALL upto 0 #73\par
+\par
+\lang1045\b\f0 M \b0 (maintenance / zastopowanie kolekcji danych)\par
+\lang1033\f1\par
+\b <- M\par
+\b0\par
+PicOS v3.3/PG110815A-WARSAW_10SHT, (C) Olsonet Communications, 2002-2010\par
+Leftover RAM: 9396 bytes\par
+\b 2001 ***Maintenance mode*** FFF0 0 4952 0\par
+\b0 2001 EE from 0 to 18722 size 28\par
+\par
+\par
+\lang1045\b\f0 F \b0 (flash erase / powr\'f3t do zwyk\'b3ego trybu czytania czujnik\'f3w i wysy\'b3ania / zapisywania danych)\lang1033\f1\par
+\par
+\b <- F\par
+\b0 0003 flash p1 erased\par
+\par
+PicOS v3.3/PG110815A-WARSAW_10SHT, (C) Olsonet Communications, 2002-2010\par
+Leftover RAM: 9396 bytes\par
+2001 EE from 0 to 18722 size 28\par
+2001 *EcoNet* 1.3 Collector commands\par
+2001 \tab Set/ show:\tab s [ Maj_freq [ min_freq [ rx_span [ hex:pl_vec [ hex:c_fl ]]]]]\par
+2001 \tab Display data:\tab D [ from [ to [ status [ limit ]]]]\par
+2001 \tab Maintenance:\tab M (*** No collection until F      ***)\par
+2001 \tab Eprom erase:\tab E (*** deletes all collected data ***)\par
+2001 \tab Flash erase:\tab F (*** clears special conditions  ***)\par
+2001 \tab Clean reset:\tab Q (*** to factory defaults (E+F)  ***)\par
+2001 \tab ID set / show:\tab I[D id]    (*** CAREFUL Host ID   ***)\par
+2001 \tab Save(d) sys:  \tab S[A]       (*** Show, SAve iFLASH ***)\par
+2001 \tab Quit (reset)\tab q\par
+2001 \tab Help:\tab\tab h\par
+\par
+\lang1045\f0\par
+\par
+\b Dane wyj\'9cciowe\lang1033\f1\par
+\b0\par
+\lang1045\b\f0 W trybie on-line (z agregatora):\par
+\b0\par
+\lang1033\f1 1002   Agg 10 slot 12: 2011-8-26 13:16:45  Col 1 slot 1: 1001-1-1 0:0:5   2544 6078 1791 -1 -1 -1 -1 -1 -1 6204 1694\par
+\par
+\lang1045\f0 1002                - marker linii danych (odczytu czujnik\'f3w)\par
+\lang1033\f1 Agg 10 slot 12: \lang1045\f0     - aggregator #10 eprom slot 12 (nieistotne)\par
+\lang1033\f1 2011-8-26 13:16:45  \lang1045\f0 - czas otrzymania pomiaru przez agregator (nieistotny w wi\'eakszo\'9cci przypadk\'f3w)\par
+\lang1033\f1 Col 1 slot 1: \lang1045\f0\tab   - kolektor #1 eprom slot 1 (nieistotne)\par
+\lang1033\f1 1001-1-1 0:0:5\lang1045\f0       - czas pomiaru (1001 wskazuje, \'bfe czas ustawiony komend\'b9 T jeszcze nie dotar\'b3 do kolektora, kt\'f3ry wystartowa\'b3 5s wcze\'9cniej)\par
+\lang1033\f1 2544 \lang1045\f0\tab\tab\tab   - odczyt napi\'eacia (filfor zamieni to na 3.11V)\par
+\lang1033\f1 6078 \lang1045\f0\tab\tab\tab   - odczyt sensora #0 temp. (filfor zamieni to na 21.16C)\par
+\lang1033\f1 1791 \lang1045\f0\tab\tab\tab   - odczyt sensora #0 wigotno\'9c\'e6 (filfor zamieni to na 59.55%)\par
+-1...-1\tab\tab   - sensory #1..#3 sa niepod\'b3\'b9czone (T, RH na pojedynczy sensor)\par
+\lang1033\f1 6204 1694\lang1045\f0\tab\tab   - sensor #4 podobnie jak sensor #0 (filfor zamieni to na 22.42C i 56.57%)\lang1033\f1\par
+\par
+\lang1045\f0 nieistotne dane, pomijane przy filtrowaniu i formatowaniu:\par
+\lang1033\f1\par
+CC1100: 1, 842.3MHz, 0/200kHz=842.3MHz\par
+\lang1045\f0 (RF dzia\'b3a na tej cz\'eastotliwo\'9cci (Euro ISM))\lang1033\f1\par
+\par
+1005 Stats for agg (BACA000A: 10): Audit 59 PLev 7 a_fl 0001 Uptime 6 Mts 0 Master 10 Stored 11 Mem free 3873 min 3638 mode 0 inp 2711\par
+\lang1045\f0 (szereg danych o stanie agregatora)\lang1033\f1\par
+\par
+\lang1045\b\f0 W trybie off-line \b0 (kolektor pod\'b3\'b9czony do peceta, komenda D):\par
+\lang1033\f1\par
+<- D\par
+\par
+2011 BOOT 0 1001-1-1 0:0:8 0 0 60\par
+2011 PLOT 1 2011-8-26 13:16:45 10 0 60\par
+\lang1045\f0 (nieistotne)\lang1033\f1\par
+\par
+2007 COLLECTED slot 2 2011-8-26 13:27:38 2481 5916 1999 -1 -1 -1 -1 -1 -1 5946 1949\par
+\par
+\lang1045\f0 2007               - marker linni danych z epromu\par
+\lang1033\f1 COLLECTED slot 2 \lang1045\f0   - nieistotne\lang1033\f1\par
+2011-8-26 13:27:38\lang1045\f0  - czas odczytu\lang1033\f1  \par
+\lang1045\f0 reszta tak jak dane zbierane on-line\par
+\lang1033\f1\par
+\par
+}
+ 

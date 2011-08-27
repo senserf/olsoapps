@@ -1,0 +1,25 @@
+This is new_eco_demo as of Aug. 2011, less custodian, instrumented for 10SHT. Although the original code is preserved and occasionally improved on, we don't want to pollute the original praxis - it is not clear if arrays of sensors are of a general use, and if the lead users will show further interest.
+
+A few notes:
+
+With the array of 10 SHT (double) sensors, we hit the CC1100's packet length boundary, so the praxis handles only (sufficient) 5 sensors. Perhaps this would be a good moment to take a look at the sensor data formats and its optimizations, or dis- re-assembly of sensor reading sessions seen as the classical packet manipulation but on the praxis level... (It seems unclear if this functionality is desirable below the praxis 'level' in vast majority of our works.)
+
+Although the separation of target boards is applicable also in this praxis, we don't do that - all is wrapped for WARSAW_10SHT and the 9600bps UART. It is very easy to split collectors andd aggregators again, if the need appears.
+
+As nearly all changes hinge on #ifdef BOARD_WARSAW_10SHT, we added the #define in options.sys for VUEE. Its removal (as mkmk for other boards types) reverts thefunctionality to new_eco_demo.
+
+Note Euro ISM settings by he end of options.sys.
+
+UART_INPUT_BUFFER_LENGTHis increased from 76 to 126 without much calculations; it may be, that it could be set to a lesser length.
+
+In tag_peg.cc, SENSOR_LIST is not defined (for VUEE), and the sensor values within VUEE runs are set regardless fo the .xml model descs - arrays of sensors are not necessary to model and appropriate sensor values' progression is better for testing and debugging.
+
+String formats for rep_str and dump_str, and the output they shape are updated without elaborate format variants, as they proved of rather little use so far.
+
+RF is open for 1s and there is only 1 retry, by default.
+
+DEF_APP_FLAGS for pegs is changed from 0xC to 0x4; this is propagated to new_eco_demo, as we can't see a reason for storing all readings on the aggs.
+
+ReadmePL.rtf contains the 1st draft of selected instructions for lead customers in Krakow. (krk_ned denotes Krakow_new_eco_demo.)
+
+

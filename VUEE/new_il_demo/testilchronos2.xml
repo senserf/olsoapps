@@ -1,0 +1,44 @@
+
+<network nodes="8" radio="8">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	</defaults>
+	<node number="1" type="peg">
+	    <location>50.0 60.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
+	</node>
+	<node number="5" type="col" start="on">
+	    <location>50.0 50.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0005</preinit>
+	</node>
+        <node number="0" type="col" start="off">
+            <location>105.0 105.0</location>
+            <preinit tag="HID" type="lword">0xBACA000A</preinit>
+        </node>
+	<node number="6" type="col" start="on">
+	    <location>45.0 45.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0006</preinit>
+	</node>
+	<node number="7" type="col" start="on">
+	    <location>40.0 45.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0007</preinit>
+	</node>
+        <node number="2" type="peg" start="off">
+            <location>0.0 0.0</location>
+            <preinit tag="HID" type="lword">0xBACA0002</preinit>
+        </node>
+
+	<node number="3" type="peg" start="off">
+	    <location>0.0 0.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0003</preinit>
+	</node>
+       <node number="4" type="peg" start="off">
+            <location>0.0 0.0</location>
+            <preinit tag="HID" type="lword">0xBACA0004</preinit>
+        </node>
+    </nodes>
+</network>
