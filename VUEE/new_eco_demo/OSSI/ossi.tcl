@@ -189,6 +189,18 @@ proc nannin { n } {
 	return 0
 }
 
+proc nanxin { n } {
+#
+# Not a nonnegative Hex Number
+#
+	upvar $n num
+
+	if [catch { expr 0x$num } num] {
+		return 1
+	}
+	return 0
+}
+
 proc napin { n } {
 #
 # Not A Positive Integer Number
@@ -659,7 +671,7 @@ proc read_map { } {
 			# the default
 			set pl 7
 		} else {
-			if [nannin pl] {
+			if [nanxin pl] {
 				smerr "illegal power level in collector $ix"
 				return 0
 			}
@@ -1526,7 +1538,8 @@ proc cmd_cpoll { co } {
 	# static parameters
 	set dp [lindex $no 2]
 
-	uart_write "c $co $ag [lindex $dp 1] -1 [lindex $dp 2] [lindex $dp 0]"
+	uart_write "c $co $ag [lindex $dp 1] -1 [lindex $dp 2] [format %x \
+		[lindex $dp 0]]"
 }
 
 proc cmd_apoll { ag } {
