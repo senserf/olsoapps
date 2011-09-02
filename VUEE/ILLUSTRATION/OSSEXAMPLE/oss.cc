@@ -12,14 +12,13 @@ void oss_clear () {
 	}
 }
 
-static byte *oss_outmsg (word st, byte code, word len) {
+static void oss_outmsg (word st, word code, word status) {
 //
 // Allocates an outgoing message of type code, length len
 //
 	byte *buf;
-	buf = abb_outf (st, len);
-	buf [0] = code;
-	return buf;
+	buf = abb_outf (st, 2);
+	*((word*)buf) = oss_hdr (code, status);
 }
 
 #ifdef	OSS_MEMORY_ACCESS
@@ -36,8 +35,7 @@ static void dump_memory (word st, address add, word len) {
 		release;
 	}
 
-	OSS_buf [0] = OSS_CODE_MTN;
-	OSS_buf [1] = OSS_CODE_MTN_MD;
+	OSS_bufw [0] = oss_hdr (OSS_CODE_MEMDUMP, OSS_STAT_OK);
 
 	memcpy (OSS_buf + 2, add, OSS_bufl - 2);
 }
@@ -46,19 +44,16 @@ static void dump_memory (word st, address add, word len) {
 
 fsm oss_handler {
 
-	word ws, wa;
+	word ws, wa, CMD;
 
 	// ====================================================================
-	// Upon startup, issue two "reset messages" to synchronize the two ends
+	// Upon startup, issue two "reset messages" to synchronize the line
 	// ====================================================================
-
 	state INIT_0:
-
-		oss_outmsg (INIT_0, OSS_CODE_MTN, 2) [1] = OSS_CODE_MTN_RSA;
+		oss_outmsg (INIT_0, OSS_CODE_RSA, OSS_STAT_OK);
 
 	state INIT_1:
-
-		oss_outmsg (INIT_1, OSS_CODE_MTN, 2) [1] = OSS_CODE_MTN_RSB;
+		oss_outmsg (INIT_1, OSS_CODE_RSB, OSS_STAT_OK);
 
 	// ====================================================================
 
@@ -66,69 +61,76 @@ fsm oss_handler {
 
 		OSS_buf = abb_in (LOOP, &OSS_bufl);
 
-		if (OSS_buf [0] == OSS_CODE_MTN) {
+		switch (CMD = oss_cmd (OSS_bufw)) {
 
-			switch (OSS_buf [1]) {
+			case OSS_CODE_RSA:
 
-				case OSS_CODE_MTN_RSA:
-				case OSS_CODE_MTN_RSB:
+				// Resync 0 -> ignore completely
+				oss_clear ();
+				proceed LOOP;
+					
+			case OSS_CODE_RSB:
 
-					// Resync request
-					ufree (OSS_buf);
-					proceed INIT_0;
+				// Resync 1 -> respond with resync 1; the
+				// message is ready in OSS_buf
+				proceed REPLY;
 #ifdef	OSS_MEMORY_ACCESS
-				case OSS_CODE_MTN_MD:
+			case OSS_CODE_MEMDUMP:
 
-					// Memory dump: expect address & length
-					// in two words
-					if (OSS_bufl < 6) {
-						ws = 2;
-						proceed RETSTAT;
-					}
-					wa = OSS_bufw [1];
-					ws = OSS_bufw [2];
-					ufree (OSS_buf);
-					proceed MEMDUMP;
+				// Memory dump: expect address & length in two
+				// words
+				if (OSS_bufl < 6)
+					proceed CLEAR_ERROR;
 
-				case OSS_CODE_MTN_MS:
+				wa = OSS_bufw [1];
+				ws = OSS_bufw [2];
+				oss_clear ();
+				proceed MEMDUMP;
 
-					// Memory set
-					if (OSS_bufl < 5) {
-						ws = 2;
-						proceed RETSTAT;
-					}
+			case OSS_CODE_MEMSET:
 
-					memcpy (OSS_bufw [1], OSS_buf + 4,
-						OSS_bufl - 4);
+				// Memory set
+				if (OSS_bufl < 5)
+					proceed CLEAR_ERROR;
 
-					ufree (OSS_buf);
-					ws = 0;
-					proceed RETSTAT;
+				memcpy (OSS_bufw [1], OSS_buf + 4,
+					OSS_bufl - 4);
+
+				proceed CLEAR_OK;
 #endif
-			}
-
-			// Ignore
-			ws = 1;
-			proceed RETSTAT;
 		}
+
+		// Process regular (praxis) requests
 
 	state RQHANDLE:
 
 		ws = oss_request (RQHANDLE);
+
 		if (OSS_buf != NULL)
 			// There is a specific reply
 			proceed REPLY;
 
 	state RETSTAT:
 
-		// Return command status
-		oss_outmsg (RETSTAT, OSS_CODE_STA, 2) [1] = (byte) ws;
+		oss_outmsg (RETSTAT, CMD, ws);
 		proceed LOOP;
 
 	state REPLY:
 
 		abb_out (REPLY, OSS_buf, OSS_bufl);
 		proceed LOOP;
+
+	state CLEAR_ERROR:
+
+		ws = OSS_STAT_ERR;
+		oss_clear ();
+		sameas RETSTAT;
+
+	state CLEAR_OK:
+
+		ws = OSS_STAT_OK;
+		oss_clear;
+		sameas RETSTAT;
 
 #ifdef	OSS_MEMORY_ACCESS
 

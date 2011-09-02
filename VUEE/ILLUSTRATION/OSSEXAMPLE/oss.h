@@ -31,21 +31,21 @@ extern word OSS_bufl;
 // Effective (buffer) length
 #define	OSS_MAX_BLEN		(OSS_MAX_PLEN-4)
 
-// Two special message codes
-#define	OSS_CODE_MTN		0xFF	// Special
-#define	OSS_CODE_STA		0xFE	// Status
+// Reserved command codes
+#define	OSS_CODE_RSA		0xFFF	// Reset (resync) 0
+#define	OSS_CODE_RSB		0xFFE	// Reset (resync) 1
+#define	OSS_CODE_MEMDUMP	0xF7E	// Memory dump
+#define	OSS_CODE_MEMSET		0xF7F	// Memory set
 
-// Special requests
-#define	OSS_CODE_MTN_RSA	0x00	// Reset A
-#define	OSS_CODE_MTN_RSB	0x01	// Reset B
-#define	OSS_CODE_MTN_MD		0x7E	// Memory dump
-#define	OSS_CODE_MTN_MS		0x7F	// RAM set
+// Standard status codes
+#define	OSS_STAT_OK		0x0	// Status OK
+#define	OSS_STAT_UNIMPL		0x1	// Command unimplemented
+#define	OSS_STAT_ERR		0x2	// Generic error
+#define	OSS_STAT_LATER		0x3	// Busy
 
-// Some standard STA codes
-#define	OSS_CODE_STA_OK		0x00	// OK (simple command ACK)
-#define	OSS_CODE_STA_NOP	0x01	// Null action (command unimplemented?)
-#define	OSS_CODE_STA_ERR	0x02	// Generic error
-#define	OSS_CODE_STA_LATER	0x03	// Try again later
+#define	oss_cmd(b)		(*((word*)(b)) >> 4)
+#define	oss_sta(b)		(*((word*)(b)) & 15)
+#define	oss_hdr(c,s)		(((c) << 4) | (s))
 
 #ifndef __SMURPH__
 // Memory dump compiled in

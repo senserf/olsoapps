@@ -7,6 +7,13 @@
 #define	UART_PHY	0
 #define	UART_PLUG	0
 
+// Praxis-specific OSS commands
+#define	OSS_CODE_TIME	0
+#define	OSS_CODE_ECHO	1
+#define	OSS_CODE_DELAY	2
+#define	OSS_CODE_RESET	3
+#define	OSS_CODE_DIAG	4
+
 fsm root {
 
 	state START:
@@ -28,9 +35,10 @@ fsm root {
 		// tcv_control (sfd, PHYSOPT_RXON, NULL);
 		ab_init (sfd);
 
-		// Not needed, this is the default
+		// Not needed, this is the default; the node should be PASSIVE
 		// ab_mode (AB_MODE_PASSIVE);
 
+		// Start the driver
 		runfsm oss_handler;
 	
 		finish;
@@ -44,16 +52,16 @@ word oss_request (word st) {
 //
 //	0 - tell time (the number of seconds since reset)
 //	1 - echo
-//	2 - stop watch: hold for up to 16 sec and then return code OK
+//	2 - stop watch: hold for the given number of milliseconds
 //	3 - reset the node
 //	4 - write a diag message
 //
 	byte *buf;
-	word bufl;
+	word bufl, CMD;
 
-	switch (OSS_buf [0]) {
+	switch (CMD = oss_cmd (OSS_bufw)) {
 
-		case 0:
+		case OSS_CODE_TIME:
 
 			if ((buf = (byte*) umalloc (bufl = 6)) == NULL) {
 				// Now we have two choices:
@@ -62,62 +70,61 @@ word oss_request (word st) {
 				release;
 				// 	2. return "try again later"
 				// 		oss_clear ();
-				// 		return OSS_CODE_STA_LATER;
+				// 		return OSS_STAT_LATER;
 				// Note that in the latter case we have to do
 				// oss_clear () to deallocate the buffer. The
 				// request handler is responsible for that!!!
 			}
 
-			// Fill the buffer with stuff. Because the exchange is
-			// highly assymetric, we may assume a simple convention
-			// whereby responses use the same headers (command
-			// codes) as commands.
-			buf [0] = 0;
-			buf [1] = 0;
+			// Fill the buffer with stuff
+			*((word*)buf) = oss_hdr (CMD, OSS_STAT_OK);
 			*((lword*)(buf + 2)) = seconds ();
-			// Replace the buffer; don't forget to release the
-			// request
-			oss_clear ();
 
+			// Replace the buffer
+			oss_clear ();
 			OSS_buf = buf;
 			OSS_bufl = bufl;
-			return OSS_CODE_STA_OK;
+			// Return value irrelevant as OSS_buf != NULL
+			return 0;
 
-		case 1:
+		case OSS_CODE_ECHO:
 
-			// Just echo the command, i.e., do nothing
-			return OSS_CODE_STA_OK;
+			// Just echo the command payload
+			return 0;
 
-		case 2:
+		case OSS_CODE_DELAY:
 
 			if (RQ_State) {
 				// Delay expired
 				RQ_State = 0;
-Rtn_OK:
-				oss_clear ();
-				return OSS_CODE_STA_OK;
+				goto Rtn_OK;
 			}
 
 			// Set up the alarm clock
-			if ((bufl = OSS_buf [1]) > 16)
-				bufl = 16;
+			if (OSS_bufl < 4) {
+				// Error
+				oss_clear ();
+				return OSS_STAT_ERR;
+			}
 
 			RQ_State = 1;
-			delay (bufl * 1024, st);
+			delay (OSS_bufw [1], st);
 			release;
 
-		case 3:
+		case OSS_CODE_RESET:
+
 			reset ();
 
-		case 4:
+		case OSS_CODE_DIAG:
 
 			diag ((char*) (OSS_buf + 2));
-			goto Rtn_OK;
+Rtn_OK:			oss_clear ();
+			return OSS_STAT_OK;
 	}
 
-	// Unimplemented; we should be prepared for that, so we can at least
+	// Unimplemented; we should be prepared for this, so we can at least
 	// deallocate the buffer
 
 	oss_clear ();
-	return OSS_CODE_STA_NOP;
+	return OSS_STAT_UNIMPL;
 }
