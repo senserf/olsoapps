@@ -367,7 +367,7 @@ fsm root {
 	if ((unsigned char) ibuf [0] == 0xff)
 		delay (1024*10, RS_AUTOSTART);
   
-	k = ser_in (RS_RCMD, ibuf, IBUFLEN-1);
+	k = ser_in (RS_RCMD, ibuf, IBUFLEN);
 
 	switch (ibuf [0]) {
 	    case 's': proceed RS_SND;
