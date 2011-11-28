@@ -78,3 +78,8 @@
 #undef MAX_TASKS
 #endif
 #define MAX_TASKS 32
+
+// output format and msg content (but not the length) changes with 0,
+// see survey.odt
+#define SEQ_NO_BUNDLES 1
+

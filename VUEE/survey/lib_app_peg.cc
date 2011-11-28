@@ -77,8 +77,8 @@ void init () {
 
 	nvm_t nvm;
 
-	if (ee_read (NVM_OSET, (byte *)&nvm, sizeof (nvm_t))) {
-		app_diag (D_SERIOUS, "Can't read eeprom");
+	if (ee_open() || ee_read (NVM_OSET, (byte *)&nvm, sizeof (nvm_t))) {
+		app_diag (D_SERIOUS, "Can't open / read eeprom");
 		halt();
 	};
 

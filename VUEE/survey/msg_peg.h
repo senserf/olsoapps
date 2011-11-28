@@ -24,7 +24,7 @@ typedef struct msgPingStruct {
 	nid_t		id;
 	word		pings;
 	word		rssi:8;
-	word		spare:8;
+	word		seqno:8;
 } msgPingType;
 	
 #define in_ping(buf, field)   (((msgPingType *)(buf))->field)

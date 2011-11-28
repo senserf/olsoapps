@@ -12,31 +12,35 @@
 #include "sysio.h"
 #include "msg_tarp.h"
 
-// no all out, uart ON in human i/f, no master change, no autoack (unused)
-#define DEF_APP_FLAGS 	0x0C
+// all out, uart ON in human i/f, no master change, no autoack (unused)
+// (no all out would be 0x0C)
+#define DEF_APP_FLAGS 	0x2C
 
 // level 2, rec 3, slack 0, fwd off
 #define DEF_TARP	0xB0
 
-#define DEF_XMT_THOLD	10
+#define DEF_XMT_THOLD	50
 #define LOW_OSS_STACK	2
 #define MAX_OSS_STACK	10
 
+// be sure that the nodes can hear others on defaults (from)
 #define DEF_PL_FR	7
-#define DEF_PL_TO	0
+#define DEF_PL_TO	7
 
-#define DEF_RA_FR	0
+#define DEF_RA_FR	3
 #define DEF_RA_TO	3
+// rates are 0..3, they also impact the range
 
 #define DEF_CH_FR	0
-#define DEF_CH_TO	255
+#define DEF_CH_TO	0
+// channels are 0..255, e.g. for interference surveys
 
 #define DEF_NID 	1
 #define DEF_MHOST	0x0101
 
-#define DEF_I_SIL	3
-#define DEF_I_WARM	5
-#define DEF_I_CYC	15
+#define DEF_I_SIL	5
+#define DEF_I_WARM	10
+#define DEF_I_CYC	30
 
 #define ST_INIT		0
 #define ST_WARM		1

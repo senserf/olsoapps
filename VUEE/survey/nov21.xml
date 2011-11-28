@@ -1,0 +1,119 @@
+<network nodes="8">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <channel>
+        <shadowing bn="-110.0dBm" syncbits="8">
+		RP(d) = received power at distance d
+		XP    = transmitted power
+		X     = lognormal random Gaussian component
+ 		=======================================================
+		RP(d)/XP [dB] = -10 x 5.1 x log(d/1.0m) + X(1.0) - 33.5
+ 		=======================================================
+	</shadowing>
+	<cutoff>-115.0dBm</cutoff>
+	<ber>
+		Interpolated ber table:
+		======================
+		  SIR		  BER
+		50.0dB		1.0E-6
+		40.0dB		2.0E-6
+		30.0dB		5.0E-6
+		20.0dB		1.0E-5
+		10.0dB		1.0E-4
+		 5.0dB		1.0E-3
+		 2.0dB		1.0E-1
+		 0.0dB		2.0E-1
+		-2.0dB		5.0E-1
+		-5.0dB		9.9E-1
+	</ber>
+	<frame>12 0</frame>
+	<rssi>
+		0	-202.0
+	       255	53.0
+       </rssi>
+	<power>
+		0	-30.0dBm
+                1	-15.0dBm
+                2	-10.0dBm
+                3	 -5.0dBm
+                4	  0.0dBm
+                5	  5.0dBm
+                6	  7.0dBm
+                7	 10.0dBm
+	</power>
+	<rates boost="yes">
+		0	4800	3dB
+		1	10000	0dB
+		2	38400	-4dB
+		3	200000	-10dB
+	</rates>
+	<channels number="255">
+		Cross channel separation
+		20dB 29dB 38dB 46dB 54dB 62dB 70dB 78dB 86dB 94dB 102dB
+	</channels>
+    </channel>
+    <nodes>
+	<defaults>
+	    <memory>8666 bytes</memory>
+	    <processes>32</processes>
+	    <radio>
+	    	<power>7</power>
+	    	<rate>1</rate>
+	    	<channel>0</channel>
+	    	<boost>0.0dB</boost>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
+	    <eeprom size="524288"></eeprom>
+	    <iflash size="256,2"></iflash>
+	    <uart rate="19200" bsize="12">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	    <preinit tag="NID" type="word">1</preinit>
+	    <preinit tag="HID" type="lword">0xBACADEAD</preinit>
+	</defaults>
+	<node number="0" type="peg">
+	    <location>1.0 1.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0101</preinit>
+	</node>
+	<node number="1" type="peg" start="on">
+	    <location>10.0 1.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0A01</preinit>
+	</node>
+	<node number="2" type="peg" start="on">
+	    <location>10.0 15.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0A0F</preinit>
+	</node>
+        <node number="3" type="peg">
+            <location>1.0 15.0</location>
+	    <preinit tag="HID" type="lword">0xBACA0106</preinit>
+	</node>
+	<node number="4" type="peg">
+	    <location>3.0 4.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
+	</node>
+	<node number="5" type="peg">
+	    <location>8.0 4.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
+	</node>
+        <node number="6" type="peg">
+            <location>8.0 12.0</location>
+            <preinit tag="HID" type="lword">0xBACA000C</preinit>
+        </node>
+        <node number="7" type="peg">
+            <location>3.0 12.0</location>
+            <preinit tag="HID" type="lword">0xBACA000D</preinit>
+        </node>
+    </nodes>
+</network>

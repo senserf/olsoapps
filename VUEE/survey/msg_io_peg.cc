@@ -83,10 +83,12 @@ void msg_ping_out (char * buf, word rssi) {
 		in_ping(buf_out, in_sattr).w = 0;
 		in_ping(buf_out, rssi) = 0;
 		in_ping(buf_out, id) = 0;
+		in_ping(buf_out, seqno) = 0;
 	} else {
 		in_ping(buf_out, in_sattr).w = in_ping(buf, out_sattr).w;
 		in_ping(buf_out, rssi) = rssi;
 		in_ping(buf_out, id) = in_header(buf, snd);
+		in_ping(buf_out, seqno) = in_header(buf, seq_no);
 	}
 
 	send_msg (buf_out, sizeof (msgPingType));

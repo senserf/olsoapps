@@ -14,6 +14,11 @@
 #include "msg_peg.h"
 #include "storage.h"
 
+// defaulted to the original output, I don't know yet what makes more sense
+#ifndef SEQ_NO_BUNDLES
+#define SEQ_NO_BUNDLES 0
+#endif
+
 // elsewhere may be a better place for this:
 #if CC1000
 #define INFO_PHYS_DEV INFO_PHYS_CC1000
@@ -79,12 +84,18 @@ static trueconst char stats_str[] =
 	" Time %lu (sstart %lu), Flags %x, Mem: free %u, min %u\r\n"
 	" State %u RF %u\r\n";
 
+#if SEQ_NO_BUNDLES
+static trueconst char ping_str[] =
+	"-- %u %u %u\t\t%u %u %u\t\t%u %u %u\t\t%u %lu\r\n"
+	"-- %u %u %u\t\t%u %u %u\t\t%u %u %u\t\t%u %lu\r\n";
+#else
 static trueconst char ping_ascii_def[] = "Ping %lu\r\n"
 	"[%u %u %u] %u (%u) (%u, %u)->(%u, %u)\r\n"
 	"[%u %u %u] %u (%u) (%u, %u)->(%u, %u)\r\n";
 
 static trueconst char ping_ascii_raw[] = " %lu %u %u %u %u %u %u %u %u %u"
 	" %u %u %u %u %u %u %u %u %u\r\n";
+#endif
 
 // ============================================================================
 
@@ -445,8 +456,12 @@ fsm rcv {
 			app_diag (D_WARNING, "Reset on unobserved ping-pong");
 			reset();
 		}
+		delay (200 + rnd() % 1000, RC_PAUSE);
+		release;
 
-		process_incoming (RC_MSG, buf_ptr, packet_size,
+	entry RC_PAUSE:
+
+		process_incoming (RC_PAUSE, buf_ptr, packet_size,
 			map_rssi(rssi));
 		proceed RC_TRY;
 
@@ -507,6 +522,7 @@ fsm cmd_in {
 void oss_ping_out (char * buf, word rssi) {
 
 	char * lbuf = NULL;
+#if SEQ_NO_BUNDLES == 0
 	char * my_str;
 
 	my_str = is_fmt_hi ? (char *)ping_ascii_def : (char *)ping_ascii_raw;
@@ -524,7 +540,40 @@ void oss_ping_out (char * buf, word rssi) {
 			in_ping(buf, out_sattr).b.ch, rssi, touts.mc,
 			in_header(buf, snd) >> 8, in_header(buf, snd) & 0xFF,
 			local_host >> 8, local_host & 0xFF);
+#else
 
+	lbuf = form (NULL, ping_str,
+		// session (cycle)
+                in_ping(buf, in_sattr).b.pl,
+                in_ping(buf, in_sattr).b.ra,
+                in_ping(buf, in_sattr).b.ch,
+
+		// from
+		in_ping(buf, id) >> 8, in_ping(buf, id) & 0xFF,
+		in_ping(buf, seqno),
+
+		// to any
+		in_header(buf, snd) >> 8, in_header(buf, snd) & 0xFF,
+		in_ping(buf, rssi),
+
+		// eol
+		in_ping(buf, pings), seconds(),
+
+		// session
+                in_ping(buf, out_sattr).b.pl,
+                in_ping(buf, out_sattr).b.ra,
+                in_ping(buf, out_sattr).b.ch,
+
+		// from
+		in_header(buf, snd) >> 8, in_header(buf, snd) & 0xFF,
+		in_header(buf, seq_no),
+
+		// to master
+		local_host >> 8, local_host & 0xFF, rssi,
+
+		// eol
+		touts.mc, seconds());
+#endif
 	if (runfsm oss_out (lbuf) == 0 ) {
 		app_diag (D_SERIOUS, "oss_out failed");
 		ufree (lbuf);
@@ -674,6 +723,8 @@ fsm root {
 		proceed RS_FREE;
 
 	entry RS_TOUTS:
+
+		sint	i1, i2, i3;
 
 		if (sstate != ST_INIT) {
 			form (ui_obuf, bad_state_str, sstate);
