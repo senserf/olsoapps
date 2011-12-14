@@ -1,0 +1,65 @@
+/* ==================================================================== */
+/* Copyright (C) Olsonet Communications, 2002 - 2006                    */
+/* All rights reserved.                                                 */
+/* ==================================================================== */
+
+#include "sysio.h"
+#include "tcvphys.h"
+#include "tcvplug.h"
+
+heapmem {10, 90};
+
+#include "ser.h"
+#include "serf.h"
+#include "form.h"
+
+#include "phys_cc1100.h"
+#include "plug_null.h"
+
+#define	MAXPLEN			60
+#define	OBUFLEN			80
+
+
+#define	RS_INIT		00
+#define	RS_WAIT		10
+
+process (root, int)
+
+  static int sfd;
+  address packet;
+  int i, len, pos;
+  static char obuf [OBUFLEN];
+
+  entry (RS_INIT)
+
+	phys_cc1100 (0, MAXPLEN);
+	tcv_plug (0, &plug_null);
+	sfd = tcv_open (NONE, 0, 0);
+	if (sfd < 0) {
+		diag ("Cannot open tcv interface");
+		halt ();
+	}
+	tcv_control (sfd, PHYSOPT_RXON, NULL);
+
+  entry (RS_WAIT)
+
+	packet = tcv_rnp (RS_WAIT, sfd);
+
+	len = (tcv_left (packet) - 2);
+	form (obuf, "[%s%d]", len < 10 ? " " : "", len);
+	pos = strlen (obuf);
+	len = (len + 1)/2;
+
+	for (i = 0; i < len; i++) {
+		if (pos >= OBUFLEN - 5)
+			break;
+		form (obuf+pos, " %x", packet [i]);
+		pos += strlen (obuf+pos);
+	}
+	tcv_endp (packet);
+	obuf [pos] = '\0';
+	diag (obuf);
+
+	proceed (RS_WAIT);
+
+endprocess (1)

@@ -1,0 +1,24 @@
+#ifdef	LEDS_DRIVER
+#undef	LEDS_DRIVER
+#endif
+
+#ifdef	RADIO_USE_LEDS
+#undef	RADIO_USE_LEDS
+#endif
+
+#ifdef	CODE_LONG_INTS
+#undef	CODE_LONG_INTS
+#endif
+
+#define	LEDS_DRIVER	1
+#define	RADIO_USE_LEDS	7
+#define	CODE_LONG_INTS	1
+
+#undef	UART_RATE_SETTABLE
+#define	UART_RATE_SETTABLE	0
+
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES		2
+
+// Make this the default
+#define	RADIO_BITRATE		200000
