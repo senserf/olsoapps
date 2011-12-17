@@ -7,7 +7,6 @@
 #define	TCV_HOOKS			0
 #define	TCV_TIMERS			0
 
-#define	UART_DRIVER			1
 #define CC1100 				1
 #define INFO_FLASH			1
 
@@ -28,6 +27,17 @@
 #define	dbg_e(c)	do { } while (0)
 #define	dbg_f(c)	do { } while (0)
 #endif
+// VUEE-only ends
+
+#ifdef BOARD_WARSAW_BLUE
+#undef UART_RATE
+#define UART_RATE                       115200
+#define UART_DRIVER                     2
+#else
+#define UART_DRIVER                     1
+#endif
+
+#define LINKMATIC
 
 #ifdef UART_INPUT_BUFFER_LENGTH
 #undef UART_INPUT_BUFFER_LENGTH
@@ -71,3 +81,6 @@
 
 // if defined, output for a 'presentation device'
 #define PD_FMT
+#define ANDROIDEMO 1
+
+

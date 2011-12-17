@@ -98,11 +98,23 @@ __PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level, char * desc) {
 	in_header(buf_out, hco) = 0;
 	in_alrm(buf_out, level) = level;
 	in_alrm(buf_out, profi) = profi_att;
+	strncpy (in_alrm(buf_out, nick), nick_att, NI_LEN);
+
 	if (desc)
 		strncpy (in_alrm(buf_out, desc), desc, PEG_STR_LEN);
 	else
 		strncpy (in_alrm(buf_out, desc), d_alrm, PEG_STR_LEN);
-	strncpy (in_alrm(buf_out, nick), nick_att, NI_LEN);
+
+#ifdef __SMURPH__
+	// overwrite for hybrid demos
+	if ( desc && strncmp (desc, "!Y!", 3) == 0) {
+		if (local_host & 1) // odd
+			strncpy (in_alrm(buf_out, desc), "!N!", 3);
+		else
+			strncpy (in_alrm(buf_out, desc), "!OK!", 4);
+	}
+#endif
+
 	send_msg (buf_out, sizeof (msgAlrmType));
 	ufree (buf_out);
 }
@@ -153,7 +165,7 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 			return;
 
 		case newTag:
-			oss_profi_out (tagIndex);
+			oss_profi_out (tagIndex, 0);
 			set_tagState (tagIndex, reportedTag, NO);
 			break;
 
@@ -203,7 +215,11 @@ __PUBLF (NodePeg, void, msg_alrm_in) (char * buf) {
 		return;
 	}
 
-	if (in_alrm(buf, level) == 7)
+	if (in_alrm(buf, level) == 7 
+#ifdef __SMURPH__
+			|| strncmp (in_alrm(buf, desc), "!Y!", 3) == 0
+#endif
+		)
 		msg_alrm_out (in_header(buf, snd), 77, in_alrm(buf, desc));
 
 	oss_alrm_out (buf);

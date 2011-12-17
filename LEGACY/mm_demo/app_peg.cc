@@ -94,8 +94,12 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
   }
 }
 
+
+
 // [0, FF] -> [1, FF]
 // it can't be 0, as find_tag() will mask the rssi out!
+// All RSSI manipulations (or lack of them) thould be done here. The below
+// is just a lame example, hopefully useful for demonstrations
 static word map_rssi (word r) {
 #ifdef __SMURPH__
 /* temporary rough estimates
@@ -313,7 +317,6 @@ static char * locatName (word rssi, word pl) { // ignoring pl
 			return "no";
 	}
 	return "rssi?";
-	// should be more... likely a number with  distance?
 }
 
 static char * descName (word info) {
@@ -321,23 +324,43 @@ static char * descName (word info) {
 	if (info & INFO_BIZ) return "business";
 	if (info & INFO_DESC) return "intro";
 	// noombuzz is independent...
-	return "no desc";
+	return "noDesc";
 }
 
-__PUBLF (NodePeg, void, oss_profi_out) (word ind) {
+static char * descMark (word info, word list) {
+
+	if (list)
+		return "LT";
+
+	if (info & INFO_PRIV) return "PRIV";
+	if (info & INFO_BIZ) return "BIZ";
+	if (info & INFO_DESC) return "DESC";
+	// noombuzz is independent...
+	return "HELLO";
+}
+
+// arg. list indicates calls from 'lt'; kludgy wrap for 'LT' for Android stuff
+__PUBLF (NodePeg, void, oss_profi_out) (word ind, word list) {
 	char * lbuf = NULL;
 
     switch (oss_fmt) {
 	case OSS_ASCII_DEF:
 		lbuf = form (NULL, profi_ascii_def,
+#if ANDROIDEMO
+                        descMark(tagArray[ind].info, list),
+#endif
 			locatName (tagArray[ind].rssi, tagArray[ind].pl),
 			tagArray[ind].nick, tagArray[ind].id,
 			seconds() - tagArray[ind].evTime,
+#if ANDROIDEMO == 0
 			tagArray[ind].intim == 0 ? " " : " *intim* ",
+#endif
 			stateName (tagArray[ind].state),
 			tagArray[ind].profi,
 			descName (tagArray[ind].info),
+#if ANDROIDEMO == 0
 			(tagArray[ind].info & INFO_NBUZZ) ? " noombuzz)" : ")",
+#endif
 			tagArray[ind].desc);
 			break;
 
@@ -364,7 +387,7 @@ __PUBLF (NodePeg, void, oss_profi_out) (word ind) {
 
 __PUBLF (NodePeg, void, oss_data_out) (word ind) {
 	// for now
-	oss_profi_out (ind);
+	oss_profi_out (ind, 0);
 }
 
 __PUBLF (NodePeg, void, oss_nvm_out) (nvmDataType * buf, word slot) {
@@ -436,6 +459,10 @@ thread (root)
 	//diag ("dupa %u %u", w1, w2 );
 
 		ee_open ();
+
+#ifdef BOARD_WARSAW_BLUE
+                ser_select (1);
+#endif
 
 		ser_out (RS_INIT, welcome_str);
 		local_host = (word)host_id;
@@ -1014,7 +1041,7 @@ thread (root)
 
 	entry (RS_L_TAG)
 		if (tagArray[rt_ind].id != 0)
-			oss_profi_out (rt_ind);
+			oss_profi_out (rt_ind, 1);
 
 		if (++rt_ind < LI_MAX)
 			proceed (RS_L_TAG);

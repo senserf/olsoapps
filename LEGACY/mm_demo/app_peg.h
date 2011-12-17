@@ -26,7 +26,12 @@
 
 #define LI_MAX  6
 #define NI_LEN  7
+
+#if ANDROIDEMO
+#define PEG_STR_LEN 33
+#else
 #define PEG_STR_LEN 15
+#endif
 
 #define INFO_DESC	1
 #define INFO_BIZ	2
@@ -44,7 +49,7 @@
 
 #define NVM_OSET 	(1024L << 8)
 #define NVM_SLOT_NUM	16
-#define NVM_SLOT_SIZE 	64
+#define NVM_SLOT_SIZE 	128
 
 typedef enum {
 	noTag, newTag, reportedTag, confirmedTag, matchedTag,
@@ -63,7 +68,7 @@ typedef struct nvmDataStruct {
 	char	dbiz[PEG_STR_LEN +1];
 	word	local_inc;
 	word	local_exc;
-	char	spare[4]; // size: 64
+	char	spare[10]; // NVM_SLOT_SIZE: 128
 } nvmDataType;
 
 typedef struct tagDataStruct {

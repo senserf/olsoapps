@@ -23,7 +23,7 @@
 
 heapmem {80, 20}; // how to find out a good ratio?
 
-const   lword	host_id		= 0xBACA0067;
+const   lword	host_id		= 0xBACADEAD;
 word	host_pl			= 2; // PicOS differs from VUEE
 
 char	*ui_ibuf	= NULL,
@@ -116,6 +116,13 @@ static const char ill_str[] = FMT_MARK "02 Illegal command (%s)\r\n";
 
 static const char bad_str[] =  FMT_MARK "03 Bad or incomplete command (%s)\r\n";
 
+#if ANDROIDEMO
+static const char stats_str[] = FMT_MARK "STATS,%lx,%u,%u,%u,%u,%lu,"
+					"%u,%u,%u,%u\r\n";
+
+static const char profi_ascii_def[] = FMT_MARK "%s,%s,%s,%u,%lu sec. ago,"
+			"state:%s,profile:%x,%s:%s\r\n";
+#else
 static const char stats_str[] = FMT_MARK "04 Stats for hostId - localHost"
 					"(%lx - %u):"
 					" Freq audit (%u), events (%u),"
@@ -124,13 +131,19 @@ static const char stats_str[] = FMT_MARK "04 Stats for hostId - localHost"
 
 static const char profi_ascii_def[] = FMT_MARK "05 %s: %s (%u) %lu sec. ago,"
 			"%sstate(%s), Profile: %x, Desc(%s%s: %s\r\n";
+#endif
 
 static const char profi_ascii_raw[] = FMT_MARK "06 nick(%s), id(%u), et(%lu), "
 	"lt(%lu), intim(%u), state(%u), profi(%x), desc(%s), info(%x), "
 	"pl(%u), rssi (%u)\r\n";
 
+#if ANDROIDEMO
+static const char alrm_ascii_def[] = FMT_MARK "ALARM,%s,%u,"
+	"%x,%u,%u,%d,%s\r\n";
+#else
 static const char alrm_ascii_def[] = FMT_MARK "07 Alrm from %s(%u) "
 	"profile(%x) lev(%u) hops(%u) for %d: %s\r\n";
+#endif
 
 static const char alrm_ascii_raw[] = FMT_MARK "08 nick(%s), id(%u), "
 	"profi(%x), lev(%u), hops(%u), for(%u), desc(%s)\r\n";
@@ -209,6 +222,7 @@ static const char be_mon_el_str[] = " %u %s\r\n"; // here and now same as ign
 static const char hz_str[] = " noombuzz %u\t%s\r\n";
 
 static const char he_str[] = " event %u\t%s\r\n";
+
 #endif
 
 #endif

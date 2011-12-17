@@ -55,7 +55,7 @@ void	_da (msg_data_out) (nid_t peg, word info);
 void	_da (msg_alrm_in) (char * buf);
 void	_da (msg_alrm_out) (nid_t peg, word level, char * desc);
 
-void 	_da (oss_profi_out) (word ind);
+void 	_da (oss_profi_out) (word ind, word list);
 void	_da (oss_data_out) (word ind);
 void 	_da (oss_alrm_out) (char * buf);
 void	_da (oss_nvm_out) (nvmDataType * buf, word slot);
