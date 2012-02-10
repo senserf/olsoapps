@@ -19,8 +19,8 @@ int tcv_ope_bridge (int, int, va_list);
 int tcv_clo_bridge (int, int);
 int tcv_rcv_bridge (int, address, int, int*, tcvadp_t*);
 int tcv_frm_bridge (address, int, tcvadp_t*);
-int tcv_out_bridge (address);
-int tcv_xmt_bridge (address);
+int tcv_out_bridge (address, int);
+int tcv_xmt_bridge (address, int);
 
 const tcvplug_t plug_bridge =
 		{ tcv_ope_bridge, tcv_clo_bridge, tcv_rcv_bridge,
@@ -104,16 +104,17 @@ int tcv_rcv_bridge (int phy, address p, int len, int *ses, tcvadp_t *bounds) {
 int tcv_frm_bridge (address p, int phy, tcvadp_t *bounds) {
 
 	// Link Id + CRC
-	return bounds->head = bounds->tail = 0;
+	bounds->head = bounds->tail = 0;
+	return 0;
 }
 
-int tcv_out_bridge (address p) {
+int tcv_out_bridge (address p, int s) {
 
 	return TCV_DSP_XMT;
 
 }
 
-int tcv_xmt_bridge (address p) {
+int tcv_xmt_bridge (address p, int s) {
 
 	return TCV_DSP_DROP;
 }

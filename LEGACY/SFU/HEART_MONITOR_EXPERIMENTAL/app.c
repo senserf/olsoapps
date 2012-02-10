@@ -33,8 +33,8 @@ int tcv_ope_heart (int, int, va_list);
 int tcv_clo_heart (int, int);
 int tcv_rcv_heart (int, address, int, int*, tcvadp_t*);
 int tcv_frm_heart (address, int, tcvadp_t*);
-int tcv_out_heart (address);
-int tcv_xmt_heart (address);
+int tcv_out_heart (address, int);
+int tcv_xmt_heart (address, int);
 
 const tcvplug_t plug_heart =
 		{ tcv_ope_heart, tcv_clo_heart, tcv_rcv_heart, tcv_frm_heart,
@@ -238,17 +238,18 @@ int tcv_rcv_heart (int phy, address p, int len, int *ses,
 int tcv_frm_heart (address p, int phy, tcvadp_t *bounds) {
 
 	// Link Id + CRC
-	return bounds->head = bounds->tail = 2;
+	bounds->head = bounds->tail = 2;
+	return 0;
 }
 
-int tcv_out_heart (address p) {
+int tcv_out_heart (address p, int s) {
 
 	QPackets++;
 	return TCV_DSP_XMT;
 
 }
 
-int tcv_xmt_heart (address p) {
+int tcv_xmt_heart (address p, int s) {
 
 	QPackets--;
 	if (QPackets == PACKET_QUEUE_LIMIT)
