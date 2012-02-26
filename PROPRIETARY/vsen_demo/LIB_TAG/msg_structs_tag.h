@@ -1,11 +1,12 @@
-#ifndef __msg_structs_col_h__
-#define __msg_structs_col_h__
+#ifndef __msg_structs_tag_h__
+#define __msg_structs_tag_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2011.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
 #include "msg_tarp.h"
+#include "commconst.h"
 
 typedef struct msgSetTagStruct {
 	headerType	header;
@@ -18,22 +19,23 @@ typedef struct msgSetTagStruct {
 	lint		ds;
 	lint		refdate;
 	word		syfreq;
-	word		ev;
+	word		ackflags;
 } msgSetTagType;
 
 #define in_setTag(buf, field)   (((msgSetTagType *)(buf))->field)
 
 typedef struct msgStatsTagStruct {
 	headerType	header;
+	lword		hostid;
 	lword		ltime;
-	word		lhid;
-	word		clh;
+	lword		slot;
 	word		maj;
 	word		min;
 	word		span;
 	word		pl;
+	word		mem;
+	word		mmin;
 	word		c_fl;
-	word		vtstats[6];
 	word		spare;
 } msgStatsTagType;
 
@@ -43,7 +45,7 @@ typedef struct msgPongStruct {
 	headerType      header;
 	word		level:4;
 	word		flags:4;
-	word		spare:4;
+	word		setsen:4;
 	word		pstatus:4; // this should be in pload, but...
 	word		freq;
 } msgPongType;
@@ -60,7 +62,7 @@ typedef struct msgPongStruct {
 typedef struct pongPloadStruct {
 	lint 	ds; 
 	lword	eslot;
-	word	sval[6];	// NUM_SENS
+	word	sval[MAX_SENS];
 } pongPloadType;
 #define in_pongPload(buf, field) (((pongPloadType *)(buf + \
 				sizeof(msgPongType)))->field)
@@ -71,7 +73,7 @@ typedef struct msgPongAckStruct {
 	lint		ds;
 	lint		refdate;
 	word		syfreq;
-	word		ev;
+	word		ackflags;
 	word		plotid;
 } msgPongAckType;
 #define in_pongAck(buf, field) (((msgPongAckType *)(buf))->field)

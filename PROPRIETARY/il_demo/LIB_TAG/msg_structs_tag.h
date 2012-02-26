@@ -43,7 +43,7 @@ typedef struct msgPongStruct {
 	headerType      header;
 	word		level:4;
 	word		flags:4;
-	word		alrms:4;
+	word		spare:4;
 	word		pstatus:4; // this should be in pload, but...
 	word		freq;
 } msgPongType;

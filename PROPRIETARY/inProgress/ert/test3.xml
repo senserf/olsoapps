@@ -1,0 +1,100 @@
+<network nodes="3">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <channel>
+        <shadowing bn="-110.0dBm" syncbits="8">
+		RP(d) = received power at distance d
+		XP    = transmitted power
+		X     = lognormal random Gaussian component
+ 		=======================================================
+		RP(d)/XP [dB] = -10 x 3.7 x log(d/1.0m) + X(1.0) - 33.5
+ 		=======================================================
+	</shadowing>
+	<cutoff>-115.0dBm</cutoff>
+	<ber>
+		Interpolated ber table:
+		======================
+		  SIR		  BER
+		50.0dB		1.0E-6
+		40.0dB		2.0E-6
+		30.0dB		5.0E-6
+		20.0dB		1.0E-5
+		10.0dB		1.0E-4
+		 5.0dB		1.0E-3
+		 2.0dB		1.0E-1
+		 0.0dB		2.0E-1
+		-2.0dB		5.0E-1
+		-5.0dB		9.9E-1
+	</ber>
+	<frame>12 0</frame>
+	<rates>9600</rates>
+	<rssi>0 -202.0 255 53.0</rssi>
+	<power>
+		0	-30.0dBm
+		1	-15.0dBm
+		2	-10.0dBm
+		3	 -5.0dBm
+		4	  0.0dBm
+		5	  5.0dBm
+		6	  7.0dBm
+		7	 10.0dBm
+	</power>
+    </channel>
+    <nodes>
+	<defaults>
+	    <memory>8666 bytes</memory>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
+	    <eeprom size="524288"></eeprom>
+	    <iflash size="256,2"></iflash>
+	    <uart rate="9600" bsize="12" mode="n">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	    <pins number="10" adc="8">
+	    	<output target="socket"></output>
+		<input source="socket"></input>
+		<status>1111111111</status>
+		<values>0000000000</values>
+		<voltage>0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0</voltage>
+	    </pins>
+<!-- 
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
+		<sensor number="1" vsize="2" delay="0.220">16483</sensor>
+		<sensor number="2" vsize="2" delay="0.06">3339</sensor>
+		<sensor number="3" vsize="2" delay="0.6">2000</sensor>
+		<sensor number="4" vsize="2" delay="0.85">4095</sensor>
+		<sensor number="5" vsize="2" delay="0.0">1</sensor>
+	    </sensors>
+-->
+	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
+	    <preinit tag="MHOST" type="word">0</preinit>
+	    <preinit tag="NID" type="word">0</preinit>
+	</defaults>
+	<node number="0" type="ert">
+	    <location>5.0 5.0</location>
+	</node>
+	<node number="1" type="ert" start="on">
+	    <location>105.0 5.0</location>
+	</node>
+	<node number="2" type="ert" start="off">
+	    <location>60.0 60.0</location>
+	</node>
+    </nodes>
+</network>

@@ -1,0 +1,13 @@
+<preinit tag="SSET" type="word">1</preinit>
+<sensors>
+	<input source="socket"></input>
+	<output target="socket"></output>
+
+	<!-- sensor 0 is not used, but without it here things don't work -->
+	<sensor number="0" vsize="2" delay="0.00" init="0">1</sensor>
+
+	<sensor number="1" vsize="2" delay="0.01" init="6000">14000</sensor>
+	<sensor number="2" vsize="2" delay="0.01" init="1500">3300</sensor>
+	<sensor number="-1" vsize="2" delay="0.01" init="2600"> 2703 </sensor>
+	<sensor number="-2" vsize="2" delay="0.01" init="3000"> 4000 </sensor>
+</sensors>

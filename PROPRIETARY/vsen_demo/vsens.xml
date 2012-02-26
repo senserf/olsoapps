@@ -1,0 +1,102 @@
+<network nodes="9">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	    <xi:include href="node.xml"/>
+	</defaults>
+
+	<node number="0" type="peg">
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-1" vsize="2" delay="0.01" init="2600">
+			2703
+		</sensor>
+	    </sensors>
+	    <location>5.0 5.0</location>
+	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
+	</node>
+
+        <node number="1" type="peg">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>105.0 5.0</location>
+            <preinit tag="HID" type="lword">0xBACA000B</preinit>
+        </node>
+
+        <node number="2" type="peg">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>205.0 5.0</location>
+            <preinit tag="HID" type="lword">0xBACA000C</preinit>
+        </node>
+
+        <node number="3" type="peg">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>305.0 5.0</location>
+            <preinit tag="HID" type="lword">0xBACA000D</preinit>
+        </node>
+
+        <node number="4" type="peg" start="off">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>5.0 105.0</location>
+            <preinit tag="HID" type="lword">0xBACA000E</preinit>
+        </node>
+
+        <node number="5" type="peg" start="off">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>15.0 105.0</location>
+            <preinit tag="HID" type="lword">0xBACA000F</preinit>
+        </node>
+
+
+	<node number="6" type="simps" start="on">
+	    <location>405.0 5.0</location>
+	    <xi:include href="senset_ils.xml"/>
+	    <preinit tag="HID" type="lword">0xBACA0065</preinit>
+	</node>
+
+        <node number="7" type="simps" start="on">
+            <location>415.0 15.0</location>
+            <xi:include href="senset_eco12.xml"/>
+            <preinit tag="HID" type="lword">0xBACA0066</preinit>
+        </node>
+
+	<node number="8" type="arras" start="on">
+	    <location>395.0 15.0</location>
+	    <xi:include href="senset_10sht.xml"/>
+	    <preinit tag="HID" type="lword">0xBACA0067</preinit>
+	</node>
+
+    </nodes>
+</network>
