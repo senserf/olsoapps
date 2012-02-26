@@ -16,5 +16,5 @@ idiosyncratic Boolean msg_isMaster (msg_t);
 idiosyncratic Boolean msg_isNew (msg_t);
 idiosyncratic Boolean msg_isClear (byte);
 idiosyncratic void set_master_chg ();
-idiosyncratic word  guide_rtr (headerType);
+idiosyncratic word  guide_rtr (headerType*);
 #endif
