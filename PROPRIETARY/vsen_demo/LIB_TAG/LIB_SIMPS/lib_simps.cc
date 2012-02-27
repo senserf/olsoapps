@@ -40,7 +40,7 @@ fsm sread {
 	state S2:
 		read_sensor (S2, cursen (2), &sens_data.ee.sval[2]);
 	state S3:
-		read_sensor (S2, cursen (3), &sens_data.ee.sval[3]);
+		read_sensor (S3, cursen (3), &sens_data.ee.sval[3]);
 #else
 	sint i;
 	app_diag (D_WARNING, "FAKE SENSORS");

@@ -63,9 +63,9 @@ char * form_dump (sensEEDumpType *sd, const char * nam, const mdate_t * md) {
 			md->dat.mm, md->dat.dd, md->dat.h, md->dat.m, md->dat.s,
 
 			sd->ee.sval[0], sd->ee.sval[1],
-			sd->ee.sval[2], sd->ee.sval[5],
-			sd->ee.sval[3], sd->ee.sval[6],
-			sd->ee.sval[4], sd->ee.sval[7],
+			sd->ee.sval[2], sd->ee.sval[3],
+			sd->ee.sval[4], sd->ee.sval[5],
+			sd->ee.sval[6], sd->ee.sval[7],
 			sd->ee.s.f.setsen);
 
 }

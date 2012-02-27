@@ -63,7 +63,7 @@
                         2703
                 </sensor>
             </sensors>
-            <location>5.0 105.0</location>
+            <location>5.0 305.0</location>
             <preinit tag="HID" type="lword">0xBACA000E</preinit>
         </node>
 
@@ -75,7 +75,7 @@
                         2703
                 </sensor>
             </sensors>
-            <location>15.0 105.0</location>
+            <location>15.0 305.0</location>
             <preinit tag="HID" type="lword">0xBACA000F</preinit>
         </node>
 

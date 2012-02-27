@@ -239,13 +239,22 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
 
+#if 0
+let's leave it in for mhop testing... (dupa keyword in diag)
+  diag ("dupa in: %u (%u %u) %u %u", in_header(buf, msg_type),
+  in_header(buf, hoc), in_header(buf, hco), in_header(buf, snd),
+  in_header(buf, rcv));
+#endif
+
   switch (in_header(buf, msg_type)) {
 
 	case msg_pong:
-
+#if 0
+this is dangerous is forgotten
 		if (in_header(buf, snd) / 1000 != local_host / 1000)
 			return;
 
+#endif
 		if (in_pong_rxon(buf)) 
 			check_msg4tag (buf);
 

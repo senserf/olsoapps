@@ -8,7 +8,7 @@ static trueconst char ee_str[] =
 	OPRE_APP_MENU_A "EE from %lu to %lu size %u\r\n";
 
 static trueconst char welcome_str[] = OPRE_APP_MENU_A 
-	"*EcoNet* 1.3" OMID_CRB "Aggregator commands:\r\n"
+	"*Vsenet 1.0" OMID_CRB "Aggregator commands:\r\n"
 	OPRE_APP_MENU_A 
 	"\tAgg set / show:\ta id [ audit_freq [ p_lev [ hex:a_fl ]]]\r\n"
 	OPRE_APP_MENU_A 
