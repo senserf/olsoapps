@@ -8,25 +8,23 @@
 
 set plug_snippets {
 
-{SHT_Temp {if { $value == 0 } {
-        set value -1
-}
-if { $value != -1 } {
+{SHT_Temp {if { $value == 0 || $value == -1 } {
+        set value "?"
+} else {
         set value [expr -39.62 + 0.01 * $value]
 }} C {2 {1 2 5}} {4 5} {6 5}} {IR_Motion {set value [expr $value]} N {3 3}} {Light {set value [expr $value * 0.5]} L {2 3}} {Chronos_Temp {if [expr $value & 0x2000] {
         set value [expr (~$value & 0x1fff) + 1]
         set value [expr -$value]
 }
-set value [expr $value / 20.0]} C {3 4}} {SHT_Humid {if { $value == 0 } {
-        set value -1
-}
-if { $value != -1 } {
-set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
-if { $value < 0.0 } {
-        set value 0.0
-} elseif { $value > 100.0 } {
-        set value 100.0
-}
+set value [expr $value / 20.0]} C {3 4}} {SHT_Humid {if { $value == 0 || $value == -1 } {
+        set value "?"
+} else {
+	set value [expr -4.0 + 0.0405 * $value - 0.0000028 * $value * $value]
+	if { $value < 0.0 } {
+		set value 0.0
+	} elseif { $value > 100.0 } {
+		set value 100.0
+	}
 }} % {3 {1 2 5}} {5 5} {7 5}} {Chip_Temp {set value [expr $value * 0.1032 - 277.75]} C {0 all}} {Chronos_Acc {set value [expr $value]} N {2 4}} {Battery {set value [expr $value * 0.001221]} V {1 all}}
 
 }
@@ -136,10 +134,22 @@ proc snip_cnvrt { v s c { units "" } { name "" } } {
 		set na [lindex $SC($c,$s) 2]
 	}
 
-	if { $snip != "" && ![catch { snip_eval $snip $v } r] } {
-		return [format %1.2f $r]
+	if { $snip == "" } {
+		return ""
 	}
-	return ""
+
+	if [catch { snip_eval $snip $v } v] {
+		set v "?"
+	}
+
+	if { $v != "?" } {
+		if [catch { expr $v } v] {
+			set v "?"
+		} else {
+			set v [format %1.2f $v]
+		}
+	}
+	return $v
 }
 
 proc snip_icache { } {
@@ -637,7 +647,9 @@ proc plug_outsensors { vals } {
 		if { $val == "" } {
 			continue
 		}
-		append val $un
+		if { $val != "?" } {
+			append val $un
+		}
 		set len [string length $na]
 		set val [plug_trims $val [expr 24 - $len]]
 		pt_tout "    Sensor $inx === $na$val"
