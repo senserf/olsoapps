@@ -131,8 +131,8 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 		return;
 	}
 
-	if (nbu < 0 && ((in_profi(buf, profi) & p_exc) ||
-			!(in_profi(buf, profi) & p_inc))) {
+	if (nbu < 0 && ((in_profi(buf, profi) & p_exc) /* ||
+			!(in_profi(buf, profi) & p_inc)*/)) {
 		app_diag (D_INFO, "Rejected %u (%x)", in_header(buf, snd),
 				in_profi(buf, profi));
 		return;
@@ -208,8 +208,8 @@ __PUBLF (NodePeg, void, msg_alrm_in) (char * buf) {
 
 	// not monitored and bad or no match
 	if (find_mon (in_header(buf, snd)) < 0 &&
-		((in_alrm(buf, profi) & p_exc) ||
-		!(in_alrm(buf, profi) & p_inc))) {
+		((in_alrm(buf, profi) & p_exc) /*||
+		!(in_alrm(buf, profi) & p_inc)*/)) {
 		app_diag (D_INFO, "Rejected alrm %u (%x)", in_header(buf, snd),
 				in_alrm(buf, profi));
 		return;
