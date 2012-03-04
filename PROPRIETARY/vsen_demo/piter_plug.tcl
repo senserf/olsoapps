@@ -600,7 +600,19 @@ proc plug_outpp_t { ln } {
 
 	if [regexp "^1002 *(Agg.*:\[0-9\]+ *)(.*)" $line mat hdr vals] {
 		# write the header, the sensors will go into separate lines
-		pt_tout "[string trim $hdr]:"
+		set gs [string first "gone" $vals]
+		set hdr [string trim $hdr]
+		if { $gs >= 0 } {
+			set vals [string range $vals [expr $gs + 4] end]
+			if [regexp "\[-0-9\]" $vals mat] {
+				set vals [string range $vals \
+					[string first $mat $vals] end]
+			} else {
+				set vals ""
+			}
+			append hdr " (GONE!)"
+		}
+		pt_tout "${hdr}:"
 		plug_outsensors $vals
 		return 0
 	}
@@ -623,6 +635,7 @@ proc plug_outpp_t { ln } {
 proc plug_outsensors { vals } {
 
 	set vl ""
+
 	while 1 {
 		set vals [string trim $vals]
 		if { $vals == "" } {
