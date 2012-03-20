@@ -353,7 +353,7 @@ static word map_rssi (word r) {
 	return 1;
 #endif
 #endif
-	return 1; // eco demo: don't overwhelm
+	return r; // eco demo: don't overwhelm
 }
 
 /*
@@ -410,7 +410,7 @@ fsm rcv {
 					in_header(rcv_buf_ptr, snd));
 #endif
 		process_incoming (RC_MSG, rcv_buf_ptr, rcv_packet_size,
-			map_rssi(rcv_rssi));
+			map_rssi(rcv_rssi >> 8));
 		proceed RC_TRY;
 }
 
@@ -538,6 +538,15 @@ void oss_report_out (char * buf) {
 	s2d (&md);
 	md2.secs = in_reportPload(buf, ppload.ds);
 	s2d (&md2);
+
+	// Another kludge, possibly affecting general sensor data:
+	// how to format variable sensor strings, include additional data, etc?
+	// Here we load plev and rssi as CHRONOS sensors [6], [7].
+	// SENSET_CHRO == 4; don't include  senset.h/cc here:
+	if (in_report(buf, setsen) == 4) {
+		in_reportPload(buf, ppload.sval[6]) = in_report(buf, pl);
+		in_reportPload(buf, ppload.sval[7]) = in_report(buf, rssi);
+	}
 
 	lbuf = form (NULL, rep_str,
 

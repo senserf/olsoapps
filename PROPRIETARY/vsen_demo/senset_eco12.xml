@@ -8,6 +8,6 @@
 
 	<sensor number="1" vsize="2" delay="0.01" init="6000">14000</sensor>
 	<sensor number="2" vsize="2" delay="0.01" init="1500">3300</sensor>
-	<sensor number="-1" vsize="2" delay="0.01" init="2600"> 2703 </sensor>
-	<sensor number="-2" vsize="2" delay="0.01" init="3000"> 4000 </sensor>
+	<sensor number="-1" vsize="2" delay="0.01" init="2501"> 2600 </sensor>
+	<sensor number="-2" vsize="2" delay="0.01" init="2800"> 4000 </sensor>
 </sensors>
