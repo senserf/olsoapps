@@ -606,15 +606,9 @@ void do_butt (word b) {
 
 	if (ev & 1) {
 		if (buttons & 1)
-#ifndef __SMURPH__
 			cma_3000_on (0);
 		else
 			cma_3000_on (1);
-#else
-			diag ("CMA LO");
-		else
-			diag ("CMA HI");
-#endif
 	}
 
 	if (ev > (1<<4)) { // external event: note that we always trigger alrm
@@ -697,7 +691,7 @@ fsm root {
 			leds (LED_G, LED_BLINK);
 #ifndef __SMURPH__
 #if CRYSTAL2_RATE
-//#error CRYSTAL2 RATE MUST BE 0, UART_RATE 9600
+#error CRYSTAL2 RATE MUST BE 0, UART_RATE 9600
 #endif
 #endif
 		if (is_flash_new) {

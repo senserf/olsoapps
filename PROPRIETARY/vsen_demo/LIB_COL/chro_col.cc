@@ -65,7 +65,7 @@ void ezlcd_on () { emul (0, "(%lu) ON", seconds()); }
 void ezlcd_off () { emul (0, "(%lu) OFF", seconds()); }
 
 void chro_xx (word hi, word a) {
-	emul (0, "(%lu) %s: %x", hi ? "hi" : "lo", seconds(), a);
+	emul (0, "(%lu) %s: %x", seconds(), hi ? "hi" : "lo", a);
 }
 
 void chro_nn (word hi, word a) {
