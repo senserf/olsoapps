@@ -11,6 +11,8 @@
 	<sensor number="-2" vsize="2" delay="0.01" init="2134"> 4000 </sensor>
 </sensors>
 
+<eeprom></eeprom>
+
 <emul>
 	<output target="socket" type="held"></output>
 </emul>
