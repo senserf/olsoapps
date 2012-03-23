@@ -281,6 +281,7 @@ fsm lcd_delay {
 		release;
 	state S_OFF:
 		ezlcd_off();
+		finish;
 }
 
 fsm rxsw {
