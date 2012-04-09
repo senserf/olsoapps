@@ -121,7 +121,7 @@ void fatal_err_t (word err, word w1, word w2, word w3) {
 }
 
 static void init () {
-	cma_3000_on (0); // for now, we'll see if low sensitivity is enough
+	cma3000_on (0, 1, 3); // for now, we'll see if low sensitivity is enough
 	ezlcd_init ();
 	ezlcd_on ();
 	chro_lo ("ILIAD");
@@ -590,7 +590,7 @@ void do_butt (word b) {
 			reset();
 		}
 		chro_lo ("SLEEP");
-		cma_3000_off ();
+		cma3000_off ();
 		runfsm lcd_delay;
 		net_opt (PHYSOPT_RXOFF, NULL);
 		net_opt (PHYSOPT_TXOFF, NULL);
@@ -607,9 +607,9 @@ void do_butt (word b) {
 
 	if (ev & 1) {
 		if (buttons & 1)
-			cma_3000_on (0);
+			cma3000_on (0, 2, 3);
 		else
-			cma_3000_on (1);
+			cma3000_on (0, 1, 3);
 	}
 
 	if (ev > (1<<4)) { // external event: note that we always trigger alrm

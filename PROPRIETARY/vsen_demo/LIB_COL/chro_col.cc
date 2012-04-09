@@ -78,10 +78,10 @@ void chro_nn (word hi, word a) {
 void chro_hi (const char *txt) { emul (0, "(%lu) hi: %s", seconds(), txt); }
 void chro_lo (const char *txt) { emul (0, "(%lu) lo: %s", seconds(), txt); }
 
-void cma_3000_on (word m) { 
-	emul (0, "(%lu) cma %s", seconds(), m ? "hi" : "lo");
+void cma3000_on (byte m, byte n, byte o) { 
+	emul (0, "(%lu) cma %d, %d, %d", seconds(), m, n, o);
 }
 
-void cma_3000_off () { emul (0, "(%lu) cma off", seconds()); }
+void cma3000_off () { emul (0, "(%lu) cma off", seconds()); }
 
 #endif

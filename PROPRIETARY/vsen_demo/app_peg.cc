@@ -240,7 +240,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 	  return;
 
 #if 0
-let's leave it in for mhop testing... (dupa keyword in diag)
+// let's leave it in for mhop testing... (dupa keyword in diag)
   diag ("dupa in: %u (%u %u) %u %u", in_header(buf, msg_type),
   in_header(buf, hoc), in_header(buf, hco), in_header(buf, snd),
   in_header(buf, rcv));

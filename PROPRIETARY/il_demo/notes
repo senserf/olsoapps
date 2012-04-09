@@ -330,7 +330,7 @@ content (what used to be sensor portion) from a CHRONOS node:
  |    |  |  |    c_flags (hex) now include board type on bits 2^6, 2^7. So far:
  |    |  |  |            0-ROOM, 1-CHRONOS
  |    |  |  buttons
- |    |  cma_3000 (acc-meter)
+ |    |  cma3000 (acc-meter)
  |    temperature
  battery
 

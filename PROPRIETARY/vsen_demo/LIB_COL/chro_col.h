@@ -14,8 +14,8 @@ void chro_xx (word hi, word a);
 void ezlcd_init ();
 void ezlcd_on ();
 void ezlcd_off ();
-void cma_3000_on (word m);
-void cma_3000_off ();
+void cma3000_on (byte, byte, byte);
+void cma3000_off ();
 #else
 #include "ez430_lcd.h"
 #endif
