@@ -39,8 +39,13 @@ const word senset = SENSET_ECO_45;
 // BOARD_CHRONOS: IT(-2) IV(-1) CMA(0) T(1) (pressure not used)
 const word senset = SENSET_CHRO;
 #else
+#ifdef BOARD_WARSAW_SONAR
+// BOARD_SONAR: IT(-2) IV(-1) SONAR(0)
+const word senset = SENSET_SONAR;
+#else
 // pseudoBOARD_GENERIC: IT(-2) IV(-1)
 const word senset = SENSET_GENERIC;
+#endif
 #endif
 #endif
 #endif

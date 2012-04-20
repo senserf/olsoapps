@@ -84,4 +84,8 @@ void cma3000_on (byte m, byte n, byte o) {
 
 void cma3000_off () { emul (0, "(%lu) cma off", seconds()); }
 
+void buzzer_init () { emul (0, "(%lu) buzzer_init", seconds()); }
+void buzzer_on () { emul (0, "(%lu) buzzer_on", seconds()); }
+void buzzer_off () { emul (0, "(%lu) buzzer_off", seconds()); }
+
 #endif

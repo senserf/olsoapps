@@ -107,7 +107,22 @@ fsm oss_out (char*) {
 	finish;
 }
 
+fsm buzz {
+
+	state BON:
+		buzzer_on();
+		delay (500, BOF);
+		release;
+
+	state BOF:
+		buzzer_off();
+		delay (10000, BON);
+		release;
+}
+
+
 void fatal_err_t (word err, word w1, word w2, word w3) {
+#if 0
 	//leds (LED_R, LED_BLINK);
 	if_write (IFLASH_SIZE -1, err);
 	if_write (IFLASH_SIZE -2, w1);
@@ -117,13 +132,15 @@ void fatal_err_t (word err, word w1, word w2, word w3) {
 		app_diag_t (D_FATAL, "HALT %x %u %u %u", err, w1, w2, w3);
 		halt();
 	}
+#endif
 	reset();
 }
 
 static void init () {
-	cma3000_on (0, 1, 3); // for now, we'll see if low sensitivity is enough
+	cma3000_on (0, 1, 3);
 	ezlcd_init ();
 	ezlcd_on ();
+	//buzzer_init ();
 	chro_lo ("ILIAD");
 	chro_nn (1, local_host);
 
@@ -150,7 +167,9 @@ static void show_ifla_t () {
 	}
 }
 
+#if 0
 static void read_ifla_t () {
+
 	if (if_read (0) == 0xFFFF) { // usual defaults
 		local_host = (word)host_id;
 		return;
@@ -178,6 +197,7 @@ static void save_ifla_t () {
 	if_write (4, pong_params.freq_min);
 	if_write (5, pong_params.rx_span);
 }
+#endif
 
 // Display node stats on UI
 static void stats () {
@@ -514,6 +534,40 @@ fsm pong {
 
 }
 
+static void cma_massage (address w) {
+	char * c = (char *) w;
+	word mi, ma;
+
+	if (c[0] != 0) { // motion 
+		sens_data.sval[2] = c[0];
+		killall (buzz);
+		buzzer_off();
+		return;
+	}
+
+	// I'm bored... anything faster?
+	if (c[1] > c[2])
+		mi = 2;
+	else
+		mi = 1;
+
+	if (c[3 - mi] > c[3]) {
+		ma = 3 - mi;
+		if (c[3] < c[mi])
+			mi = 3;
+	} else {
+		ma = 3;
+	}
+
+	sens_data.sval[2] =  128; // it'll be [0, 255]
+	sens_data.sval[2] +=  ((sint)(c[mi] + c[ma]) < 0) ?
+	       1000* mi + c[mi] : c[ma] + 1000* ma;
+
+	// start buzzing
+	if (!running (buzz))
+		runfsm buzz;
+}
+
 #define BATTERY_WARN	2250
 
 fsm sens {
@@ -540,8 +594,25 @@ fsm sens {
 		read_sensor (SE_0, -2, &sens_data.sval[0]);
 	entry SE_1:
 		read_sensor (SE_1, -1, &sens_data.sval[1]);
-	entry SE_2: // motion
-		read_sensor (SE_2, 0,  &sens_data.sval[2]);
+
+#ifndef __SMURPH__
+		// force measurement mode only when needed
+		read_sensor (WNONE, 0, w);
+		if (*(char*)w != 0) { // motion
+			sens_data.sval[2] = *(char *)w;
+			killall (buzz);
+			buzzer_off();
+			proceed (SE_3);
+		}
+#endif
+
+	entry SE_2: // motion without motion (orientation)
+		read_sensor (SE_2, 0,  w);
+		cma_massage (w);
+#ifndef __SMURPH__
+		// dupa temporary, vuee will be updated
+		wait_sensor (0, WNONE);
+#endif
 	entry SE_3: // temp, pressure
 		read_sensor (SE_3, 1, w);
 #ifndef __SMURPH__
@@ -600,18 +671,20 @@ void do_butt (word b) {
 		killall (pong);
 		killall (sens);
 		killall (pong);
+		killall (buzz);
+		buzzer_off();
 		killall (rcv); // keep last: this fsm can call do_butt()!!
 
 		return;
 	}
-
+#if 0
 	if (ev & 1) {
 		if (buttons & 1)
 			cma3000_on (0, 2, 3);
 		else
 			cma3000_on (0, 1, 3);
 	}
-
+#endif
 	if (ev > (1<<4)) { // external event: note that we always trigger alrm
 		if (buttons & 0x1F & ev) {
 			chro_lo ("IGNOR");
@@ -623,6 +696,10 @@ void do_butt (word b) {
 		//flip
 		buttons = buttons & ev ? 
 			buttons & ~ev : buttons | ev;
+
+		// any button, any position
+		killall (buzz);
+		buzzer_off();
 	}
 
 	if (!(buttons & 0x1F)) // all buttons 0-4 cleared
@@ -705,7 +782,11 @@ fsm root {
 
 	entry RS_INIT1:
 		ser_out (RS_INIT1, obuf);
-		master_host = local_host;
+
+		local_host = (word)host_id; // FIM disabled
+		master_host = local_host; // I'm not sure what this is for...
+		init();
+#if 0
 		read_ifla_t();
 		init();
 
@@ -724,6 +805,7 @@ fsm root {
 			stats();
 			proceed RS_RCMD;
 		}
+#endif
 		leds (LED_G, LED_OFF);
 
 	entry RS_INIT2:
@@ -795,7 +877,7 @@ fsm root {
 
 		if (cmd_line[0] == 'q')
 			reset();
-
+#if 0
 		if (cmd_line[0] == 'M') {
 			if (if_read (IFLASH_SIZE -1) != 0xFFFF) {
 				diag (OPRE_APP_ACK "Already in maintenance");
@@ -819,7 +901,7 @@ fsm root {
 			diag (OPRE_APP_ACK "all erased");
 			reset();
 		}
-
+#endif
 		if (cmd_line[0] == 's') {
 
 			i1 = i2 = i3 = i4 = i5 = -1;
@@ -881,8 +963,10 @@ fsm root {
 		}
 
 		if (cmd_line[0] == 'S') {
+#if 0
 			if (cmd_line[1] == 'A')
 				save_ifla_t();
+#endif
 			show_ifla_t();
 			proceed RS_FREE; 
 		}

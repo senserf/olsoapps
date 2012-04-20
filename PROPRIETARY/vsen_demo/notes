@@ -8,3 +8,12 @@ econnect and piter (with piter_plug.tcl) are part of this adventure; the works s
 
 It didn't go too well; I hope to continue it, with folding collectors back into one program and setting decent sensor modules. In general, this can be a playground for better modularity we plan for OSSI, storage, et al.
 
+---
+April 19, 2012: added WARSAW_SONAR (as simps), updated CHRONOS with the driver changes: if there has been motion within the reporting cycle (for demo it is 30s), the triggering axis is reported (1,2,3). Immobile chronos will attempt at report orientation: prevailing axis *1000 plus the reading shifted by 128 to [0, 255]. When there is no movement, chronos buzzes every 10s for 500ms. At reporting times, movements cancel the buzzing, so id any button. Note that buttons trigger reports, so repeated button press triggers 'immobility alarm'. Could be useful for various demoing scenarios.
+
+Things seem to work, but it is still work in progress:
+- nasty surprise with FIM: it doesn't get erased at flashing time. I disabled FIM for now.
+- sensor accuracy is bad, especially sonar's. We may wait for a real need, but as is, it is rather useless.
+- we may want to make chronos functionality 'better', even without real reqs. Power budget should be doble checked with cma and the buzzer.
+
+---

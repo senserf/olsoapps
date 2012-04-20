@@ -16,6 +16,9 @@ void ezlcd_on ();
 void ezlcd_off ();
 void cma3000_on (byte, byte, byte);
 void cma3000_off ();
+void buzzer_init ();
+void buzzer_on ();
+void buzzer_off ();
 #else
 #include "ez430_lcd.h"
 #endif

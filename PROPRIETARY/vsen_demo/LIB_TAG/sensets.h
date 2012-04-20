@@ -21,6 +21,7 @@
 #define SENSET_ILS	3
 #define SENSET_CHRO	4
 #define SENSET_10SHT	5
+#define SENSET_SONAR	6
 
 //+++ "sensets.cc"
 

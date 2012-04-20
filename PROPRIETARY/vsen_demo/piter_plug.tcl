@@ -8,15 +8,15 @@
 
 set plug_snippets {
 
-{Light {set value [expr $value * 0.5]} li {2 3}} {IR_Motion {set value [expr $value]} mo {3 3}} {Chronos_Acc {set value [expr $value]} mo {2 4}} {Battery {set value [expr $value * 0.001221]} V {1 all}} {Chronos_RSSI {set value [expr $value]} rss {7 4}} {SHT_Temp {if { $value == 0 || $value == -1 } {
+{Light {set value [expr $value * 0.5]} li {2 3}} {IR_Motion {set value [expr $value]} mo {3 3}} {Chronos_Acc {set value [expr $value]} mo {2 4}} {Sonar {set value [expr $value * 0.3175]} cm {2 6}} {Battery {set value [expr $value * 0.001221]} V {1 all}} {Chronos_RSSI {set value [expr $value]} rss {7 4}} {SHT_Temp {if { $value == 0 || $value == -1 } {
                 set value "?"
 } else {
                 set value [expr -39.62 + 0.01 * $value]
-}} C {2 {1 2 5}} {4 5} {6 5}} {Msp_Temp {set value [expr $value * 0.10318 - 277.74 + 9.0]} C {0 1} {0 2} {0 3} {0 5}} {Chronos_Temp {if [expr $value & 0x2000] {
+}} C {2 {1 2 5}} {4 5} {6 5}} {Msp_Temp {set value [expr $value * 0.10318 - 277.74 + 9.0]} C {0 1} {0 2} {0 3} {0 5}} {Sonar_Temp {set value [expr $value * 0.10318 - 277.74 + 9.0]} C {0 6}} {Chronos_Temp {if [expr $value & 0x2000] {
                 set value [expr (~$value & 0x1fff) + 1]
                                 set value [expr -$value]
 }
-set value [expr $value / 20.0 - 3.0]} C {3 4}} {Chronos_Buttons {set value [expr $value]} bu {5 4}} {Chronos_PLev {set value [expr $value]} pl {6 4}} {CC_Temp {set value [expr $value * 0.1628 - 300.0 -25.0]} C {0 4}} {Chronos_Pres {if { $value < 0 } {
+set value [expr $value / 20.0 - 3.0]} C {3 4}} {Chronos_Buttons {set value [expr $value]} bu {5 4}} {Chronos_PLev {set value [expr $value]} pl {6 4}} {Sonar_count {set value [expr $value]} # {3 6}} {CC_Temp {set value [expr $value * 0.1628 - 300.0 -25.0]} C {0 4}} {Chronos_Pres {if { $value < 0 } {
                 set value [expr 65536 + $value]
 }
 set value [expr $value / 500.0]} kPa {4 4}} {SHT_Humid {if { $value == 0 || $value == -1 } {
