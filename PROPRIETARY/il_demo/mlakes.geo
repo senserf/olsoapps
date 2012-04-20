@@ -1,7 +1,7 @@
 <geometry>
 	<root>=(10,30)</root>
 
-	<roamer image="mlakes.jpg" width="800.0" display="yes">
+	<roamer image="mlakes.gif" width="800.0" display="yes">
 		=(200,200)
 		<nodecolor type="peg">tomato1</nodecolor>
 		<nodecolor type="col">lightblue</nodecolor>
