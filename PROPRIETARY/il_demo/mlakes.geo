@@ -6,6 +6,7 @@
 		<nodecolor type="peg">tomato1</nodecolor>
 		<nodecolor type="col">lightblue</nodecolor>
 		<nodecolor type="tag">green</nodecolor>
+		<viscolors label="brown">magenta goldenrod</viscolors>
 	</roamer>
 
 	<leds display="yes">

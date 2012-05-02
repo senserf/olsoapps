@@ -74,6 +74,9 @@ void send_msg_t (char * buf, sint size) {
 	}
 
 	if (net_tx (WNONE, buf, size, 0) == 0) {
+		highlight_set (1, 1.5, "Sent %u to %u",
+			in_header(buf, msg_type),
+			in_header(buf, rcv));
         	app_diag_t (D_DEBUG, "Sent %u to %u",
 			in_header(buf, msg_type),
 			in_header(buf, rcv));

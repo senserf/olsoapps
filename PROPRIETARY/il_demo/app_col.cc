@@ -344,10 +344,19 @@ fsm rcv {
 			psize = 0;
 		}
 		psize = net_rx (RC_TRY, &buf, &rssi, 0);
+
 		if (psize <= 0) {
 			app_diag_t (D_SERIOUS, "net_rx failed (%d)", psize);
 			proceed RC_TRY;
 		}
+
+		highlight_set (0, 1.5, "RCV (%d): %x %u %u %u %u %u",
+			  psize, in_header(buf, msg_type),
+			  in_header(buf, seq_no) & 0xffff,
+			  in_header(buf, snd),
+			  in_header(buf, rcv),
+			  in_header(buf, hoc) & 0xffff,
+			  in_header(buf, hco) & 0xffff);
 
 		app_diag_t (D_DEBUG, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",
 			  psize, in_header(buf, msg_type),
