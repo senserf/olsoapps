@@ -26,6 +26,7 @@ typedef struct msgProfiStruct {
 	word		pl:4;
 	word		spare:12;
 	char		nick[NI_LEN +1];
+	char		desc[PEG_STR_LEN +1];
 } msgProfiType;
 	
 #define in_profi(buf, field)   (((msgProfiType *)(buf))->field)

@@ -25,6 +25,7 @@ heapmem {80, 20}; // how to find out a good ratio?
 
 const   lword	host_id		= 0xBACADEAD;
 word	host_pl			= 2; // PicOS differs from VUEE
+word	batter			=0;
 
 char	*ui_ibuf	= NULL,
 	*ui_obuf	= NULL,
@@ -70,11 +71,19 @@ static const char d_nbu[][12] = {
 // output strings same for all devices
 static const char welcome_str[] = "***Seawolfie 0.4***\r\n"
 	"Set / show matching (s, p):\r\n"
+	"\tid:\tsi <id>\r\n"
 	"\tnickname:\tsn <nickname 7>\r\n"
-	"\tdesc:\t\tsd <description 15>\r\n"
-	"\tpriv:\t\tsp <priv desc 15>\r\n"
-	"\tbiz:\t\tsb <biz desc 15>\r\n"
-	"\talrm:\t\tsa <alrm desc 15>\r\n"
+#if ANDROIDEMO
+	"\tdesc:\tsd <description 33>\r\n"
+	"\tpriv:\tsp <priv desc 33>\r\n"
+	"\tbiz:\tsb <biz desc 33>\r\n"
+	"\talrm:\tsa <alrm desc 33>\r\n"
+#else
+	"\tdesc:\tsd <description 15>\r\n"
+	"\tpriv:\tsp <priv desc 15>\r\n"
+	"\tbiz:\tsb <biz desc 15>\r\n"
+	"\talrm:\tsa <alrm desc 15>\r\n"
+#endif
 	"\tprofile:\tpp <ABCD hex>\r\n"
 	"\texclude:\tpe <ABCD hex>\r\n"
 	"\tinclude:\tpi <ABCD hex>\r\n\r\n"
@@ -117,22 +126,20 @@ static const char ill_str[] = FMT_MARK "02 Illegal command (%s)\r\n";
 static const char bad_str[] =  FMT_MARK "03 Bad or incomplete command (%s)\r\n";
 
 #if ANDROIDEMO
-static const char stats_str[] = FMT_MARK "STATS,%lx,%u,%u,%u,%u,%lu,"
+static const char stats_str[] = FMT_MARK "STATS,%u,%lu,%u,%u,%u,%u,%u,"
 					"%u,%u,%u,%u\r\n";
 
-static const char profi_ascii_def[] = FMT_MARK "%s,%s,%s,%u,%lu sec. ago,"
+static const char profi_ascii_def[] = FMT_MARK "%s,%u,%u,%s,%u,%lu ago,"
 			"state:%s,profile:%x,%s:%s\r\n";
 #else
-static const char stats_str[] = FMT_MARK "04 Stats for hostId - localHost"
-					"(%lx - %u):"
+static const char stats_str[] = FMT_MARK "04 Stats for %u at %lu babe(%u %u):"
 					" Freq audit (%u), events (%u),"
-					" PLev (%u), Time (%lu),"
+					" PLev (%u),"
 					" Mem free (%u, %u) min (%u, %u)\r\n";
 
-static const char profi_ascii_def[] = FMT_MARK "05 %s: %s (%u) %lu sec. ago,"
+static const char profi_ascii_def[] = FMT_MARK "05 (%u %u): %s(%u) %lu ago,"
 			"%sstate(%s), Profile: %x, Desc(%s%s: %s\r\n";
 #endif
-
 static const char profi_ascii_raw[] = FMT_MARK "06 nick(%s), id(%u), et(%lu), "
 	"lt(%lu), intim(%u), state(%u), profi(%x), desc(%s), info(%x), "
 	"pl(%u), rssi (%u)\r\n";
@@ -183,13 +190,17 @@ static const char hs_str[] = 	"Nick: %s, Desc: %s\r\n"
 static const char ill_str[] =	"Illegal command (%s)\r\n";
 static const char bad_str[] =   "Bad or incomplete command (%s)\r\n";
 
-static const char stats_str[] = "Stats for hostId - localHost (%lx - %u):\r\n"
-	" Freq audit (%u) events (%u) PLev (%u) Time (%lu)\r\n"
+static const char stats_str[] = "Stats for %u at %lu babe(%u, %u):\r\n"
+	" Freq audit (%u) events (%u) PLev (%u)\r\n"
 	" Mem free (%u, %u) min (%u, %u)\r\n";
 
-static const char profi_ascii_def[] = "\r\n%s: %s (%u) %lu sec. ago,"
+#if ANDROIDEMO
+static const char profi_ascii_def[] = "\r\n(%s)(%u %u): %s(%u) %lu ago,"
+	       "state(%s):\r\n -Profile: %x Desc %s: %s\r\n";
+#else
+static const char profi_ascii_def[] = "\r\n(%u %u): %s(%u) %lu ago,"
 		"%sstate(%s):\r\n -Profile: %x Desc(%s%s: %s\r\n";
-
+#endif
 static const char profi_ascii_raw[] = "nick(%s) id(%u) et(%lu) lt(%lu) "
 	"intim(%u) state(%u) profi(%x) desc(%s) info(%x) pl(%u) rssi (%u)\r\n";
 

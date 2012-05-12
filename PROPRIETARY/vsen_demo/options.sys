@@ -140,9 +140,12 @@
 
 #define SD_KEEP_IDLE 		1
 
-#define CC1100_FREQ_FREQ2_VALUE 0x20
-#define CC1100_FREQ_FREQ1_VALUE 0x65
-#define CC1100_FREQ_FREQ0_VALUE 0xE8
+//#define CC1100_FREQ_FREQ2_VALUE 0x20
+//#define CC1100_FREQ_FREQ1_VALUE 0x65
+//#define CC1100_FREQ_FREQ0_VALUE 0xE8
+
+#define RADIO_DEFAULT_CHANNEL	255
+
 #define SHTXX_CLOCK_DELAY 1
 
 // see 'notes' in il_demo, especially about TARP

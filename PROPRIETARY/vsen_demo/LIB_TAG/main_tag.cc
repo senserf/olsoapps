@@ -68,7 +68,7 @@ static word 		png_shift;
 word app_flags	= DEF_APP_FLAGS;
 word plot_id	= 0;
 
-pongParamsType	pong_params = {	30,	// freq_maj in sec, max 63K
+pongParamsType	pong_params = {	900,	// freq_maj in sec, max 63K
 				5,  	// freq_min in sec. max 63
 				0x0077, // levels / retries
 				1024, 	// rx_span in msec (max 63K) 1: ON

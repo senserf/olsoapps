@@ -3,6 +3,7 @@
 
 __EXTERN __CONST lword _da (host_id);
 __EXTERN word _da (host_pl);
+__EXTERN word _da (batter);
 
 __EXTERN tagDataType  _da (tagArray) [LI_MAX];
 __EXTERN tagShortType _da (ignArray) [LI_MAX];

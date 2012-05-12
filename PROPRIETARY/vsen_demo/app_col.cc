@@ -32,7 +32,7 @@ lint		lh_time;
 
 sensDatumType	sens_data;
 
-pongParamsType	pong_params = { 30, 5, 0x7531, 2048, 0, 0 };
+pongParamsType	pong_params = { 60, 5, 0x7531, 2048, 0, 0 };
 
 static char		* cmd_line;
 
@@ -105,6 +105,17 @@ fsm oss_out (char*) {
 	ser_outb (OO_RETRY, data);
 	trigger (OSS_DONE);
 	finish;
+}
+
+fsm buzz_ronin {
+	state BRON:
+		buzzer_on();
+		delay (200, BROF);
+		release;
+
+	state BROF:
+		buzzer_off();
+		finish;
 }
 
 fsm buzz {
@@ -499,6 +510,7 @@ fsm pong {
 
 		leds (LED_B, LED_BLINK);
 		chro_lo ("RONIN");
+		runfsm buzz_ronin;
 		next_col_time ();
 		if (lh_time <= 0 || is_alrms)
 			proceed PS_SENS;

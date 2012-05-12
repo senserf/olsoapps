@@ -49,6 +49,7 @@
 
 #define NVM_OSET 	(1024L << 8)
 #define NVM_SLOT_NUM	16
+// this could be reduced to 64 if PEG_STR is back to 15
 #define NVM_SLOT_SIZE 	128
 
 typedef enum {
@@ -68,7 +69,11 @@ typedef struct nvmDataStruct {
 	char	dbiz[PEG_STR_LEN +1];
 	word	local_inc;
 	word	local_exc;
-	char	spare[10]; // NVM_SLOT_SIZE: 128
+#if ANDROIDEMO
+	char	spare[10];
+#else
+	char	spare[64]; // NVM_SLOT_SIZE: 128
+#endif
 } nvmDataType;
 
 typedef struct tagDataStruct {

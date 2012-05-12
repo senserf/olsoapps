@@ -62,9 +62,9 @@ __PUBLF (NodePeg, void, stats) (word state) {
 	word mem1 = memfree(1, &faults1);
 
 	ser_outf (state, stats_str,
-			host_id, local_host,
-			tag_auditFreq, tag_eventGran,
-			host_pl, seconds(),
+			local_host, seconds(), batter,
+			running (mbeacon) ? 1 : 0,
+			tag_auditFreq, tag_eventGran, host_pl,
 			mem0, mem1, faults0, faults1);
 }
 
@@ -101,6 +101,8 @@ __PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
 // All RSSI manipulations (or lack of them) thould be done here. The below
 // is just a lame example, hopefully useful for demonstrations
 static word map_rssi (word r) {
+	return r >> 8;
+#if 0
 #ifdef __SMURPH__
 /* temporary rough estimates
  =======================================================
@@ -125,6 +127,8 @@ static word map_rssi (word r) {
 	if ((r >> 8) > 181) return 3;
 	if ((r >> 8) > 150) return 2;
 	return 1;
+#endif
+	
 #endif
 }
 
@@ -183,6 +187,7 @@ thread (rcv)
 #endif
 		process_incoming (RC_MSG, rcv_buf_ptr, rcv_packet_size,
 			map_rssi(rcv_rssi));
+
 		proceed (RC_TRY);
 
 endthread
@@ -204,6 +209,7 @@ thread (audit)
 			app_diag (D_WARNING, "Audit stops");
 			finish;
 		}
+		read_sensor (AS_START, -1, &batter);
 		aud_ind = LI_MAX;
 
 		// leds should be better... when we know what's needed
@@ -304,7 +310,7 @@ static char * stateName (word state) {
 			return "unknown?";
 	}
 }
-
+#if 0
 static char * locatName (word rssi, word pl) { // ignoring pl 
 	switch (rssi) {
 		case 3:
@@ -318,7 +324,7 @@ static char * locatName (word rssi, word pl) { // ignoring pl
 	}
 	return "rssi?";
 }
-
+#endif
 static char * descName (word info) {
 	if (info & INFO_PRIV) return "private";
 	if (info & INFO_BIZ) return "business";
@@ -349,7 +355,8 @@ __PUBLF (NodePeg, void, oss_profi_out) (word ind, word list) {
 #if ANDROIDEMO
                         descMark(tagArray[ind].info, list),
 #endif
-			locatName (tagArray[ind].rssi, tagArray[ind].pl),
+			//locatName (tagArray[ind].rssi, tagArray[ind].pl),
+			 tagArray[ind].pl, tagArray[ind].rssi,
 			tagArray[ind].nick, tagArray[ind].id,
 			seconds() - tagArray[ind].evTime,
 #if ANDROIDEMO == 0
@@ -458,14 +465,12 @@ thread (root)
 	//w1 = memfree(0, &w2);
 	//diag ("dupa %u %u", w1, w2 );
 
-		ee_open ();
-
 #ifdef BOARD_WARSAW_BLUE
                 ser_select (1);
 #endif
 
 		ser_out (RS_INIT, welcome_str);
-		local_host = (word)host_id;
+		ee_open ();
 #ifndef __SMURPH__
 		net_id = DEF_NID;
 #endif
@@ -490,7 +495,6 @@ thread (root)
 		runthread (rcv);
 		runthread (cmd_in);
 		runthread (audit);
-		runthread (mbeacon);
 		led_state.color = LED_G;
 		led_state.state = LED_ON;
 		leds (LED_G, LED_ON);
@@ -499,9 +503,12 @@ thread (root)
 			app_diag (D_SERIOUS, "Can't read nvm");
 		} else {
 	 	  if (nvm_dat.id != 0xFFFF) {
+#if 0
 			if (nvm_dat.id != local_host)
 				app_diag (D_WARNING, "Bad nvm data");
 			else {
+#endif
+				local_host = nvm_dat.id;
 				strncpy (nick_att, nvm_dat.nick, NI_LEN);
 				strncpy (desc_att, nvm_dat.desc, PEG_STR_LEN);
 				strncpy (d_biz, nvm_dat.dbiz, PEG_STR_LEN);
@@ -510,10 +517,13 @@ thread (root)
 				p_inc = nvm_dat.local_inc;
 				p_exc = nvm_dat.local_exc;
 				oss_nvm_out (&nvm_dat, 0);
-			}
+//			}
 		  }
+
+		  else {
+			  local_host = (word)host_id;
 #ifdef __SMURPH__
-		  else { // model doesn't hold eprom, but has preinits
+			  // model doesn't hold eprom at start, but has preinits
 			  memset (&nvm_dat, 0xFF, NVM_SLOT_SIZE);
 			  nvm_dat.id = local_host;
 			  nvm_dat.profi = profi_att;
@@ -526,9 +536,12 @@ thread (root)
 			  if (ee_write (WNONE, NVM_OSET, (byte *)&nvm_dat,
 						  NVM_SLOT_SIZE))
 				  app_diag (D_SERIOUS, "ee_write failed");
-		  }
 #endif
+		  }
 		}
+
+		if (local_host != 0xDEAD)
+			runthread (mbeacon);
 
 		proceed (RS_RCMD);
 
@@ -587,6 +600,24 @@ thread (root)
 			w1 -= 2;
 
 		switch (cmd_line[1]) {
+
+		  case 'i':
+			if (w1 > 0 && scan (cmd_line +2, "%u", &w1) > 0) {
+				if (w1 == 0xDEAD && local_host != 0xDEAD) {
+					ee_erase (WNONE, 0, 0); 
+					reset();
+				}
+				if (w1 != 0xDEAD && w1 != 0 &&
+						local_host == 0xDEAD) {
+					local_host = rt_id = w1;
+					if (!running (mbeacon)) // shouldn't be
+							runthread (mbeacon);
+					goto StoreAll;
+				}
+			}
+			form (ui_obuf, "Id: %u\r\n", local_host);
+			proceed (RS_UIOUT);
+
 		  case 'n':
 			if (w1 > 0)
 				strncpy (nick_att, cmd_line +3,
@@ -906,7 +937,7 @@ thread (root)
 
 		if (rt_id == 0)
 			proceed (RS_L_NVM);
-
+StoreAll:
 		if (rt_id == local_host) {
 			memset (&nvm_dat, 0xFF, NVM_SLOT_SIZE);
 			nvm_dat.id = rt_id;

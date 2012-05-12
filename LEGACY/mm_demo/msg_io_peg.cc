@@ -83,6 +83,7 @@ __PUBLF (NodePeg, void, msg_profi_out) (nid_t peg) {
 	in_profi(buf_out, profi) = profi_att;
 	in_profi(buf_out, pl) = host_pl;
 	strncpy (in_profi(buf_out, nick), nick_att, NI_LEN);
+	strncpy (in_profi(buf_out, desc), desc_att, PEG_STR_LEN);
 	send_msg (buf_out, sizeof (msgProfiType));
 	ufree (buf_out);
 }
@@ -158,6 +159,13 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 	if (in_header(buf, rcv) != 0 && tagArray[tagIndex].intim == 0)
 		tagArray[tagIndex].intim = 1;
 	strncpy (tagArray[tagIndex].nick, in_profi(buf, nick), NI_LEN);
+
+	// this desc in beacon is really across...
+	if (tagArray[tagIndex].info <= INFO_DESC) {
+		strncpy (tagArray[tagIndex].desc, in_profi(buf, desc), 
+				PEG_STR_LEN);
+		tagArray[tagIndex].info |= INFO_DESC;
+	}
 
 	switch (tagArray[tagIndex].state) {
 		case noTag:

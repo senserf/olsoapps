@@ -190,6 +190,9 @@ __PUBLF (NodePeg, int, insert_tag) (char * buf) {
 			tagArray[i].profi = in_profi(buf, profi);
 			set_tagState (i, newTag, YES);
 			strncpy (tagArray[i].nick, in_profi(buf, nick), NI_LEN);
+			strncpy (tagArray[i].desc, in_profi(buf, desc), 
+					PEG_STR_LEN);
+			tagArray[i].info |= INFO_DESC;
 			tagArray[i].pl = in_profi(buf, pl);
 			tagArray[i].intim = in_header(buf, rcv) != 0 ? 1 : 0;
 			app_diag (D_DEBUG, "Inserted tag %u at %u",
