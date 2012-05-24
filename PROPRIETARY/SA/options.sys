@@ -1,0 +1,2 @@
+#define	TCV_LIMIT_XMT		16
+#define	TCV_LIMIT_URGENT_BUMP	4

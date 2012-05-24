@@ -1,0 +1,4780 @@
+#!/bin/sh
+#####################\
+exec wish85 "$0" "$@"
+
+###############################################################################
+# Determine the system type ###################################################
+###############################################################################
+if [catch { exec uname } ST(SYS)] {
+	set ST(SYS) "W"
+} elseif [regexp -nocase "linux" $ST(SYS)] {
+	set ST(SYS) "L"
+} elseif [regexp -nocase "cygwin" $ST(SYS)] {
+	set ST(SYS) "C"
+} else {
+	set ST(SYS) "W"
+}
+if { $ST(SYS) != "L" } {
+	# sanitize arguments; here you a sample of the magnitude of stupidity
+	# I have to fight when glueing together Windows and Cygwin stuff;
+	# the last argument (sometimes!) has a CR character appended at the
+	# end, and you wouldn't believe how much havoc that can cause
+	set u [string trimright [lindex $argv end]]
+	if { $u == "" } {
+		set argv [lreplace $argv end end]
+	} else {
+		set argv [lreplace $argv end end $u]
+	}
+	unset u
+}
+
+###############################################################################
+# Determine the way devices are named; if running natively under Cygwin, use
+# Linux style
+###############################################################################
+
+if [file isdirectory "/dev"] {
+	set ST(DEV) "L"
+} else {
+	set ST(DEV) "W"
+}
+
+###############################################################################
+
+set ST(VER) 0.01
+
+## double exit avoidance flag
+set DEAF 0
+
+###############################################################################
+
+package provide unames 1.0
+##########################################################################
+# This is a package for handling the various names under which COM ports #
+# may appear in our messy setup.                                         #
+# Copyright (C) 2012 Olsonet Communications Corporation.                 #
+##########################################################################
+
+namespace eval UNAMES {
+
+variable Dev
+
+proc unames_init { stype } {
+
+	variable Dev
+
+	set Dev(SYS) $stype
+	unames_defnames
+
+	if { $Dev(SYS) == "L" } {
+		# determine the root of virtual ttys
+		if [file isdirectory "/dev/pts"] {
+			# BSD style
+			set Dev(PRT) "/dev/pts/"
+		} else {
+			set Dev(PRT) "/dev/pty"
+		}
+	}
+}
+
+proc unames_defnames { } {
+#
+# Generate the list of default names
+#
+	variable Dev
+
+	# flag == default names, not real devices
+	set Dev(DEF) 1
+	# true devices
+	set Dev(COM) ""
+	# virtual devices
+	set Dev(VCM) ""
+
+	if { $Dev(SYS) == "L" } {
+		# Linux style
+		for { set i 0 } { $i < 32 } { incr i } {
+			lappend Dev(COM) "ttyS$i (COM[expr $i + 1])"
+		}
+		for { set i 0 } { $i < 9 } { incr i } {
+			lappend Dev(VCM) "pty$i (virt)"
+		}
+	} else {
+		for { set i 1 } { $i <= 32 } { incr i } {
+			lappend Dev(COM) "COM$i:"
+		}
+		for { set i 0 } { $i < 4 } { incr i } {
+			lappend Dev(VCM) "CNCA$i"
+			lappend Dev(VCM) "CNCB$i"
+		}
+	}
+}
+
+proc unames_ntodev { n } {
+#
+# Proposes a device list for a number
+#
+	variable Dev
+
+	if { $Dev(SYS) == "L" } {
+		return "/dev/ttyS$n /dev/ttyUSB$n /dev/tty$n"
+	} else {
+		if { $n < 1 } {
+			return ""
+		}
+		return "COM$n:"
+	}
+}
+
+proc unames_ntovdev { n } {
+#
+# Proposes a virtual device list for a number
+#
+	variable Dev
+
+	if { $Dev(SYS) == "L" } {
+		return "$Dev(PRT)$n"
+	} else {
+		if { $n > 3 } {
+			return ""
+		}
+		return "CNCA$n CNCB$n"
+	}
+}
+
+proc unames_unesc { dn } {
+#
+# Escapes the device name so it can be used as an argument to open
+#
+	variable Dev
+
+	if { $Dev(SYS) == "L" } {
+		# no need to do anything
+		return $dn
+	}
+
+	if [regexp -nocase "^com(\[0-9\]+):$" $dn jk pn] {
+		set dn "\\\\.\\COM$pn"
+	} else {
+		set dn "\\\\.\\$dn"
+	}
+
+	return $dn
+}
+
+proc unames_scan { } {
+#
+# Scan actual devices
+#
+	variable Dev
+
+	set Dev(DEF) 0
+	set Dev(COM) ""
+	set Dev(VCM) ""
+
+	# real devices
+	for { set i 0 } { $i < 256 } { incr i } {
+		set dl [unames_ntodev $i]
+		if { $dl == "" } {
+			continue
+		}
+		foreach d $dl {
+			if [catch { open [unames_unesc $d] "r" } fd] {
+				continue
+			}
+			catch { close $fd }
+			lappend Dev(COM) $d
+		}
+	}
+
+	# virtual devices
+	for { set i 0 } { $i < 32 } { incr i } {
+		set dl [unames_ntovdev $i]
+		if { $dl == "" } {
+			continue
+		}
+		foreach d $dl {
+			if [catch { open [unames_unesc $d] "r" } fd] {
+				continue
+			}
+			catch { close $fd }
+			lappend Dev(VCM) $d
+		}
+	}
+}
+
+proc unames_fnlist { fn } {
+#
+# Returns the list of filenames to try to open, given an element from one of
+# the lists; if not on the list, assume a direct name (to be escaped, however)
+#
+	variable Dev
+
+	if [regexp "^\[0-9\]+$" $fn] {
+		# just a number
+		return [unames_ntodev $fn]
+	}
+
+	if { [lsearch -exact $Dev(COM) $fn] >= 0 } {
+		if !$Dev(DEF) {
+			# this is an actual device
+			return $fn
+		}
+		# get a number and convert to a list
+		if ![regexp "\[0-9\]+" $fn n] {
+			return ""
+		}
+		return [unames_ntodev $n]
+	}
+	if { [lsearch -exact $Dev(VCM) $fn] >= 0 } {
+		if !$Dev(DEF) {
+			return $fn
+		}
+		if ![regexp "\[0-9\]+" $fn n] {
+			return ""
+		}
+		return [unames_ntovdev $n]
+	}
+	# return as is
+	return $fn
+}
+
+proc unames_choice { } {
+
+	variable Dev
+
+	return [list $Dev(COM) $Dev(VCM)]
+}
+
+namespace export unames_*
+
+### end of UNAMES namespace ###################################################
+}
+
+namespace import ::UNAMES::*
+
+###############################################################################
+# TOOLTIPS ####################################################################
+###############################################################################
+
+proc tip_set { w t } {
+
+	bind $w <Any-Enter> [list after 200 [list tip_show %W $t]]
+	bind $w <Any-Leave> [list after 500 [list destroy %W.ttip]]
+	bind $w <Any-KeyPress> [list after 500 [list destroy %W.ttip]]
+	bind $w <Any-Button> [list after 500 [list destroy %W.ttip]]
+}
+
+proc tip_show { w t } {
+
+	global tcl_platform FO PM
+
+	set px [winfo pointerx .]
+	set py [winfo pointery .]
+
+	if { [string match $w* [winfo containing $px $py]] == 0 } {
+                return
+        }
+
+	catch { destroy $w.ttip }
+
+	set scrh [winfo screenheight $w]
+	set scrw [winfo screenwidth $w]
+
+	set tip [toplevel $w.ttip -bd 1 -bg black]
+
+	wm geometry $tip +$scrh+$scrw
+	wm overrideredirect $tip 1
+
+	if { $tcl_platform(platform) == "windows" } {
+		wm attributes $tip -topmost 1
+	}
+
+	pack [label $tip.label -bg lightyellow -fg black -text $t \
+		-justify left -wraplength $PM(TWR) -font $FO(SMA)]
+
+	set wi [winfo reqwidth $tip.label]
+	set hi [winfo reqheight $tip.label]
+
+	set xx [expr $px - round($wi / 2.0)]
+
+	if { $py > [expr $scrh / 2.0] } {
+		# lower half
+		set yy [expr $py - $hi - 10]
+	} else {
+		set yy [expr $py + 10]
+	}
+
+	if  { [expr $xx + $wi] > $scrw } {
+		set xx [expr $scrw - $wi]
+	} elseif { $xx < 0 } {
+		set xx 0
+	}
+
+	wm geometry $tip [join "$wi x $hi + $xx + $yy" {}]
+
+        raise $tip
+
+        bind $w.ttip <Any-Enter> { destroy %W }
+        bind $w.ttip <Any-Leave> { destroy %W }
+}
+
+###############################################################################
+# ISO 3309 CRC ################################################################
+###############################################################################
+
+set CRCTAB {
+    0x0000  0x1021  0x2042  0x3063  0x4084  0x50a5  0x60c6  0x70e7
+    0x8108  0x9129  0xa14a  0xb16b  0xc18c  0xd1ad  0xe1ce  0xf1ef
+    0x1231  0x0210  0x3273  0x2252  0x52b5  0x4294  0x72f7  0x62d6
+    0x9339  0x8318  0xb37b  0xa35a  0xd3bd  0xc39c  0xf3ff  0xe3de
+    0x2462  0x3443  0x0420  0x1401  0x64e6  0x74c7  0x44a4  0x5485
+    0xa56a  0xb54b  0x8528  0x9509  0xe5ee  0xf5cf  0xc5ac  0xd58d
+    0x3653  0x2672  0x1611  0x0630  0x76d7  0x66f6  0x5695  0x46b4
+    0xb75b  0xa77a  0x9719  0x8738  0xf7df  0xe7fe  0xd79d  0xc7bc
+    0x48c4  0x58e5  0x6886  0x78a7  0x0840  0x1861  0x2802  0x3823
+    0xc9cc  0xd9ed  0xe98e  0xf9af  0x8948  0x9969  0xa90a  0xb92b
+    0x5af5  0x4ad4  0x7ab7  0x6a96  0x1a71  0x0a50  0x3a33  0x2a12
+    0xdbfd  0xcbdc  0xfbbf  0xeb9e  0x9b79  0x8b58  0xbb3b  0xab1a
+    0x6ca6  0x7c87  0x4ce4  0x5cc5  0x2c22  0x3c03  0x0c60  0x1c41
+    0xedae  0xfd8f  0xcdec  0xddcd  0xad2a  0xbd0b  0x8d68  0x9d49
+    0x7e97  0x6eb6  0x5ed5  0x4ef4  0x3e13  0x2e32  0x1e51  0x0e70
+    0xff9f  0xefbe  0xdfdd  0xcffc  0xbf1b  0xaf3a  0x9f59  0x8f78
+    0x9188  0x81a9  0xb1ca  0xa1eb  0xd10c  0xc12d  0xf14e  0xe16f
+    0x1080  0x00a1  0x30c2  0x20e3  0x5004  0x4025  0x7046  0x6067
+    0x83b9  0x9398  0xa3fb  0xb3da  0xc33d  0xd31c  0xe37f  0xf35e
+    0x02b1  0x1290  0x22f3  0x32d2  0x4235  0x5214  0x6277  0x7256
+    0xb5ea  0xa5cb  0x95a8  0x8589  0xf56e  0xe54f  0xd52c  0xc50d
+    0x34e2  0x24c3  0x14a0  0x0481  0x7466  0x6447  0x5424  0x4405
+    0xa7db  0xb7fa  0x8799  0x97b8  0xe75f  0xf77e  0xc71d  0xd73c
+    0x26d3  0x36f2  0x0691  0x16b0  0x6657  0x7676  0x4615  0x5634
+    0xd94c  0xc96d  0xf90e  0xe92f  0x99c8  0x89e9  0xb98a  0xa9ab
+    0x5844  0x4865  0x7806  0x6827  0x18c0  0x08e1  0x3882  0x28a3
+    0xcb7d  0xdb5c  0xeb3f  0xfb1e  0x8bf9  0x9bd8  0xabbb  0xbb9a
+    0x4a75  0x5a54  0x6a37  0x7a16  0x0af1  0x1ad0  0x2ab3  0x3a92
+    0xfd2e  0xed0f  0xdd6c  0xcd4d  0xbdaa  0xad8b  0x9de8  0x8dc9
+    0x7c26  0x6c07  0x5c64  0x4c45  0x3ca2  0x2c83  0x1ce0  0x0cc1
+    0xef1f  0xff3e  0xcf5d  0xdf7c  0xaf9b  0xbfba  0x8fd9  0x9ff8
+    0x6e17  0x7e36  0x4e55  0x5e74  0x2e93  0x3eb2  0x0ed1  0x1ef0
+}
+
+proc pt_chks { wa } {
+
+	global CRCTAB
+
+	set nb [string length $wa]
+
+	set chs 0
+
+	while { $nb > 0 } {
+
+		binary scan $wa su waw
+		#set waw [expr $waw & 0x0000ffff]
+
+		set wa [string range $wa 2 end]
+		incr nb -2
+
+		set chs [expr (($chs << 8) ^ \
+		    ( [lindex $CRCTAB [expr ($chs >> 8) ^ ($waw >>   8)]] )) & \
+			0x0000ffff ]
+		set chs [expr (($chs << 8) ^ \
+		    ( [lindex $CRCTAB [expr ($chs >> 8) ^ ($waw & 0xff)]] )) & \
+			0x0000ffff ]
+	}
+
+	return $chs
+}
+
+proc pt_abort { ln } {
+
+	tk_dialog "Abort!" "Fatal error: ${msg}!" "" 0 "OK"
+	terminate
+}
+
+proc pt_diag { } {
+
+	global ST CH
+
+	if { [string index $ST(BUF) 0] == $CH(ZER) } {
+		# binary
+		set ln [string range $ST(BUF) 3 5]
+		binary scan $ln cuSu lv code
+		puts "DIAG: \[[format %02x $lv] -> [format %04x $code]\]"
+	} else {
+		# ASCII
+		puts "DIAG: [string trim $ST(BUF)]"
+	}
+	flush stdout
+}
+
+###############################################################################
+# The "S" module yanked from piter ############################################
+###############################################################################
+
+# UART FD
+set ST(SFD) 	""
+
+# character zero (aka NULL)
+set CH(ZER)	[format %c [expr 0x00]]
+
+# diag preamble (for packet modes) = ASCII DLE
+set CH(DPR)	[format %c [expr 0x10]]
+
+# maximum message length
+set PM(MPL)	132
+
+# UART bit rate
+set PM(DSP) 	115200
+
+# Binary flag (a constant, can be fixed in code, but let is stay for
+# compatibility with the original package
+set ST(BIN)	1
+
+# output busy flag (current message pending) + output event variable; also
+# used as main event trigger for all vital events
+set ST(OBS)	0
+
+# current outgoing message
+set ST(OUT)	""
+
+# queue of outgoing messages
+set ST(OQU)	""
+
+# send callback
+set ST(SCB)	""
+
+# readable emulation callback
+set ST(ONR)	""
+
+# low-level reception timer
+set ST(TIM)  ""
+
+# reception automaton initial state
+set ST(STA) 0
+
+# reception automaton remaining byte count
+set ST(CNT) 0
+
+# output queue bypass flag == not allowed; values: 0 - NA, 1 - tmp off,
+# 2 - tmp on, 3 - permanent
+set ST(BYP) 0
+
+# app-level input function
+set ST(DFN)	"nop"
+
+# packet timeout (msec), once reception has started
+set IV(PKT)	80
+
+# short retransmit interval
+set IV(RTS)	250
+
+# long retransmit interval
+set IV(RTL)	2000
+
+proc nop { args } { }
+
+###############################################################################
+# Module: mode == S ###########################################################
+###############################################################################
+
+proc mo_init_s { } {
+#
+# Initialize
+#
+	global CH ST PM
+
+	mo_reset_s
+
+	# ACK flag
+	set CH(ACK) 4
+	# Direct
+	set CH(MAD) [expr 0xAC]
+	# AB
+	set CH(MAP) [expr 0xAD]
+	set CH(IPR) [format %c [expr 0x55]]
+	set ST(MOD) "S"
+	#
+	set ST(STA) 0
+	set ST(CNT) 0
+	set ST(BUF) ""
+
+	# User packet length: in the S mode, the Network ID field is used by
+	# the protocol
+
+	set PM(UPL) [expr $PM(MPL) - 2]
+
+	fconfigure $ST(SFD) -buffering full -translation binary
+
+	# start the write callback for the persistent stream
+	mo_send_s
+}
+
+proc mo_send_s { } {
+#
+# Callback for sending packets out
+#
+	global ST IV CH
+	
+	# cancel the callback, in case called explicitly
+	if { $ST(SCB) != "" } {
+		catch { after cancel $ST(SCB) }
+		set ST(SCB) ""
+	}
+
+	if !$ST(OBS) {
+		# just in case
+		set ST(OUT) ""
+	}
+	# if len is nonzero, an outgoing message is pending; note: its length
+	# has been checked already (and is <= MAXPL)
+	set len [string length $ST(OUT)]
+
+	set flg [expr $CH(CUR) | ( $CH(EXP) << 1 )]
+
+	if { $len == 0 } {
+		# ACK only
+		set flg [expr $flg | $CH(ACK)]
+	}
+
+	mo_fnwrite_s "[binary format cc $CH(MAP) $flg]$ST(OUT)"
+
+	set ST(SCB) [after $IV(RTL) mo_send_s]
+}
+
+proc mo_fnwrite_s { msg } {
+#
+	global PM CH ST
+
+	set ln [string length $msg]
+	if { $ln > $PM(MPL) } {
+		pt_abort "Assert mo_frame_s: length > max"
+	}
+
+	if { $ln < 2 } {
+		pt_abort "Assert mo_frame_s: length < min"
+	}
+
+	if [expr $ln & 1] {
+		append msg $CH(ZER)
+		incr ln -1
+	} else {
+		incr ln -2
+	}
+
+	puts -nonewline $ST(SFD) \
+		"$CH(IPR)[binary format c $ln]$msg[binary format s\
+			[pt_chks $msg]]"
+	flush $ST(SFD)
+}
+
+proc mo_rawread_s { } {
+#
+# Called whenever data is available on the UART (mode S)
+#
+	global ST PM
+#
+#  STA = 0  -> Waiting for preamble
+#        1  -> Waiting for the length byte
+#        2  -> Waiting for (CNT) bytes until the end of packet
+#        3  -> Waiting for end of DIAG preamble
+#        4  -> Waiting for EOL until end of DIAG
+#        5  -> Waiting for (CNT) bytes until the end of binary diag
+#
+	set chunk ""
+	set void 1
+
+	while 1 {
+
+		if { $chunk == "" } {
+
+			if [catch { read $ST(SFD) } chunk] {
+				# nonblocking read, ignore errors
+				set chunk ""
+			}
+
+			if { $chunk == "" } {
+				# check for timeout
+				if { $ST(TIM) != "" } {
+					# reset
+					catch { after cancel $ST(TIM) }
+					set ST(TIM) ""
+					set ST(STA) 0
+				} elseif { $ST(STA) != 0 } {
+					# something has started, set up timer
+					global IV
+					set ST(TIM) \
+					     [after $IV(PKT) mo_rawread_x]
+				}
+				return $void
+			}
+			# there is something to process, cancel timeout
+			if { $ST(TIM) != "" } {
+				catch { after cancel $ST(TIM) }
+				set ST(TIM) ""
+			}
+			set void 0
+		}
+
+		set bl [string length $chunk]
+
+		switch $ST(STA) {
+
+		0 {
+			# waiting for packet preamble
+			global CH
+			# Look up the preamble byte in the received string
+			for { set i 0 } { $i < $bl } { incr i } {
+				set c [string index $chunk $i]
+				if { $c == $CH(IPR) } {
+					# preamble found
+					set ST(STA) 1
+					break
+				}
+				if { $c == $CH(DPR) } {
+					# diag preamble
+					set ST(STA) 3
+					break
+				}
+			}
+			if { $i == $bl } {
+				# not found, keep waiting
+				set chunk ""
+				continue
+			}
+			# found, remove the parsed portion and keep going
+			set chunk [string range $chunk [expr $i + 1] end]
+		}
+
+		1 {
+			# expecting the length byte (note that the byte
+			# does not cover the statid field, so its range is
+			# up to MPL - 2)
+			binary scan [string index $chunk 0] cu bl
+			set chunk [string range $chunk 1 end]
+			if { [expr $bl & 1] || $bl > [expr $PM(MPL) - 2] } {
+				# reset
+				set ST(STA) 0
+				continue
+			}
+			# how many bytes to expect
+			set ST(CNT) [expr $bl + 4]
+			set ST(BUF) ""
+			# found
+			set ST(STA) 2
+		}
+
+		2 {
+			# packet reception, filling the buffer
+			if { $bl < $ST(CNT) } {
+				append ST(BUF) $chunk
+				set chunk ""
+				incr ST(CNT) -$bl
+				continue
+			}
+
+			# end of packet, reset
+			set ST(STA) 0
+
+			if { $bl == $ST(CNT) } {
+				append ST(BUF) $chunk
+				set chunk ""
+				# we have a complete buffer
+				mo_receive_s
+				continue
+			}
+
+			# merged packets
+			append ST(BUF) [string range $chunk 0 \
+				[expr $ST(CNT) - 1]]
+			set chunk [string range $chunk $ST(CNT) end]
+			mo_receive_s
+		}
+
+		3 {
+			# waiting for the end of a diag header
+			global CH
+			set chunk [string trimleft $chunk $CH(DPR)]
+			if { $chunk != "" } {
+				set ST(BUF) ""
+				# look at the first byte of diag
+				if { [string index $chunk 0] == $CH(ZER) } {
+					# a binary diag, length == 7
+					set ST(CNT) 7
+					set ST(STA) 5
+				} else {
+					# ASCII -> wait for NL
+					set ST(STA) 4
+				}
+			}
+		}
+
+		4 {
+			# waiting for NL ending a diag
+			set c [string first "\n" $chunk]
+			if { $c < 0 } {
+				append ST(BUF) $chunk
+				set chunk ""
+				continue
+			}
+
+			append ST(BUF) [string range $chunk 0 $c]
+			set chunk [string range $chunk [expr $c + 1] end]
+			# reset
+			set ST(STA) 0
+			pt_diag
+		}
+
+		5 {
+			# waiting for CNT bytes of binary diag
+			if { $bl < $ST(CNT) } {
+				append ST(BUF) $chunk
+				set chunk ""
+				incr ST(CNT) -$bl
+				continue
+			}
+			# reset
+			set ST(STA) 0
+			append ST(BUF) [string range $chunk 0 \
+				[expr $ST(CNT) - 1]]
+
+			set chunk [string range $chunk $ST(CNT) end]
+			pt_diag
+		}
+
+		default {
+			set ST(STA) 0
+		}
+		}
+	}
+}
+
+proc mo_receive_s { } {
+#
+# Handle received packet
+#
+	global ST CH IV
+
+	# validate CRC
+	if [pt_chks $ST(BUF)] {
+		return
+	}
+
+	# strip off the checksum
+	set msg [string range $ST(BUF) 0 end-2]
+	set len [string length $msg]
+
+	if { $len < 2 } {
+		# ignore it
+		return
+	}
+
+	# extract the header
+	binary scan $msg cucu pr fg
+
+	# trim the message
+	set msg [string range $msg 2 end]
+	if !$ST(BIN) {
+		# character mode, strip the sentinel, if any
+		set cu [string first $CH(ZER) $msg]
+		if { $cu >= 0 } {
+			set msg [string range $msg 0 [expr $cu - 1]]
+		}
+	}
+
+	if { $pr == $CH(MAD) } {
+		# direct, receive right away, nothing else to do
+		dump "RD" $msg
+		$ST(DFN) $msg
+		return
+	}
+
+	if { $pr != $CH(MAP) } {
+		# wrong magic
+		return
+	}
+
+	set cu [expr $fg & 1]
+	set ex [expr ($fg & 2) >> 1]
+	set ac [expr $fg & 4]
+
+	if $ST(OBS) {
+		# we have an outgoing message
+		if { $ex != $CH(CUR) } {
+			# expected != our current, we are done with this
+			# packet
+			set ST(OUT) ""
+			set CH(CUR) $ex
+			set ST(OBS) 0
+		}
+	} else {
+		# no outgoing message, set current to expected
+		set CH(CUR) $ex
+	}
+
+	if $ac {
+		# treat as pure ACK and ignore
+		return
+	}
+
+	if { $cu != $CH(EXP) } {
+		# not what we expect, speed up the NAK
+		catch { after cancel $ST(SCB) }
+		set ST(SCB) [after $IV(RTS) mo_send_s]
+		return
+	}
+
+	# receive it
+	dump "RS" $msg
+	$ST(DFN) $msg
+
+	# update expected
+	set CH(EXP) [expr 1 - $CH(EXP)]
+
+	# force an ACK
+	mo_send_s
+}
+
+proc mo_write_s { msg byp } {
+#
+# Send out a message
+#
+	global ST PM CH
+
+	dump "W$byp" $msg
+
+	set lm [expr $PM(MPL) - 2]
+	if { [string length $msg] > $lm } {
+		set msg [string range $msg 0 [expr $lm - 1]]
+	}
+
+	if $byp {
+		# immediate output, direct protocol
+		mo_fnwrite_s "[binary format cc $CH(MAD) 0]$msg"
+		return
+	}
+
+	if $ST(OBS) {
+		pt_abort "Assert mo_write_s: output busy"
+	}
+
+	set ST(OUT) $msg
+	set ST(OBS) 1
+	mo_send_s
+}
+
+proc mo_reset_s { } {
+
+	global ST CH
+
+	set ST(OQU) ""
+	set ST(OUT) ""
+	set ST(OBS) 0
+
+	set CH(EXP) 0
+	set CH(CUR) 0
+
+	set ST(BYP) 1
+}
+
+proc mo_stop_s { } {
+
+	global ST
+
+	foreach cb { "SCB" "TIM" } {
+		# kill callbacks
+		if { $ST($cb) != "" } {
+			catch { after cancel $ST($cb) }
+			set ST($cb) ""
+		}
+	}
+
+	mo_reset_s
+
+	set ST(STA) 0
+	set ST(CNT) 0
+	set ST(BUF) ""
+}
+
+set MODULE(S) [list mo_init_s mo_rawread_s mo_write_s mo_reset_s mo_stop_s]
+
+###############################################################################
+lassign $MODULE(S) ST(IFN) ST(GFN) ST(OFN) ST(RFN) ST(SFN)
+###############################################################################
+
+proc cw { } {
+#
+# Returns the window currently in focus or null if this is the root window
+#
+	set w [focus]
+	if { $w == "." } {
+		set w ""
+	}
+
+	return $w
+}
+
+###############################################################################
+# Modal windows ###############################################################
+###############################################################################
+
+proc md_click { val { lv 0 } } {
+#
+# Generic done event for modal windows/dialogs
+#
+	global Mod ST
+
+	if { [info exists Mod($lv,EV)] && $Mod($lv,EV) == 0 } {
+		set Mod($lv,EV) $val
+	}
+
+	trigger
+}
+
+proc md_stop { { lv 0 } } {
+#
+# Close operation for a modal window
+#
+	global Mod
+
+	if [info exists Mod($lv,WI)] {
+		catch { destroy $Mod($lv,WI) }
+	}
+	array unset Mod "$lv,*"
+	# make sure all upper modal windows are destroyed as well; this is
+	# in case grab doesn't work
+	for { set l $lv } { $l < 10 } { incr l } {
+		if [info exists Mod($l,WI)] {
+			md_stop $l
+		}
+	}
+	# if we are at level > 0 and previous level exists, make it grab the
+	# pointers
+	while { $lv > 0 } {
+		incr lv -1
+		if [info exists Mod($lv,WI)] {
+			catch { grab $Mod($lv,WI) }
+			break
+		}
+	}
+}
+
+proc md_wait { { lv 0 } } {
+#
+# Wait for an event on the modal dialog
+#
+	global ST Mod
+
+	set Mod($lv,EV) 0
+
+	event_loop
+
+	if ![info exists Mod($lv,EV)] {
+		return -1
+	}
+	if { $Mod($lv,EV) < 0 } {
+		# cancellation
+		md_stop $lv
+		return -1
+	}
+
+	return $Mod($lv,EV)
+}
+
+proc md_window { tt { lv 0 } } {
+#
+# Creates a modal dialog
+#
+	global Mod
+
+	set w [cw].modal$lv
+	catch { destroy $w }
+	set Mod($lv,WI) $w
+	toplevel $w
+	wm title $w $tt
+
+	if { $lv > 0 } {
+		set l [expr $lv - 1]
+		if [info exists Mod($l,WI)] {
+			# release the grab of the previous level window
+			catch { grab release $Mod($l,WI) }
+		}
+	}
+
+	# this fails sometimes
+	catch { grab $w }
+	return $w
+}
+
+###############################################################################
+###############################################################################
+
+proc alert { msg } {
+
+	tk_dialog [cw].alert "Attention!" "${msg}!" "" 0 "OK"
+}
+
+proc confirm { msg } {
+
+	set w [tk_dialog [cw].confirm "Warning!" $msg "" 0 "NO" "YES"]
+	return $w
+}
+
+proc terminate { } {
+
+	global DEAF
+
+	if $DEAF { return }
+
+	set DEAF 1
+
+	setsparams
+
+	exit 0
+}
+
+proc valid_int_number { n min max { res "" } } {
+
+	if [catch { expr $n } val] {
+		return 0
+	}
+
+	if ![string is integer -strict $val] {
+		return 0
+	}
+
+	if { $val < $min || $val > $max } {
+		return 0
+	}
+
+	if { $res != "" } {
+		upvar $res r
+		set r $val
+	}
+
+	return 1
+}
+
+proc valid_fp_number { n min max fra { res "" } } {
+
+	if [catch { expr $n } val] {
+		return 0
+	}
+
+	if [catch { format %1.${fra}f $n } val] {
+		return 0
+	}
+
+	if { $val < $min || $val > $max } {
+		return 0
+	}
+
+	if { $res != "" } {
+		upvar $res r
+		set r $val
+	}
+
+	return 1
+}
+
+proc valid_ban { n { res "" } } {
+#
+# Validates a band setting
+#
+	global PM
+
+	if { $n != "Single" && $n != "Single/rcv" } {
+		# neither of the two special values
+		if [catch { expr $n } n] {
+			return 0
+		}
+		set fa 1
+		foreach p $PM(BAN) {
+			if { [expr abs($p - $n)] < 0.0001 } {
+				set n $p
+				set fa 0
+				break
+			}
+		}
+		if $fa {
+			return 0
+		}
+	}
+
+	if { $res != "" } {
+		upvar $res r
+		set r $n
+	}
+
+	return 1
+}
+
+proc freq_decode { val } {
+
+	global PM
+
+	return [format %1.2f [expr (double ($val) / 65536.0) * $PM(FRE_qua)]]
+}
+
+proc freq_encode { freq } {
+
+	global PM
+
+	return [expr int( ($freq / $PM(FRE_qua)) * 65536.0 + 0.5)]
+}
+
+proc band_to_step { bf } {
+#
+# Converts band frequency to raw step
+#
+	global PM
+
+	# half the scale
+	set hb [expr ($PM(NSA) - 1) / 2]
+	# band frequency step per sample
+	set fi [expr $bf / double($hb)]
+	# raw increment
+	return [freq_encode $fi]
+}
+
+proc band_width { } {
+#
+# Returns the band interval <from to> (for a band scan)
+#
+	global RC
+
+	set b $RC(BAN)
+	set fr [expr $RC(FCE) - $b]
+	set up [expr $RC(FCE) + $b]
+
+	return [list $fr $up]
+}
+
+proc hencode { buf } {
+#
+# Encode binary buf as hex bytes
+#
+	set code ""
+
+	set nb [string length $buf]
+	binary scan $buf cu$nb code
+	set ol ""
+
+	foreach co $code {
+		append ol [format " %02x" $co]
+	}
+
+	return $ol
+}
+
+proc getsparams { } {
+#
+# Retrieve parameters from RC file
+#
+	global RC PM Params RGroups
+
+	if { $PM(RCF) == "" } {
+		# switched off
+		return
+	}
+
+	if [catch { open $PM(RCF) "r" } fd] {
+		# no such file
+		return
+	}
+
+	if [catch { read $fd } pars] {
+		catch { close $fd }
+		return
+	}
+	catch { close $fd }
+
+	# parameters
+	foreach p $Params {
+		if [catch { dict get $pars PARAMS $p } v] {
+			continue
+		}
+		if ![info exists RC(+,$p)] {
+			# something wrong
+			continue
+		}
+		set valcode $RC(+,$p)
+		regsub "%I" $valcode "\$v" valcode
+		regsub "%O" $valcode "v" valcode
+		if [eval $valcode] {
+			# OK
+			set RC($p) $v
+		}
+	}
+
+	# register groups
+	if [catch { dict keys [dict get $pars REGISTERS] } rgrps] {
+		set rgrps ""
+	}
+
+	foreach g $rgrps {
+		if [catch { dict get $pars REGISTERS $g } rg] {
+			continue
+		}
+		# note: an RG is a list, not a dictionary
+		set RGroups($g) $rg
+	}
+
+	if [info exists RGroups(Default)] {
+		# redefining the built-in register group
+		reguse Default
+	}
+}
+
+proc setsparams { } {
+#
+# Save parameters in RC file
+#
+	global RC PM Params RGroups
+
+	if { $PM(RCF) == "" } {
+		# disabled
+		return
+	}
+
+	if [catch { open $PM(RCF) "w" } fd] {
+		alert "Cannot save parameters in $PM(RCF), failed to open: $fd"
+		set PM(RCF) ""
+		return
+	}
+
+	set d [dict create]
+
+	# parameters
+	foreach p $Params {
+		if ![info exists RC($p)] {
+			# something wrong
+			continue
+		}
+		dict set d PARAMS $p $RC($p)
+	}
+
+	# register groups
+	foreach g [array names RGroups] {
+		# do not save the special names
+		if { [string index $g 0] == "+" } {
+			continue
+		}
+		dict set d REGISTERS $g $RGroups($g)
+	}
+
+	if [catch { puts -nonewline $fd $d } err] {
+		catch { close $fd }
+		alert "Cannot save parameters in $PM(RCF),\
+			failed to write: $err"
+		set PM(RCF) ""
+	}
+}
+
+###############################################################################
+
+proc log { line } {
+
+	global ST WN PM
+
+	# the backing storage
+
+	if { $ST(LOL) >= $PM(MXL) } {
+		set de [expr $ST(LOL) - $PM(MXL) + 1]
+		set ST(LOG) [lrange $ST(LOG) $de end]
+		set ST(LOL) $PM(MXL)
+	} else {
+		incr ST(LOL)
+	}
+
+	lappend ST(LOG) $line
+
+	# for brevity
+	set t $WN(LOG)
+
+	if { $t == "" } {
+		# no window
+		return
+	}
+
+	$t configure -state normal
+	$t insert end "$line\n"
+
+	while 1 {
+		# remove excess lines from top
+		set ix [$t index end]
+		set ix [string range $ix 0 [expr [string first "." $ix] - 1]]
+		if { $ix <= $PM(MXL) } {
+			break
+		}
+		# delete the tompmost line
+		$t delete 1.0 2.0
+	}
+
+	$t configure -state disabled
+	$t yview -pickplace end
+}
+
+proc log_open { } {
+#
+# Opens the log window
+#
+	global ST WN FO
+
+	if { $WN(LOG) != "" } {
+		# already open
+		return
+	}
+
+	set w ".logw"
+	toplevel $w
+	wm title $w "Log"
+
+	set c $w.log
+
+	set WN(LOG) [text $c -width 80 -height 24 -borderwidth 2 \
+		-setgrid true -wrap none \
+		-yscrollcommand "$w.scrolly set" \
+		-xscrollcommand "$w.scrollx set" \
+		-font $FO(LOG) \
+		-exportselection 1 -state normal]
+
+	scrollbar $w.scrolly -command "$c yview"
+	scrollbar $w.scrollx -orient horizontal -command "$c xview"
+
+	pack $w.scrolly -side right -fill y
+	pack $w.scrollx -side bottom -fill x
+	pack $c -side top -expand y -fill both
+
+	bind $w <Destroy> log_close
+	bind $w <ButtonRelease-1> "tk_textCopy $w"
+	bind $w <ButtonRelease-2> "tk_textPaste $w"
+
+	$c delete 1.0 end
+	$c configure -state normal
+
+	# insert pending lines
+	foreach ln $ST(LOG) {
+		$c insert end "${ln}\n"
+	}
+
+	$c yview -pickplace end
+
+	$WN(LOB) configure -text "Log Off"
+}
+
+proc log_close { } {
+
+	global WN
+
+	catch { destroy .logw }
+	set WN(LOG) ""
+	$WN(LOB) configure -text "Log On"
+}
+
+proc log_toggle { } {
+#
+# Close/open the log window
+#
+	global WN
+
+	if { $WN(LOG) == "" } {
+		log_open
+	} else {
+		log_close
+	}
+}
+
+###############################################################################
+# This circumvents a bug in Cygwin native Tcl whereby "readable" on a COM port
+# causes Windows to lose text events (at least this is how much I understand
+# abou the bug. So in such a case, the readable event is emulated by timer
+# callbacks. This is ugly (FIXME), but hopefully I will remove it some day.
+###############################################################################
+
+proc readcb { fun } {
+
+	global ST
+
+	if [$fun] {
+		# a void call, increase the timeout
+		if { $ST(ROT) < 40 } {
+			incr ST(ROT)
+		}
+	} else {
+		set ST(ROT) 0
+	}
+
+	set ST(ONR) [after $ST(ROT) "readcb $fun"]
+}
+
+proc onreadable { fun } {
+#
+# This circumvents a bug (FIXME)
+#
+	global ST
+
+	if { $ST(SYS) == "L" || $ST(DEV) != "L" } {
+		# we have no problem unless this doesn't hold, i.e., we are
+		# on Windows running Cygwin native Tcl
+		fileevent $ST(SFD) readable $fun
+		return
+	}
+
+	# emulate the callback by a timer
+	set ST(ROT) 1
+	readcb $fun
+}
+
+###############################################################################
+
+proc event_loop { } {
+#
+# Main event loop to handle outgoing I/O
+#
+	global ST
+
+	if !$ST(OBS) {
+		# not busy
+		if { $ST(OQU) != "" } {
+			# something in queue
+			if { $ST(SFD) != "" } {
+				$ST(OFN) [lindex $ST(OQU) 0] 0
+				set ST(OQU) [lrange $ST(OQU) 1 end]
+			} else {
+				# drop everything, this is just a precaution
+				set ST(OQU) ""
+			}
+		}
+	}
+	vwait ST(OBS)
+}
+
+proc trigger { } {
+#
+# Trigger a global event
+#
+	global ST
+
+	set ST(OBS) $ST(OBS)
+}
+
+proc send_command { buf } {
+
+	global ST
+
+	if { $ST(SFD) == "" } {
+		# ignore if disconnected, shouldn't happen
+		trc "Ignored, disconnected"
+		return
+	}
+
+	if { $ST(BYP) > 1 } {
+		# queue bypass
+		$ST(OFN) $buf 1
+		trc "Bypassed"
+		return
+	}
+
+	lappend ST(OQU) $buf
+
+	trigger
+}
+
+proc bypass { on } {
+
+	if $on {
+		set ST(BYP) 2
+	} else {
+		set ST(BYP) 1
+	}
+}
+
+###############################################################################
+
+proc send_handshake { } {
+
+	send_command [binary format c 0xFF]
+	send_command [binary format c 0xFE]
+	send_command [binary format c 0x05]
+}
+
+###############################################################################
+
+proc open_uart { udev } {
+
+	global PM ST
+
+	if { $ST(SYS) == "L" } {
+		set accs { RDWR NOCTTY NONBLOCK }
+	} else {
+		set accs "r+"
+	}
+
+	trc "opening [unames_unesc $udev] $accs"
+
+	if [catch { open [unames_unesc $udev] $accs } ST(SFD)] {
+		trc "failed: $ST(SFD)"
+		set ST(SFD) ""
+		return 0
+	}
+
+	if [catch { fconfigure $ST(SFD) -mode "$PM(DSP),n,8,1" -handshake none \
+	    -blocking 0 -eofchar "" -ttycontrol { RTS 0 } } err] {
+		catch { close $ST(SFD) }
+		set ST(SFD) ""
+		return 0
+	}
+
+	# module initializer
+	$ST(IFN)
+
+	# input processor
+	set ST(DFN) "first_input"
+
+	# UART reader
+	onreadable $ST(GFN)
+
+	# send the first command
+	send_handshake
+
+	return 1
+}
+
+proc close_uart { } {
+
+	global ST
+
+	if { [info exist ST(ONR)] && $ST(ONR) != "" } {
+		catch { after cancel $ST(ONR) }
+		set ST(ONR) ""
+	}
+
+	catch { close $ST(SFD) }
+	set ST(SFD) ""
+
+	$ST(SFN)
+
+	set ST(DFN) "nop"
+
+	# global event
+	trigger
+}
+
+proc first_input { msg } {
+#
+# To establish a handshake (receive a magic byte) from the node
+#
+	global ST
+
+	trc "first input: [string length $msg]"
+	if { [string length $msg] < 4 } {
+		return
+	}
+
+	binary scan $msg cucucucu a b c d
+	trc "handshake: $a $b $c $d"
+
+	if { $a != 0x05 || $b != 0xCE || $c != 0x31 || $d != 0x7A } {
+		# still not it
+		return
+	}
+
+	# OK, reset the input function, this is what we have been waiting for
+	set ST(DFN) "read_data"
+
+	# global event
+	trigger
+}
+
+proc do_connect_disconnect { } {
+
+	global ST WN Mod PM
+
+	if { $ST(SFD) != "" } {
+		close_uart
+		log "Disconnected"
+		$WN(COB) configure -text Connect
+		update_widgets
+		return
+	}
+
+	# connecting
+	set w [md_window "Connect to device"]
+
+	set f $w.f
+	frame $f
+	pack $f -side top -expand n -fill x
+
+	label $f.st -text "Status: "
+	pack $f.st -side left
+
+	set Mod(0,ST) "idle"
+
+	label $f.s -textvariable Mod(0,ST)
+	pack $f.s -side left
+
+	set f $w.ff
+	frame $f
+	pack $f -side top -expand n -fill x
+
+	# real devices only
+	set Mod(0,DL) [lindex [unames_choice] 0]
+	set Mod(0,DV) ""
+
+	seldef
+
+	button $f.scb -text "Scan" -anchor w -command scandev
+	pack $f.scb -side left
+
+	eval "set Mod(0,DM) \[tk_optionMenu $f.scm Mod(0,DV) $Mod(0,DL)\]"
+	bind $Mod(0,DM) <ButtonRelease-1> seldev
+	pack $f.scm -side left
+
+	button $f.tdb -text "This device" -anchor w -command "md_click 1"
+	pack $f.tdb -side left
+
+	button $f.aub -text "Auto" -anchor w -command "md_click 2"
+	pack $f.aub -side left
+
+	button $f.cab -text "Cancel" -anchor e -command "md_click 3"
+	pack $f.cab -side right
+	set cb $f.cab
+
+	bind $w <Destroy> "md_click 3"
+
+	#######################################################################
+
+	while 1 {
+
+		while 1 {
+			# first round
+			set ev [md_wait]
+
+			if { $ev == 3 } {
+				# cancellation
+				md_stop
+				return
+			}
+
+			if { $ev == 1 } {
+				set dev $Mod(0,DV)
+				break
+			}
+
+			if { $ev == 2 } {
+				set dev ""
+				break
+			}
+		}
+
+		if { $dev == "" } {
+			scandev
+			set dev $Mod(0,DL)
+			# short timeout
+			set tm [lindex $PM(HST) 0]
+		} else {
+			set dev [list $dev]
+			# long timeout
+			set tm [lindex $PM(HST) 1]
+		}
+
+		$cb configure -text Abort
+
+		foreach d $dev {
+
+			set Mod(0,ST) "connecting to $d"
+			log "Connecting to $d"
+			if { [open_uart $d] == 0 } {
+				log "Failed to open $d"
+				continue
+			}
+
+			set Mod(0,CT) [after $tm "md_click 4"]
+
+			while 1 {
+
+				set ev [md_wait]
+
+				if { $ST(DFN) == "read_data" } {
+					# bingo
+					$WN(COB) configure -text "Disconnect"
+					md_stop
+					log "Connected"
+					update_widgets
+					return
+				}
+
+				# not connected
+				if { $ev == 3 } {
+					# abort
+					catch { after cancel $Mod(0,CT) }
+					log "Aborted"
+					close_uart
+					md_stop
+					return
+				}
+
+				if { $ev == 4 } {
+					# timeout, doesn't hurt to do this:
+					catch { after cancel $Mod(0,CT) }
+					log "Timeout"
+					close_uart
+					break
+				}
+
+				# nothing
+			}
+		}
+
+		# failed, do this once more just in case
+		close_uart
+		log "Failed to connect"
+		set Mod(0,ST) "failed"
+		$cb configure -text Cancel
+	}
+}
+
+proc scandev { } {
+#
+# Produces a scanned device list
+#
+	global Mod
+
+	unames_scan
+
+	set Mod(0,DL) [lindex [unames_choice] 0]
+
+	$Mod(0,DM) delete 0 end
+	set ix 0
+	foreach w $Mod(0,DL) {
+		$Mod(0,DM) add command -label $w -command "seldev $ix"
+		incr ix
+	}
+	seldef
+}
+
+proc seldev { { ix -1 } } {
+
+	global Mod
+
+	if { $ix >= 0 } {
+		if [catch { $Mod(0,DM) entrycget $ix -label } w] {
+			set w [lindex $Mod(0,DL) 0]
+		}
+	} else {
+		set w $Mod(0,DV)
+	}
+
+	if { [lsearch -exact $Mod(0,DL) $w] < 0 } {
+		set w [lindex $Mod(0,DL) 0]
+	}
+	set Mod(0,DV) $w
+}
+
+proc seldef { } {
+#
+# Sets the default device selection based on the current list and the
+# saved value in the rc file
+#
+	global Mod
+
+	if { $Mod(0,DV) == "" } {
+		set Mod(0,DV) [lindex $Mod(0,DL) 0]
+	} else {
+		# check if present on the list
+		if { [lsearch -exact $Mod(0,DL) $Mod(0,DV)] < 0 } {
+			# absent
+			set Mod(0,DV) [lindex $Mod(0,DL) 0]
+		}
+	}
+}
+
+proc ack_timeout { } {
+#
+# Timeout for an expected command
+#
+	global ST
+
+	set ST(ECM) -1
+	trigger
+}
+
+proc wack { cmd } {
+#
+# Wait for an acknowledgement; FIXME: not sure if we need it
+#
+	global ST PM
+
+	set ST(ECM) $cmd
+	set ST(ECM,M) ""
+	set ST(ECC) [after $PM(CMT) ack_timeout]
+
+	while 1 {
+		event_loop
+		if { $ST(ECM) <= 0 } {
+			catch { after cancel $ST(ECC) }
+			return $ST(ECM)
+		}
+	}
+}
+
+proc read_data { msg } {
+
+	global ST PM
+
+	set len [expr [string length $msg] - 1]
+	binary scan $msg cu code
+
+	if { $code == $ST(ECM) } {
+		# this command has been expected; note that 0 is not a valid
+		# command code
+		set ST(ECM) 0
+		set ST(ECM,M) [string range $msg 1 end]
+		trigger
+		return
+	}
+
+	if { $code == 2 } {
+		if { $len < $PM(NSA) } {
+			log "Bad sample, $len bytes instead of $PM(NSA)"
+			return
+		}
+		set msg [string range $msg 1 end]
+		if { $ST(SIP) == 1 } {
+			process_band_sample $msg
+		} elseif { $ST(SIP) != 0 } {
+			process_freq_sample $msg
+		}
+		return
+	}
+
+	if { $code == 1 } {
+		# packet
+		log_packet [string range $msg 1 end] $len
+		return
+	}
+}
+
+proc log_packet { smp len } {
+
+	if { $len < 5 } {
+		return
+	}
+
+	binary scan $smp cucu l0 ln
+
+	log "Packet (length=$ln):"
+	log [string trimleft [hencode [string range $smp 2 end]]]
+}
+
+proc process_band_sample { smp } {
+
+	global PM RC SM MX
+
+	# calculate new curve
+	set alpha [expr 2.0/double(1 + $RC(EMA))]
+
+	binary scan $smp cu$PM(NSA) code
+
+	set i 0
+	foreach v $code {
+		set SM($i) [expr $v * $alpha + (1.0 - $alpha) * $SM($i)]
+		if { $SM($i) > $MX($i) } {
+			set MX($i) $SM($i)
+		}
+		incr i
+	}
+
+	clear_sample
+	draw_band_sample
+	if $RC(TMX) {
+		draw_band_max
+	}
+}
+
+proc process_freq_sample { smp } {
+
+	global PM RC SM MX
+
+	binary scan $smp cu$PM(NSS) code
+
+	set max 0
+	set fr 0
+	set ro [expr $RC(MOA) / 2]
+
+	while 1 {
+
+		if { $fr >= $PM(NSS) } {
+			break
+		}
+
+		set to [expr $fr + $RC(MOA)]
+
+		if { $to > $PM(NSS) } {
+			# shift back
+			set d [expr $to - $PM(NSS)]
+			incr fr -$d
+			incr to -$d
+		}
+
+		set v 0
+		while { $fr < $to } {
+			incr v [lindex $code $fr]
+			incr fr
+		}
+
+		set v [expr ($v + $ro) / $RC(MOA)]
+
+		if { $v > $max } {
+			set max $v
+		}
+	}
+
+	set in $SM(IN)
+	set SM($in) $max
+	incr in
+	if { $in == $PM(NSS) } {
+		set in 0
+	}
+	set SM(IN) $in
+
+	if { $max > $MX(0) } {
+		set MX(0) $max
+	}
+
+	clear_sample
+	draw_freq_sample
+	if $RC(TMX) {
+		draw_freq_max
+	}
+}
+
+proc pack3 { val } {
+#
+# Packs a three-byte value
+#
+	return [binary format ccc [expr  $val        & 0xff] \
+				  [expr ($val >>  8) & 0xFF] \
+				  [expr ($val >> 16) & 0xFF] \
+	       ]
+}
+
+proc pack2 { val } {
+#
+# Packs a three-byte value
+#
+	return [binary format cc [expr  $val        & 0xff] \
+				 [expr ($val >>  8) & 0xFF] \
+	       ]
+}
+
+proc pack1 { val } {
+
+	return [binary format c [expr  $val & 0xff]]
+}
+
+proc clear_sample { } {
+
+	global WN SM
+
+	$WN(CAN) delete smp
+}
+
+proc do_start_stop { } {
+
+	global ST SM MX RC PM WN
+
+	if { $ST(SFD) == "" } {
+		# disconnected
+		return
+	}
+
+	if $ST(SIP) {
+		# stop scan
+		send_command [binary format c 0xFF]
+		send_command [binary format c 0xFE]
+		set ST(SIP) 0
+		$WN(SSB) configure -text "Start"
+		update_widgets
+		return
+	}
+
+	clear_sample
+
+	set fc [freq_encode $RC(FCE)]
+
+	if [mode_single] {
+		if [mode_reception] {
+			set mo 2
+		} else {
+			set mo 1
+		}
+		set fs 0
+	} else {
+		set mo 0
+		# calculate step frequency
+		set fs [band_to_step $RC(BAN)]
+		set fc [expr $fc - ($PM(NSS)/2) * $fs]
+	}
+
+	set SM(fc) $fc
+	set SM(fs) $fs
+	set SM(mo) $mo
+
+	trc "SEP: $mo, $RC(FCE)<$fc>, $RC(BAN)<$fs>, $RC(STA), $RC(ISD)"
+
+	# reset the node
+	send_command [binary format c 0xFF]
+	send_command [binary format c 0xFE]
+
+	if [wack 0xFE] {
+		alert "Node reset timeout"
+		return
+	}
+
+	# write registers
+	set err [regs_write]
+	if { $err != "" } {
+		alert $err
+		return
+	}
+
+	# issue the request
+
+	set cmd [binary format c 0x02]
+
+	append cmd [pack1 $mo]
+	append cmd [pack3 $fc]
+	append cmd [pack3 $fs]
+	append cmd [pack1 $RC(STA)]
+	append cmd [pack1 $RC(ISD)]
+
+	send_command $cmd
+
+	set ST(SIP) [expr $mo + 1]
+	$WN(SSB) configure -text "Stop"
+
+	for { set i 0 } { $i < $PM(NSA) } { incr i } {
+		set SM($i) $RC(GRS)
+		set MX($i) $RC(GRS)
+	}
+
+	# this is the end-buffer pointer for freq samples
+	set SM(IN) 0
+
+	update_widgets
+}
+
+###############################################################################
+
+proc all_false { } { return 0 }
+
+proc nsbox { w lab min max var row { lst "" } } {
+#
+# Create a numerical spinbox
+#
+	global WN PM
+
+	label ${w}l -text "$lab:    " -anchor w
+	grid ${w}l -column 0 -row $row -sticky sw
+
+	set b ${w}b
+
+	if { [expr $max - $min] > 15 } {
+		# use a slider
+		scale $b -orient horizontal -from $min -to $max -resolution 1 \
+			-variable RC($var) -showvalue 1 \
+			-command "do_spinbox $var"
+	} else {
+		# use a spinbox with no entry capabilities
+		spinbox $b -from $min -to $max -textvariable RC($var) \
+		-validate all -vcmd "all_false" \
+		-justify right -command "do_spinbox $var"
+	}
+
+	if { $lst != "" } {
+		lappend WN($lst) ${w}b
+	}
+
+	grid ${w}b -column 1 -row $row -sticky nes
+}
+
+proc graph_bounds { } {
+#
+# Calculate drawing parameters implied by the canvas size (which we may want
+# to make resizable in the future) and the current numerical parameters
+#
+	global WN RC
+
+	# starting x-coordinate
+	set xs $WN(LMA)
+
+	# ending x-coordinate
+	set xe [expr $WN(CAW) + $xs]
+
+	# starting y-coordinate
+	set ys $WN(BMA)
+
+	# ending y-coordinate
+	set ye [expr $WN(CAH) + $ys]
+
+	set WN(xs) $xs
+	set WN(xe) $xe
+	set WN(ys) $ys
+	set WN(ye) $ye
+	set WN(yd) [expr $ye - $ys + 1]
+	# complete height of the canvas for mirroring
+	set WN(ym) [expr $WN(CAH) + $WN(BMA) + $WN(UMA)]
+	# the middle x point
+	set WN(xh) [expr ($WN(xs) + $WN(xe)) / 2]
+}
+
+proc yco { y } {
+#
+# Mirror the y coordinate
+#
+	global WN
+
+	return [expr $WN(ym) - $y]
+}
+
+proc draw_x_tick { x val } {
+
+	global WN FO
+
+	set y0 [yco [expr $WN(ys) - $WN(XTS)]]
+
+	$WN(CAN) create line $x [yco $WN(ys)] $x $y0 \
+		-fill $WN(AXC) \
+		-tags axis
+
+	if { $x == $WN(xs) } {
+		set an "nw"
+	} elseif { $x == $WN(xe) } {
+		set an "ne"
+	} else {
+		set an "n"
+	}
+	$WN(CAN) create text $x $y0 -text [format %1.2f $val] -anchor $an \
+		-font $FO(SMA) -fill $WN(AXC) -tags axis
+}
+
+proc draw_x_recs { lev xl xr vl vr } {
+#
+# Draw x-ticks recursively
+#
+	global WN
+
+	if { $lev >= $WN(ml) } {
+		# maximum depth reached
+		return
+	}
+
+	set d [expr ($xr + $xl) / 2]
+	set v [expr $vl + (double($d - $xl)/($xr - $xl - 1)) * ($vr - $vl)]
+
+	draw_x_tick $d $v
+
+	incr lev
+	if { $lev == $WN(ml) } {
+		return
+	}
+
+	draw_x_recs $lev $xl $d $vl $v
+	draw_x_recs $lev $d $xr $v $vr
+}
+
+proc draw_y_ticks { xc } {
+#
+# Draw y ticks along the vertical axis
+#
+	global WN RC FO
+
+	if { $xc == $WN(xh) } {
+		# center line
+		set x0 [expr $xc - $WN(YTS)]
+		set x1 [expr $xc + $WN(YTS)]
+		set xt $x1
+		set tan "w"
+	} else {
+		# right line
+		set x0 [expr $xc - $WN(YTS) - $WN(YTS)]
+		set x1 [expr $xc]
+		set xt $x0
+		set tan "e"
+	}
+
+	set y [expr $WN(MVT) / 2]
+	set yt [expr $WN(ye) - $WN(MVT) / 4]
+
+	while { $y <= $yt } {
+
+		set ya [yco $y]
+
+		set val [expr (double($y - $WN(ys)) / ($WN(ye) - $WN(ys))) * \
+			($RC(MRS) - $RC(GRS)) * 0.5]
+
+		$WN(CAN) create line $x0 $ya $x1 $ya -fill $WN(AXC) -tags axis
+
+		$WN(CAN) create text $xt $ya -text [format " %1.2f dB" $val] \
+			-anchor $tan -font $FO(SMA) -fill $WN(AXC) -tags axis
+
+		incr y $WN(MVT)
+	}
+}
+
+proc draw_axes { } {
+
+	global WN RC FO
+
+	# the canvas
+	set cv $WN(CAN)
+
+	# the color
+	set co $WN(AXC)
+
+	# calculate the frame
+	graph_bounds
+
+	$WN(CAN) delete axis
+
+	# horizontal axis
+	set y0 [yco $WN(ys)]
+	$WN(CAN) create line $WN(xs) $y0 $WN(xe) $y0 -fill $WN(AXC) \
+		-width 2 -tags axis
+
+	if [mode_single] {
+		draw_x_tick $WN(xe) $RC(FCE)
+		# the vertical axis
+		$WN(CAN) create line $WN(xe) $y0 $WN(xe) [yco $WN(ye)] \
+			-fill $WN(AXC) -width 1 -tags axis
+		draw_y_ticks $WN(xe)
+	} else {
+		# two edge ticks
+		lassign [band_width] fr up
+		draw_x_tick $WN(xs) $fr
+		draw_x_tick $WN(xe) $up
+		# calculate the maximum level of ticks
+		set lev 0
+		set spa [expr $WN(xe) - $WN(xs)]
+		while { $spa > $WN(MHT) } {
+			incr lev
+			set spa [expr $spa / 2]
+		}
+		set WN(ml) $lev
+		# recurse
+		draw_x_recs 0 $WN(xs) $WN(xe) $fr $up
+		# the vertical axis
+		$WN(CAN) create line $WN(xh) $y0 $WN(xh) [yco $WN(ye)] \
+			-fill $WN(AXC) -width 1 -tags axis
+		draw_y_ticks $WN(xh)
+	}
+}
+
+proc draw_freq_sample { } {
+#
+	global WN SM RC PM
+
+	set xa [expr $WN(xs) + $WN(SEF) - 1]
+	set yv [expr double($RC(MRS) - $RC(GRS))]
+	set ix $SM(IN)
+	set yp 0
+	for { set i 0 } { $i < $PM(NSS) } { incr i } {
+		set xb [expr $xa + $WN(SEF)]
+		set v $SM($ix)
+		incr ix
+		if { $ix == $PM(NSS) } {
+			set ix 0
+		}
+		if { $v < $RC(GRS) } {
+			set v $RC(GRS)
+		} elseif { $v > $RC(MRS) } {
+			set v $RC(MRS)
+		}
+		set y [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) +\
+			$WN(ys)]]
+		if { $yp > 0 } {
+			$WN(CAN) create line $xa $yp $xa $y $xb $y \
+				-fill $WN(SMC) -width 1 -tags smp
+		} else {
+			$WN(CAN) create line $xa $y $xb $y \
+				-fill $WN(SMC) -width 1 -tags smp
+		}
+		set xa $xb
+		set yp $y
+	}
+}
+
+proc draw_freq_max { } {
+#
+	global WN MX RC PM
+
+	set v $MX(0)
+	set yv [expr double($RC(MRS) - $RC(GRS))]
+
+	if { $v < $RC(GRS) } {
+		set v $RC(GRS)
+	} elseif { $v > $RC(MRS) } {
+		set v $RC(MRS)
+	}
+	set y \
+	     [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) + $WN(ys)]]
+
+	$WN(CAN) create line $WN(xs) $y $WN(xe) $y -fill $WN(MXC) \
+		-width 1 -tags smp
+}
+
+proc draw_band_sample { } {
+#
+	global WN SM RC PM
+
+	set xa $WN(xs)
+	set yv [expr double($RC(MRS) - $RC(GRS))]
+	for { set i 0 } { $i < $PM(NSA) } { incr i } {
+		set xb [expr $xa + $WN(SEF)]
+		set v $SM($i)
+		if { $v < $RC(GRS) } {
+			set v $RC(GRS)
+		} elseif { $v > $RC(MRS) } {
+			set v $RC(MRS)
+		}
+		set y [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) +\
+			$WN(ys)]]
+		$WN(CAN) create line $xa $y $xb $y -fill $WN(SMC) -width 2 \
+			-tags smp
+		set xa $xb
+	}
+}
+
+proc draw_band_max { } {
+#
+	global WN MX RC PM
+
+	set xa $WN(xs)
+	set yv [expr double($RC(MRS) - $RC(GRS))]
+	set yp 0
+	for { set i 0 } { $i < $PM(NSA) } { incr i } {
+		set xb [expr $xa + $WN(SEF)]
+		set v $MX($i)
+		if { $v < $RC(GRS) } {
+			set v $RC(GRS)
+		} elseif { $v > $RC(MRS) } {
+			set v $RC(MRS)
+		}
+		set y [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) +\
+			$WN(ys)]]
+		if { $yp > 0 } {
+			$WN(CAN) create line $xa $yp $xa $y $xb $y \
+				-fill $WN(MXC) -width 1 -tags smp
+		} else {
+			$WN(CAN) create line $xa $y $xb $y \
+				-fill $WN(MXC) -width 1 -tags smp
+		}
+		set xa $xb
+		set yp $y
+	}
+}
+
+proc reset_max { } {
+
+	global MX PM
+
+	for { set i 0 } { $i < $PM(NSA) } { incr i } {
+		set MX($i) 0
+	}
+}
+
+proc redraw { } {
+
+	global SM
+
+	clear_sample
+	draw_axes
+}
+
+proc update_widgets { } {
+#
+# Enable/disables the widgets whose status depends on our state
+#
+	global WN ST
+
+	if { $ST(SFD) == "" } {
+		# not connected, not scanning
+		set sc "disabled"
+		set ss "normal"
+	} else {
+		set sc "normal"
+		if $ST(SIP) {
+			# scanning
+			set ss "disabled"
+		} else {
+			set ss "normal"
+		}
+	}
+
+	foreach c [array names WN "*,SIP"] {
+		foreach w $WN($c) {
+			$w configure -state $ss
+		}
+	}
+
+	foreach c [array names WN "*,CON"] {
+		foreach w $WN($c) {
+			$w configure -state $sc
+		}
+	}
+}
+
+proc do_spinbox { var { val "" } } {
+
+	global RC
+
+	if { $var == "GRS" || $var == "MRS" } {
+		redraw
+	}
+}
+
+proc mode_single { } {
+
+	global RC
+
+	if { [string index $RC(BAN) 0] == "S" } {
+		return 1
+	}
+
+	return 0
+}
+
+proc mode_reception { } {
+
+	global RC
+
+	if { [string first "rcv" $RC(BAN)] < 0 } {
+		return 0
+	}
+
+	return 1
+}
+
+proc set_averaging_button { } {
+#
+# Updates the text on the "Averaging" button
+#
+	global WN RC
+
+	if [mode_single] {
+		set t "MOA=$RC(MOA)"
+	} else {
+		set t "EMA=$RC(EMA)"
+	}
+
+	$WN(AVB) configure -text $t
+}
+
+proc band_menu_click { w n } {
+#
+# Handles a selection from the band menu
+#
+	global RC
+
+	set t [$w.m entrycget $n -label]
+	$w configure -text $t
+	set RC(BAN) $t
+	set_averaging_button
+	redraw
+}
+
+proc set_averaging { w } {
+#
+# Sets one of the three frequency parameters
+#
+	global RC Mod WN PM
+
+	# create the window
+	set w [md_window "Set averaging mode"]
+
+	if [mode_single] {
+		set var "MOA"
+		set max $PM(MOA_max)
+	} else {
+		set var "EMA"
+		set max $PM(EMA_max)
+	}
+
+	set Mod(0,CU) $RC($var)
+
+	set f $w.tf
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	if { $var == "MOA" } {
+		set tt "Maximum of averages of ..."
+	} else {
+		set tt "Exponential moving average of ..."
+	}
+
+	label $f.ll -text $tt
+	pack $f.ll -side top
+
+	set sli $w.sc
+
+	scale $sli -orient horizontal -length $WN(SLW) \
+		-from 1 -to $max -resolution 1 \
+		-tickinterval [expr $max/8] \
+		-variable Mod(0,CU) \
+		-showvalue 1
+
+	pack $sli -side top -expand y -fill x
+
+	# frame for buttons
+	set f $w.bf
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	button $f.d -text "Done" -command "md_click 1"
+	pack $f.d -side right -expand n
+
+	button $f.c -text "Cancel" -command "md_click -1"
+	pack $f.c -side left -expand n
+
+	bind $w <Destroy> "md_click -1"
+
+	#######################################################################
+
+	while 1 {
+
+		set ev [md_wait]
+
+		if { $ev < 0 } {
+			# cancellation
+			return
+		}
+
+		if { $ev == 1 } {
+			# set the changes
+			set RC($var) $Mod(0,CU)
+			md_stop
+			set_averaging_button
+			return
+		}
+	}
+}
+
+proc set_center_frequency { w } {
+#
+# Sets one of the three frequency parameters
+#
+	global RC Mod WN PM
+
+	# create the window
+	set w [md_window "Set center frequency"]
+
+	set Mod(0,CU) $RC(FCE)
+
+	# the slider is a frame of its own
+	set sli $w.sc
+
+	scale $sli -orient horizontal -length $WN(SLW) \
+		-from $PM(FRE_min) -to $PM(FRE_max) -resolution 0.01 \
+		-tickinterval [expr ($PM(FRE_max) - $PM(FRE_min)) / 6] \
+		-variable Mod(0,CU) \
+		-showvalue 1
+
+	pack $sli -side top -expand y -fill x
+
+	# frame for buttons
+	set f $w.bf
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	button $f.d -text "Done" -command "md_click 1"
+	pack $f.d -side right -expand n
+
+	button $f.c -text "Cancel" -command "md_click -1"
+	pack $f.c -side left -expand n
+
+	bind $w <Destroy> "md_click -1"
+
+	#######################################################################
+
+	while 1 {
+
+		set ev [md_wait]
+
+		if { $ev < 0 } {
+			# cancellation
+			return
+		}
+
+		if { $ev == 1 } {
+			# set the changes
+			set RC(FCE) $Mod(0,CU)
+			md_stop
+			redraw
+			return
+		}
+	}
+}
+
+proc mk_rootwin { win } {
+
+	global WN ST RC PM
+
+	wm title $win "Olsonet Spectrum Analyzer V$ST(VER)"
+
+	if { $win == "." } {
+		set w ""
+	} else {
+		set w $win
+	}
+
+	# list of scan parameter widgets
+	set WN(RWI,SIP) ""
+
+	set WN(CAN) "$w.c"
+	canvas $WN(CAN) -width [expr $WN(CAW) + $WN(LMA) + $WN(RMA)] \
+		       -height [expr $WN(CAH) + $WN(BMA) + $WN(UMA)] \
+				-bg black
+	pack $WN(CAN) -side left -expand n
+
+	set mf "$w.tf"
+	frame $mf
+	pack $mf -side left -expand y -fill both
+
+	#######################################################################
+
+	set f $mf.t
+	frame $f -pady 4 -padx 4
+	pack $f -side top -expand y -fill x -anchor n
+
+	#######################################################################
+
+	set x $f.t
+
+	labelframe $x -padx 4 -pady 4 -text "Scan parameters"
+	pack $x -side top -expand y -fill both -anchor w
+
+	#######################################################################
+
+	label $x.cl -text "Center frequency (MHz): " -anchor w
+	grid $x.cl -column 0 -row 0 -sticky nsw
+
+	button $x.cb -textvariable RC(FCE) -anchor e \
+		-command "set_center_frequency $x.cb"
+
+	lappend WN(RWI,SIP) $x.cb
+	grid $x.cb -column 1 -row 0 -sticky news
+
+	#######################################################################
+
+	label $x.bl -text "Band (MHz) / mode: " -anchor w
+	grid $x.bl -column 0 -row 1 -sticky nsw
+
+	set ol [concat { "Single" "Single/rcv" } $PM(BAN)]
+	menubutton $x.bm -text $RC(BAN) -direction left -menu $x.bm.m \
+		-relief raised
+	menu $x.bm.m -tearoff 0
+	set n 0
+	foreach it $ol {
+		$x.bm.m add command -label $it \
+			-command "band_menu_click $x.bm $n"
+		incr n
+	}
+	lappend WN(RWI,SIP) $x.bm
+	grid $x.bm -column 1 -row 1 -sticky news
+
+	#######################################################################
+
+	nsbox $x.sa "Samples to average" 1 $PM(STA_max) STA 2 RWI,SIP
+	nsbox $x.is "Inter-sample delay" 0 $PM(ISD_max) ISD 3 RWI,SIP
+
+	#######################################################################
+
+	grid columnconfigure $x 0 -weight 0
+	grid columnconfigure $x 1 -weight 1
+
+	#######################################################################
+
+	set x $f.gr
+
+	labelframe $x -padx 4 -pady 4 -text "Graph parameters"
+	pack $x -side top -expand y -fill both -anchor w
+
+	#######################################################################
+
+	nsbox $x.ba "Ground RSSI" 0 128 GRS 0
+	nsbox $x.ma "Maximum RSSI" 128 255 MRS 1
+
+	#######################################################################
+
+	label $x.al -text "Averaging:  "
+	grid $x.al -column 0 -row 2 -sticky nsw
+
+	button $x.ab -text "-" -anchor e -command "set_averaging $x.ab"
+	set WN(AVB) $x.ab
+	set_averaging_button
+	grid $x.ab -column 1 -row 2 -sticky nes
+
+	#######################################################################
+
+	label $x.ml -text "Track maximum:  "
+	grid $x.ml -column 0 -row 3 -sticky nsw
+
+	frame $x.uf
+	grid $x.uf -column 1 -row 3 -sticky nes
+	
+	checkbutton $x.uf.mb -variable RC(TMX)
+	pack $x.uf.mb -side left
+
+	button $x.uf.mc -text Rst -command reset_max
+	pack $x.uf.mc -side right
+
+	#######################################################################
+
+	grid columnconfigure $x 0 -weight 0
+	grid columnconfigure $x 1 -weight 1
+
+	#######################################################################
+
+	set x $f.ub
+	frame $x -relief sunken
+	pack $x -side top -expand y -fill x -anchor n
+
+	# this is probably temporary ##########################################
+	button $x.lo -text "Log On" -command "log_toggle" -width 8
+	grid $x.lo -column 0 -row 0 -sticky news
+	set WN(LOB) $x.lo
+	#######################################################################
+
+	#######################################################################
+	button $x.rg -text "Regs On" -command "regs_toggle" -width 8
+	grid $x.rg -column 0 -row 1 -sticky news
+	set WN(REB) $x.rg
+	#######################################################################
+
+	set x $mf.bu
+
+	frame $x -padx 4 -pady 4 -relief ridge
+	pack $x -side bottom -expand y -fill x -anchor s
+
+	#######################################################################
+	button $x.qu -text "Quit" -command "terminate"
+	pack $x.qu -side left
+	#######################################################################
+
+	#######################################################################
+	button $x.co -text "Connect" -command "do_connect_disconnect"
+	pack $x.co -side left
+	set WN(COB) $x.co
+	#######################################################################
+
+	#######################################################################
+	button $x.go -text "Start" -command "do_start_stop"
+	pack $x.go -side right
+	set WN(SSB) $x.go
+	#######################################################################
+
+	#######################################################################
+	button $x.in -text "Inject" -command "do_inject"
+	pack $x.in -side right
+	lappend WN(RWI,SIP) $x.in
+	#######################################################################
+
+	bind . <Destroy> "terminate"
+}
+
+###############################################################################
+# Registers ###################################################################
+###############################################################################
+
+# the always-present default, built-in register groups; RO registers occur as
+# a special group
+set RGroups(+RW) ""
+set RGroups(+RO) ""
+
+proc regdef { name addr def { len 0 } { status 0 } } {
+#
+# Defines a register
+#
+	global RG RGroups
+
+	set RG($name,A) [expr $addr]
+	set RG($name,L) $len
+	# for status (read-only) registers
+	set RG($name,S) $status
+
+	if $status {
+		lappend RGroups(+RO) $name
+		set addr [expr $addr | 0xC0]
+	} else {
+		# only RW registers go to groups
+		lappend RGroups(+RW) [list $name $def]
+	}
+
+	if !$len {
+		# only single-valued registers can have fields
+		set RG($name,NF) 0
+	}
+
+	regset $name $def
+
+	set RG($name,T) ""
+}
+
+proc regtip { name tip } {
+
+	global RG
+
+	set RG($name,T) $tip
+}
+
+proc regfld { name tag h { l "" } } {
+#
+# Add a field to a reg definition
+#
+	global RG
+
+	if { $l == "" } {
+		set l $h
+	}
+
+	if $RG($name,L) {
+		error "fields not supported for multivalue registers"
+	}
+
+	set x $RG($name,NF)
+	incr RG($name,NF)
+
+	set RG($name,F$x,n) $tag
+	set RG($name,F$x,h) $h
+	set RG($name,F$x,l) $l
+	set RG($name,F$x,t) ""
+}
+
+proc regftp { name tag tip } {
+
+	global RG
+
+	set n $RG($name,NF)
+
+	for { set i 0 } { $i < $n } { incr i } {
+		if { $RG($name,F$i,n) == $tag } {
+			set RG($name,F$i,t) $tip
+			return
+		}
+	}
+
+	error "field $tag not found in $name"
+}
+
+proc regval { name } {
+#
+# Returns register value
+#
+	global RG FO
+
+	if ![info exists RG($name,A)] {
+		return ""
+	}
+
+	if $RG($name,L) {
+		# multivalue
+		set res ""
+		for { set i 0 } { $i < $RG($name,L) } { incr i } {
+			lappend res [expr 0x$RG($name,V,$i)]
+		}
+		return $res
+	}
+
+	return [expr 0x$RG($name,V)]
+}
+
+proc regwid { name w row } {
+#
+# Sets up a register widget
+#
+	global RG WN BV FO
+
+	label $w.n$row -text $name -anchor w
+	grid $w.n$row -column 0 -row $row -sticky nes
+	if { $RG($name,T) != "" } {
+		tip_set $w.n$row $RG($name,T)
+	}
+
+	set f $w.f$row
+	frame $f -borderwidth 1
+	grid $f -column 1 -row $row -sticky news
+
+	# read only?
+	set ro $RG($name,S)
+
+	# value length
+	set ln $RG($name,L)
+
+	# value label color
+	if $ro {
+		set lc $WN(RRC)
+	} else {
+		set lc $WN(RWC)
+	}
+
+	if $ln {
+		# a multi-valued register, no fields
+		for { set i 0 } { $i < $ln } { incr i } {
+			label $f.tl$i -text " V$i:"
+			pack $f.tl$i -side left
+			label $f.td$i -textvariable RG($name,V,$i) -bg $lc \
+				-font $FO(REG) -cursor $WN(CCD)
+			pack $f.td$i -side left
+			if !$ro {
+				bind $f.td$i <ButtonRelease-1> \
+				    "reg_val_change $name +1 $f.td$i %x $i"
+				bind $f.td$i <ButtonRelease-2> \
+				    "reg_val_change $name -1 $f.td$i %x $i"
+				bind $f.td$i <ButtonRelease-3> \
+				    "reg_val_change $name -1 $f.td$i %x $i"
+			}
+		}
+		# no fields
+		set ns 0
+
+	} else {
+
+		# single value
+		label $f.td -textvariable RG($name,V) -bg $lc -font $FO(REG) \
+			-cursor $WN(CCD)
+		pack $f.td -side left
+		if !$ro {
+			bind $f.td <ButtonRelease-1> \
+				"reg_val_change $name +1 $f.td %x"
+			bind $f.td <ButtonRelease-2> \
+				"reg_val_change $name -1 $f.td %x"
+			bind $f.td <ButtonRelease-3> \
+				"reg_val_change $name -1 $f.td %x"
+		}
+
+		set ns $RG($name,NF)
+	}
+
+	if $ns {
+
+		# fields present; this implies single value
+
+		frame $f.s -borderwidth 1
+		set f $f.s
+		pack $f -side left
+
+		# store the tag of the field widget frame
+		set RG($name,FW) $f
+
+		for { set i 0 } { $i < $ns } { incr i } {
+			set ix "$name,F$i"
+			set nm $RG($ix,n)
+			set bh $RG($ix,h)
+			set bl $RG($ix,l)
+			set ti $RG($ix,t)
+
+			append nm "<$bh"
+			if { $bh != $bl } {
+				append nm ":$bl"
+			}
+			append nm ">"
+			label $f.l$i -text "  $nm" -anchor w
+			pack $f.l$i -side left
+			if { $ti != "" } {
+				tip_set $f.l$i $ti
+			}
+
+			# the number of bits in the field
+			set nb [expr $bh - $bl + 1]
+
+			while 1 {
+				label $f.b$bh \
+					-textvariable RG($name,$bh) \
+					-bg $lc -font $FO(REG) \
+					-cursor $WN(CCD)
+				pack $f.b$bh -side left
+				if !$ro {
+					bind $f.b$bh <ButtonRelease-1> \
+						"reg_toggle_bit $name $bh"
+					bind $f.b$bh <ButtonRelease-2> \
+						"reg_toggle_bit $name $bh"
+					bind $f.b$bh <ButtonRelease-3> \
+						"reg_toggle_bit $name $bh"
+				}
+				if { $bh == $bl } {
+					break
+
+				}
+				incr bh -1
+			}
+		}
+	}
+
+	# the read button
+	set f $w.rw$row
+	frame $f
+	grid $f -column 2 -row $row -sticky news
+
+	label $f.r -text r -cursor $WN(CCD) -bg $WN(RBC)
+	pack $f.r -side left -expand y -fill x
+	bind $f.r <ButtonRelease-1> "reg_read_click $name"
+	if !$ro {
+		label $f.w -text w -cursor $WN(CCD) -bg $WN(WBC)
+		pack $f.w -side left -expand y -fill x
+		bind $f.w <ButtonRelease-1> "reg_write_click $name"
+	}
+}
+
+proc regset { name val { i "" } } {
+#
+# Set the register
+#
+	global RG
+
+	# make sure there are no surprises
+	set len $RG($name,L)
+
+	if $len {
+		if { $i == "" } {
+			# val is a list
+			for { set i 0 } { $i < $len } { incr i } {
+				set eva [format %02X \
+					[expr [lindex $val $i] & 0xFF]]
+				set RG($name,V,$i) $eva
+				set RG($name,D0,$i) [string index $eva 0]
+				set RG($name,D1,$i) [string index $eva 1]
+			}
+		} else {
+			# val is a single value
+			set eva [format %02X [expr $val & 0xFF]]
+			set RG($name,V,$i) $eva
+			set RG($name,D0,$i) [string index $eva 0]
+			set RG($name,D1,$i) [string index $eva 1]
+		}
+		return
+	}
+
+	set val [expr $val & 0xFF]
+	set eva [format %02X $val]
+	set RG($name,V) $eva
+	set RG($name,D0) [string index $eva 0]
+	set RG($name,D1) [string index $eva 1]
+
+	for { set j 0 } { $j < 8 } { incr j } {
+		set RG($name,$j) [expr ($val >> $j) & 1]
+	}
+}
+
+proc reguse { grp } {
+#
+# Assume the specified register set
+#
+	global RGroups RG WN
+
+	foreach p $RGroups($grp) {
+
+		set rg [lindex $p 0]
+		set rv [lindex $p 1]
+
+		if ![info exists RG($rg,A)] {
+			continue
+		}
+		if [catch { regset $rg $rv } err] {
+			trc "regset error <$p $rv>: $err"
+		}
+	}
+
+	if { [string index $grp 0] == "+" } {
+		set WN(CRG) "Built In"
+	} else {
+		set WN(CRG) $grp
+	}
+
+	if { $WN(REG) != "" } {
+		wm title $WN(REG) "Registers: $WN(CRG)"
+	}
+}
+
+proc reg_val_change { name dir w x { i 0 } } {
+#
+# Register value change (from widget)
+#
+	global RG
+
+	# determine the digit
+	set d [winfo width $w]
+
+	if { $x < [expr $d / 2] } {
+		set d 0
+	} else {
+		set d 1
+	}
+
+	if $RG($name,L) {
+		set ix "$name,D$d,$i"
+	} else {
+		set ix "$name,D$d"
+	}
+
+	set v [expr 0x$RG($ix)]
+
+	if { $dir > 0 } {
+		if { $v == 15 } {
+			set v 0
+		} else {
+			incr v
+		}
+	} else {
+		if { $v == 0 } {
+			set v 15
+		} else {
+			incr v -1
+		}
+	}
+
+	set RG($ix) [format %X $v]
+
+	if $RG($name,L) {
+		set v [expr 0x$RG($name,D0,$i)$RG($name,D1,$i)]
+		regset $name $v $i
+		return
+	}
+
+	set v [expr 0x$RG($name,D0)$RG($name,D1)]
+	regset $name $v
+}
+
+proc reg_toggle_bit { name i } {
+#
+# Toggles the indicated bit in the register
+#
+	global RG
+
+	# single-valued registers only
+	set val [regval $name]
+	set bit [expr 1 << $i]
+
+	if [expr $val & $bit] {
+		set val [expr $val ^ $bit]
+	} else {
+		set val [expr $val | $bit]
+	}
+
+	regset $name $val
+}
+
+proc reg_write { name } {
+
+	global ST RG
+
+	if { $ST(SFD) == "" } {
+		# disconnected, this probably will never happen
+		return "Cannot write register, not connected to device"
+	}
+
+	if ![info exists RG($name,A)] {
+		# impossible
+		return "Cannot write register $name, no such register"
+	}
+
+	if $RG($name,S) {
+		return "Cannot write register $name, register is read-only"
+	}
+
+	set val [regval $name]
+
+	if $RG($name,L) {
+		# burst
+		set cmd [binary format ccc 0x06 $RG($name,A) $RG($name,L)]
+		foreach v $val {
+			append cmd [pack1 $v]
+		}
+	} else {
+		# single
+		set cmd [binary format cccc 0x03 1 $RG($name,A) $val]
+	}
+
+	send_command $cmd
+	if [wack 0xFD] {
+		return "Failed to write register $name, node response timeout"
+	}
+
+	return ""
+}
+
+proc reg_write_click { name } {
+
+	set err [reg_write $name]
+
+	if { $err != "" } {
+		alert $err
+	}
+}
+
+proc regs_write { } {
+#
+# Writes all R/W registers to the device
+#
+	global ST RG RGroups
+
+	if { $ST(SFD) == "" } {
+		# disconnected
+		return "Cannot write registers, not connected to device"
+	}
+
+	# single set
+	set gs ""
+	# multiple set
+	set gm ""
+
+	foreach r $RGroups(+RW) {
+		set r [lindex $r 0]
+		if $RG($r,L) {
+			# multivalue
+			lappend gm $r
+		} else {
+			lappend gs [list $RG($r,A) [regval $r]]
+		}
+	}
+
+	set cmd [binary format cc 0x03 [llength $gs]]
+	foreach r $gs {
+		append cmd [pack1 [lindex $r 0]]
+		append cmd [pack1 [lindex $r 1]]
+	}
+
+	# write single-valued registers
+	send_command $cmd
+	if [wack 0xFD] {
+		return "Failed to write single-valued registers, node response\
+			timeout"
+	}
+
+	# take care of the burst registers; there's probably just one, i.e.,
+	# the PATABLE
+	foreach r $gm {
+		set err [reg_write $r]
+		if { $err != "" } {
+			return $err
+		}
+	}
+
+	return ""
+}
+
+proc regs_write_click { } {
+
+	set err [regs_write]
+
+	if { $err != "" } {
+		alert $err
+	}
+}
+	
+proc reg_read { name } {
+#
+# Read register from device
+#
+	global ST RG
+
+	if { $ST(SFD) == "" } {
+		return "Cannot read register $name, not connected to device"
+	}
+
+	if ![info exists RG($name,A)] {
+		return "Cannot read register $name, no such register"
+	}
+
+	if $RG($name,L) {
+		# burst
+		set wai 0x07
+		set cmd [binary format ccc $wai $RG($name,A) $RG($name,L)]
+	} else {
+		# single
+		set wai 0x04
+		set cmd [binary format ccc $wai 1 $RG($name,A)]
+	}
+
+	send_command $cmd
+
+	if [wack $wai] {
+		return "Failed to read register $name, node response timeout"
+	}
+
+	# the register has been read
+	set rep $ST(ECM,M)
+	set ST(ECM,M) ""
+	set al [string length $rep]
+
+	if $RG($name,L) {
+		# burst
+		set el [expr $RG($name,L) + 1]
+		if { $al < $el } {
+			return "Failed to read register $name, response too\
+				short, expected $el, got $al bytes"
+		}
+		incr el -1
+		binary scan [string index $rep 0] cu al
+		if { $al != $el } {
+			return "Failed to read register $name, expected $el\
+				bytes, got $al"
+		}
+		binary scan [string range $rep 1 end] cu${al} vl
+	} else {
+		# single value
+		if { $al < 2 } {
+			return "Failed to read register $name, response too\
+				short"
+		}
+		binary scan $rep cucu el vl
+		if { $el != 1 } {
+			return "Failed to read register $name, illegal\
+				response from node"
+		}
+	}
+		
+	regset $name $vl
+
+	return ""
+}
+
+proc reg_read_click { name } {
+
+	set err [reg_read $name]
+
+	if { $err != "" } {
+		alert $err
+	}
+}
+
+proc regs_read { } {
+#
+# Read all registers
+#
+	global ST RG RGroups
+
+	if { $ST(SFD) == "" } {
+		# disconnected
+		return "Cannot read registers, not connected to device"
+	}
+
+	set gs ""
+	set gm ""
+	foreach r $RGroups(+RW) {
+		set r [lindex $r 0]
+		if $RG($r,L) {
+			lappend gm $r
+		} else {
+			lappend gs $r
+		}
+	}
+
+	if 0 {
+		# R/O registers can only be read individually
+		foreach r $RGroups(+RO) {
+			if $RG($r,L) {
+				lappend gm $r
+			} else {
+				lappend gs $r
+			}
+		}
+	}
+
+	# start with the burst ones
+	foreach r $gm {
+		set err [reg_read $r]
+		if { $err != "" } {
+			return $err
+		}
+	}
+
+
+	# now for the single-valued ones
+
+	set el [llength $gs]
+	set cmd [binary format cc 0x04 $el]
+
+	foreach r $gs {
+		append cmd [pack1 $RG($r,A)]
+	}
+
+	# read all single-valued registers
+	send_command $cmd
+
+	if [wack 0x04] {
+		return "Failed to read registers, node response timeout"
+	}
+
+	set rep $ST(ECM,M)
+	set ST(ECM,M) ""
+	set al [string length $rep]
+
+	if { $al < [expr $el + 1] } {
+		return "Failed to read registers, node response too short,\
+			expected [expr $el + 1] bytes, got $al"
+	}
+
+	binary scan [string index $rep 0] cu al
+
+	if { $al != $el } {
+		return "Failed to read registers, got back only $al values,\
+			expected $el"
+	}
+
+	binary scan [string range $rep 1 end] cu${al} vl
+
+	foreach r $gs v $vl {
+		regset $r $v
+	}
+
+
+	return ""
+}
+
+proc regs_read_click { } {
+
+	set err [regs_read]
+
+	if { $err != "" } {
+		alert $err
+	}
+}
+
+proc regs_toggle { } {
+#
+# Open/close the registers window
+#
+	global WN
+
+	if { $WN(REG) == "" } {
+		regs_open
+	} else {
+		regs_close
+	}
+}
+
+proc regs_close { } {
+
+	global WN
+
+	catch { destroy $WN(REG) }
+	set WN(REG) ""
+	array unset WN "REG,*"
+	$WN(REB) configure -text "Regs On"
+}
+
+proc regs_open { } {
+#
+# Opens the registers window
+#
+	global WN RGroups
+
+	if { $WN(REG) != "" } {
+		# already open
+		return
+	}
+
+	$WN(REB) configure -text "Regs Off"
+
+	set w ".regw"
+	toplevel $w
+	wm title $w "Registers: $WN(CRG)"
+
+	set WN(REG) $w
+	set WN(REG,CON) ""
+
+	bind $w <Destroy> regs_close
+
+	set f $w.mf
+	frame $f
+	pack $f -side left -expand y -fill both
+
+	set b $w.bf
+	frame $b
+	pack $b -side left -expand n -fill y
+
+	#######################################################################
+	# buttons #############################################################
+	#######################################################################
+	button $b.c -text Close -command regs_close
+	pack $b.c -side bottom -expand n -fill x
+
+	button $b.w -text Write -command regs_write_click
+	pack $b.w -side bottom -expand n -fill x
+	lappend WN(REG,CON) $b.w
+
+	button $b.r -text Read -command regs_read_click
+	pack $b.r -side bottom -expand n -fill x
+	lappend WN(REG,CON) $b.r
+
+	button $b.l -text Load -command regs_load
+	pack $b.l -side top -expand n -fill x
+
+	button $b.s -text Save -command regs_save
+	pack $b.s -side top -expand n -fill x
+
+	#######################################################################
+	#######################################################################
+
+	ttk::frame $f.tf
+	set f $f.tf
+	pack $f -expand y -fill both
+
+
+	scrollbar $f.sb -orient vertical -command "$f.tt yview" -takefocus 1
+	scrollbar $f.sc -orient horizontal -command "$f.tt xview" -takefocus 1
+	pack $f.sb -side right -fill y
+	pack $f.sc -side bottom -fill x
+
+	text $f.tt -yscrollcommand "$f.sb set" -xscrollcommand "$f.sc set" \
+		-cursor $WN(CRP) -width 80 -state disabled
+	pack $f.tt -expand y -fill both -padx 1
+
+	set x $f.tt.r
+	frame $x
+
+	# more ...
+	set row 0
+
+	foreach r $RGroups(+RW) {
+		regwid [lindex $r 0] $x $row
+		incr row
+	}
+
+	foreach r $RGroups(+RO) {
+		regwid $r $x $row
+		incr row
+	}
+
+	$f.tt window create end -window $x
+
+	update_widgets
+}
+
+proc regs_load { } {
+#
+# Load a new register set
+#
+	global WN RGroups Mod
+
+	# the list of groups
+	set gl ""
+
+	foreach g [array names RGroups] {
+		if { [string index $g 0] != "+" } {
+			lappend gl $g
+		}
+	}
+
+	set gl [concat [list "Built In"] [lsort $gl]]
+
+	if { $gl == "" } {
+		alert "No saved register sets are available"
+		return
+	}
+
+	# we need a simple modal window
+	set w [md_window "Choose register set"]
+	set f $w
+	set Mod(0,SE) [lindex $gl 0]
+
+	eval "tk_optionMenu $f.op Mod(0,SE) $gl"
+	pack $f.op -side top -expand y -fill x
+
+	set f $w.bf
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	button $f.c -text Cancel -anchor w -command "md_click -1"
+	pack $f.c -side left
+
+	button $f.l -text Load -anchor e -command "md_click 1"
+	pack $f.l -side right
+
+	button $f.d -text Delete -anchor e -command "md_click 2"
+	pack $f.d -side right
+
+	bind $w <Destroy> "md_click -1"
+
+	#######################################################################
+
+	while 1 {
+
+		set ev [md_wait]
+
+		if { $ev < 0 } {
+			return
+		}
+
+		set v [string trim $Mod(0,SE)]
+		if { $v == "" || [string index $v 0] == "+" } {
+			# a precaution
+			continue
+		}
+
+		if { $ev == 1 } {
+			reguse "+RW"
+			if { $v != "Built In" } {
+				reguse $v
+			}
+			md_stop
+			return
+		}
+
+		if { $ev == 2 } {
+			if { $v == "Built In" } {
+				alert "This register set cannot be removed"
+				continue
+			}
+			if [info exists RGroups($v)] {
+				if [confirm "Do you really want to remove the\
+				    register set: $v"] {
+					unset RGroups($v)
+					md_stop
+					return
+				}
+			}
+		}
+	}
+}
+
+proc regs_save { } {
+#
+# Save the current register set
+#
+	global WN RGroups Mod
+
+	# the list of groups
+	set gl ""
+
+	foreach g [array names RGroups] {
+		if { [string index $g 0] != "+" } {
+			lappend gl $g
+		}
+	}
+
+	set gl [lsort $gl]
+
+	set w [md_window "Save register set"]
+	set f $w.t
+
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	label $f.l -text "Name to save under:" -anchor w
+	pack $f.l -side top -expand n -anchor w
+
+
+	set Mod(0,SE) [ttk::combobox $f.op -values $gl]
+	pack $f.op -side top -expand y -fill x
+
+	set f $w.bf
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	button $f.c -text Cancel -anchor w -command "md_click -1"
+	pack $f.c -side left
+
+	button $f.l -text Save -anchor e -command "md_click 1"
+	pack $f.l -side right
+
+	bind $w <Destroy> "md_click -1"
+
+	#######################################################################
+
+	while 1 {
+
+		set ev [md_wait]
+
+		if { $ev < 0 } {
+			return
+		}
+
+		if { $ev == 1 } {
+			set n [string trim [$Mod(0,SE) get]]
+			if { $n == "Built In" } {
+				alert "This register set cannot be overwritten"
+				continue
+			}
+			if { $n == "" || [string index $n 0] == "+" } {
+				alert "This name: $n is illegal"
+				continue
+			}
+			set gr ""
+			foreach r $RGroups(+RW) {
+				set r [lindex $r 0]
+				lappend gr [list $r [regval $r]]
+			}
+			set RGroups($n) $gr
+			md_stop
+			return
+		}
+	}
+}
+
+###############################################################################
+###############################################################################
+	
+proc trc { msg } {
+
+	global ST
+
+	if !$ST(DBG) {
+		return
+	}
+
+	puts $msg
+}
+
+proc dump { hd buf } {
+
+	global ST
+
+	if !$ST(DBG) {
+		return
+	}
+
+	puts "$hd ->[hencode $buf]"
+}
+
+proc initialize { } {
+
+	global ST RC argv
+
+	unames_init $ST(DEV)
+
+	if { [lindex $argv 0] == "-D" } {
+		set ST(DBG) 1
+	}
+
+	trc "Starting"
+
+	getsparams
+
+	mk_rootwin .
+
+	update_widgets
+
+	redraw
+}
+
+###############################################################################
+###############################################################################
+
+# Debug flag
+set ST(DBG)	0
+
+# tip text wrap length (pixels)
+set PM(TWR)	320
+
+# Handshake timeout: short, long
+set PM(HST)	{ 2000 8000 }
+
+# Command timeout
+set PM(CMT)	6000
+
+# scan in progress
+set ST(SIP)	0
+
+# expected command code, and the command itself
+set ST(ECM)	0
+set ST(ECM,M)	""
+
+###############################################################################
+
+# canvas margins: left, right, bottom, up
+set WN(LMA) 5
+set WN(RMA) 5
+set WN(BMA) 25
+set WN(UMA) 5
+
+# number of samples in a row, number of single-freq samples in a packet
+set PM(NSA) 129
+set PM(NSS) [expr $PM(NSA) - 1]
+
+# sample expansion factor: pixels per sample
+set WN(SEF) 4
+
+# drawable canvas width and height (total will include margins)
+set WN(CAW) [expr $PM(NSA) * $WN(SEF)]
+set WN(CAH) 512
+
+# minimum separation between tick on horizontal axis
+set WN(MHT) 70
+
+# minimum separation between ticks on vertical axis
+set WN(MVT) 90
+
+# x-tick height
+set WN(XTS) 4
+
+# y-tick 1/2 width
+set WN(YTS) 2
+
+# axis color
+set WN(AXC) "#FFFF66"
+
+# sample color
+set WN(SMC) "#00FF00"
+
+# max color
+set WN(MXC) "#FF0000"
+
+# RO register label color
+set WN(RRC) "#DDDDDD"
+
+# RW register label color
+set WN(RWC) "#A6D0FC"
+
+# R-button color
+set WN(RBC) "#F9D6A4"
+
+# W-button color
+set WN(WBC) "#FCADA6"
+
+# slider width
+set WN(SLW) 400
+
+# log buffer size (number of lines); later we will turn this into a flexible
+# parameter
+set PM(MXL) 1024
+
+# the log, and number of lines
+set ST(LOG) ""
+set ST(LOL) 0
+
+# log text area
+set WN(LOG) ""
+
+# regs window
+set WN(REG) ""
+
+# cursors for regs pane and clickable digit
+set WN(CRP) plus
+set WN(CCD) hand2
+
+# rc file
+set PM(RCF) ".sapicrc"
+if { [info exists env(HOME)] && $env(HOME) != "" } {
+	set e $env(HOME)
+} else {
+	set e [pwd]
+}
+
+set PM(RCF) [file join $e $PM(RCF)]
+
+# frequency prereqs: minimum, maximum (from), maximum (to) default, min step
+# max step, crystal freq
+set PM(FRE_min) 300.00
+set PM(FRE_max) 930.00
+set PM(FRE_def) 904.00
+set PM(FRE_qua) 26.0
+
+# Samples to average, inter-sample delay
+set PM(STA_max) 255
+set PM(ISD_max) 255
+set PM(EMA_max) 64
+set PM(MOA_max) $PM(NSS)
+
+# List of discrete bands to choose from (MHz)
+set PM(BAN) { 0.025 0.05 0.1 0.2 0.5 1.0 2.0 5.0 10.0 20.0 50.0 }
+
+# font for axis ticks #########################################################
+foreach e [font names] {
+	if [regexp -nocase "small" $e] {
+		set FO(SMA) $e
+		break
+	}
+}
+if ![info exists FO(SMA)] {
+	set FO(SMA) {-family courier -size 9}
+}
+###############################################################################
+
+# font for the log
+set FO(LOG) "-family courier -size 9"
+
+# for register labels
+set FO(REG) "-family courier -size 10"
+
+unset e
+
+set Params ""
+
+proc pardef { name vcmd def } {
+
+	global RC Params
+
+	set RC(+,$name) $vcmd
+	set RC($name) $def
+
+	lappend Params $name
+}
+
+# list of RC parameters together with validation functions and default
+# (fallback) values
+
+pardef FCE "valid_fp_number %I $PM(FRE_min) $PM(FRE_max) 2 %O" $PM(FRE_def)
+pardef BAN "valid_ban %I %O" [lindex $PM(BAN) 7]
+pardef STA "valid_int_number %I 1 $PM(STA_max) %O" 1
+pardef ISD "valid_int_number %I 0 $PM(ISD_max) %O" 1
+pardef GRS "valid_int_number 0 128 %I %O" 64
+pardef MRS "valid_int_number 128 255 %I %O" 255
+pardef EMA "valid_int_number 1 $PM(EMA_max) %I %O" 1
+pardef MOA "valid_int_number 1 $PM(MOA_max) %I %O" 1
+pardef TMX "valid_int_number 0 1 %I %O" 1
+
+###############################################################################
+###############################################################################
+
+set WN(CRG) "Built In"
+
+set t0 "Invert output, i.e. select active low"
+set t1 "See table 41 in the manual (also see IOCFG2 CFG)."
+
+regdef	IOCFG2	     0x00 0x2f
+regtip	IOCFG2		"GDO2 output pin configuration."
+
+regfld	IOCFG2 INV 6
+regftp	IOCFG2 INV	$t0
+
+regfld	IOCFG2 CFG 5 0
+regftp	IOCFG2 CFG	"See table 41 in the manual. Some initial values\
+			 are:\n0 - asserts when RX FIFO is filled at or above\
+			 the RX FIFO threshold\n1 - asserts when RX FIFO is\
+			 filled at or above the RX FIFO threshold or the end\
+			 of packet is reached\n2 - TX FIFO filled at or above\
+			 the TX FIFO threshold\n3 - TX FIFO full\n4 - RX FIFO\
+			 overflow\n5 - TX FIFO underflow\n6 - sync word\
+			 sent/received\n7 - packet has been received with CRC\
+			 OK\n8 - preamble quality reached\n9 - clear channel\
+			 assessment."
+
+###############################################################################
+
+regdef	IOCFG1	     0x01 0x2f
+regtip	IOCFG1		"GDO1 output pin configuration."
+
+regfld	IOCFG1 INV 6
+regftp	IOCFG1 INV	$t0
+
+regfld	IOCFG1 CFG 5 0
+regftp	IOCFG1 CFG	$t1
+
+
+###############################################################################
+
+regdef	IOCFG0	     0x02 0x01
+regtip	IOCFG0		"GDO0 output pin configuration."
+
+regfld	IOCFG0 INV 6
+regftp	IOCFG0 INV	$t0
+
+regfld	IOCFG0 CFG 5 0
+regftp	IOCFG0 CFG	$t1
+
+unset t0 t1
+
+###############################################################################
+
+regdef	FIFOTHR	     0x03 0x0f
+regtip	FIFOTHR		"FIFO thresholds."
+
+regfld	FIFOTHR RET 6
+regftp	FIFOTHR RET	"0: TEST1=0x31 and TEST2=0x88 when waking up from\
+			 SLEEP. 1: TEST1=0x35 and TEST2=0x81 when waking up\
+			 from SLEEP. Note that the changes in the TEST\
+			 registers due to the RET setting are only seen\
+			 INTERNALLY in the analog part. The values read from\
+			 the TEST registers when waking up from SLEEP mode\
+			 will always be the reset values. The RET bit should be\
+			 set to 1 before going into SLEEP mode if settings\
+			 with an RX filter bandwidth below 325 kHz are required\
+			 at wake-up."
+
+regfld	FIFOTHR ATT 5 4
+regftp	FIFOTHR ATT	"RX attenuation (close-range reception):\n00 - 0dB\n01\
+			 - 6dB\n10 - 12dB\n11 - 18dB."
+
+regfld	FIFOTHR THR 3 0
+regftp	FIFOTHR THR	"Threshold for the TX FIFO and RX FIFO.\
+			 The threshold is exceeded when the number of bytes in\
+			 the FIFO is equal to or higher than the threshold\
+			 value:\n0 - TX:61, RX:4\n1 - 57, 8\n2 - 53, 12\n3 -\
+			 49, 16\n4 - 45, 20\n5 - 41, 24\n6 - 37, 28\n7 - 33,\
+			 32\n8 - 29, 36\n9 - 25, 40\n10 - 21, 44\n11 - 17,\
+			 48\n12 - 13, 52\n13 - 9, 56\n14 - 5, 60\n15 - 1, 64."
+
+###############################################################################
+
+regdef	SYNC1        0x04 0xAB
+regtip	SYNC1		"Sync word upper byte."
+
+###############################################################################
+
+regdef	SYNC0        0x05 0x35
+regtip	SYNC0		"Sync word lower byte."
+
+###############################################################################
+
+regdef	PKTLEN       0x06 63
+regtip	PKTLEN		"Indicates the packet length when fixed packet length\
+			 mode is enabled.\nIf variable packet length mode is\
+			 used, this value indicates the maximum packet length\
+			 allowed.\nMust be different from 0.\nThe default\
+			 setting for PKTLEN is max FIFO-1; this is because the\
+			 default packet params are for \"formatted\" packets\
+			 with the length sent as the first byte."
+
+###############################################################################
+
+regdef	PKTCTRL1     0x07 0x04
+regtip	PKTCTRL1	"Packet automation control."
+
+regfld	PKTCTRL1 PQT 7 5
+regftp	PKTCTRL1 PQT	"Preamble quality estimator threshold\
+			 (4*PQT). Higher values increase preamble quality\
+			 requirements before\
+			 accepting sync word.\nIf PQT is zero, then sync is\
+			 always accepted.\nThe preamble quality estimator\
+			 increases an internal counter by one each time a bit\
+			 is received that is different from the previous bit,\
+			 and decreases the counter by 8 each time a bit is\
+			 received that is the same as the last bit."
+
+regfld	PKTCTRL1 CRCAF 3
+regftp	PKTCTRL1 CRCAF	"CRC autoflush. Theoretically enables automatic\
+			 cleanup of FIFO when hardware CRC is bad. Doesn't\
+			 seem to work, so don't use."
+
+regfld	PKTCTRL1 AS 2
+regftp	PKTCTRL1 AS	"Append status: when enabled, two status bytes will be\
+			 appended to the payload of the packet. The status\
+			 bytes contain RSSI and LQI values, as well as the\
+			 CRC OK flag."
+
+regfld	PKTCTRL1 ACHK 1 0
+regftp	PKTCTRL1 ACHK	"Controls address check configuration of received\
+			 packets:\n00 - no check\n01 - check,\
+			 no broadcast\n10 -\
+			 check, 0x00 = bdcst\n11 - check, 0x00+0xff are\
+			 bdcst\nWe don't use this feature."
+
+###############################################################################
+
+regdef	PKTCTRL0     0x08 0x45
+regtip	PKTCTRL0	"Packet automation control."
+
+regfld	PKTCTRL0 WHITE 6
+regftp	PKTCTRL0 WHITE	"Turns data whitening on."
+
+regfld	PKTCTRL0 FMT 5 4
+regftp	PKTCTRL0 FMT	"Packet format, 00 = normal mode using FIFOs for both\
+			 RX and TX. Don't use any other values."
+
+regfld	PKTCTRL0 CRC 2
+regftp	PKTCTRL0 CRC	"Enable hardware CRC (calculation and check)."
+
+regfld	PKTCTRL0 LCF 1 0
+regftp	PKTCTRL0 LCF	"Packet length configuration: 00 = fixed length (as\
+			 set in PKTLEN), 01 = variable (length in first byte\
+			 after sync), 10 = infinite, 11 = unused.\nWe only use\
+			 01."
+
+###############################################################################
+
+regdef	ADDR         0x09 0x00
+regtip	ADDR		"Device address used for packet filtration.\
+			 Optional broadcast addresses are 0x00 and 0xFF."
+
+###############################################################################
+
+regdef	CHANNR       0x0A 0x00
+regtip	CHANNR		"Channel number (multiplied by channel spacing and\
+			 added to the base frequency). See MDMCFG0."
+
+###############################################################################
+
+regdef	FSCTRL1      0x0B 0x0C
+regtip	FSCTRL1		"Frequency synthesizer control."
+
+regfld	FSCTRL1 IF 4 0
+regftp	FSCTRL1 IF	"The IF (intermediate frequency) to be used by the\
+			 receiver. Subtracted from the FS base frequency.\
+			 Controls the digital complex mixer in the\
+			 demodulator.\nFrequency = (Fxtal * IF) / 1024."
+
+###############################################################################
+
+regdef	FSCTRL0      0x0C 0x00
+regtip	FSCTRL0		"Frequency synthesizer control.\nFrequency offset\
+			 added to the base frequency before being used by the\
+			 synthesizer (2's-complement).\
+			 Resolution is Fxtal/2^14 (1.59kHz-1.65kHz);\
+			 range is +-202 kHz to +-210 kHz, dependent of XTAL\
+			 frequency."
+
+###############################################################################
+
+set tip			"The frequency is\
+			 determined as:\n\Fc = (Fxtal * FREQ)/65536\nwhere\
+			 FREQ is FREQ2.FREQ1.FREQ0 (a 24 byte int)."
+
+regdef	FREQ2        0x0D 0x22
+regtip	FREQ2		"Frequency control word (high byte). $tip"
+			
+regdef	FREQ1        0x0E 0xC4
+regtip	FREQ1		"Frequency control word (middle byte). $tip"
+
+regdef	FREQ0        0x0F 0xEC
+regtip	FREQ0		"Frequency control word (low byte). $tip"
+
+unset tip
+
+###############################################################################
+
+regdef	MDMCFG4      0x10 0x68
+regtip	MDMCFG4		"Modem configuration."
+
+regfld	MDMCFG4 CHBW 7 4
+regftp	MDMCFG4 CHBW	"These are in fact two fields (E7:6 and M5:4) which\
+			 together determine the channel filter bandwidth, i.e.,\
+			 the selectivity of the channel. You can reduce this\
+			 (to improve sensitivity), e.g., if you know that the\
+			 match is good, or you have compensated by an offset\
+			 (see FSCTRL0). As a single value, they yield (kHz):\
+			 0-812, 1-650, 2-541, 3-464, 4-406, 5-325, 6-270,\
+			 7-232, 8-203, 9-162, 10-135, 11-116, 12-102, 13-81,\
+			 14-68, 15-58."
+
+regfld	MDMCFG4 DRE 3 0
+regftp	MDMCFG4 DRE	"The exponent of data rate, see MDMCFG3."
+
+###############################################################################
+
+regdef	MDMCFG3      0x11 0x93
+regtip	MDMCFG3		"Modem configuration: the mantissa of the data rate\
+			 (the exponent is given\
+			 by DRE (see MDMCFG4). The rate is determined as:\nR\
+			 = (256 + M) * 2^E * Fxtal / 2^28."
+
+###############################################################################
+
+regdef	MDMCFG2      0x12 0x03
+regtip	MDMCFG2		"Modem configuration."
+
+regfld	MDMCFG2 DCOFF 7
+regftp	MDMCFG2 DCOFF	"Disable DC blocking filter (for some current savings).\
+			 We don't disable the filter. Disabling the filter\
+			 affects the recommended IF setting."
+
+regfld	MDMCFG2 MODF 6 4
+regftp	MDMCFG2 MODF	"Modulation format:\n000 - 2-FSK\n001 - GFSK\n011\
+			 - ASK/OOK\n100 - 4-FSK\n111 - MSK.\nMSK is only\
+			 supported for data rates above 26k."
+
+regfld	MDMCFG2 MANC 3
+regftp	MDMCFG2 MANC	"Enables Manchester encoding."
+
+regfld	MDMCFG2 SYNC 2 0
+regftp	MDMCFG2 SYNC	"Sync word/qualifier mode:\n000 - no\
+			 preamble/sync\n001 - 15/16 sync bits detected\n010 -\
+			 16/16 sync bits detected\n011 - 30/32 sync bits\
+			 detected\n100 - no pre/sync, CS above\
+			 threshold\n101 - 15/16 + CS above threshold\n110 -\
+			 16/16 + CS above threshold\n111 - 30/32 + CS above\
+			 threshold.\nThe values 0 and 4 disable preamble and\
+			 sync word transmission in TX and preamble and sync\
+			 word detection in RX. The values 1, 2, 5, and 6\
+		 	 enable 16-bit sync word transmission in TX and\
+			 16 bits detection in RX. Only 15 of 16 bits need to\
+			 match in RX when using settings 1 or 5. The values 3\
+			 and 7 enable repeated sync word transmission in TX\
+			 and 32-bit sync word detection in RX (only 30 of 32\
+			 bits need to match)."
+
+###############################################################################
+
+regdef	MDMCFG1      0x13 0x42
+regtip	MDMCFG1		"Modem configuration."
+
+regfld	MDMCFG1 FEC 7
+regftp 	MDMCFG1 FEC	"Enable forward error correction. Only supported in\
+			 fixed packet length mode (see PKTCTRL0 LCF)."
+
+regfld	MDMCFG1 PRE 6 4
+regftp	MDMCFG1 PRE	"Sets the minimum number of preamble bytes to be\
+			 transmitted: 0-2, 1-3, 2-4, 3-6, 4-8, 5-12, 6-16,\
+			 7-24."
+
+regfld	MDMCFG1 CSE 1 0
+regftp	MDMCFG1 CSE	"Channel spacing exponent, see MDMCFG0."
+
+###############################################################################
+
+regdef	MDMCFG0      0x14 0xF8
+regtip	MDMCFG0		"Modem configuration: channel spacing mantissa.\
+			 The formula is:\nSP = (256 + M) * 2^E * Fxtal / 2^18."
+
+###############################################################################
+
+regdef	DEVIATN      0x15 0x34
+regtip	DEVIATN		"Modem deviation setting."
+
+regfld	DEVIATN E 6 4
+regftp	DEVIATN E	"Deviation exponent."
+
+regfld	DEVIATN M 2 0
+regftp	DEVIATN M	"Deviation mantissa. For TX with\
+			 2-FSK, GFSK, 4-FSK, M and E\
+			 specifiy the nominal frequency deviation from the\
+			 carrier for a 0 (-DEVIATN) and 1 (+DEVIATN) as\nD =\
+			 (8 + M) * 2^E * Fxtal / 2^17.\nFor MSK specifies the\
+			 fraction of symbol period (1/8-8/8) during which a\
+			 phase change occurs (0: +90deg, 1:-90deg).\nFor RX\
+			 with 2-FSK, GFSK, 4-FSK, specifies the expected\
+			 deviation of incoming signal.\nFor ASK/OOK this\
+			 setting has no effect."
+
+###############################################################################
+
+set t0 "Main radio control state machine configuration."
+
+regdef	MCSM2        0x16 0x07
+regtip	MCSM2		$t0
+
+regfld	MCSM2 RSSI 4
+regftp 	MCSM2 RSSI	"Direct RX termination based on RSSI measurement (CS).\
+			 For ASK/OOK modulation, RX times out if there is no\
+			 CS in the first 8 symbol periods. See AGCCTRL1,2."
+
+regfld	MCSM2 QUAL 3
+regftp	MCSM2 QUAL	"When TIME expires, the chip checks if sync word is\
+			 found (when QUAL=0), or if either sync word is found\
+			 or PQI (preamble qualifier, see MDMCFG2 SYNC) is set\
+			 (when QUAL=1)."
+
+regfld	MCSM2 TIME 2 0
+regftp	MCSM2 TIME	"Timeout for sync word search in RX for both WOR mode\
+			 and normal RX operation. The timeout is relative to\
+			 the programmed EVENT0 timeout. Note: we don't use WOR."
+
+###############################################################################
+
+regdef	MCSM1        0x17 0x03
+regtip	MCSM1		$t0
+
+regfld	MCSM1 CCA 5 4
+regftp	MCSM1 CCA	"Selects CCA (clear channel assessment) mode for\
+			 RX:\n00 - always\n01 - RSSI below threshold\n10 -\
+			 not receiving\n11 - both."
+
+regfld	MCSM1 RXOFF 3 2
+regftp	MCSM1 RXOFF	"What happens after packet reception (the module's\
+			 state):\n00 - IDLE\n01 - FSTXON\n10 - TX\n11 -\
+			 RX\nIt is not possible to set RXOFF to TX or FSTXON\
+			 and at the same time use CCA."
+
+regfld	MCSM1 TXOFF 1 0
+regftp	MCSM1 TXOFF	"What happens after packet transmission (the module's\
+			 state):\n00 - IDLE\n01 - FSTXON\n10 - TX\n11 - RX."
+			
+###############################################################################
+
+regdef	MCSM0        0x18 0x18
+regtip	MCSM0		$t0
+
+regfld	MCSM0 CAL 5 4
+regftp	MCSM0 CAL	"Automatically calibrate when going to RX or TX, or\
+			 back to IDLE:\n00 - never (only manually)\n01 -\
+			 when going from IDLE to RX or TX\n10 -\
+			 when going from RX or TX to IDLE\n11 - every 4th time\
+			 when going from RX/TX to IDLE."
+
+regfld	MCSM0 TIM 3 2
+regftp	MCSM0 TIM	"Timeout to stabilize oscillator on power up:\n00 -\
+			 2.3-3.4us\n01 - 37-39us\n10 - 149-155us\n11 -\
+			 597-620us."
+
+regfld	MCSM0 PEN 1
+regftp	MCSM0 PEN	"Enables the pin radio control option."
+
+regfld	MCSM0 XON 0
+regftp	MCSM0 XON	"Forces the crystal oscillator to stay on in the\
+			 SLEEP state."
+
+unset t0
+
+###############################################################################
+
+regdef	FOCCFG       0x19 0x15
+regtip	FOCCFG		"Frequency offset compensation configuration."
+
+regfld	FOCCFG FRZ 5
+regftp	FOCCFG FRZ	"Freeze offset compensation until CS goes high\
+			 (according to the CS thresholding described in\
+			 AGCCTRL1,2). Useful when there are long gaps\
+			 between reception with RF switched on (otherwise\
+			 offset may go to boundaries while tracking noise)."
+
+regfld	FOCCFG SYN 4 3
+regftp	FOCCFG SYN	"Frequency compensation loop gain to be used\
+			 before a sync word is detected:\n00 - K\n01 -\
+			 2K\n10 - 3K\n11 - 4K."
+
+regfld	FOCCFG POST 2
+regftp	FOCCFG POST	"Frequency compensation loop gain to be used after\
+			 a sync word is detected:\n0 - same as SYN\n1 - K/2."
+
+regfld	FOCCFG LIMIT 1 0
+regftp	FOCCFG LIMIT	"Saturation point for the compensation algorithm\
+			 (when to stop):\n00 - switched off\n01 -\
+			 +-BW/8\n10 - +-BW/4\n11 - +-BW/2\nwhere\
+			 BW is the channel filter bandwidth (MDMCFG4)."
+
+###############################################################################
+
+regdef	BSCFG        0x1A 0x6C
+regtip	BSCFG		"Bit synchronization configuration."
+
+regfld	BSCFG BPI 7 6
+regftp	BSCFG BPI	"Clock recovery feedback loop integral gain to be used\
+			 before a sync word is detected (to correct offsets in\
+			 data rate):\n00 - Kl\n01 - 2Kl\n10 - 3Kl\n11 - 4Kl."
+
+regfld	BSCFG BPP 5 4
+regftp	BSCFG BPP 	"Clock recovery feedback loop proportional gain to be\
+			 used before a sync word is detected:\n00 - Kp\n01 -\
+			 2Kp\n10 - 3Kp\n11 - 4Kp."
+
+regfld	BSCFG BAI 3
+regftp	BSCFG BAI	"Clock recovery feedback loop integral gain to be used\
+			 after a sync word is detected:\n0 - same as BPI\n1 -\
+			 Kl/2."
+
+regfld	BSCFG BAP 2
+regftp	BSCFG BAP	"Clock recovery feedback loop proportional gain to be\
+			 used after a sync word is detected:\n0 - same as\
+			 BPP\n1 - Kp."
+
+regfld	BSCFG LIMIT 1 0
+regftp	BSCFG LIMIT	"Saturation point (max data rate difference) for the\
+			 data rate offset compensation algorithm:\n00 -\
+			 +- 0 (no compensation)\n01 - +-3.125%%\n10 -\
+			 +-6.25%%\n11 - +-12.5%%."
+
+###############################################################################
+
+regdef	AGCCTRL2     0x1B 0x03
+regtip	AGCCTRL2	"AGC control: primarily determining CS for clear\
+			 channel assessment, but also for triggering CS-based\
+			 reception events, if used."
+
+regfld	AGCCTRL2 DVGA 7 6
+regftp	AGCCTRL2 DVGA	"Reduces the maximum allowable DVGA gain:\n00 - all\
+			 settings used\n01 - except for highest\n10 - except\
+			 for 2 highest\n11 - except for 3 highest."
+
+regfld	AGCCTRL2 LNA 5 3
+regftp	AGCCTRL2 LNA	"Sets the maximum allowable LNA + LNA 2 gain relative\
+			 to the maximum possible gain:\n0 - max possible\n1 -\
+			 2.6dB less\n2 - 6.1dB less\n3 - 7.4dB less\n4 -\
+			 9.2dB less\n5 - 11.5dB less\n6 - 14.6dB less\n7 -\
+			 17.1dB less."
+
+regfld	AGCCTRL2 TGT 2 0
+regftp	AGCCTRL2 TGT	"Target for the averaged amplitude from the digital\
+			 channel filter (1 LSB = 0 dB):\n0 - 24dB\n1 -\
+			 27dB\n2 - 30dB\n3 - 33dB\n4 - 36dB\n5 - 38dB\n6 -\
+			 40dB\n7 - 42dB."
+
+###############################################################################
+
+set t0 "AGC control."
+
+regdef	AGCCTRL1     0x1C 0x40
+regtip	AGCCTRL1	$t0
+
+regfld	AGCCTRL1 LNA 6	
+regftp	AGCCTRL1 LNA	"Selects between two different strategies for LNA and\
+			 LNA 2 gain adjustment. When 1, the LNA gain is\
+			 decreased first. When 0, the LNA 2 gain is decreased\
+			 to minimum before decreasing LNA gain."
+
+regfld	AGCCTRL1 CSR 5 4
+regftp	AGCCTRL1 CSR	"Relative change threshold for asserting carrier\
+			 sense:\n00 - disabled\n01 - 6dB increase\n10 -\
+			 10dB increase\n11 - 14dB increase."
+
+regfld	AGCCTRL1 CSA 3 0
+regftp	AGCCTRL1 CSA	"Absolute RSSI threshold for asserting carrier sense\
+			 (2-complement, signed, in steps of 1 dB, relative to\
+			 AGGCTRL2 TGT):\n1000 (-8) - disabled\n1001 (-7) -\
+			 7dB below TGT\n...\n1111 (-1) - 1dB below TGT\n0000 -\
+			 at TGT\n0001 - 1dB above TGT\n...\n0111 - 7dB above\
+			 TGT."
+
+###############################################################################
+
+regdef	AGCCTRL0     0x1D 0x91
+regtip	AGCCTRL0	$t0
+
+regfld	AGCCTRL0 HYST 7 6
+regftp	AGCCTRL0 HYST	"Level of hysteresis on the magnitude deviation\
+			 (internal AGC signal that determines gain\
+			 changes):\n0 - no hysteresis, small symmetric dead\
+			 zone, high gain\n1 - low hysteresis, small\
+			 asymmetric dead zone, medium gain\n2 - medium\
+			 hysteresis, medium asymmetric dead zone, medium\
+			 gain\n3 - large hysteresis, large asymmetric dead\
+			 zone, low gain."
+
+regfld	AGCCTRL0 WAIT 5 4
+regftp	AGCCTRL0 WAIT	"The number of channel filter samples from a gain\
+			 adjustment to be made until the AGC algorithm starts\
+			 accumulating new samples:\n00 - 8\n01 - 16\n10 -\
+			 24\n11 - 32."
+
+regfld	AGCCTRL0 FRE 3 2
+regftp	AGCCTRL0 FRE	"Freeze AGC:\n00 - never\n01 - when\
+			 a sync word detected\n10 - manually freeze analogue\
+			 gain, continue to adjust digital gain\n11 - freeze\
+			 both gains."
+
+regfld	AGCCTRL0 FLE 1 0
+regftp	AGCCTRL0 FLE	"For 2-FSK, 4-FSK, MSK: the averaging length (number of\
+			 samples) for the amplitude from the channel\
+			 filter: 0 - 8, 1 - 16, 2 - 32, 3 - 64.\nFor ASK, OOK:\
+			 the decision boundary for reception: 0 - 4dB, 1 - \
+			 8dB, 2 - 12dB, 3 - 16dB."
+
+unset t0
+
+###############################################################################
+
+regdef	WOREVT1	     0x1E 0x87
+regtip	WOREVT1		"High byte event0 timeout.\nTe0 =\
+			 750 * T * 2^RES / Fxtal\nSee WORCTRL for RES."
+
+###############################################################################
+
+regdef	WOREVT0	     0x1F 0x6B
+regtip	WOREVT0		"Low byte event0 timeout. See WOREVT1."
+
+###############################################################################
+
+regdef	WORCTRL	     0x20 0x01
+regtip	WORCTRL		"Wake on radio control."
+
+regfld	WORCTRL PD 7
+regftp	WORCTRL PD	"Power down signal to RC oscillator. When set to 0,\
+			 automatic initial calibration will be performed."
+
+regfld	WORCTRL EV 6 4
+regftp	WORCTRL EV	"Timeout setting from register block (decoded to Event1\
+			 timeout. RC oscillator clock frequency = Fxtal/750 =\
+			 34.7kHz. The number of clock periods after Event0\
+			 before Event 1 times out is:\n0 - 4 (0.111ms)\n1 -\
+			 6 (0.167ms)\n2 - 8 (0.222ms)\n3 - 12 (0.333ms)\n4 -\
+			 16 (0.444ms)\n5 - 24 (0.667ms)\n6 - 32 (0.889ms)\n7 -\
+			 48 (1.333ms)."
+
+regfld	WORCTRL CAL 3
+regftp 	WORCTRL CAL	"Enables the RC oscillator calibration."
+
+regfld	WORCTRL RES 1 0
+regftp	WORCTRL RES	"Controls Event0 resolution + the maximum timeout of\
+			 the WOR module + the maximum timeout under normal RX\
+			 operation:\n0 - resolution 1 period (28us), max\
+			 timeout 1.8s\n1 - 32 periods (0.89us)/58s\n2 -\
+			 1024 periods (28ms)/31m\n3 - 32K periods\
+			 (0.91s)/16.5h."
+
+###############################################################################
+
+regdef	FREND1       0x21 0x56
+regtip	FREND1		"Front end RX configuration."
+
+regfld	FREND1 LNA 7 6
+regftp	FREND1 LNA	"Adjusts front-end LNA PTAT current output."
+
+regfld	FREND1 PTAT 5 4
+regftp	FREND1 PTAT	"Adjusts front-end PTAT outputs."
+
+regfld	FREND1 LODIV 3 2
+regftp	FREND1 LODIV	"Adjusts current in RX LO buffer (LO input to mixer)."
+
+regfld	FREND1 MIX 1 0
+regftp	FREND1 MIX	"Adjusts current in mixer."
+
+###############################################################################
+
+regdef	FREND0       0x22 0x10
+regtip	FREND0		"Front end TX configuration."
+
+regfld	FREND0 LODIV 5 4
+regftp	FREND0 LODIV	"Adjusts current TX LO buffer (input to PA)."
+
+regfld	FREND0 PAP 2 0
+regftp	FREND0 PAP	"Selects PA power setting. This is an index to the\
+			 PATABLE, which can be programmed with up to 8\
+			 different PA settings. In OOK/ASK mode, this selects\
+			 the PATABLE index to use when transmitting a 1.\
+			 PATABLE index zero is used in OOK/ASK when\
+			 transmitting a 0. The PATABLE settings from index 0\
+			 to PAP are used for ASK TX shaping, and for power\
+			 ramp-up/ramp-down at the start/end of transmission\
+			 in all TX modulation formats."
+
+###############################################################################
+
+regdef	FSCAL3       0x23 0xA9
+regtip	FSCAL3		"Frequency synthesizer calibration."
+
+regfld	FSCAL3 CONF 7 6
+regftp	FSCAL3 CONF	"Some configuration attribute. This is basically\
+			 magic. The manual says nothing"
+
+regfld	FSCAL3 EN 5 4
+regftp	FSCAL3 EN	"Set to zero to disable charge pump calibration stage."
+
+regfld	FSCAL3 RES 3 0
+regftp	FSCAL3 RES	"Frequency synthesizer calibration result register.\
+			 Digital bit vector defining the charge pump output\
+			 current, on an exponential scale:\nIout =\
+			 I0 * 2^(RES/4)\nFast frequency hopping without\
+			 calibration for each hop can be done by calibrating\
+			 upfront for each frequency and saving the resulting\
+			 FSCAL3, FSCAL2 and FSCAL1 register values.\nBetween\
+			 each frequency hop, calibration can be replaced by\
+			 writing the FSCAL3, FSCAL2 and FSCAL1 register values\
+			 corresponding to the next RF frequency."
+
+###############################################################################
+
+set t0 "Frequency synthesizer calibration."
+
+regdef	FSCAL2       0x24 0x2A
+regtip	FSCAL2		$t0
+
+regfld	FSCAL2 VCO 5
+regftp	FSCAL2 VCO	"Chooses high (1) or low (0) VCO (voltage\
+			 controlled oscillator)."
+
+regfld	FSCAL2 RES 4 0
+regftp	FSCAL2 RES	"Result register (see FSCAL3 RES)."
+
+###############################################################################
+
+regdef	FSCAL1       0x25 0x00
+regtip	FSCAL1		$t0
+
+regfld	FSCAL1 RES 5 0
+regftp	FSCAL1 RES	"Result register (see FSCAL3 RES). Capacitor array\
+			 setting for VCO coarse tuning."
+
+###############################################################################
+
+regdef	FSCAL0       0x26 0x0D
+regtip	FSCAL0		"$t0 This is some magic\
+			 of which the manual says nothing."
+
+unset t0
+
+###############################################################################
+
+regdef	RCCTRL1      0x27 0x00
+regtip	RCCTRL1		"RC oscillator configuration.\nIn applications where\
+			 the radio wakes up very often, it is possible to do\
+			 the RC oscillator calibration once and then turn off\
+			 calibration to reduce the current consumption. This\
+			 is done by setting WORCTRL CAL to 0 and requires that\
+			 RC oscillator calibration values are read from\
+			 registers RCCTRL0S (status) and RCCTRL1S and\
+			 written back to RCCTRL0 and RCCTRL1 respectively."
+
+###############################################################################
+
+regdef	RCCTRL0      0x28 0x00
+regtip	RCCTRL0		"RC oscillator configuration. See RCCTRL1."
+
+###############################################################################
+
+regdef	FSTEST       0x29 0x59
+regtip	FSTEST		"For tests only, do not write!"
+
+###############################################################################
+
+regdef	PTEST        0x2A 0x7F
+regtip	PTEST		"Production test. Writing 0xBF to this register makes\
+			 the on-chip temperature sensor available in the IDLE\
+			 state. The default 0x7F value should then be written\
+			 back before leaving the IDLE state. Other use of this\
+			 register is for test only."
+
+###############################################################################
+
+regdef	AGCTEST       0x2B 0x3F
+regtip	AGCTEST		"For tests only, do not write!"
+
+###############################################################################
+
+regdef	TEST2         0x2C 0x88
+regtip	TEST2		"For tests only, better do not touch!"
+
+###############################################################################
+
+regdef	TEST1         0x2D 0x31
+regtip	TEST1		"For tests only, better do not touch!"
+
+###############################################################################
+
+regdef	TEST0         0x2E 0x02
+regtip	TEST0		"For tests only (also some magic),\
+			 better do not touch!"
+
+###############################################################################
+
+regdef	PATABLE       0x3E { 0x03 0x1C 0x57 0x8E 0x85 0xCC 0xC6 0xC3 } 8
+regtip	PATABLE		"TX power table to convert the power index\
+			 (see FREND0 PAP) to the actual setting."
+###############################################################################
+
+# reading this causes problems
+#regdef	PARTNUM       0x30 0 0 1
+#regtip	PARTNUM		"Chip part number."
+
+###############################################################################
+
+regdef	VERSION       0x31 0 0 1
+regtip	VERSION		"Chip version number."
+
+###############################################################################
+
+regdef	FREQEST       0x32 0 0 1
+regtip	FREQEST		"The estimated frequency offset (2s complement) of the\
+			 carrier. Resolution is: Fxtal/2^14 (1.59kHz),\
+			 range is +-202kHz.\nFrequency offset compensation is\
+			 only supported for 2-FSK, GFSK, 4-FSK, and MSK."
+
+###############################################################################
+
+regdef	LQI           0x33 0 0 1
+regtip	LQI		"Demodulator estimate of link quality."
+
+regfld	LQI CRC 7
+regftp	LQI CRC		"CRC OK."
+
+regfld	LQI EST 6 0
+regftp	LQI EST		"Estimates how easily a received signal can be\
+			 demodulated. Calculated over the 64 symbols following\
+			 the sync word."
+
+###############################################################################
+
+regdef	RSSI          0x34 0 0 1
+regtip	RSSI		"Received signal strength indication."
+
+###############################################################################
+
+regdef	STATE         0x35 0 0 1
+regtip	STATE		"Machine state:\n0x00-SLEEP\n0x01-IDLE\n0x02-XOFF\
+			 \n0x03-VCOON_MC\n0x04-REGON_MC\n0x05-MANCAL\
+			 \n0x06-VCOON\n0x07-REGON\n0x08-STARTCAL\n0x09-BWBOOST\
+			 \n0x0A-FS_LOCK\n0x0B-IFADCON\n0x0C-ENDCAL\n0x0D-RX\
+			 \n0x0E-RX_END\n0x0F-RX_RST\n0x10-TXRX_SWITCH\
+			 \n0x11-RXFIFO_OVERFLOW\n0x12-FSTXON\n0x13-TX\
+			 \n0x14-TX_END\n0x15-RXTX_SWITCH\
+			 \n0x16-TXFIFO_UNDERFLOW."
+
+###############################################################################
+
+regdef	WORTIME1      0x36 0 0 1
+regtip	WORTIME1	"High byte of WOR time."
+
+###############################################################################
+
+regdef	WORTIME0      0x37 0 0 1
+regtip	WORTIME0	"Low byte of WOR time."
+
+###############################################################################
+
+regdef	PKTSTATUS     0x38 0 0 1
+regtip	PKTSTATUS	"GDOx and packet status."
+
+regfld	PKTSTATUS CRC 7
+regftp	PKTSTATUS CRC	"CRC OK (cleared when extering RX)."
+
+regfld	PKTSTATUS CS 6
+regftp 	PKTSTATUS CS	"Carrier sense (cleared when entering IDLE)."
+
+regfld	PKTSTATUS PQT 5
+regftp 	PKTSTATUS PQT	"Preamble quality reached. If leaving RX state when\
+			 this bit is set it will remain asserted until the chip\
+			 re-enters RX state. The bit will also be cleared if\
+			 PQI goes below the programmed PQT value (see\
+			 PKTCTRL1 PQT)."
+
+regfld	PKTSTATUS CCA 4
+regftp 	PKTSTATUS CCA	"Channel is clear."
+
+regfld	PKTSTATUS SFD 3
+regftp 	PKTSTATUS SFD	"Start of frame delimiter. In RX, asserted\
+			 when sync word has been received and de-asserted at\
+			 the end of the packet. It will also deassert when\
+			 a packet is discarded due to address or maximum length\
+			 filtering or the radio enters RXFIFO overflow. In TX\
+			 always reads as 0."
+
+regfld	PKTSTATUS GDO2 2
+regftp 	PKTSTATUS GDO2	"Current GDO2 value."
+
+regfld	PKTSTATUS GDO0 0
+regftp 	PKTSTATUS GDO0	"Current GDO0 value."
+
+###############################################################################
+
+#regdef	VCOVCDAC      0x39 0 0 1
+#regtip	VCOVCDAC	"For tests only."
+
+###############################################################################
+
+regdef	TXBYTES       0x3A 0 0 1
+regtip	TXBYTES		"Underflow and number of bytes in TX FIFO."
+
+regfld	TXBYTES U 7
+regftp	TXBYTES U	"TX FIFO undeflow."
+
+regfld	TXBYTES N 6 0
+regftp	TXBYTES N	"Number of bytes in TX FIFO."
+
+
+###############################################################################
+
+regdef	RXBYTES       0x3B 0 0 1
+regtip	RXBYTES		"Overflow and number of bytes in RX FIFO."
+
+regfld	RXBYTES O 7
+regftp	RXBYTES O	"RX FIFO overflow."
+
+regfld	RXBYTES N 6 0
+regftp	RXBYTES N	"Number of bytes in RX FIFO."
+
+###############################################################################
+
+regdef	RCCTRL1S      0x3C 0 0 1
+regtip	RCCTRL1S	"Contains the RCCTRL1 value from the last run of the\
+			 RC oscillator calibration routine (see RCCTRL1)."
+
+###############################################################################
+
+regdef	RCCTRL0S      0x3D 0 0 1
+regtip	RCCTRL0S	"Contains the RCCTRL0 value from the last run of the\
+			 RC oscillator calibration routine (see RCCTRL0)."
+
+###############################################################################
+###############################################################################
+
+initialize
+
+while 1 { event_loop }

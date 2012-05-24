@@ -1,0 +1,11 @@
+Check registers for: gain setting, switch off AGC
+
+Remove sync word detection for band scan
+
+LEDs on the node
+
+Delay must be at least 1, otherwise the output tends to be flat
+
+Auto-connect (fast)
+
+Faster interruption of sample collection
