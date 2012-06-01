@@ -28,6 +28,7 @@
 #define	OSS_CMD_D_SRGB	0x06	// Set register burst
 #define	OSS_CMD_D_GRGB	0x07	// Get register burst
 #define	OSS_CMD_U_GRGB	0x07
+#define	OSS_CMD_D_INJT	0x08	// Inject packet
 
 // The response should contain 4 bytes: 0x05 0xCE 0x31 0x7A
 #define	OSS_MAG0	0xCE

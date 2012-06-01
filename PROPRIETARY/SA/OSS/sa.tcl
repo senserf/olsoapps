@@ -406,6 +406,99 @@ proc pt_diag { } {
 	flush stdout
 }
 
+proc pt_ishex { c } {
+	return [regexp -nocase "\[0-9a-f\]" $c]
+}
+
+proc pt_isoct { c } {
+	return [regexp -nocase "\[0-7\]" $c]
+}
+
+proc pt_stparse { line } {
+#
+# Parse a UNIX string into a list of hex codes; update the source to point to
+# the first character behind the string
+#
+	upvar $line ln
+
+	set nc [string index $ln 0]
+	if { $nc != "\"" } {
+		error "illegal string delimiter: $nc"
+	}
+
+	# the original - for errors
+	set or "\""
+
+	set ln [string range $ln 1 end]
+
+	set vals ""
+
+	while 1 {
+		set nc [string index $ln 0]
+		if { $nc == "" } {
+			error "unterminated string: $or"
+		}
+		set ln [string range $ln 1 end]
+		if { $nc == "\"" } {
+			# done (this version assumes that the sentinel must be
+			# explicit, append 0x00 if this is a problem)
+			return $vals
+		}
+		if { $nc == "\\" } {
+			# escapes
+			set c [string index $ln 0]
+			if { $c == "" } {
+				# delimiter error, will be diagnosed at next
+				# turn
+				continue
+			}
+			if { $c == "x" } {
+				# get hex digits
+				set ln [string range $ln 1 end]
+				while 1 {
+					set d [string index $ln 0]
+					if ![pt_ishex $d] {
+						break
+					}
+					append c $d
+					set ln [string range $ln 1 end]
+				}
+				if [catch { expr 0$c % 256 } val] {
+					error "illegal hex escape in string: $c"
+				}
+				lappend vals $val
+				continue
+			}
+			if [pt_isoct $c] {
+				if { $c != 0 } {
+					set c "0$c"
+				}
+				# get octal digits
+				set ln [string range $ln 1 end]
+				while 1 {
+					set d [string index $ln 0]
+					if ![pt_isoct $d] {
+						break
+					}
+					append c $d
+					set ln [string range $ln 1 end]
+				}
+				if [catch { expr $c % 256 } val] {
+					error \
+					    "illegal octal escape in string: $c"
+				}
+				lappend vals $val
+				continue
+			}
+			set ln [string range $ln 1 end]
+			set nc $c
+			continue
+		}
+		scan $nc %c val
+		lappend vals [expr $val % 256]
+	}
+}
+
 ###############################################################################
 # The "S" module yanked from piter ############################################
 ###############################################################################
@@ -560,10 +653,15 @@ proc mo_fnwrite_s { msg } {
 		incr ln -2
 	}
 
-	puts -nonewline $ST(SFD) \
-		"$CH(IPR)[binary format c $ln]$msg[binary format s\
-			[pt_chks $msg]]"
-	flush $ST(SFD)
+	if [catch {
+		puts -nonewline $ST(SFD) \
+			"$CH(IPR)[binary format c $ln]$msg[binary format s\
+				[pt_chks $msg]]"
+		flush $ST(SFD)
+	}] {
+		trc "Closing connection on write error"
+		close_uart
+	}
 }
 
 proc mo_rawread_s { } {
@@ -784,6 +882,7 @@ proc mo_receive_s { } {
 		# direct, receive right away, nothing else to do
 		dump "RD" $msg
 		$ST(DFN) $msg
+		# count received messages as a form of heartbeat
 		return
 	}
 
@@ -1020,7 +1119,7 @@ proc confirm { msg } {
 
 proc terminate { } {
 
-	global DEAF
+	global DEAF ST
 
 	if $DEAF { return }
 
@@ -1028,26 +1127,77 @@ proc terminate { } {
 
 	setsparams
 
+	if $ST(SIP) {
+		# send a reset request to the node
+		send_reset
+		wack 0xFE 1000
+	}
+
 	exit 0
+}
+
+proc isinteger { u } {
+
+	if [catch { expr $u } v] {
+		return 0
+	}
+
+	if [regexp -nocase "\[.e\]" $u] {
+		return 0
+	}
+
+	return 1
+}
+
+proc intsize { v } {
+#
+# Returns the number of bytes needed to represent v
+#
+	if { $v < 0 } {
+		set f -1
+	} else {
+		set f 0
+	}
+
+	set n 0
+	while { $v != $f } {
+		set v [expr $v >> 8]
+		incr n
+	}
+
+	if { $n == 0 } {
+		set n 1
+	}
+
+	return $n
+}
+
+proc int_to_bytes { v s } {
+#
+# Converts an int to s raw bytes in little-endian format
+#
+	set bb ""
+	for { set n 0 } { $n < $s } { incr n } {
+		set b [expr $v & 0xFF]
+		set v [expr $v >> 8]
+		append bb [binary format c $b]
+	}
+	return $bb
 }
 
 proc valid_int_number { n min max { res "" } } {
 
-	if [catch { expr $n } val] {
+	if ![isinteger $n] {
 		return 0
 	}
 
-	if ![string is integer -strict $val] {
-		return 0
-	}
-
-	if { $val < $min || $val > $max } {
+	if { $n < $min || $n > $max } {
 		return 0
 	}
 
 	if { $res != "" } {
 		upvar $res r
-		set r $val
+		set r $n
 	}
 
 	return 1
@@ -1169,7 +1319,7 @@ proc getsparams { } {
 #
 # Retrieve parameters from RC file
 #
-	global RC PM Params RGroups
+	global RC PM Params RGroups PLayouts
 
 	if { $PM(RCF) == "" } {
 		# switched off
@@ -1206,21 +1356,31 @@ proc getsparams { } {
 	}
 
 	# register groups
-	if [catch { dict keys [dict get $pars REGISTERS] } rgrps] {
-		set rgrps ""
+	if [catch { dict keys [dict get $pars REGISTERS] } keys] {
+		set keys ""
 	}
 
-	foreach g $rgrps {
-		if [catch { dict get $pars REGISTERS $g } rg] {
-			continue
+	foreach ky $keys {
+		if ![catch { dict get $pars REGISTERS $ky } item] {
+			# note: an RG is a list, not a dictionary
+			set RGroups($ky) $item
 		}
-		# note: an RG is a list, not a dictionary
-		set RGroups($g) $rg
 	}
 
 	if [info exists RGroups(Default)] {
 		# redefining the built-in register group
 		reguse Default
+	}
+
+	# inject layout database
+	if [catch { dict keys [dict get $pars PLAYOUTS] } keys] {
+		set keys ""
+	}
+
+	foreach ky $keys {
+		if ![catch { dict get $pars PLAYOUTS $ky } item] {
+			set PLayouts($ky) $item
+		}
 	}
 }
 
@@ -1228,7 +1388,7 @@ proc setsparams { } {
 #
 # Save parameters in RC file
 #
-	global RC PM Params RGroups
+	global RC PM Params RGroups PLayouts
 
 	if { $PM(RCF) == "" } {
 		# disabled
@@ -1253,12 +1413,17 @@ proc setsparams { } {
 	}
 
 	# register groups
-	foreach g [array names RGroups] {
+	foreach k [array names RGroups] {
 		# do not save the special names
-		if { [string index $g 0] == "+" } {
+		if { [string index $k 0] == "+" } {
 			continue
 		}
-		dict set d REGISTERS $g $RGroups($g)
+		dict set d REGISTERS $k $RGroups($k)
+	}
+
+	# inject packet layouts
+	foreach k [array names PLayouts] {
+		dict set d PLAYOUTS $k $PLayouts($k)
 	}
 
 	if [catch { puts -nonewline $fd $d } err] {
@@ -1358,7 +1523,7 @@ proc log_open { } {
 
 	$c yview -pickplace end
 
-	$WN(LOB) configure -text "Log Off"
+	$WN(LOB) configure -text "Packet Log Off"
 }
 
 proc log_close { } {
@@ -1367,7 +1532,7 @@ proc log_close { } {
 
 	catch { destroy .logw }
 	set WN(LOG) ""
-	$WN(LOB) configure -text "Log On"
+	$WN(LOB) configure -text "Packet Log On"
 }
 
 proc log_toggle { } {
@@ -1490,10 +1655,17 @@ proc bypass { on } {
 
 ###############################################################################
 
-proc send_handshake { } {
+proc send_reset { } {
 
 	send_command [binary format c 0xFF]
 	send_command [binary format c 0xFE]
+}
+
+proc send_handshake { { pure "" } } {
+
+	if { $pure == "" } {
+		send_reset
+	}
 	send_command [binary format c 0x05]
 }
 
@@ -1585,207 +1757,141 @@ proc first_input { msg } {
 	trigger
 }
 
-proc do_connect_disconnect { } {
+proc auto_connect_callback { } {
+#
+# This callback checks if we are connected and if not tries to connect us
+# automatically to the node
+#
+	global ST ACB
 
-	global ST WN Mod PM
+	if ![info exists ACB(LDS)] {
+		# the first time around
+		trc "ACB: init"
+		set ACB(LDS) 0
+		set ACB(STA) "L"
+		set ACB(RRM) -1
+	}
 
-	if { $ST(SFD) != "" } {
-		close_uart
-		log "Disconnected"
-		$WN(COB) configure -text Connect
-		update_widgets
+	if { $ACB(STA) == "R" && $ST(SFD) != "" } {
+		trc "ACB: connected"
+		if { $ST(RRM) == $ACB(RRM) } {
+			# stall?
+			send_handshake only
+			set ACB(STA) "T"
+			set ACB(FAI) 0
+			after 1000 auto_connect_callback
+			return
+		}
+		set ACB(RRM) $ST(RRM)
+		# we are connected, no need to panic
+		after 2000 auto_connect_callback
 		return
 	}
 
-	# connecting
-	set w [md_window "Connect to device"]
-
-	set f $w.f
-	frame $f
-	pack $f -side top -expand n -fill x
-
-	label $f.st -text "Status: "
-	pack $f.st -side left
-
-	set Mod(0,ST) "idle"
-
-	label $f.s -textvariable Mod(0,ST)
-	pack $f.s -side left
-
-	set f $w.ff
-	frame $f
-	pack $f -side top -expand n -fill x
-
-	# real devices only
-	set Mod(0,DL) [lindex [unames_choice] 0]
-	set Mod(0,DV) ""
-
-	seldef
-
-	button $f.scb -text "Scan" -anchor w -command scandev
-	pack $f.scb -side left
-
-	eval "set Mod(0,DM) \[tk_optionMenu $f.scm Mod(0,DV) $Mod(0,DL)\]"
-	bind $Mod(0,DM) <ButtonRelease-1> seldev
-	pack $f.scm -side left
-
-	button $f.tdb -text "This device" -anchor w -command "md_click 1"
-	pack $f.tdb -side left
-
-	button $f.aub -text "Auto" -anchor w -command "md_click 2"
-	pack $f.aub -side left
-
-	button $f.cab -text "Cancel" -anchor e -command "md_click 3"
-	pack $f.cab -side right
-	set cb $f.cab
-
-	bind $w <Destroy> "md_click 3"
+	if { $ACB(STA) == "T" } {
+		if { $ST(SFD) == "" } {
+			set ACB(STA) "L"
+			after 100 auto_connect_callback
+			return
+		}
+		if { $ST(RRM) == $ACB(RRM) } {
+			if { $ACB(FAI) == 5 } {
+				set ACB(STA) "L"
+				trc "ACB: stalled connection"
+				close_uart
+				after 100 auto_connect_callback
+				return
+			}
+			incr ACB(FAI)
+			send_handshake only
+			after 600 auto_connect_callback
+			return
+		}
+		set ACB(RRM) $ST(RRM)
+		set ACB(STA) "R"
+		after 2000 auto_connect_callback
+		return
+	}
+	
+	set_status "disconnected"
 
 	#######################################################################
 
-	while 1 {
+	if { $ACB(STA) == "L" } {
+		# Main loop
+		set tm [clock seconds]
+		if { $tm > [expr $ACB(LDS) + 5] } {
+			# last scan for new devices was done more than 5 sec
+			# ago, rescan
+			trc "ACB: rescan"
+			unames_scan
+			set ACB(DVS) [lindex [unames_choice] 0]
+			set ACB(DVL) [llength $ACB(DVS)]
+			set ACB(LDS) $tm
+		}
+		# index into the device table
+		set ACB(CUR) 0
+		set ACB(STA) "N"
+		after 250 auto_connect_callback
+		return
+	}
 
-		while 1 {
-			# first round
-			set ev [md_wait]
+	#######################################################################
 
-			if { $ev == 3 } {
-				# cancellation
-				md_stop
+	if { $ACB(STA) == "N" } {
+		# try to open a new UART
+		if { $ACB(CUR) >= $ACB(DVL) } {
+			if { $ACB(DVL) == 0 } {
+				# no devices
+				set ACB(LDS) 0
+				trc "ACB: no devices"
+				after 1000 auto_connect_callback
 				return
 			}
-
-			if { $ev == 1 } {
-				set dev $Mod(0,DV)
-				break
-			}
-
-			if { $ev == 2 } {
-				set dev ""
-				break
-			}
+			set ACB(STA) "L"
+			after 100 auto_connect_callback
+			return
 		}
 
-		if { $dev == "" } {
-			scandev
-			set dev $Mod(0,DL)
-			# short timeout
-			set tm [lindex $PM(HST) 0]
-		} else {
-			set dev [list $dev]
-			# long timeout
-			set tm [lindex $PM(HST) 1]
+		set dev [lindex $ACB(DVS) $ACB(CUR)]
+		incr ACB(CUR)
+		trc "ACB: trying $dev"
+		if { [open_uart $dev] == 0 } {
+			trc "ACB: $dev doesn't open"
+			after 100 auto_connect_callback
+			return
 		}
 
-		$cb configure -text Abort
+		set_status "handshake"
 
-		foreach d $dev {
+		trc "ACB: connected, waiting for handshake"
+		set ACB(STA) "C"
+		after 1000 auto_connect_callback
+		return
+	}
 
-			set Mod(0,ST) "connecting to $d"
-			log "Connecting to $d"
-			if { [open_uart $d] == 0 } {
-				log "Failed to open $d"
-				continue
-			}
-
-			set Mod(0,CT) [after $tm "md_click 4"]
-
-			while 1 {
-
-				set ev [md_wait]
-
-				if { $ST(DFN) == "read_data" } {
-					# bingo
-					$WN(COB) configure -text "Disconnect"
-					md_stop
-					log "Connected"
-					update_widgets
-					return
-				}
-
-				# not connected
-				if { $ev == 3 } {
-					# abort
-					catch { after cancel $Mod(0,CT) }
-					log "Aborted"
-					close_uart
-					md_stop
-					return
-				}
-
-				if { $ev == 4 } {
-					# timeout, doesn't hurt to do this:
-					catch { after cancel $Mod(0,CT) }
-					log "Timeout"
-					close_uart
-					break
-				}
-
-				# nothing
-			}
+	if { $ACB(STA) == "C" } {
+		# check if handshake established
+		if { $ST(DFN) == "read_data" } {
+			# yep, assume connection OK
+			trc "ACB: handshake OK, we are set"
+			update_widgets
+			set ACB(STA) "R"
+			set_status "connected"
+			clear_sip
+			after 2000 auto_connect_callback
+			return
 		}
-
-		# failed, do this once more just in case
+		# sorry, try another one
 		close_uart
-		log "Failed to connect"
-		set Mod(0,ST) "failed"
-		$cb configure -text Cancel
-	}
-}
-
-proc scandev { } {
-#
-# Produces a scanned device list
-#
-	global Mod
-
-	unames_scan
-
-	set Mod(0,DL) [lindex [unames_choice] 0]
-
-	$Mod(0,DM) delete 0 end
-	set ix 0
-	foreach w $Mod(0,DL) {
-		$Mod(0,DM) add command -label $w -command "seldev $ix"
-		incr ix
-	}
-	seldef
-}
-
-proc seldev { { ix -1 } } {
-
-	global Mod
-
-	if { $ix >= 0 } {
-		if [catch { $Mod(0,DM) entrycget $ix -label } w] {
-			set w [lindex $Mod(0,DL) 0]
-		}
-	} else {
-		set w $Mod(0,DV)
+		set ACB(STA) "N"
+		after 100 auto_connect_callback
+		return
 	}
 
-	if { [lsearch -exact $Mod(0,DL) $w] < 0 } {
-		set w [lindex $Mod(0,DL) 0]
-	}
-	set Mod(0,DV) $w
-}
-
-proc seldef { } {
-#
-# Sets the default device selection based on the current list and the
-# saved value in the rc file
-#
-	global Mod
-
-	if { $Mod(0,DV) == "" } {
-		set Mod(0,DV) [lindex $Mod(0,DL) 0]
-	} else {
-		# check if present on the list
-		if { [lsearch -exact $Mod(0,DL) $Mod(0,DV)] < 0 } {
-			# absent
-			set Mod(0,DV) [lindex $Mod(0,DL) 0]
-		}
-	}
+	trc "ACB: fall through, state $ACB(STA)"
+	set ACB(STA) "L"
+	after 1000 auto_connect_callback
 }
 
 proc ack_timeout { } {
@@ -1794,25 +1900,26 @@ proc ack_timeout { } {
 #
 	global ST
 
-	set ST(ECM) -1
+	set ST(ECM,C) -1
 	trigger
 }
 
-proc wack { cmd } {
+proc wack { cmd { tim 6000 } } {
 #
-# Wait for an acknowledgement; FIXME: not sure if we need it
+# Wait for a response
 #
 	global ST PM
 
 	set ST(ECM) $cmd
+	set ST(ECM,C) 0
 	set ST(ECM,M) ""
-	set ST(ECC) [after $PM(CMT) ack_timeout]
+	set ST(ECM,T) [after $tim ack_timeout]
 
 	while 1 {
 		event_loop
-		if { $ST(ECM) <= 0 } {
-			catch { after cancel $ST(ECC) }
-			return $ST(ECM)
+		if { $ST(ECM,C) != 0 } {
+			catch { after cancel $ST(ECM,T) }
+			return $ST(ECM,C)
 		}
 	}
 }
@@ -1821,21 +1928,24 @@ proc read_data { msg } {
 
 	global ST PM
 
+	incr ST(RRM)
+
 	set len [expr [string length $msg] - 1]
 	binary scan $msg cu code
 
-	if { $code == $ST(ECM) } {
-		# this command has been expected; note that 0 is not a valid
-		# command code
-		set ST(ECM) 0
-		set ST(ECM,M) [string range $msg 1 end]
-		trigger
-		return
+	foreach c $ST(ECM) {
+		if { $code == $c } {
+			# this command has been expected
+			set ST(ECM,C) $c
+			set ST(ECM,M) [string range $msg 1 end]
+			trigger
+			return
+		}
 	}
 
 	if { $code == 2 } {
 		if { $len < $PM(NSA) } {
-			log "Bad sample, $len bytes instead of $PM(NSA)"
+			trc "Bad sample, $len bytes instead of $PM(NSA)"
 			return
 		}
 		set msg [string range $msg 1 end]
@@ -1854,6 +1964,11 @@ proc read_data { msg } {
 	}
 }
 
+proc tstamp { } {
+
+	return [clock format [clock seconds] -format "%H:%M:%S"]
+}
+
 proc log_packet { smp len } {
 
 	if { $len < 5 } {
@@ -1861,9 +1976,13 @@ proc log_packet { smp len } {
 	}
 
 	binary scan $smp cucu l0 ln
-
-	log "Packet (length=$ln):"
-	log [string trimleft [hencode [string range $smp 2 end]]]
+	set smp [string range $smp 2 end]
+	set l0 [string length $smp]
+	if { $l0 > [expr $ln + 2] } {
+		set smp [string range $smp 0 [expr $ln + 1]]
+	}
+	log "Received packet \[[tstamp]\] (length=$ln):"
+	log [string trimleft [hencode $smp]]
 }
 
 proc process_band_sample { smp } {
@@ -1979,6 +2098,20 @@ proc clear_sample { } {
 	$WN(CAN) delete smp
 }
 
+proc clear_sip { } {
+#
+# Enter the idle state after re-connection
+#
+	global ST WN
+
+	if $ST(SIP) {
+		set ST(SIP) 0
+		$WN(SSB) configure -text "Start"
+		update_widgets
+		inject_button_status
+	}
+}
+
 proc do_start_stop { } {
 
 	global ST SM MX RC PM WN
@@ -1990,11 +2123,11 @@ proc do_start_stop { } {
 
 	if $ST(SIP) {
 		# stop scan
-		send_command [binary format c 0xFF]
-		send_command [binary format c 0xFE]
-		set ST(SIP) 0
-		$WN(SSB) configure -text "Start"
-		update_widgets
+		send_reset
+		clear_sip
+		if { [wack 0xFE] < 0 } {
+			alert "Node reset timeout"
+		}
 		return
 	}
 
@@ -2023,10 +2156,9 @@ proc do_start_stop { } {
 	trc "SEP: $mo, $RC(FCE)<$fc>, $RC(BAN)<$fs>, $RC(STA), $RC(ISD)"
 
 	# reset the node
-	send_command [binary format c 0xFF]
-	send_command [binary format c 0xFE]
+	send_reset
 
-	if [wack 0xFE] {
+	if { [wack 0xFE] < 0 } {
 		alert "Node reset timeout"
 		return
 	}
@@ -2062,6 +2194,7 @@ proc do_start_stop { } {
 	set SM(IN) 0
 
 	update_widgets
+	inject_button_status
 }
 
 ###############################################################################
@@ -2399,9 +2532,11 @@ proc update_widgets { } {
 
 	if { $ST(SFD) == "" } {
 		# not connected, not scanning
+		set sm "disabled"
 		set sc "disabled"
 		set ss "normal"
 	} else {
+		set sm "normal"
 		set sc "normal"
 		if $ST(SIP) {
 			# scanning
@@ -2410,6 +2545,8 @@ proc update_widgets { } {
 			set ss "normal"
 		}
 	}
+
+	$WN(SSB) configure -state $sm
 
 	foreach c [array names WN "*,SIP"] {
 		foreach w $WN($c) {
@@ -2740,13 +2877,13 @@ proc mk_rootwin { win } {
 	pack $x -side top -expand y -fill x -anchor n
 
 	# this is probably temporary ##########################################
-	button $x.lo -text "Log On" -command "log_toggle" -width 8
+	button $x.lo -text "Packet Log On" -command "log_toggle" -width 12
 	grid $x.lo -column 0 -row 0 -sticky news
 	set WN(LOB) $x.lo
 	#######################################################################
 
 	#######################################################################
-	button $x.rg -text "Regs On" -command "regs_toggle" -width 8
+	button $x.rg -text "Show Regs" -command "regs_toggle" -width 8
 	grid $x.rg -column 0 -row 1 -sticky news
 	set WN(REB) $x.rg
 	#######################################################################
@@ -2762,21 +2899,14 @@ proc mk_rootwin { win } {
 	#######################################################################
 
 	#######################################################################
-	button $x.co -text "Connect" -command "do_connect_disconnect"
-	pack $x.co -side left
-	set WN(COB) $x.co
-	#######################################################################
-
-	#######################################################################
 	button $x.go -text "Start" -command "do_start_stop"
 	pack $x.go -side right
 	set WN(SSB) $x.go
 	#######################################################################
 
 	#######################################################################
-	button $x.in -text "Inject" -command "do_inject"
+	button $x.in -text "Inject" -command "inject_click"
 	pack $x.in -side right
-	lappend WN(RWI,SIP) $x.in
 	#######################################################################
 
 	bind . <Destroy> "terminate"
@@ -3195,7 +3325,7 @@ proc reg_write { name } {
 	}
 
 	send_command $cmd
-	if [wack 0xFD] {
+	if { [wack 0xFD 2000] < 0 } {
 		return "Failed to write register $name, node response timeout"
 	}
 
@@ -3245,7 +3375,7 @@ proc regs_write { } {
 
 	# write single-valued registers
 	send_command $cmd
-	if [wack 0xFD] {
+	if { [wack 0xFD 3000] < 0 } {
 		return "Failed to write single-valued registers, node response\
 			timeout"
 	}
@@ -3297,7 +3427,7 @@ proc reg_read { name } {
 
 	send_command $cmd
 
-	if [wack $wai] {
+	if { [wack $wai 2000] < 0 } {
 		return "Failed to read register $name, node response timeout"
 	}
 
@@ -3401,7 +3531,7 @@ proc regs_read { } {
 	# read all single-valued registers
 	send_command $cmd
 
-	if [wack 0x04] {
+	if { [wack 0x04 2000] < 0 } {
 		return "Failed to read registers, node response timeout"
 	}
 
@@ -3460,7 +3590,7 @@ proc regs_close { } {
 	catch { destroy $WN(REG) }
 	set WN(REG) ""
 	array unset WN "REG,*"
-	$WN(REB) configure -text "Regs On"
+	$WN(REB) configure -text "Show Regs"
 }
 
 proc regs_open { } {
@@ -3474,7 +3604,7 @@ proc regs_open { } {
 		return
 	}
 
-	$WN(REB) configure -text "Regs Off"
+	$WN(REB) configure -text "Hide Regs"
 
 	set w ".regw"
 	toplevel $w
@@ -3713,6 +3843,1194 @@ proc regs_save { } {
 }
 
 ###############################################################################
+
+proc unique { } {
+#
+# Returns a unique ID
+#
+	global WN
+
+	incr WN(UNQ)
+	return "u$WN(UNQ)"
+}
+
+proc inject_wl { } {
+#
+# Returns the list of "this" tags for all inject windows currently present
+#
+	global WN
+
+	set wl [array names WN "INJ,*,WN"]
+	set re ""
+	foreach w $wl {
+		set r ""
+		regexp ",(.+)," $w j r
+		if { $r != "" } {
+			lappend re $r
+		}
+	}
+	return $re
+}
+
+proc inject_update_db_selection { } {
+#
+# Called whenever the layout selection changes to update the selection menus
+# at all packet injection windows
+#
+	global WN PLayouts
+
+	if { [array names PLayouts] != "" } {
+		set s "normal"
+	} else {
+		set s "disabled"
+	}
+
+	foreach t [inject_wl] {
+
+		if ![info exists WN(INJ,$t,WN)] {
+			# a precaution
+			continue
+		}
+
+		# Load/Delete
+		$WN(INJ,$t,BL) configure -state $s
+	}
+}
+
+proc inject_update_save_buttons { this } {
+#
+# Called whenever the status of either of the two save buttons has to be
+# updated
+#
+	global WN
+
+	if ![info exists WN(INJ,$this,BS)] {
+		# the usual precaution
+		return
+	}
+
+	set sa "disabled"
+	set sb $sa
+
+	if { $WN(INJ,$this,LA) != "" } {
+		set sa "normal"
+		if { $WN(INJ,$this,NM) != "" } {
+			set sb "normal"
+		}
+	}
+
+	$WN(INJ,$this,BS) configure -state $sb
+	$WN(INJ,$this,BA) configure -state $sa
+}
+
+proc inject_button_status { } {
+#
+# Activate/deactivate the Inject/Repeat buttons
+#
+	global WN ST
+
+	foreach t [inject_wl] {
+		set w0 $WN(INJ,$t,BI)
+		set w1 $WN(INJ,$t,BR)
+		set s0 "disabled"
+		set s1 "disabled"
+		if { $ST(SIP) >= 2 && $WN(INJ,$t,LA) != "" } {
+			if { $WN(INJ,$t,CB) == "" } {
+				set s0 "normal"
+			}
+			set rp [lindex [lindex $WN(INJ,$t,LA) 0] 1]
+			if $rp {
+				set s1 "normal"
+			}
+		} else {
+			if { $WN(INJ,$t,CB) != "" } {
+				catch { after cancel $WN(INJ,$t,CB) }
+				set WN(INJ,$t,CB) ""
+			}
+		}
+		$w0 configure -state $s0
+		if { $WN(INJ,$t,CB) == "" } {
+			set tx "Repeat"
+		} else {
+			set tx "Stop Repeat"
+		}
+		$w1 configure -state $s1 -text $tx
+	}
+}
+
+proc inject_parse_hex_list { val } {
+#
+# Parses a list of hex pairs returning the list of values
+#
+	set vl ""
+	while 1 {
+		set val [string trimleft $val]
+		if { $val == "" } {
+			return $vl
+		}
+		set c ""
+		regexp "^(\[^ \t\]+)" $val c
+		set l [string length $c]
+		if { $l > 2 } {
+			# failed
+			return ""
+		}
+		if [catch { expr 0x$c } c] {
+			# not hex
+			return ""
+		}
+		lappend vl $c
+		incr l
+		set val [string range $val $l end]
+	}
+}
+
+proc inject_value_to_bytes { val typ siz } {
+#
+# Converts a value of the given type to a string of bytes
+#
+	global CH
+	upvar $siz size
+
+	set typ [string index $typ 0]
+	set val [string trim $val]
+	# this can be h, o, i; only h admits spaces separating pairs of
+	# digits
+	if { $typ == "h" } {
+		if { $val == "" } {
+			set val 0
+		}
+		# decode the values into a list
+		set vals [inject_parse_hex_list $val]
+		if { $vals == "" } {
+			# try a single value
+			if [catch { expr 0x$val } vals] {
+				# no way
+				error "illegal hex value (or list thereof)"
+			}
+		}
+		set ll [llength $vals]
+		if { $size == "-" } {
+			if { $ll > 1 } {
+				# this is the size, one byte per value
+				set size $ll
+			} else {
+				# otherwise (single item), the size is
+				# determined by the range
+				set size [intsize [lindex $vals 0]]
+			}
+		}
+		# pack the bytes
+		if { $ll > 1 } {
+			if { $ll > $size } {
+				# make this an error
+				error "hex list longer than requested size"
+			}
+			set bb ""
+			for { set i 0 } { $i < $size } { incr i } {
+				set v [lindex $vals $i]
+				if { $v == "" } {
+					set v 0
+				}
+				append bb [binary format c $v]
+			}
+		} else {
+			# a single value
+			set bb [int_to_bytes [lindex $vals 0] $size]
+		}
+		return $bb
+	}
+
+	if { $typ == "o" || $typ == "i" } {
+		if { $val == "" } {
+			set val 0
+		}
+		if { $typ == "o" && [string index $val 0] != 0 } {
+			set val "0$val"
+		}
+		if [catch { expr $val } $val] {
+			error "illegal $typ value"
+		}
+		if { $size == "-" } {
+			set size [intsize $val]
+		}
+		return [int_to_bytes $val $size]
+	}
+
+	# we have a string
+	if { [string index $val 0] != "\"" } {
+		set val "\"$val\""
+	}
+
+	if [catch { pt_stparse val } vals] {
+		error $vals
+	}
+
+	set nc [llength $vals]
+	if { $nc == 0 || [lindex $vals end] != 0 } {
+		# force a sentinel
+		lappend vals 0
+		incr nc
+	}
+	if { $size == "-" } {
+		# implied by the string length
+		set size $nc
+	}
+
+	if { $size < [expr $nc - 1] } {
+		# consider the sentinel optional
+		error "size insufficient to accommodate string"
+	}
+
+	set bb ""
+	set i 0
+	foreach b $vals {
+		if { $i == $size } {
+			break
+		}
+		append bb [binary format c $b]
+		incr i
+	}
+	while { $i < $size } {
+		append bb $CH(ZER)
+		incr i
+	}
+	return $bb
+}
+
+proc inject_incr_value { val typ how } {
+#
+# Increment the value
+#
+	if { $typ == "hex" } {
+		set v 0x$val
+	} elseif { $typ == "oct" && [string index $val 0] != 0 } {
+		set v 0$val
+	} else {
+		set v $val
+	}
+
+	if [catch { expr $v + $how } v] {
+		return $val
+	}
+
+	# format it properly
+	if { $typ == "hex" } {
+		set v [format %02X $v]
+	} elseif { $typ == "oct" } {
+		set v [format %03o $v]
+	}
+	return $v
+}
+
+proc inject_update_layout { this } {
+#
+# Updates the packet layout based on the current content of widgets
+#
+	global WN PM CH
+
+	if ![info exists WN(INJ,$this,WN)] {
+		# in case the window has disappeared in the meantime
+		return ""
+	}
+
+	# packet length
+	set ln 0
+
+	# layout
+	set WN(INJ,$this,LA) ""
+	set WN(INJ,$this,PL) 0
+	set la ""
+
+	# disable buttons: Inject + Repeat
+	inject_button_status
+	# disable them as well
+	inject_update_save_buttons $this
+
+	# clean the content labels and byte numbers
+	for { set i 0 } { $i < $WN(NLE) } { incr i } {
+		set WN(INJ,$this,N$i) "-"
+		set WN(INJ,$this,B$i) [string repeat " " $WN(NCC)]
+	}
+
+	for { set i 0 } { $i < $WN(NLE) } { incr i } {
+
+		# component number
+		set ci [expr $i + 1]
+
+		set sz $WN(INJ,$this,S$i)
+
+		set val [string trim $WN(INJ,$this,V$i)]
+
+		if { $sz == "-" && $val == "" } {
+			# append a null element to keep the list length
+			# consistent with the numbering of fields
+			lappend la ""
+			continue
+		}
+
+		# the type
+		set ty $WN(INJ,$this,T$i)
+
+		# the size + some obsessive precaution
+		if { $sz != "-" } {
+			# to be determined from the value
+			if [catch { expr $sz } sz] {
+				# a precaution, it can only be a number now
+				return "Illegal size for component $ci, must be\
+					an int <= $PM(MPS), -, or ?"
+			}
+		}
+
+		# turn into bytes
+		if [catch { inject_value_to_bytes $val $ty sz } bb] {
+			return "Component $ci: $bb"
+		}
+
+		set WN(INJ,$this,N$i) $ln
+
+		set npl [expr $sz + $ln]
+
+		if { $npl > $PM(MPS) } {
+			return "The size of component $ci ($sz) yields total\
+				packet length of $npl, which exceeds the max\
+				of $PM(MPS) by [expr $npl - $PM(MPS)]"
+		}
+
+		set in $WN(INJ,$this,I$i)
+		if [catch { expr $in } in] {
+			set in 0
+		}
+
+		set WN(INJ,$this,S$i) $sz
+
+		if $in {
+			# increment/decrement test
+			if { [inject_incr_value $val $ty 1] == $val } {
+				return "Component $ci: the value cannot be\
+					incremented or decremented"
+			}
+		}
+
+		lappend la [list $ln $sz $ty $val $in $bb]
+
+		set ln $npl
+	}
+
+	if { $ln == 0 } {
+		return "No components, zero packet length"
+	}
+
+	if $WN(INJ,$this,SC) {
+		# software CRC
+		if [expr $ln & 1] {
+			return "Software CRC can only be computed when packet\
+				length is even (it is $ln)"
+		}
+		set mcpl [expr ($PM(MPS) - 2) & ~1]
+		if { $ln > $mcpl } {
+			return "For software CRC, the packet must not be longer\
+				than $mcpl bytes"
+		}
+	}
+
+	# Repeat/Delay
+	if [catch { inject_get_repeat_params $this } rp] {
+		return $rp
+	}
+
+	# fill the contents
+	set last $i
+
+	for { set i 0 } { $i < $last } { incr i } {
+		set WN(INJ,$this,B$i) [inject_bytes_to_contents \
+			[lindex [lindex $la $i] 5]]
+	}
+
+	# insert the three special parameters in front
+	set WN(INJ,$this,LA) [linsert $la 0 \
+		[list $WN(INJ,$this,SC) [lindex $rp 0] [lindex $rp 1]]]
+
+	set WN(INJ,$this,PL) $ln
+
+	inject_update_save_buttons $this
+	inject_button_status
+
+	return ""
+}
+
+proc inject_update_click { this } {
+
+	set err [inject_update_layout $this]
+
+	if { $err != "" } {
+		alert $err
+	}
+}
+
+proc inject_get_repeat_params { this } {
+#
+# Two parameters of the repeat mode: count and delay; throws exceptions
+#
+	global WN
+
+	if ![info exists WN(INJ,$this,RC)] {
+		return [list 0 0]
+	}
+
+	set rc [string trim $WN(INJ,$this,RC)]
+	set de [string trim $WN(INJ,$this,DE)]
+
+	if { $rc == "" || $rc == 0 } {
+		if { $de != "" && $de != 0 } {
+			error "Repeat count is empty while Delay isn't"
+		}
+		return [list 0 0]
+	}
+
+	if { ![isinteger $rc] || $rc < 0 } {
+		error "Repeat count must be an integer >= 0"
+	}
+
+	if { ![isinteger $de] || $de <= 0 } {
+		error "Delay must be an integer > 0"
+	}
+
+	return [list $rc $de]
+}
+
+proc inject_bytes_to_contents { bb } {
+#
+# Converts raw bytes to the contents label
+#
+	global WN
+
+	set ll [string length $bb]
+
+	if { $ll > $WN(NCM) } {
+		set ll [expr $WN(NCM) - 1]
+		set ap "..."
+	} else {
+		set ap ""
+	}
+
+	set lb ""
+
+	for { set i 0 } { $i < $ll } { incr i } {
+		set c [string index $bb $i]
+		binary scan $c cu v
+		if { $lb != "" } {
+			append lb " "
+		}
+		append lb [format %02X $v]
+	}
+
+	append lb $ap
+
+	return $lb
+}
+
+proc inject_save { this how } {
+#
+# Saves the current packet layout
+#
+	global WN PLayouts
+
+	if { ![info exists WN(INJ,$this,WN)] || $WN(INJ,$this,LA) == "" } {
+		alert "No layout to save"
+		return
+	}
+
+	if { $how == 0 && $WN(INJ,$this,NM) == "" } {
+		# force "Save As" is name unknown
+		set how 1
+	}
+
+	if $how {
+		# we need a dialog
+		set ll [lsort [array names PLayouts]]
+		set w [md_window "Save layout"]
+		set f $w.t
+		frame $f
+		pack $f -side top -expand y -fill x
+
+		label $f.l -text "Name to save under:" -anchor w
+		pack $f.l -side top -expand n -anchor w
+
+		set Mod(0,SE) [ttk::combobox $f.op -values $ll]
+		pack $f.op -side top -expand y -fill x
+
+		set f $w.bf
+		frame $f
+		pack $f -side top -expand y -fill x
+
+		button $f.c -text Cancel -anchor w -command "md_click -1"
+		pack $f.c -side left
+
+		button $f.l -text Save -anchor e -command "md_click 1"
+		pack $f.l -side right
+
+		bind $w <Destroy> "md_click -1"
+
+		###############################################################
+
+		while 1 {
+
+			set ev [md_wait]
+
+			if { $ev < 0 } {
+				return
+			}
+
+			if { $ev == 1 } {
+				set name [string trim [$Mod(0,SE) get]]
+				if { $name != "" } {
+					md_stop
+					break
+				}
+				alert "Name to save under cannot be empty"
+			}
+		}
+	} else {
+		set name $WN(INJ,$this,NM)
+	}
+
+	set la ""
+
+	foreach it $WN(INJ,$this,LA) {
+		if { [llength $it] >= 5 } {
+			lappend la [list [lindex $it 1] [lindex $it 2] \
+				[lindex $it 3] [lindex $it 4]]
+		} else {
+			lappend la $it
+		}
+	}
+
+	set PLayouts($name) $la
+
+	inject_update_db_selection
+}
+
+proc inject_load { this } {
+#
+# Load the current DB selection into the layout
+#
+	global WN PLayouts PM Mod
+
+	# the list of layouts
+	set ll [lsort [array names PLayouts]]
+	if { $ll == "" } {
+		alert "No layouts are available"
+		return
+	}
+
+	# we need a simple modal window
+	set w [md_window "Select layout to load"]
+	set f $w
+	set Mod(0,SE) [lindex $ll 0]
+
+	eval "tk_optionMenu $f.op Mod(0,SE) $ll"
+	pack $f.op -side top -expand y -fill x
+
+	set f $w.bf
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	button $f.c -text Cancel -anchor w -command "md_click -1"
+	pack $f.c -side left
+
+	button $f.l -text Load -anchor e -command "md_click 1"
+	pack $f.l -side right
+
+	button $f.d -text Delete -anchor e -command "md_click 2"
+	pack $f.d -side right
+
+	bind $w <Destroy> "md_click -1"
+
+	#######################################################################
+
+	while 1 {
+
+		set ev [md_wait]
+
+		if { $ev < 0 } {
+			return
+		}
+
+		set name [string trim $Mod(0,SE)]
+		if { $name == "" } {
+			# a precaution
+			continue
+		}
+
+		if { $ev == 1 } {
+			# Load
+			md_stop
+			break
+		}
+
+		if { $ev == 2 } {
+			# Delete
+			if [info exists PLayouts($name)] {
+				if [confirm "Do you really want to remove the\
+				    layout: $name"] {
+					unset PLayouts($name)
+					md_stop
+					inject_update_db_selection
+					return
+				}
+			}
+		}
+	}
+
+	if ![info exists PLayouts($name)] {
+		alert "The layout $name doesn't exist in database"
+		return
+	}
+
+	inject_reset $this
+
+	set n [llength $PLayouts($name)]
+	set e "The DB layout appears to be broken"
+	if { $n < 2 } {
+		alert $e
+		return
+	}
+
+	incr n -1
+	if { $n > $WN(NLE) } {
+		set n $WN(NLE)
+	}
+
+	set it [lindex $PLayouts($name) 0]
+	if { [llength $it] != 3 } {
+		alert $e
+		return
+	}
+
+	foreach i $it {
+		if ![isinteger $i] {
+			alert $e
+			return
+		}
+	}
+
+	if [lindex $it 0] {
+		set WN(INJ,$this,SC) 
+	}
+
+	set WN(INJ,$this,RC) [lindex $it 1]
+	set WN(INJ,$this,DE) [lindex $it 2]
+
+	set la [lrange $PLayouts($name) 1 end]
+
+	for { set i 0 } { $i < $n } { incr i } {
+
+		set it [lindex $la $i]
+
+		if { [llength $it] != 4 } {
+			continue
+		}
+
+		# size, type, value, increment
+		lassign $it sz ty va in
+
+		if { [lsearch -exact $PM(LAS) $sz] < 0 } {
+			set sz "?"
+		}
+
+		if { [lsearch -exact $PM(VTY) $ty] < 0 } {
+			set ty [lindex $PM(VTY) 0]
+		}
+
+		set WN(INJ,$this,S$i) $sz
+		set WN(INJ,$this,T$i) $ty
+
+		if [catch { expr $in } in] {
+			set in 0
+		}
+
+		if { $in < 0 } {
+			set in "-1"
+		} elseif { $in > 0 } {
+			set in "+1"
+		} else {
+			set in "0"
+		}
+		set WN(INJ,$this,I$i) $in
+		set WN(INJ,$this,V$i) $va
+	}
+
+	inject_setname $this $name
+	inject_update_layout $this
+}
+
+proc inject_close { this } {
+#
+	global WN
+
+	if ![info exists WN(INJ,$this,WN)] {
+		return
+	}
+
+	if { $WN(INJ,$this,CB) != "" } {
+		catch { after cancel $WN(INJ,$this,CB) }
+	}
+
+	catch { destroy $WN(INJ,$this,WN) }
+
+	array unset WN "INJ,$this,*"
+}
+
+proc inject_reset { this } {
+#
+# Zeroes out the current layout
+#
+	global WN
+
+	if ![info exists WN(INJ,$this,WN)] {
+		return
+	}
+
+	set WN(INJ,$this,LA) ""
+	set WN(INJ,$this,PL) 0
+	inject_setname $this ""
+	set WN(INJ,$this,DE) ""
+	set WN(INJ,$this,RC) ""
+	set WN(INJ,$this,SC) 0
+
+	for { set i 0 } { $i < $WN(NLE) } { incr i } {
+		set WN(INJ,$this,N$i) "-"
+		set WN(INJ,$this,T$i) "hex"
+		set WN(INJ,$this,S$i) "-"
+		set WN(INJ,$this,V$i) ""
+		set WN(INJ,$this,I$i) "0"
+	}
+
+	inject_update_save_buttons $this
+	inject_update_layout $this
+}
+
+proc inject_setname { this name } {
+#
+# Sets the name attribute of an inject window
+#
+	global WN
+
+	if ![info exists WN(INJ,$this,WN)] {
+		return
+	}
+
+	set WN(INJ,$this,NM) $name
+
+	if { $name == "" } {
+		set ap ""
+	} else {
+		set ap " (layout $name)"
+	}
+	
+	wm title $WN(INJ,$this,WN) "Packet to inject$ap"
+}
+
+proc inject_click { } {
+#
+# Opens a packet injection window
+#
+	global WN PM FO
+
+	set this [unique]
+	set w ".i$this"
+
+	toplevel $w
+	wm title $w "Packet to inject"
+
+	# this is for the record; we could easily recover the window path from
+	# "this" (see above), but we will also use this entry to tell whether
+	# the window for the given tag is present at all (i.e. when the entry
+	# exists)
+	set WN(INJ,$this,WN) $w
+
+	# callback for repeat injection
+	set WN(INJ,$this,CB) ""
+
+	set tf $w.f
+	frame $tf
+	pack $tf -side top -fill x -expand n
+
+	#######################################################################
+
+	# start with an empty layout
+	set WN(INJ,$this,LA) ""
+	# packet length
+	set WN(INJ,$this,PL) 0
+	# it also happens to be unnamed
+	inject_setname $this ""
+	# Delay/Repeat count
+	set WN(INJ,$this,DE) ""
+	set WN(INJ,$this,RC) ""
+	# no software CRC
+	set WN(INJ,$this,SC) 0
+
+	#######################################################################
+
+	set f $tf.ls
+	frame $f
+	pack $f -side left -expand n -fill x -anchor w
+
+	# Reset, Save, Save As
+	set x $f.rb
+	button $x -text Reset -command "inject_reset $this"
+	pack $x -side left -expand n -anchor w
+	# Reset is always enabled, it doesn't hurt
+
+	set x $f.lb
+	button $x -text Load/Delete -command "inject_load $this"
+	pack $x -side left -expand n -anchor w
+	set WN(INJ,$this,BL) $x
+
+	set x $f.sb
+	button $x -text Save -command "inject_save $this 0"
+	pack $x -side left -expand n -anchor w
+	# save is enabled if layout nonempty and named
+	set WN(INJ,$this,BS) $x
+
+	set x $f.ab
+	button $x -text "Save As" -command "inject_save $this 1"
+	pack $x -side left -expand n -anchor w
+	# save as is enabled if layout nonempty
+	set WN(INJ,$this,BA) $x
+
+	set x $f.vb
+	button $x -text Verify/Update -command "inject_update_click $this"
+	pack $x -side left -expand n
+
+	#######################################################################
+
+	# layout widgets
+
+	set f $w.w
+	frame $f
+	pack $f -side top -fill x -expand y
+
+	# the legend
+	label $f.n -text Byte -justify left -anchor w
+	grid $f.n -column 0 -row 0 -sticky w -padx 1 -pady 4
+
+	label $f.s -text Size -justify left -anchor w
+	grid $f.s -column 1 -row 0 -sticky w -padx 1 -pady 4
+
+	label $f.t -text Type -justify left -anchor w
+	grid $f.t -column 2 -row 0 -sticky w -padx 1 -pady 4
+
+	label $f.v -text Value -justify left -anchor w
+	grid $f.v -column 3 -row 0 -sticky w -padx 1 -pady 4
+
+	label $f.i -text Incr -justify left -anchor w
+	grid $f.i -column 4 -row 0 -sticky w -padx 1 -pady 4
+
+	label $f.b -text Content -justify left -anchor w
+	grid $f.b -column 5 -row 0 -sticky w -padx 1 -pady 4
+
+	set row 1
+	for { set i 0 } { $i < $WN(NLE) } { incr i } {
+
+		# byte number
+		set WN(INJ,$this,N$i) "-"
+		label $f.n$i -textvariable WN(INJ,$this,N$i) -justify right \
+			-anchor e -font $FO(INJ)
+		grid $f.n$i -column 0 -row $row -sticky w -padx 1 -pady 1
+
+		# size selection
+		set WN(INJ,$this,S$i) "-"
+		spinbox $f.s$i -textvariable WN(INJ,$this,S$i) \
+			-values $PM(LAS) -wrap 1 -width 2 -state readonly
+		grid $f.s$i -column 1 -row $row -sticky w -padx 1 -pady 1
+
+		# value type
+		set WN(INJ,$this,T$i) [lindex $PM(VTY) 0]
+		spinbox $f.t$i -textvariable WN(INJ,$this,T$i) \
+			-values $PM(VTY) \
+			-wrap 1 -width 3 -state readonly
+		grid $f.t$i -column 2 -row $row -sticky w -padx 1 -pady 1
+
+		# value entry box; this column will be expandable
+		set WN(INJ,$this,V$i) ""
+		entry $f.v$i -width 8 -font $FO(INJ) \
+			-textvariable WN(INJ,$this,V$i)
+		grid $f.v$i -column 3 -row $row -sticky ew -padx 1 -pady 1
+		bind $f.v$i <ButtonRelease-1> "tk_textCopy $f.v$i"
+		#bind $f.v$i <ButtonRelease-2> "tk_textPaste $f.v$i"
+
+		# increment choice
+		set WN(INJ,$this,I$i) "0"
+		tk_optionMenu $f.i$i WN(INJ,$this,I$i) "-1" "0" "+1"
+		grid $f.i$i -column 4 -row $row -sticky w -padx 1 -pady 1
+
+		# content
+		set WN(INJ,$this,B$i) [string repeat " " $WN(NCC)]
+		label $f.b$i -textvariable WN(INJ,$this,B$i) -justify left \
+			-anchor w -font $FO(INJ)
+		grid $f.b$i -column 5 -row $row -sticky w -padx 1 -pady 1
+
+		incr row
+	}
+
+	grid columnconfigure $f { 0 1 2 4 5 } -weight 0
+	grid columnconfigure $f 3 -weight 1
+
+	#######################################################################
+
+	set f $w.a
+	frame $f
+	pack $f -side top -expand y -fill x
+
+	label $f.lh -text "Packet length: "
+	pack $f.lh -side left -expand n
+
+	label $f.ll -textvariable WN(INJ,$this,PL) -bg gray
+	pack $f.ll -side left -expand n
+
+	checkbutton $f.sc -variable WN(INJ,$this,SC)
+	pack $f.sc -side right -expand n
+
+	label $f.sl -text "  Soft CRC:"
+	pack $f.sl -side right -expand n
+
+	entry $f.de -width 4 -font $FO(INJ) -textvariable WN(INJ,$this,DE)
+	pack $f.de -side right -expand n
+
+	label $f.dl -text "  Delay:"
+	pack $f.dl -side right -expand n
+
+	entry $f.rc -width 4 -font $FO(INJ) -textvariable WN(INJ,$this,RC)
+	pack $f.rc -side right -expand n
+
+	label $f.rl -text "  Repeat:"
+	pack $f.rl -side right -expand n
+
+	#######################################################################
+
+	set f $w.b
+	frame $f -relief solid -bd 1
+	pack $f -side top -expand y -fill x -anchor s
+
+	button $f.cl -text "Close" -command "inject_close $this"
+	pack $f.cl -side left -expand n
+
+	button $f.in -text "Inject" -command "inject_execute $this"
+	set WN(INJ,$this,BI) $f.in
+	pack $f.in -side right -expand n
+
+	button $f.rp -text "Repeat" -command "inject_repeat $this"
+	set WN(INJ,$this,BR) $f.rp
+	pack $f.rp -side right -expand n
+	
+	# initial fill
+	inject_update_db_selection
+	inject_update_save_buttons $this
+	inject_update_layout $this
+
+	bind $w <Destroy> "inject_close $this"
+}
+
+proc inject_build_packet { this } {
+#
+# Build a packet to inject
+#
+	global WN CH
+
+	if ![info exists WN(INJ,$this,WN)] {
+		return ""
+	}
+
+	set pkt ""
+
+	# the list of components
+	set la $WN(INJ,$this,LA)
+	# software checksum flag
+	set lf [lindex $la 0]
+	set sc [lindex $lf 0]
+	# skip the special entry
+	set la [lrange $la 1 end]
+
+	set nl [list $lf]
+	set i 0
+
+	foreach it $la {
+		if { [llength $it] >= 6 } {
+			lassign $it bn sz ty va in bb
+			if { $bb == "" } {
+				# something wrong
+				return ""
+			}
+			append pkt $bb
+			if $in {
+				# increment/decrement
+				set v [inject_incr_value $va $ty $in]
+				if { $v != $va } {
+					set WN(INJ,$this,V$i) $v
+					if [catch { inject_value_to_bytes $v \
+					    $ty sz } vv] {
+						# something went wrong, revert
+						set v $val
+					} else {
+						set bb $vv
+					}
+					set WN(INJ,$this,B$i) \
+						[inject_bytes_to_contents $bb]
+					# update the item
+					set it [list $bn $sz $ty $v $in $bb]
+				}
+			}
+		}
+		lappend nl $it
+		incr i
+	}
+
+	set WN(INJ,$this,LA) $nl
+
+	if $sc {
+		# software checksum
+		if [expr [string length $pkt] & 1] {
+			append pkt $CH(ZER)
+		}
+		set pkt "$pkt[pt_chks $pkt]"
+	}
+
+	return $pkt
+}
+				
+proc inject_execute { this } {
+
+	global WN
+
+	if ![info exists WN(INJ,$this,WN)] {
+		return
+	}
+
+	if { $WN(INJ,$this,CB) != "" } {
+		# repeating, ignore, the button should be disabled anyway
+		return
+	}
+
+	$WN(INJ,$this,BI) configure -state disabled
+	$WN(INJ,$this,BR) configure -state disabled
+
+	set pkt [inject_build_packet $this]
+
+	if { $pkt == "" } {
+		alert "Cannot generate a packet from this layout"
+		inject_button_status
+		return
+	} 
+
+	log "Injecting packet \[[tstamp]\] (length=[string length $pkt]):"
+	log [string trimleft [hencode $pkt]]
+	send_command "[binary format cc 0x08 [string length $pkt]]$pkt"
+	set ret [wack { 0xFD 0xFC } 4000]
+	if { $ret < 0 } {
+		alert "Node response timeout"
+	} elseif { $ret != 0xFD } {
+		alert "Request rejected by node"
+	}
+
+	inject_button_status
+}
+
+proc inject_repeat { this } {
+
+	global WN
+
+	if ![info exists WN(INJ,$this,WN)] {
+		return
+	}
+
+	if { $WN(INJ,$this,CB) != "" } {
+		# repeating, cancel
+		catch { after cancel $WN(INJ,$this,CB) }
+		set WN(INJ,$this,CB) ""
+		inject_button_status
+		return
+	}
+
+	# start repeat
+	set la $WN(INJ,$this,LA)
+	set la [lindex $la 0]
+
+	set rc [lindex $la 1]
+	set de [lindex $la 2]
+
+	if { $rc == "" || $de == "" || $rc == 0 } {
+		alert "No repeat parameters for this layout"
+		return
+	}
+
+	# sent count+ delay
+	set WN(INJ,$this,RL) $rc
+	set WN(INJ,$this,RK) 0
+	set WN(INJ,$this,RD) $de
+
+	set WN(INJ,$this,CB) [after 100 "inject_repeat_callback $this"]
+	inject_button_status
+}
+
+proc inject_repeat_callback { this } {
+#
+	global WN
+
+	if { ![info exists WN(INJ,$this,WN)] || $WN(INJ,$this,CB) == "" } {
+		# we are gone
+		return
+	}
+
+	set pkt [inject_build_packet $this]
+
+	if { $pkt == "" } {
+		# problems
+		set WN(INJ,$this,CB) ""
+		inject_button_status
+		alert "Cannot build packet from this layout"
+		return
+	}
+
+	set rc [expr $WN(INJ,$this,RK) + 1]
+
+	log "Injecting packet \[[tstamp]\] ($rc of $WN(INJ,$this,RL),\
+		length=[string length $pkt]):"
+	log [string trimleft [hencode $pkt]]
+
+	send_command "[binary format cc 0x08 [string length $pkt]]$pkt"
+	set ret [wack { 0xFD 0xFC } 4000]
+	if { $ret < 0 } {
+		log "repeat injection failed (node response timeout)"
+	} elseif { $ret != 0xFD } {
+		log "repeat injection failed (node busy)"
+	}
+
+	if { $rc >= $WN(INJ,$this,RL) } {
+		# done
+		set WN(INJ,$this,CB) ""
+		inject_button_status
+		return
+	}
+
+	set WN(INJ,$this,RK) $rc
+	set WN(INJ,$this,CB) \
+		[after $WN(INJ,$this,RD) "inject_repeat_callback $this"]
+}
+
+###############################################################################
+
+proc set_status { stat } {
+
+	global ST
+
+	if { $ST(CST) != $stat } {
+		wm title . "Olsonet Spectrum Analyzer V$ST(VER): $stat"
+		set ST(CST) $stat
+	}
+}
+
 ###############################################################################
 	
 proc trc { msg } {
@@ -3753,6 +5071,8 @@ proc initialize { } {
 
 	mk_rootwin .
 
+	set_status "disconnected"
+
 	update_widgets
 
 	redraw
@@ -3770,17 +5090,20 @@ set PM(TWR)	320
 # Handshake timeout: short, long
 set PM(HST)	{ 2000 8000 }
 
-# Command timeout
-set PM(CMT)	6000
-
 # scan in progress
 set ST(SIP)	0
 
-# expected command code, and the command itself
-set ST(ECM)	0
+# expected command list, actual command code, or -1 for timeout, the message,
+# timer
+set ST(ECM)	""
+set ST(ECM,C)	0
 set ST(ECM,M)	""
+set ST(ECM,T)	""
 
 ###############################################################################
+
+# tag for unique identifiers
+set WN(UNQ) 0
 
 # canvas margins: left, right, bottom, up
 set WN(LMA) 5
@@ -3791,6 +5114,9 @@ set WN(UMA) 5
 # number of samples in a row, number of single-freq samples in a packet
 set PM(NSA) 129
 set PM(NSS) [expr $PM(NSA) - 1]
+
+# maximum injected packet length
+set PM(MPS) 63
 
 # sample expansion factor: pixels per sample
 set WN(SEF) 4
@@ -3835,6 +5161,15 @@ set WN(WBC) "#FCADA6"
 # slider width
 set WN(SLW) 400
 
+# number of layout entries in the inject window
+set WN(NLE) 12
+
+# width of "content" label in a layout entry (in characters); it should be a
+# multiple of 3 - 1; the second limit is the maximum number of bytes that can
+# be displayed in the label
+set WN(NCC) 23
+set WN(NCM) [expr ($WN(NCC) + 1) / 3]
+
 # log buffer size (number of lines); later we will turn this into a flexible
 # parameter
 set PM(MXL) 1024
@@ -3842,6 +5177,10 @@ set PM(MXL) 1024
 # the log, and number of lines
 set ST(LOG) ""
 set ST(LOL) 0
+
+# displayable connection status + received (raw) message counter
+set ST(CST) ""
+set ST(RRM) 0
 
 # log text area
 set WN(LOG) ""
@@ -3879,6 +5218,15 @@ set PM(MOA_max) $PM(NSS)
 # List of discrete bands to choose from (MHz)
 set PM(BAN) { 0.025 0.05 0.1 0.2 0.5 1.0 2.0 5.0 10.0 20.0 50.0 }
 
+# List of discrete sizes for inject packet layout
+set PM(LAS) { - }
+for { set e 1 } { $e <= $PM(MPS) } { incr e } {
+	lappend PM(LAS) $e
+}
+
+# list of value types
+set PM(VTY) { hex int oct str }
+
 # font for axis ticks #########################################################
 foreach e [font names] {
 	if [regexp -nocase "small" $e] {
@@ -3896,6 +5244,9 @@ set FO(LOG) "-family courier -size 9"
 
 # for register labels
 set FO(REG) "-family courier -size 10"
+
+# for packet being injected
+set FO(INJ) "-family courier -size 10"
 
 unset e
 
@@ -4776,5 +6127,7 @@ regtip	RCCTRL0S	"Contains the RCCTRL0 value from the last run of the\
 ###############################################################################
 
 initialize
+
+auto_connect_callback
 
 while 1 { event_loop }

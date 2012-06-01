@@ -20,6 +20,31 @@ static word	Mode;		// 0-band, 1-single freq, 2-single+receiving
 // Samples
 static byte Samples [OSS_SAMPLES];
 
+// Packet to inject and its length
+static byte *PTI = NULL, PTIL;
+
+#define	MAX_CTS_TRIES	1024
+
+// ============================================================================
+
+#define	LED_RED		0
+#define	LED_GREEN	1
+#define	LED_YELLOW	2
+static byte led_stat [3];
+
+static led_toggle (word led) {
+
+	led_stat [led] = 1 - led_stat [led];
+	leds (led, led_stat [led]);
+}
+
+static leds_clear () {
+
+	leds_all (0);
+	fastblink (0);
+	led_stat [0] = led_stat [1] = led_stat [2] = 0;
+}
+
 // ============================================================================
 
 static lword unpack3 (byte *b) {
@@ -110,6 +135,9 @@ fsm band_sampler {
 
 		FreqCurr = FreqStart;
 		sn = 0;
+		led_toggle (LED_YELLOW);
+		leds (LED_GREEN, 0);
+		leds (LED_RED, 0);
 
 	state FREQ_UPDATE:
 
@@ -157,9 +185,17 @@ fsm freq_sampler {
 	state LOOP:
 
 		max = sn = 0;
+		led_toggle (LED_YELLOW);
+		leds (LED_GREEN, 0);
+		leds (LED_RED, 0);
 
 	state WAIT_SAMPLE:
 
+		if (PTI != NULL)
+			// There is a packet to inject; we check this at sample
+			// boundaries
+			proceed INJECT;
+			
 		sacc = scnt = 0;
 		delay (SampleDelay, SAMPLE);
 		release;
@@ -172,6 +208,7 @@ fsm freq_sampler {
 	state FIFO_FLUSH:
 
 		if (RX_FIFO_READY) {
+			leds (LED_GREEN, 1);
 			if (Mode > 1)
 				out_fifo (FIFO_FLUSH);
 			rrf_enter_rx ();
@@ -193,12 +230,64 @@ fsm freq_sampler {
 
 		flush_samples (FLUSH);
 		proceed LOOP;
+
+	state INJECT:
+
+		// Wait for channel assessment
+		leds (LED_RED, 1);
+		sacc = 0;
+
+	state CCLEAR:
+
+		if (!rrf_cts ()) {
+			if (sacc >= MAX_CTS_TRIES) {
+				// Failed
+				ufree (PTI);
+				PTI = NULL;
+				rrf_enter_rx ();
+				proceed INJECT_FAIL;
+			}
+			sacc++;
+			delay (1, CCLEAR);
+			release;
+		}
+
+		// Channel OK, start sending
+		rrf_send (PTI, PTIL);
+		// Wait until done
+WaitTX:
+		delay (1, INJECT_TX_CHECK);
+		release;
+
+	state INJECT_TX_CHECK:
+
+		if (rrf_status () == CC1100_STATE_TX)
+			goto WaitTX;
+
+		ufree (PTI);
+		PTI = NULL;
+		rrf_enter_rx ();
+
+	state INJECT_OK:
+
+		oss_ack (INJECT_OK, OSS_CMD_ACK);
+		proceed WAIT_SAMPLE;
+
+	state INJECT_FAIL:
+
+		oss_ack (INJECT_FAIL, OSS_CMD_NAK);
+		proceed WAIT_SAMPLE;
 }			
 
 static void reset_all () {
 
 	killall (band_sampler);
 	killall (freq_sampler);
+	if (PTI) {
+		ufree (PTI);
+		PTI = NULL;
+	}
+	leds_clear ();
 }
 
 static void start_all () {
@@ -210,6 +299,7 @@ static void start_all () {
 		    ((lword) rrf_get_reg (CCxxx0_FREQ1) <<  8) |
 		    ((lword) rrf_get_reg (CCxxx0_FREQ0)      );
 
+	leds_clear ();
 	if (Mode)
 		runfsm freq_sampler;
 	else
@@ -248,6 +338,7 @@ static void rq_handler (word st, byte *cmd, word cmdlen) {
 			if (cmdlen < 10) {
 SErr:
 				oss_ack (st, OSS_CMD_NAK);
+				leds (LED_RED, 0);
 				return;
 			}
 
@@ -276,6 +367,7 @@ SErr:
 			word i;
 			sint len;
 
+			leds (LED_RED, 1);
 			// The minimum is cmd npairs + 2 bytes
 			if (cmdlen < 4)
 				goto SErr;
@@ -290,6 +382,7 @@ SErr:
 			for (i = 2; i < len; i += 2)
 				rrf_mod_reg (cmd [i], cmd+1+i, 0);
 
+			leds (LED_RED, 0);
 			return;
 		}
 
@@ -302,6 +395,7 @@ SErr:
 			word i;
 			byte *buf;
 
+			leds (LED_RED, 1);
 			if (cmdlen < 3)
 				goto SErr;
 
@@ -320,6 +414,7 @@ SErr:
 			for (i = 2; i < len; i++)
 				buf [i] = rrf_get_reg (cmd [i]);
 			oss_send (buf);
+			leds (LED_RED, 0);
 			return;
 		}
 
@@ -330,6 +425,7 @@ SErr:
 			//	len
 			//	bytes
 
+			leds (LED_RED, 1);
 			if (cmdlen < 4)
 				goto SErr;
 
@@ -339,6 +435,7 @@ SErr:
 			oss_ack (st, OSS_CMD_ACK);
 
 			rrf_mod_reg (cmd [1], cmd + 3, cmd [2]);
+			leds (LED_RED, 0);
 			return;
 
 		case OSS_CMD_D_GRGB: {
@@ -348,6 +445,7 @@ SErr:
 			//	len
 			byte *buf;
 
+			leds (LED_RED, 1);
 			if (cmdlen < 3 || cmd [2] > OSS_SAMPLES)
 				goto SErr;
 
@@ -359,6 +457,7 @@ SErr:
 
 			rrf_get_reg_burst (cmd [1], buf + 2, cmd [2]);
 			oss_send (buf);
+			leds (LED_RED, 0);
 			return;
 		}
 
@@ -366,6 +465,7 @@ SErr:
 
 			byte *buf;
 
+			leds (LED_RED, 1);
 			if ((buf = oss_outr (st, 4)) == NULL)
 				// Cannot happen
 				goto SErr;
@@ -376,8 +476,34 @@ SErr:
 			buf [3] = OSS_MAG2;
 
 			oss_send (buf);
+			leds (LED_RED, 0);
 			return;
 		}
+
+		case OSS_CMD_D_INJT:
+
+			// Len
+			// Bytes to be written to TX FIFO
+
+			leds (LED_RED, 1);
+			if (cmdlen < 3)
+				goto SErr;
+
+			if (cmd [1] == 0 || cmd [1] > cmdlen - 2)
+				goto SErr;
+
+			if (cmd [1] > MAX_TOTAL_PL + 1)
+				goto SErr;
+
+			if (!running (freq_sampler) || PTI)
+				goto SErr;
+
+			if ((PTI = (byte*) umalloc (cmd [1])) == NULL)
+				goto SErr;
+
+			PTIL = cmd [1];
+			memcpy (PTI, cmd + 2, PTIL);
+			return;
 
 		default:
 			goto SErr;
@@ -389,6 +515,7 @@ fsm root {
 
 	state INIT:
 
+		leds_clear ();
 		oss_init (rq_handler);
 		// Init RF, power down, default registers
 		rrf_init ();
@@ -397,4 +524,5 @@ fsm root {
 
 		// Hold on to your slot
 		when (root, RELAX);
+		leds (LED_GREEN, 1);
 }
