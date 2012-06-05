@@ -8,12 +8,14 @@
 // Sampling parameters
 static lword	FreqStart,	// Frequency range to scan
 		FreqStep,	// Increment
+		FreqMax,
 
 		FreqPrev,	// Previous and current frequency (to avoid
 		FreqCurr;	// unnecessary register updates)
 
 static word	SamplesToAverage,	// Samples per take
-		SampleDelay;		// Inter-sample delay
+		SampleDelay,		// Inter-sample delay
+		CurrentSample;
 
 static word	Mode;		// 0-band, 1-single freq, 2-single+receiving
 
@@ -125,6 +127,26 @@ static void set_freq () {
 	FreqPrev = FreqCurr;
 }
 
+static void update_frequency () {
+//
+// Increment the frequency accounting for a possible wrap around
+//
+	if (++CurrentSample >= OSS_SAMPLES) {
+		CurrentSample = 0;
+		FreqCurr = FreqStart;
+	} else {
+		FreqCurr += FreqStep;
+	}
+}
+
+static lword init_freq () {
+//
+// Initializes the starting scan frequency at random from within the sampled
+// range
+//
+	FreqCurr = FreqStart + FreqStep * (CurrentSample = lrnd () & 0x7f);
+}
+
 fsm band_sampler {
 //
 // Samples the specified band
@@ -133,7 +155,7 @@ fsm band_sampler {
 
 	state LOOP:
 
-		FreqCurr = FreqStart;
+		init_freq ();
 		sn = 0;
 		led_toggle (LED_YELLOW);
 		leds (LED_GREEN, 0);
@@ -159,11 +181,12 @@ fsm band_sampler {
 		if (scnt < SamplesToAverage)
 			proceed SAMPLE;
 
-		Samples [sn++] = (sacc + (scnt >> 1)) / scnt;
+		Samples [CurrentSample] = (sacc + (scnt >> 1)) / scnt;
+		sn++;
 
 		if (sn < OSS_SAMPLES) {
 			// keep going
-			FreqCurr += FreqStep;
+			update_frequency ();
 			proceed FREQ_UPDATE;
 		}
 
@@ -346,10 +369,11 @@ SErr:
 			if (Mode > 2)
 				goto SErr;
 
-			FreqStart 		= unpack3 (cmd +  2);
-			FreqStep 		= unpack3 (cmd +  5);
+			FreqStart 	= unpack3 (cmd +  2);
+			FreqStep 	= unpack3 (cmd +  5);
+			FreqMax		= FreqStart + FreqStep * OSS_SAMPLES;
 
-			SamplesToAverage 	= cmd [8];
+			SamplesToAverage	= cmd [8];
 			SampleDelay 		= cmd [9];
 
 			oss_ack (st, OSS_CMD_ACK);

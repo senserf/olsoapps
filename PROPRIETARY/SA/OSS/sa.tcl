@@ -1723,6 +1723,8 @@ proc close_uart { } {
 	catch { close $ST(SFD) }
 	set ST(SFD) ""
 
+	clear_sip
+
 	$ST(SFN)
 
 	set ST(DFN) "nop"
@@ -1904,7 +1906,7 @@ proc ack_timeout { } {
 	trigger
 }
 
-proc wack { cmd { tim 6000 } } {
+proc wack { cmd { tim 8000 } } {
 #
 # Wait for a response
 #
