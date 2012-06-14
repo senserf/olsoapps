@@ -59,22 +59,43 @@ namespace eval UNAMES {
 
 variable Dev
 
-proc unames_init { stype } {
+proc unames_init { dtype { stype "" } } {
 
 	variable Dev
 
+	# device layout type: "L" (Linux), other "Windows"
+	set Dev(DEV) $dtype
+	# system type: "L" (Linux), other "Windows/Cygwin"
 	set Dev(SYS) $stype
-	unames_defnames
 
-	if { $Dev(SYS) == "L" } {
+	if { $Dev(DEV) == "L" } {
 		# determine the root of virtual ttys
 		if [file isdirectory "/dev/pts"] {
 			# BSD style
-			set Dev(PRT) "/dev/pts/"
+			set Dev(PRT) "/dev/pts/%"
 		} else {
-			set Dev(PRT) "/dev/pty"
+			set Dev(PRT) "/dev/pty%"
 		}
+		# number bounds (inclusive) for virtual devices
+		set Dev(PRB) { 0 8 }
+		# real ttys
+		if { $Dev(SYS) == "L" } {
+			# actual Linux
+			set Dev(RRT) "/dev/ttyUSB%"
+		} else {
+			# Cygwin
+			set Dev(RRT) "/dev/ttyS%"
+		}
+		# and their bounds
+		set Dev(RRB) { 0 31 }
+	} else {
+		set Dev(PRT) { "CNCA%" "CNCB%" }
+		set Dev(PRB) { 0 3 }
+		set Dev(RRT) "COM%:"
+		set Dev(RRB) { 1 32 }
 	}
+
+	unames_defnames
 }
 
 proc unames_defnames { } {
@@ -90,22 +111,25 @@ proc unames_defnames { } {
 	# virtual devices
 	set Dev(VCM) ""
 
-	if { $Dev(SYS) == "L" } {
-		# Linux style
-		for { set i 0 } { $i < 32 } { incr i } {
-			lappend Dev(COM) "ttyS$i (COM[expr $i + 1])"
+	set rf [lindex $Dev(RRB) 0]
+	set rt [lindex $Dev(RRB) 1]
+	set pf [lindex $Dev(PRB) 0]
+	set pt [lindex $Dev(PRB) 1]
+
+	while { $rf <= $rt } {
+		foreach d $Dev(RRT) {
+			regsub "%" $d $rf d
+			lappend Dev(COM) $d
 		}
-		for { set i 0 } { $i < 9 } { incr i } {
-			lappend Dev(VCM) "pty$i (virt)"
+		incr rf
+	}
+
+	while { $pf <= $pt } {
+		foreach d $Dev(PRT) {
+			regsub "%" $d $pf d
+			lappend Dev(VCM) $d
 		}
-	} else {
-		for { set i 1 } { $i <= 32 } { incr i } {
-			lappend Dev(COM) "COM$i:"
-		}
-		for { set i 0 } { $i < 4 } { incr i } {
-			lappend Dev(VCM) "CNCA$i"
-			lappend Dev(VCM) "CNCB$i"
-		}
+		incr pf
 	}
 }
 
@@ -115,14 +139,8 @@ proc unames_ntodev { n } {
 #
 	variable Dev
 
-	if { $Dev(SYS) == "L" } {
-		return "/dev/ttyS$n /dev/ttyUSB$n /dev/tty$n"
-	} else {
-		if { $n < 1 } {
-			return ""
-		}
-		return "COM$n:"
-	}
+	regsub -all "%" $Dev(RRT) $n d
+	return $d
 }
 
 proc unames_ntovdev { n } {
@@ -131,14 +149,13 @@ proc unames_ntovdev { n } {
 #
 	variable Dev
 
-	if { $Dev(SYS) == "L" } {
-		return "$Dev(PRT)$n"
-	} else {
-		if { $n > 3 } {
-			return ""
-		}
-		return "CNCA$n CNCB$n"
+	regsub -all "%" $Dev(PRT) $n d
+
+	if { $Dev(DEV) == "L" && ![file exists $d] } {
+		# this is supposed to be authoritative
+		return ""
 	}
+	return $d
 }
 
 proc unames_unesc { dn } {
@@ -147,7 +164,7 @@ proc unames_unesc { dn } {
 #
 	variable Dev
 
-	if { $Dev(SYS) == "L" } {
+	if { $Dev(DEV) == "L" } {
 		# no need to do anything
 		return $dn
 	}
@@ -174,9 +191,6 @@ proc unames_scan { } {
 	# real devices
 	for { set i 0 } { $i < 256 } { incr i } {
 		set dl [unames_ntodev $i]
-		if { $dl == "" } {
-			continue
-		}
 		foreach d $dl {
 			if [catch { open [unames_unesc $d] "r" } fd] {
 				continue
@@ -186,10 +200,18 @@ proc unames_scan { } {
 		}
 	}
 
-	# virtual devices
 	for { set i 0 } { $i < 32 } { incr i } {
 		set dl [unames_ntovdev $i]
 		if { $dl == "" } {
+			continue
+		}
+		if { $Dev(DEV) == "L" } {
+			# don't try to open them; unames_ntovdev is
+			# authoritative, and opening those representing
+			# terminals may mess them up
+			foreach d $dl {
+				lappend Dev(VCM) $d
+			}
 			continue
 		}
 		foreach d $dl {
@@ -5061,7 +5083,7 @@ proc initialize { } {
 
 	global ST RC argv
 
-	unames_init $ST(DEV)
+	unames_init $ST(DEV) $ST(SYS)
 
 	if { [lindex $argv 0] == "-D" } {
 		set ST(DBG) 1
