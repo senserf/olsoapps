@@ -21,4 +21,4 @@
 #define	DIAG_MESSAGES		2
 
 // Make this the default
-#define	RADIO_BITRATE		200000
+#define	RADIO_DEFAULT_BITRATE	200000

@@ -151,7 +151,7 @@ fsm band_sampler {
 //
 // Samples the specified band
 //
-	word sn, sacc, scnt;
+	word sn, sacc, scnt, dcnt;
 
 	state LOOP:
 
@@ -168,6 +168,15 @@ fsm band_sampler {
 		if (SampleDelay) {
 			delay (SampleDelay, SAMPLE);
 			release;
+		}
+
+		dcnt = 4;
+
+	state NULL_DELAY:
+
+		if (dcnt) {
+			dcnt--;
+			proceed NULL_DELAY;
 		}
 
 	state SAMPLE:

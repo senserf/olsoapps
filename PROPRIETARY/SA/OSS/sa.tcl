@@ -2148,10 +2148,10 @@ proc do_start_stop { } {
 	if $ST(SIP) {
 		# stop scan
 		send_reset
-		clear_sip
 		if { [wack 0xFE] < 0 } {
 			alert "Node reset timeout"
 		}
+		clear_sip
 		return
 	}
 
@@ -2249,10 +2249,12 @@ proc nsbox { w lab min max var row { lst "" } } {
 	}
 
 	if { $lst != "" } {
-		lappend WN($lst) ${w}b
+		lappend WN($lst) $b
 	}
 
-	grid ${w}b -column 1 -row $row -sticky nes
+	grid $b -column 1 -row $row -sticky nes
+
+	return $b
 }
 
 proc graph_bounds { } {
@@ -2631,6 +2633,24 @@ proc set_averaging_button { } {
 	$WN(AVB) configure -text $t
 }
 
+proc fix_min_isd { } {
+#
+# Fixes the minimum "inter-sample delay" depending on the mode
+#
+	global WN RC
+
+	if [mode_single] {
+		set min 0
+	} else {
+		set min 1
+		if { $RC(ISD) == 0 } {
+			set RC(ISD) 1
+		}
+	}
+
+	$WN(ISB) configure -from $min
+}
+
 proc band_menu_click { w n } {
 #
 # Handles a selection from the band menu
@@ -2641,6 +2661,7 @@ proc band_menu_click { w n } {
 	$w configure -text $t
 	set RC(BAN) $t
 	set_averaging_button
+	fix_min_isd
 	redraw
 }
 
@@ -2846,7 +2867,9 @@ proc mk_rootwin { win } {
 	#######################################################################
 
 	nsbox $x.sa "Samples to average" 1 $PM(STA_max) STA 2 RWI,SIP
-	nsbox $x.is "Inter-sample delay" 0 $PM(ISD_max) ISD 3 RWI,SIP
+
+	set WN(ISB) [nsbox $x.is "Inter-sample delay" 0 $PM(ISD_max) ISD 3 \
+		RWI,SIP]
 
 	#######################################################################
 
@@ -2873,6 +2896,7 @@ proc mk_rootwin { win } {
 	button $x.ab -text "-" -anchor e -command "set_averaging $x.ab"
 	set WN(AVB) $x.ab
 	set_averaging_button
+	fix_min_isd
 	grid $x.ab -column 1 -row 2 -sticky nes
 
 	#######################################################################

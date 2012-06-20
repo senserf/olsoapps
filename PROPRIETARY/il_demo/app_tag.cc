@@ -48,17 +48,6 @@ static word		permalrm [3];
 word 			app_flags = DEF_APP_FLAGS;
 word			plot_id;
 
-
-idiosyncratic int tr_offset (headerType*);
-
-idiosyncratic Boolean msg_isBind (msg_t m), msg_isTrace (msg_t m),
-		      msg_isMaster (msg_t m), msg_isNew (msg_t m),
-		      msg_isClear (byte o);
-
-idiosyncratic void set_master_chg (void);
-
-idiosyncratic word guide_rtr (headerType * b);
-
 #include "diag.h"
 #include "str_tag.h"
 #include "ser.h"

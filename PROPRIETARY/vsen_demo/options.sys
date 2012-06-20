@@ -62,11 +62,6 @@
 #endif
 #define RANDOM_NUMBER_GENERATOR 2
 
-//#ifdef RADIO_BITRATE
-//#undef RADIO_BITRATE
-//#endif
-//#define RADIO_BITRATE	200000
-
 #ifdef RADIO_USE_LEDS
 #undef RADIO_USE_LEDS
 #endif

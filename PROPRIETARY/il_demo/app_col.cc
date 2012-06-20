@@ -54,16 +54,6 @@ word			plot_id;
 
 word			buttons;
 
-idiosyncratic int tr_offset (headerType*);
-
-idiosyncratic Boolean msg_isBind (msg_t m), msg_isTrace (msg_t m),
-		      msg_isMaster (msg_t m), msg_isNew (msg_t m),
-		      msg_isClear (byte o);
-
-idiosyncratic void set_master_chg (void);
-
-idiosyncratic word guide_rtr (headerType * b);
-
 #include "diag.h"
 #include "str_col.h"
 
