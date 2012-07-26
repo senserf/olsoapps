@@ -59,8 +59,6 @@ heapmem {80, 20};
 
 // ============================================================================
 
-//+++ "hostid.cc"
-
 static char	*ui_ibuf	= NULL,
 		*ui_obuf	= NULL,
 		*cmd_line	= NULL;

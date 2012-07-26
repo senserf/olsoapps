@@ -1,6 +1,6 @@
 #ifdef	__SMURPH__
 
-#define BOARD_WARSAW_10SHT	dupa
+// #define BOARD_WARSAW_10SHT	dupa
 
 // Note: this is just define or not, no value
 #define	VUEE_LIB_PLUG_TARP

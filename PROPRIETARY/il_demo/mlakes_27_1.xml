@@ -6,56 +6,44 @@
 	<defaults>
 	<xi:include href="tag.xml"/>
 	</defaults>
-	<node number="0" type="peg">
+	<node number="0" type="peg" hid="0xBACA0001">
 	    <location>450.0 375.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
 	</node>
-	<node number="1" type="peg" start="off">
+	<node number="1" type="peg" start="off" hid="0xBACA03f2">
 	    <location>25.0 25.0</location>
-	    <preinit tag="HID" type="lword">0xBACA03f2</preinit>
 	</node>
-        <node number="2" type="peg" start="off">
+        <node number="2" type="peg" start="off" hid="0xBACA03fc">
             <location>35.0 25.0</location>
-            <preinit tag="HID" type="lword">0xBACA03fc</preinit>
         </node>
-        <node number="3" type="peg" start="on">
+        <node number="3" type="peg" start="on" hid="0xBACA0406">
             <location>453.0 280.0</location>
-            <preinit tag="HID" type="lword">0xBACA0406</preinit>
         </node>
 
-	<node number="4" type="col" start="on">
+	<node number="4" type="col" start="on" hid="0xBACA03f3">
 	    <location>448.0 200.0</location>
-	    <preinit tag="HID" type="lword">0xBACA03f3</preinit>
 	</node>
-        <node number="5" type="col" start="on">
+        <node number="5" type="col" start="on" hid="0xBACA03f4">
             <location>455.0 201.0</location>
-            <preinit tag="HID" type="lword">0xBACA03f4</preinit>
         </node>
-        <node number="6" type="col" start="on">
+        <node number="6" type="col" start="on" hid="0xBACA03f5">
             <location>462.0 202.0</location>
-            <preinit tag="HID" type="lword">0xBACA03f5</preinit>
         </node>
 
-       <node number="7" type="col" start="on">
+       <node number="7" type="col" start="on" hid="0xBACA0407">
             <location>460.0 230.0</location>
-            <preinit tag="HID" type="lword">0xBACA0407</preinit>
         </node>
 
-	<node number="8" type="col" start="on">
+	<node number="8" type="col" start="on" hid="0xBACA0408">
 	    <location>470.0 220.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0408</preinit>
 	</node>
-        <node number="9" type="col" start="on">
+        <node number="9" type="col" start="on" hid="0xBACA0409">
             <location>510.0 237.0</location>
-            <preinit tag="HID" type="lword">0xBACA0409</preinit>
         </node>
-        <node number="10" type="col" start="on">
+        <node number="10" type="col" start="on" hid="0xBACA040a">
             <location>502.0 227.0</location>
-            <preinit tag="HID" type="lword">0xBACA040a</preinit>
         </node>
-        <node number="11" type="col" start="on">
+        <node number="11" type="col" start="on" hid="0xBACA040b">
             <location>516.0 227.0</location>
-            <preinit tag="HID" type="lword">0xBACA040b</preinit>
         </node>
     </nodes>
 </network>

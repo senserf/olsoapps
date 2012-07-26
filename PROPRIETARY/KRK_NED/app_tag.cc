@@ -70,8 +70,6 @@ static char *rcv_buf_ptr;
 static char	 	png_frame [sizeof(msgPongType) + sizeof(sensDataType)];
 static word 		png_shift;
 
-//+++ "hostid.cc"
-
 word app_flags	= DEF_APP_FLAGS;
 word plot_id	= 0;
 

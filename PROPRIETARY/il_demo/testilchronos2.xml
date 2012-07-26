@@ -7,38 +7,30 @@
 	<defaults>
 	<xi:include href="tag.xml"/>
 	</defaults>
-	<node number="1" type="peg">
+	<node number="1" type="peg" hid="0xBACA0001">
 	    <location>50.0 60.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0001</preinit>
 	</node>
-	<node number="5" type="col" start="on">
+	<node number="5" type="col" start="on" hid="0xBACA0005">
 	    <location>50.0 50.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0005</preinit>
 	</node>
-        <node number="0" type="col" start="off">
+        <node number="0" type="col" start="off" hid="0xBACA000A">
             <location>105.0 105.0</location>
-            <preinit tag="HID" type="lword">0xBACA000A</preinit>
         </node>
-	<node number="6" type="col" start="on">
+	<node number="6" type="col" start="on" hid="0xBACA0006">
 	    <location>45.0 45.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0006</preinit>
 	</node>
-	<node number="7" type="col" start="on">
+	<node number="7" type="col" start="on" hid="0xBACA0007">
 	    <location>40.0 45.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0007</preinit>
 	</node>
-        <node number="2" type="peg" start="off">
+        <node number="2" type="peg" start="off" hid="0xBACA0002">
             <location>0.0 0.0</location>
-            <preinit tag="HID" type="lword">0xBACA0002</preinit>
         </node>
 
-	<node number="3" type="peg" start="off">
+	<node number="3" type="peg" start="off" hid="0xBACA0003">
 	    <location>0.0 0.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0003</preinit>
 	</node>
-       <node number="4" type="peg" start="off">
+       <node number="4" type="peg" start="off" hid="0xBACA0004">
             <location>0.0 0.0</location>
-            <preinit tag="HID" type="lword">0xBACA0004</preinit>
         </node>
     </nodes>
 </network>

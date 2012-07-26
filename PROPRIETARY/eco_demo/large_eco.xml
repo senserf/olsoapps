@@ -6,7 +6,7 @@
 	<defaults>
 	<xi:include href="collector.xml"/>
 	</defaults>
-	<node number="0" type="peg">
+	<node number="0" type="peg" hid="0xBACA000A">
 	    <sensors>
 	    	<input source="socket"></input>
 	    	<sensor number="0" vsize="2" delay="0.01" init="2030">
@@ -14,10 +14,9 @@
 		</sensor>
 	    </sensors>
 	    <location>65.0 5.0</location>
-	    <preinit tag="HID" type="lword">0xBACA000A</preinit>
 	    <preinit tag="MHOST" type="word">10</preinit>
 	</node>
-	<node number="1" type="peg">
+	<node number="1" type="peg" hid="0xBACA000B">
 	    <sensors>
 	    	<input source="socket"></input>
 	    	<sensor number="0" vsize="2" delay="0.01" init="2028">
@@ -25,36 +24,28 @@
 		</sensor>
 	    </sensors>
 	    <location>205.0 5.0</location>
-	    <preinit tag="HID" type="lword">0xBACA000B</preinit>
 	    <preinit tag="MHOST" type="word">10</preinit>
 	</node>
-	<node number="2" type="tag" start="on">
+	<node number="2" type="tag" start="on" hid="0xBACA0066">
 	    <location>5.0 5.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0066</preinit>
 	</node>
-	<node number="3" type="tag" start="on">
+	<node number="3" type="tag" start="on" hid="0xBACA0067">
 	    <location>5.0 55.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0067</preinit>
 	</node>
-	<node number="4" type="tag" start="on">
+	<node number="4" type="tag" start="on" hid="0xBACA0068">
 	    <location>5.0 105.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0068</preinit>
 	</node>
-	<node number="5" type="tag" start="on">
+	<node number="5" type="tag" start="on" hid="0xBACA0073">
 	    <location>275.0 5.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0073</preinit>
 	</node>
-	<node number="6" type="tag" start="on">
+	<node number="6" type="tag" start="on" hid="0xBACA0074">
 	    <location>275.0 55.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0074</preinit>
 	</node>
-	<node number="7" type="tag" start="on">
+	<node number="7" type="tag" start="on" hid="0xBACA0075">
 	    <location>275.0 105.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0075</preinit>
 	</node>
-	<node number="8" type="tag" start="on">
+	<node number="8" type="tag" start="on" hid="0xBACA00D0">
 	    <location>120.0 50.0</location>
-	    <preinit tag="HID" type="lword">0xBACA00D0</preinit>
 	</node>
     </nodes>
 </network>

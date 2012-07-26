@@ -3,8 +3,6 @@
 
 #include "app_peg.h"
 
-extern const lword host_id;
-
 extern word host_pl;
 extern lword master_ts;
 extern word app_flags;

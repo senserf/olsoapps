@@ -53,8 +53,6 @@ heapmem {80, 20}; // how to find out a good ratio?
 
 // ============================================================================
 
-//+++ "hostid.cc"
-
 static char	*ui_ibuf	= NULL,
 		*ui_obuf	= NULL,
 		*cmd_line	= NULL;

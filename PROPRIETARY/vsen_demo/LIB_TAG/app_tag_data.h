@@ -3,7 +3,6 @@
 
 #include "app_tag.h"
 
-extern const lword host_id;
 extern const word senset;
 
 extern lword ref_ts;

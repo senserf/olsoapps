@@ -26,8 +26,6 @@
 // attribute (a de facto variable). You need trueconst to have a true
 // constant - see str_peg.h.
 //
-// const lword	host_id = (lword) PREINIT (0xBACADEAD, "HID");
-//+++ host_id.cc
 
 // PiComp
 //

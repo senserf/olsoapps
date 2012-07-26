@@ -75,48 +75,41 @@
 		<!-- dummy -->
 		<sensor number="5" vsize="2" delay="0.0">1</sensor>
 	    </sensors>
-	    <preinit tag="HID" type="lword">3133857453</preinit>
 	    <preinit tag="MHOST" type="word">0</preinit>
 	    <preinit tag="NID" type="word">85</preinit>
 	</defaults>
-	<node number="0" type="peg">
+	<node number="0" type="peg" hid="0x5A7E000A">
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
 		<sensor number="0" vsize="2" delay="0.01">2047</sensor>
 	    </sensors>
 	    <location>55.0 55.0</location>
-	    <preinit tag="HID" type="lword">0x5A7E000A</preinit>
 	    <!-- in this scenario, routing is absent, so we
 	         don't care about 'm 0'.
 	    -->
 	    <preinit tag="MHOST" type="word">10</preinit>
 	</node>
-	<node number="1" type="peg">
+	<node number="1" type="peg" hid="0xBACA040B">
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
 		<sensor number="0" vsize="2" delay="0.01">2047</sensor>
 	    </sensors>
 	    <location>105.0 105.0</location>
-	    <preinit tag="HID" type="lword">0xBACA040B</preinit>
 	    <preinit tag="MHOST" type="word">10</preinit>
     	</node>
-	<node number="2" type="tag" start="on">
+	<node number="2" type="tag" start="on" hid="0xBACA0065">
 	    <location>5.0 5.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0065</preinit>
 	</node>
-	<node number="3" type="tag" start="on">
+	<node number="3" type="tag" start="on" hid="0xBACA0466">
 	    <location>155.0 155.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0466</preinit>
 	</node>
-	<node number="4" type="cus" start="on">
+	<node number="4" type="cus" start="on" hid="0XBACA0010">
 	    <location>75.0 55.0</location>
-	    <preinit tag="HID" type="lword">0xBACA0010</preinit>
 	</node>
-	<node number="5" type="cus" start="on">
+	<node number="5" type="cus" start="on" hid="0x5A7E0011">
 	    <location>125.0 55.0</location>
-	    <preinit tag="HID" type="lword">0x5A7E0011</preinit>
 	</node>
     </nodes>
 </network>

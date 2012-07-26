@@ -7,7 +7,7 @@
 
 // Content of all LibApps
 
-//+++ "lib_app_peg.cc" "msg_io_peg.cc" "app_diag_peg.cc" "host_id.cc"
+//+++ "lib_app_peg.cc" "msg_io_peg.cc" "app_diag_peg.cc"
 
 #include "sysio.h"
 #include "msg_tarp.h"

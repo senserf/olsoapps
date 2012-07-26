@@ -8,7 +8,6 @@
 #include "app_col.h"
 #include "tarp.h"
 
-extern const lword     host_id;
 extern lword           ref_ts;
 extern lint            ref_date;
 extern lint            lh_time;

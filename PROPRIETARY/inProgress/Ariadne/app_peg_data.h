@@ -3,7 +3,6 @@
 
 #include "app_peg.h"
 
-extern const lword 	host_id;
 extern sattr_t 		sattr [];
 extern tout_t 		touts;
 extern word		sstate;

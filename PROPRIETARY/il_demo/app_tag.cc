@@ -26,13 +26,6 @@
 
 #include "sensors.h"
 
-// PiComp
-//
-// This is explained in app_peg.cc
-//
-//const lword	host_id	= (lword) PREINIT (0xBACADEAD, "HID");
-//+++ host_id.cc
-
 lword		ref_ts;
 lint		ref_date;
 lint		lh_time;

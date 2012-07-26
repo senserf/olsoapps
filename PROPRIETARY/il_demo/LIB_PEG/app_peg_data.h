@@ -13,7 +13,6 @@
 // I have only left those that appear to be needed (are in fact referenced
 // across files)
 //
-extern const lword     host_id;
 extern lword           master_ts;
 extern lint            master_date;
 extern wroomType       msg4tag;

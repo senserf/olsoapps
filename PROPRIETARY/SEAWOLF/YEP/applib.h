@@ -29,7 +29,6 @@ lcdg_dm_obj_t *mkrmenu ();
 #define	cxt_flag	_daprx (cxt_flag)
 #define ad_buf		_daprx (ad_buf)
 #define curr_rec	_daprx (curr_rec)
-#define	host_id		_daprx (host_id)
 
 #else
 
@@ -39,8 +38,6 @@ extern rf_rcv_t		rf_rcv, ad_rcv;
 extern cflags_t		cxt_flag;
 extern char *		ad_buf;
 extern sea_rec_t *	curr_rec;
-
-extern const lword host_id;
 
 #endif
 
