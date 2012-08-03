@@ -4,5 +4,14 @@
 	<lcdg>0=(10,10),1=(300,10),2=(590,10),3=(880,10)</lcdg>
 	<pins>0=(10,250),1=(300,250),2=(590,250),3=(880,250)</pins>
 	<panel>=(500,550)</panel>
-
+	<labels>
+		<pins>
+			A,blue,white B,yellow,red
+			JoyN,white,blue
+			JoyE,white,blue
+			JoyS,white,blue
+			JoyW,white,blue
+			JoyP,red,orange
+		</pins>
+	</labels>
 </geometry>
