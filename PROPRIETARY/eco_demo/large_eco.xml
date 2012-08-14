@@ -1,30 +1,37 @@
 <network nodes="9" radio="9">
     <grid>0.1m</grid>
+    <display>
+	<roamer nodesize="30"/>
+    </display>
     <tolerance quality="2">1E-4</tolerance>
     <xi:include href="channel.xml"/>
     <nodes>
 	<defaults>
-	<xi:include href="collector.xml"/>
+	  <xi:include href="collector.xml"/>
 	</defaults>
 	<node number="0" type="peg" hid="0xBACA000A">
 	    <sensors>
 	    	<input source="socket"></input>
 	    	<sensor number="-1" vsize="2" delay="0.01" init="2030">
 			2047
+			<label fg="red" bg="yellow">Voltage</label>
 		</sensor>
 	    </sensors>
 	    <location>65.0 5.0</location>
 	    <preinit tag="MHOST" type="word">10</preinit>
+	    <color solid="magenta"/>
 	</node>
 	<node number="1" type="peg" hid="0xBACA000B">
 	    <sensors>
 	    	<input source="socket"></input>
 	    	<sensor number="-1" vsize="2" delay="0.01" init="2028">
 			2047
+			<label index="-1" fg="red" bg="yellow">Voltage</label>
 		</sensor>
 	    </sensors>
 	    <location>205.0 5.0</location>
 	    <preinit tag="MHOST" type="word">10</preinit>
+	    <color solid="magenta"/>
 	</node>
 	<node number="2" type="tag" start="on" hid="0xBACA0066">
 	    <location>5.0 5.0</location>

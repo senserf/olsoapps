@@ -42,3 +42,5 @@
 		<module id="storage">0.030 0.030 10.0 15.0 17.0 16.0</module>
 		<module id="sensors">0.0 2.5</module>
 	    </ptracker>
+
+	    <color solid="green"/>

@@ -1,6 +1,10 @@
 <network nodes="6">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
+    <display>
+      <root>800,550</root>
+      <panel>500,550</panel>
+    </display>
     <channel>
         <shadowing bn="-110.0dBm" syncbits="8">
 		RP(d) = received power at distance d
@@ -68,6 +72,13 @@
 		<output target="socket"></output>
 		<buttons polarity="low" timing="200">0 1 2 3 4 5 6</buttons>
 		<values>1111111</values>
+		<label fg="blue" bg="white">A</label>
+		<label fg="yellow" bg="red">B</label>
+		<label fg="white" bg="blue">JoyN</label>
+		<label fg="white" bg="blue">JoyE</label>
+		<label fg="white" bg="blue">JoyS</label>
+		<label fg="white" bg="blue">JoyW</label>
+		<label fg="red" bg="orange">JoyP</label>
 	    </pins>
 	    <preinit tag="NID" type="word">85</preinit>
 	    <preinit tag="MHOST" type="word">0</preinit>
@@ -75,18 +86,26 @@
 	<node number="0" hid="0xBACA0001">
 	    <location>5.0 5.0</location>
 	    <eeprom size="524288" clean="0xFF" image="eeprom1.nok"></eeprom>
+	    <lcdg_window>10,10</lcdg_window>
+	    <pins_window>10,250</pins_window>
 	</node>
 	<node number="1" start="off" hid="0xBACA0002">
 	    <location>5.0 15.0</location>
 	    <eeprom size="524288" clean="0xFF" image="eeprom2.nok"></eeprom>
+	    <lcdg_window>300,10</lcdg_window>
+	    <pins_window>300,250</pins_window>
 	</node>
         <node number="2" start="off" hid="0xBACA0004">
             <location>15.0 15.0</location>
             <eeprom size="524288" clean="0xFF" image="eeprom4.nok"></eeprom>
+	    <lcdg_window>590,10</lcdg_window>
+	    <pins_window>590,250</pins_window>
         </node>
         <node number="3" start="off" hid="0xBACA0008">
             <location>15.0 5.0</location>
             <eeprom size="524288" clean="0xFF" image="eeprom8.nok"></eeprom>
+	    <lcdg_window>880,10</lcdg_window>
+	    <pins_window>880,250</pins_window>
         </node>
 	<node number="4" start="on" hid="0xBACA004D">
 	    <location>9.0 10.0</location>

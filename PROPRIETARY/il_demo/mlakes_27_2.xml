@@ -1,49 +1,75 @@
 <network nodes="12" radio="12">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
+    <display>
+	<root>10,30</root>
+	<roamer image="mlakes.gif" width="800.0" display="yes">200,200</roamer>
+    </display>
     <xi:include href="channel.xml"/>
     <nodes>
 	<defaults>
-	<xi:include href="tag.xml"/>
+	    <xi:include href="tag.xml"/>
+	    <highlight fg="green" bg="white">magenta goldenrod</highlight>
 	</defaults>
 	<node number="0" type="peg" hid="0xBACA0001">
 	    <location>450.0 375.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,200</leds_window>
 	</node>
 	<node number="1" type="peg" start="off" hid="0xBACA03f2">
 	    <location>25.0 25.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,265</leds_window>
 	</node>
         <node number="2" type="peg" start="on" hid="0xBACA03fc">
             <location>465.0 225.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,330</leds_window>
         </node>
         <node number="3" type="peg" start="on" hid="0xBACA0406">
             <location>453.0 280.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,395</leds_window>
         </node>
-
 	<node number="4" type="col" start="on" hid="0xBACA03f3">
 	    <location>448.0 200.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">77,200</leds_window>
 	</node>
         <node number="5" type="col" start="on" hid="0xBACA03f4">
             <location>455.0 201.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">77,265</leds_window>
         </node>
         <node number="6" type="col" start="on" hid="0xBACA03f5">
             <location>462.0 202.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">77,330</leds_window>
         </node>
-
-       <node number="7" type="col" start="on" hid="0xBACA0407">
+        <node number="7" type="col" start="on" hid="0xBACA0407">
             <location>460.0 230.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">77,425</leds_window>
         </node>
-
 	<node number="8" type="col" start="on" hid="0xBACA0408">
 	    <location>470.0 220.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">77,490</leds_window>
 	</node>
         <node number="9" type="col" start="on" hid="0xBACA0409">
             <location>510.0 237.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">1020,505</leds_window>
         </node>
         <node number="10" type="col" start="on" hid="0xBACA040a">
             <location>502.0 227.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">1020,570</leds_window>
         </node>
         <node number="11" type="col" start="on" hid="0xBACA040b">
             <location>516.0 227.0</location>
+	    <color solid="lightblue"/>
+	    <leds_window display="yes">1020,635</leds_window>
         </node>
     </nodes>
 </network>

@@ -13,6 +13,12 @@
 	    </radio>
 	    <leds number="3">
 	    	<output target="socket"></output>
+		<color fg="red" bg="black"/>
+		<color fg="yellow" bg="black"/>
+		<color fg="green" bg="black"/>
+		<label fg="red" bg="beige">ON</label>
+		<label fg="purple" bg="beige">XMT</label>
+		<label fg="green" bg="beige">RCV</label>
 	    </leds>
 	    <eeprom size="524288" clean="0xFF"
 		timing="0.000004,0.000006,
@@ -27,16 +33,35 @@
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
-		<sensor number="0" vsize="2" delay="0.6">1024</sensor>
-		<sensor number="1" vsize="2" delay="0.6">8000</sensor>
-		<sensor number="2" vsize="2" delay="0.6">2700</sensor>
-		<sensor number="3" vsize="2" delay="0.6">2400</sensor>
-		<sensor number="4" vsize="2" delay="0.220">16483</sensor>
-		<sensor number="5" vsize="2" delay="0.06">3339</sensor>
-		<sensor number="6" vsize="2" delay="0.1">2000</sensor>
+		<sensor index="0" vsize="2" delay="0.6">
+			1024
+			<label fg="pink" bg="white">Temp</label>
+		</sensor>
+		<sensor index="1" vsize="2" delay="0.6">
+			8000
+			<label fg="green" bg="white">Humid</label>
+		</sensor>
+		<sensor index="2" vsize="2" delay="0.6">
+			2700
+			<label fg="maroon" bg="white">Moist</label>
+		</sensor>
+		<sensor index="3" vsize="2" delay="0.6">
+			2400
+			<label fg="mediumpurple" bg="white">Infra</label>
+		</sensor>
+		<sensor index="4" vsize="2" delay="0.220">
+			16483
+		</sensor>
+		<sensor index="5" vsize="2" delay="0.06">
+			3339
+		</sensor>
+		<sensor index="6" vsize="2" delay="0.1">
+			2000
+		</sensor>
 		<!-- Voltage sensor -->
-		<sensor number="-1" vsize="2" delay="0.0" init="2600">
+		<sensor index="-1" vsize="2" delay="0.0" init="2600">
 			2703
+			<label fg="red" bg="yellow">Voltage</label>
 		</sensor>
 	    </sensors>
 	    <preinit tag="MHOST" type="word">0</preinit>
@@ -48,3 +73,6 @@
 		<module id="storage">0.030 0.030 10.0 15.0 17.0 16.0</module>
 		<module id="sensors">0.0 2.5</module>
 	    </ptracker>
+
+	    <highlight fg="red" bg="white">red green blue</highlight>
+	    <color solid="lightblue"/>

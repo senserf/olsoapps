@@ -1,55 +1,82 @@
 <network nodes="14" radio="14">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
+    <display>
+	<root>10,30</root>
+	<roamer image="ams.gif" width="560.0" display="yes">200,200</roamer>
+    </display>
     <xi:include href="channel.xml"/>
     <nodes>
 	<defaults>
 	<xi:include href="tag.xml"/>
 	</defaults>
-
 	<node number="0" type="peg" start="off" hid="0xBACA00FF">
 	    <location>10.0 10.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,200</leds_window>
 	</node>
 	<node number="1" type="peg" hid="0xBACA0001">
 	    <location>365.0 120.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,265</leds_window>
 	</node>	
 	<node number="2" type="peg" hid="0xBACA0002">
 	    <location>270.0 120.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,330</leds_window>
 	</node>
 	<node number="3" type="peg" hid="0xBACA0003">
 	    <location>160.0 120.0</location>
+	    <color solid="tomato1"/>
+	    <leds_window display="yes">1020,395</leds_window>
 	</node>
-
         <node number="4" type="tag" start="on" hid="0xBACA0068">
             <location>480.0 85.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">77,200</leds_window>
         </node>
         <node number="5" type="tag" start="on" hid="0xBACA0069">
             <location>475.0 88.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">77,265</leds_window>
         </node>
 	<node number="6" type="tag" start="on" hid="0xBACA006A">
 	    <location>470.0 91.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">77,330</leds_window>
 	</node>
         <node number="7" type="tag" start="on" hid="0xBACA006B">
             <location>465.0 88.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">77,425</leds_window>
         </node>
         <node number="8" type="tag" start="on" hid="0xBACA006C">
             <location>460.0 85.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">77,490</leds_window>
         </node>
-
-       <node number="9" type="tag" start="on" hid="0xBACA00D1">
+        <node number="9" type="tag" start="on" hid="0xBACA00D1">
             <location>60.0 130.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">1020,505</leds_window>
         </node>
 	<node number="10" type="tag" start="on" hid="0xBACA00D2">
 	    <location>65.0 133.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">1020,570</leds_window>
 	</node>
         <node number="11" type="tag" start="on" hid="0xBACA00D3">
             <location>70.0 136.0</location>
+	    <color solid="green"/>
+	    <leds_window display="yes">1020,635</leds_window>
         </node>
         <node number="12" type="tag" start="on" hid="0xBACA00D4">
             <location>65.0 113.0</location>
+	    <color solid="green"/>
         </node>
         <node number="13" type="tag" start="on" hid="0xBACA00D5">
             <location>70.0 116.0</location>
+	    <color solid="green"/>
         </node>
     </nodes>
 </network>
