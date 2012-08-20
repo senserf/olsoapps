@@ -1,3 +1,28 @@
+#ifdef  __SMURPH__
+
+#define SENSOR_BATTERY  (-1)
+
+#ifdef BOARD_CHRONOS
+#define SENSOR_MOTION   0
+#define SENSOR_PRESSTEMP 1
+#else
+#define SENSOR_LIGHT    0
+#define SENSOR_MOTION   1
+#endif
+
+
+// Note: this is just define or not, no value
+#define VUEE_LIB_PLUG_TARP
+#define VUEE_LIB_PLUG_NULL
+
+#ifdef BOARD_WARSAW_BLUE
+#define UART_DRIVER                     2
+#else
+#define UART_DRIVER                     1
+#endif
+#endif
+
+
 #ifdef UART_INPUT_BUFFER_LENGTH
 #undef UART_INPUT_BUFFER_LENGTH
 #endif
@@ -90,13 +115,13 @@
 #define	PID_VER_TYPE	0
 
 // TESTING RUNS should have this set (see cc1100.h):
-//#define	RADIO_OPTIONS		0
-#define RADIO_OPTIONS	(1+4)
+#define	RADIO_OPTIONS		0
+//#define RADIO_OPTIONS	(1+4)
 
 #define _APP_EXPERIMENT		0
 #define _TARP_T_LIGHT		0
 
-#define RADIO_CRC_MODE		4
+#define RADIO_CRC_MODE		0
 #define EE_ERASE_ON_NEW_FLASH	0
 
 // for static collectors on WARSAW_ILS: no eeprom, SD

@@ -83,4 +83,6 @@
 #define PD_FMT
 #define ANDROIDEMO 1
 
+#undef STACK_SZIE
+#define STACK_SIZE 512
 

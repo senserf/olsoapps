@@ -8,6 +8,7 @@
 #include "hold.h"
 #include "app_col_data.h"
 
+#if 0
 #ifndef __SMURPH__
 // I don't think you need (I mean REALLY need) this (PG)
 #include "board_pins.h"
@@ -15,6 +16,12 @@
 #define SENSOR_LIST
 //#define powerdown() 	diag ("pdown");
 //#define powerup()	diag ("pup");
+#endif
+#endif
+
+#include "pins.h"
+#ifdef __SMURPH__
+#define SENSOR_LIST
 #endif
 
 // PiComp
@@ -25,6 +32,11 @@
 //+++ app_diag_col.cc "lib_app_col.cc" <msg_io_col.cc>
 
 #include "sensors.h"
+
+// PiComp
+//
+// This is explained in app_peg.cc
+//
 
 lword		ref_ts;
 lint		ref_date;
@@ -46,6 +58,16 @@ word 			app_flags = DEF_APP_FLAGS;
 word			plot_id;
 
 word			buttons;
+
+idiosyncratic int tr_offset (headerType*);
+
+idiosyncratic Boolean msg_isBind (msg_t m), msg_isTrace (msg_t m),
+		      msg_isMaster (msg_t m), msg_isNew (msg_t m),
+		      msg_isClear (byte o);
+
+idiosyncratic void set_master_chg (void);
+
+idiosyncratic word guide_rtr (headerType * b);
 
 #include "diag.h"
 #include "str_col.h"
@@ -611,7 +633,7 @@ fsm pesens {
 		}
 
 #ifndef BOARD_CHRONOS
-		read_sensor (PSE_LOOP, 1, workalrm); // light
+		read_sensor (PSE_LOOP, SENSOR_LIGHT, workalrm); // light
 
 		if (is_alrm0 && !is_alrms && workalrm[0] > SENS_LIGHT_THOLD &&
 				seconds() - alrm_ts > ALRM_COOL) {
@@ -623,11 +645,9 @@ fsm pesens {
 			permalrm[0] = workalrm[0]; // store max
 #endif
 	 entry PSE_2:
-#ifdef BOARD_CHRONOS
-		read_sensor (PSE_2, 1, workalrm); // motion
-#else
-		read_sensor (PSE_2, 2, workalrm); // motion
-#endif
+		read_sensor (PSE_2, SENSOR_MOTION, workalrm); // motion
+	 		// (also at CHRONOS, but diff number
+
 		if (is_alrm1 && !is_alrms && workalrm[0] > SENS_MOTION_THOLD &&
 				seconds() - alrm_ts > ALRM_COOL) {
 			alrm_ts = seconds();
@@ -668,7 +688,7 @@ fsm sens {
 		lh_time = seconds();
 #ifdef SENSOR_LIST
 	entry SE_0: // battery
-		read_sensor (SE_0, 0, &sens_data.sval[0]);
+		read_sensor (SE_0, SENSOR_BATTERY, &sens_data.sval[0]);
 		if (sens_data.sval[0] < BATTERY_WARN)
 			leds (LED_R, LED_BLINK);
 		else
@@ -677,20 +697,20 @@ fsm sens {
 	entry SE_1: // CHRONOS - temp; WAW_ILS - light
 #ifdef BOARD_CHRONOS
 		// pressure, temp
-		read_sensor (SE_1, 2,  workalrm);
+		read_sensor (SE_1, SENSOR_PRESSTEMP,  workalrm);
 		sens_data.sval[1] = workalrm[2]; // temp
 #else
-		read_sensor (SE_1, 1,  &sens_data.sval[1]);
+		read_sensor (SE_1, SENSOR_LIGHT,  &sens_data.sval[1]);
 		if (sens_data.sval[1] < permalrm[0])
 			sens_data.sval[1] = permalrm[0];
 		permalrm[0] = 0;
 #endif
 	entry SE_2: // motion
 #ifdef BOARD_CHRONOS
-		read_sensor (SE_2, 1, workalrm);
+		read_sensor (SE_2, SENSOR_MOTION, workalrm);
 		sens_data.sval[2] = workalrm[0];
 #else
-		read_sensor (SE_2, 2, &sens_data.sval[2]);
+		read_sensor (SE_2, SENSOR_MOTION, &sens_data.sval[2]);
 #endif
 		sens_data.sval[2] += permalrm[1];
 		permalrm[1] = 0;

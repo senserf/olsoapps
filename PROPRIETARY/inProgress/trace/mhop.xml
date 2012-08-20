@@ -1,0 +1,49 @@
+<network nodes="12" radio="12">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	</defaults>
+	<node number="0" hid="0xBACA000A">
+	    <location>10.0 10.0</location>
+	</node>
+	<node number="1" start="on" hid="0xBACA000B">
+	    <location>90.0 10.0</location>
+	</node>
+        <node number="2" start="on" hid="0xBACA000B">
+            <location>170.0 10.0</location>
+        </node>
+        <node number="3" start="on" hid="0xBACA000D">
+            <location>250.0 10.0</location>
+        </node>
+
+	<node number="4" start="on" hid="0xBACA000E">
+	    <location>330.0 10.0</location>
+	</node>
+        <node number="5" start="on" hid="0xBACA0019">
+            <location>380.0 10.0</location>
+        </node>
+        <node number="6" start="on" hid="0xBACA001A">
+            <location>390.0 20.0</location>
+        </node>
+
+       <node number="7" start="on" hid="0xBACA001B">
+            <location>400.0 30.0</location>
+        </node>
+
+	<node number="8" start="on" hid="0xBACA006C">
+	    <location>230.0 100.0</location>
+	</node>
+        <node number="9" start="on" hid="0xBACA006D">
+            <location>250.0 100.0</location>
+        </node>
+        <node number="10" start="on" hid="0xBACA006E">
+            <location>200.0 60.0</location>
+        </node>
+        <node number="11" start="on" hid="0xBACA006F">
+            <location>230.0 60.0</location>
+        </node>
+    </nodes>
+</network>
