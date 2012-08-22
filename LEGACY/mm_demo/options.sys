@@ -37,7 +37,8 @@
 #define UART_DRIVER                     1
 #endif
 
-#define LINKMATIC
+#define BT_MODULE_LINKMATIK
+// #define BT_MODULE_BTM182
 
 #ifdef UART_INPUT_BUFFER_LENGTH
 #undef UART_INPUT_BUFFER_LENGTH
