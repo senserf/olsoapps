@@ -1,0 +1,35 @@
+#define	TCV_PRESENT			1
+#define	TCV_HOOKS			0
+#define	TCV_TIMERS			0
+
+#undef	UART_DRIVER
+#undef	RADIO_USE_LEDS
+#undef	LEDS_DRIVER
+#undef	LEDS_BLINKING
+#undef	CODE_LONG_INTS
+#undef	DIAG_MESSAGES
+#undef	RANDOM_NUMBER_GENERATOR
+#undef	INFO_FLASH
+#undef	STORAGE_AT45XXX
+
+#define	UART_DRIVER			0
+
+#define CC1100 				1
+#define RADIO_USE_LEDS 			0
+#define LEDS_DRIVER			0
+#define LEDS_BLINKING			0
+
+#define CODE_LONG_INTS 			0
+#define DIAG_MESSAGES 			0
+
+#define RANDOM_NUMBER_GENERATOR 	0
+
+#define INFO_FLASH			0
+
+#define CRYSTAL2_RATE 			0
+
+#define STORAGE_AT45XXX			0
+
+#define	RADIO_DEFAULT_POWER		7
+#define	RADIO_DEFAULT_CHANNEL		17
+#define	RADIO_SYSTEM_IDENT		0xBA55
