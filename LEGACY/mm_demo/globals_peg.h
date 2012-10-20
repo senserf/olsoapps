@@ -23,7 +23,6 @@
 
 heapmem {80, 20}; // how to find out a good ratio?
 
-const   lword	host_id		= 0xBACADEAD;
 word	host_pl			= 2; // PicOS differs from VUEE
 word	batter			=0;
 

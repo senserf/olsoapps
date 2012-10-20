@@ -32,6 +32,9 @@
 			<label>AccMeter</label>
 		</sensor>
 	    </sensors>
+	    <emul>
+		<output target="socket" type="held"></output>
+	    </emul>
 	    <ptracker>
 		<output target="socket"/>
 		<module id="cpu">0.3 0.0077</module>

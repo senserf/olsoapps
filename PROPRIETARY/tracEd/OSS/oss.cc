@@ -16,7 +16,12 @@ void rel_cmd (cmd_t * cmd) {
 	ufree (cmd);
 }
 
-// caller must NOT free req->cmd nor req 
+/*
+- Caller must NOT free req->cmd nor req
+- If we ever want to put req on a beacon, this rather belongs to OSS
+  (not so with periodic msgs... dupa: I'm not sure if this distinction is
+   convincing)
+*/ 
 sint req_in (req_t * req) {
 	sint rc = 0, st = 0;
 
@@ -27,8 +32,13 @@ sint req_in (req_t * req) {
 
 	switch (req->cmd->code) {
 		case 's':
-			if (req->src == 0) // not from remote 'a'
+			if (req->src == 0) { // not from remote 'a'
+
 				req->src = req->cmd->argv_w[0];
+				if (req->cmd->arg_c > 0 && req->src == 0)
+					// kludgy bcast
+					req->src = 0xFFFF;
+			}
 			st = 1;
 			break;
 		case 'h':
@@ -46,12 +56,6 @@ sint req_in (req_t * req) {
 		case ' ':
 			req->cmd->code = 'b';
 			runfsm ossi_out ((char *)req->cmd);
-			break;
-		case 'T':
-			if (req->cmd->arg_c > 0)
-				tarp_ctrl.param = req->cmd->argv_w[0];
-			st = 1;
-			diag ("TARP %x", tarp_ctrl.param);
 			break;
 		case 't':
 			if (msg_trace_out (req->cmd->argv_w[0],
@@ -92,6 +96,8 @@ sint req_in (req_t * req) {
 					leds (LED_G, LED_OFF);
 					if (!running (mbeacon))
 						runfsm mbeacon;
+					else
+						trigger (TRIG_MASTER);
 				 } else {
 					 master_host = 0;
 					 killall (mbeacon);
@@ -102,6 +108,23 @@ sint req_in (req_t * req) {
 			st = 1;
 			break;
 
+		case 'b':
+			if (req->cmd->arg_c > 0) {
+				killall (msgbeac);
+				ufree (beac.b); beac.b = NULL;
+				beac.s = 0;
+				if (req->cmd->argv_w[0] &&
+						req->cmd->argv_w[0] < 64)
+					beac.f = req->cmd->argv_w[0];
+				else
+					beac.f = 0;
+			} else
+				trigger (TRIG_BEAC);
+
+			ossi_beac_out();
+			ufree (req->cmd);
+			break;
+			
 		default:
 			rc = 1;
 	}

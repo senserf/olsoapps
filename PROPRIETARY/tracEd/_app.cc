@@ -32,6 +32,8 @@ fsm root {
 		else
 			leds (LED_B, LED_OFF);
 
+		// this may not be such a good idea in some situations, e.g.
+		// on CHRONOS with RX OFF most of the time:
 		if (seconds() - master_ts > 3* (MAS_QUANT >> 10)) {
 			master_host = 0;
 			master_ts = seconds();

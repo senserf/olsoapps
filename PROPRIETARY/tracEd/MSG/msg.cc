@@ -13,12 +13,16 @@
 #include "net.h"
 #include "tarp.h"
 
+//msg-related global 
+mb_t beac;
+
 // statics here
 static void msg_master_in (char * buf);
 static void process_incoming (char * buf, word size, word rssi);
 static word map_rssi (word r);
 static void msg_trace_in (char * buf, word rssi);
 static void msg_any_in (char * b, word siz);
+static void send_msg (char * buf, sint size);
 
 // Master beacon, killable with no need to cleanup.
 // Note that in many praxes it is more practical to go for a suicide
@@ -33,9 +37,28 @@ fsm mbeacon {
 	master_ts = seconds();
 	highlight_set (1, 0.0, NULL);
 
+	when (TRIG_MASTER, MB_SEND);
 	delay (MAS_QUANT + rnd() % 1024, MB_SEND);
 	release;
 }
+
+// more or less universal beacon: note that it could have its private data
+// and many beacons active... not such a good idea in general, I think.
+fsm msgbeac {
+	state MSGB_LOOP:
+		if (beac.f == 0) {
+			ufree (beac.b);
+			beac.b = NULL;
+		}
+		if (beac.b == NULL)
+			finish;
+
+		send_msg (beac.b, beac.s);
+
+		when (TRIG_BEAC, MSGB_LOOP);
+		delay (beac.f << 10, MSGB_LOOP);
+		release;
+}		
 
 // Receiver fsm and its static helpers
 static void process_incoming (char * buf, word size, word rssi) {
@@ -119,7 +142,7 @@ fsm rcv {
                 }
 
 		// say, we want to study rcv on a particular node
-		highlight_set (0, local_host == 13 ? 0.0 : 1.5,
+		highlight_set (0, local_host == 12 ? 0.0 : 1.5,
 			"RCV (%u): %u %u %u",
 			psize, in_header(buf, msg_type),
 			in_header(buf, snd),
@@ -145,7 +168,7 @@ fsm rcv {
 }
 
 // Send uses net_tx, way too complex for current real needs...
-void send_msg (char * buf, sint size) {
+static void send_msg (char * buf, sint size) {
 
 	if (in_header(buf, rcv) == local_host) {
 		diag ("%u to lh", in_header(buf, msg_type));
@@ -175,6 +198,20 @@ static void msg_master_in (char * buf) {
 	}
 }
 
+// Note that the ,sg is constructed once forthe beacon's lifetime, i.e. no
+// updates, e.g. for status or timestamps. It is trivial to make data current,
+// of course.
+static void beac_or_send (char * b, word s) {
+	if (beac.f != 0 && beac.b == NULL) {
+		beac.b = b;
+		beac.s = s;
+		runfsm msgbeac;
+	} else {
+		send_msg (b, s);
+		ufree (b);
+	}
+}
+
 sint msg_stats_out (nid_t t) {
 	char * b = get_mem (WNONE, sizeof(msgStatsType));
 	word w;
@@ -183,7 +220,13 @@ sint msg_stats_out (nid_t t) {
 		return 1;
 
 	in_header(b, msg_type) = msg_stats;
-	in_header(b, rcv) = t;
+
+	if (t == 0xFFFF) { // kludgy bcast
+		in_header(b, rcv) = 0;
+		in_header(b, hco) = 1; // only the neighbours
+	} else
+		in_header(b, rcv) = t;
+
 	in_stats(b, ltime) = seconds();
 	in_stats(b, mhost) = master_host;
 	in_stats(b, fl) = app_flags;
@@ -191,8 +234,8 @@ sint msg_stats_out (nid_t t) {
 	in_stats(b, mmin) = w;
 	in_stats(b, stack) = stackfree();
 	in_stats(b, batter) = bat;
-	send_msg (b, sizeof(msgStatsType));
-	ufree (b);
+
+	beac_or_send (b, sizeof(msgStatsType));
 	return 0;
 }
 
@@ -217,8 +260,8 @@ sint msg_trace_out (nid_t t, word dir, word hlim) {
 	}
 	in_header(b, rcv) = t;
 	in_header(b, hco) = hlim;
-	send_msg (b, sizeof(msgTraceType));
-	ufree (b);
+
+	beac_or_send (b, sizeof(msgTraceType));
 	return 0;
 }
 
@@ -320,8 +363,8 @@ sint msg_any_out (req_t * r) {
 	in_header(b, hco) = r->cmd->argv_w[1];
 	memcpy (b +sizeof(msgAnyType), (char *)r->cmd + sizeof(cmd_t), 
 		r->cmd->size);
-	send_msg (b, sizeof(msgAnyType) + r->cmd->size);
-	ufree (b);
+
+	beac_or_send (b, sizeof(msgAnyType) + r->cmd->size);
 	return 0;
 }
 

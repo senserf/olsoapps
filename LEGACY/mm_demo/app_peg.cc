@@ -474,7 +474,8 @@ thread (root)
 #ifndef __SMURPH__
 		net_id = DEF_NID;
 #endif
-		tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
+		//tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
+		tarp_ctrl.param = 0xA3; // level 2, rec 2, slack 1, fwd on
 
 		init_tags();
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);

@@ -19,5 +19,6 @@ fsm ossi_init, ossi_in, ossi_out (char *);
 void ossi_stats_out (char * b);
 void ossi_trace_out (char * buf, word rssi);
 void ossi_help_out ();
+void ossi_beac_out ();
 
 #endif
