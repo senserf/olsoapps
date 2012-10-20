@@ -30,4 +30,11 @@ typedef struct reqStruct {
 	cmd_t * cmd;
 } req_t;
 
+typedef struct mbStruct {
+	char 	* b;
+	word	f :6;
+	word	s :6;
+	word	spare :4;
+} mb_t;
+
 #endif

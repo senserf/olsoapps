@@ -3,7 +3,6 @@
 	_da (ui_obuf)		= NULL;
 	_da (cmd_line)		= NULL;
 
-	_da (host_id)		= (lword) preinit ("HID");
 	_da (app_flags)		= DEF_APP_FLAGS;
 
 	_da (host_pl)		= 1; // note that VUEE differs from PicOS

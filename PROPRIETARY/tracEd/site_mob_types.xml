@@ -4,6 +4,7 @@
     <display>
     	<root>1,1</root>
 	<roamer image="site.gif" width="800.0" display="yes">85,95</roamer>
+	<panel>95,420</panel>
     </display>
     <roamer>
 	<input source="string">
@@ -18,50 +19,51 @@
 	<xi:include href="tag.xml"/>
 	<highlight fg="green" bg="white">magenta blue</highlight>
 	</defaults>
-	<node number="0" hid="0xBACA000A">
+	<node number="0" type="war" hid="0xBACA000A">
 	    <location>400.0 210.0</location>
 	    <leds_window display="yes">940,12</leds_window>
 	</node>
 
-	<node number="1" start="on" hid="0xBACA000B">
+	<node number="1" type="war" start="on" hid="0xBACA000B">
 	    <location>475.0 200.0</location>
 	</node>
-        <node number="2" start="on" hid="0xBACA000C">
+        <node number="2" type="war" start="on" hid="0xBACA000C">
             <location>560.0 250.0</location>
         </node>
-        <node number="3" start="on" hid="0xBACA000D">
+        <node number="3" type="war" start="on" hid="0xBACA000D">
             <location>700.0 320.0</location>
         </node>
 
-	<node number="4" start="on" hid="0xBACA000E">
+	<node number="4" type="war" start="on" hid="0xBACA000E">
 	    <location>775.0 225.0</location>
 	</node>
-        <node number="5" start="on" hid="0xBACA0019">
+        <node number="5" type="chr" start="on" hid="0xBACA0019">
             <location>725.0 120.0</location>
 	    <color solid="tomato1"/>
 	    <leds_window display="yes">1105,12</leds_window>
 	    <ptracker_window display="yes">415,1</ptracker_window>
+	    <sensors_window>880,605</sensors_window>
         </node>
-        <node number="6" start="on" hid="0xBACA001A">
+        <node number="6" type="chr" start="on" hid="0xBACA001A">
             <location>735.0 130.0</location>
 	    <color solid="lightblue"/>
         </node>
 
-       <node number="7" start="on" hid="0xBACA001B">
+       <node number="7" type="chr" start="on" hid="0xBACA001B">
             <location>745.0 140.0</location>
 	    <color solid="lightblue"/>
         </node>
 
-	<node number="8" start="on" hid="0xBACA006C">
+	<node number="8" type="war" start="on" hid="0xBACA006C">
 	    <location>400.0 300.0</location>
 	</node>
-        <node number="9" start="on" hid="0xBACA006D">
+        <node number="9" type="war" start="on" hid="0xBACA006D">
             <location>350.0 350.0</location>
         </node>
-        <node number="10" start="on" hid="0xBACA006E">
+        <node number="10" type="war" start="on" hid="0xBACA006E">
             <location>275.0 275.0</location>
         </node>
-        <node number="11" start="on" hid="0xBACA006F">
+        <node number="11" type="war" start="on" hid="0xBACA006F">
             <location>265.0 350.0</location>
         </node>
     </nodes>

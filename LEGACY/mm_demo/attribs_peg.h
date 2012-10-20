@@ -1,7 +1,6 @@
 #ifndef	__attribs_peg_h__
 #define	__attribs_peg_h__
 
-__EXTERN __CONST lword _da (host_id);
 __EXTERN word _da (host_pl);
 __EXTERN word _da (batter);
 

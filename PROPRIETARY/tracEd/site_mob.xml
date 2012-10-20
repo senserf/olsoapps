@@ -4,7 +4,15 @@
     <display>
     	<root>1,1</root>
 	<roamer image="site.gif" width="800.0" display="yes">85,95</roamer>
+	<panel>95,420</panel>
     </display>
+    <roamer>
+	<input source="string">
+	    M 5 725.0 120.0
+	    T +10.0
+	    R 5 [200.0 250.0] [800.0 400.0] [3.0 6.0] [0.5 0.5] -1
+	</input>
+    </roamer>
     <xi:include href="channel.xml"/>
     <nodes>
 	<defaults>
@@ -34,6 +42,7 @@
 	    <color solid="tomato1"/>
 	    <leds_window display="yes">1105,12</leds_window>
 	    <ptracker_window display="yes">415,1</ptracker_window>
+	    <sensors_window>880,605</sensors_window>
         </node>
         <node number="6" start="on" hid="0xBACA001A">
             <location>735.0 130.0</location>

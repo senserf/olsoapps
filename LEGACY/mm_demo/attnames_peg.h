@@ -9,7 +9,6 @@
 #define	ui_obuf		_dac (NodePeg, ui_obuf)
 #define	cmd_line	_dac (NodePeg, cmd_line)
 
-#define	host_id		_dac (NodePeg, host_id)
 #define	host_pl		_dac (NodePeg, host_pl)
 #define batter		_dac (NodePeg, batter)
 

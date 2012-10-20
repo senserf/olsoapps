@@ -36,21 +36,8 @@
 #define TRIGGER_BASE_ID	77
 
 #define TRIG_OSSI	(TRIGGER_BASE_ID +0)
-
-// command line
-#define CMD_READER	(TRIGGER_BASE_ID +0)
-#define CMD_WRITER	(TRIGGER_BASE_ID +1)
-
-#define SENS_DONE	(TRIGGER_BASE_ID +2)
-#define OSS_DONE	(TRIGGER_BASE_ID +3)
-
-// rx switch control
-#define RX_SW_ON	(TRIGGER_BASE_ID +4)
-
-// for pongAcks
-#define ACK_IN		(TRIGGER_BASE_ID +5)
-
-#define ALRMS		(TRIGGER_BASE_ID +6)
+#define TRIG_MASTER	(TRIGGER_BASE_ID +1)
+#define TRIG_BEAC	(TRIGGER_BASE_ID +2)
 
 // end of trigger / when ids
 
