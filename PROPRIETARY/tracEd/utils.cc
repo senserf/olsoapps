@@ -45,10 +45,8 @@ void init () {
 	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0) {
 		// diag issued from failing net_init diag ("net_init");
 		leds (LED_R, LED_BLINK);
-		halt(); // dupa will it keep blinking?
+		halt(); // it won't keep blinking
 	}
-
-	//dupa leds_all OFF needed? BOARD def?
 
 	net_opt (PHYSOPT_SETSID, &net_id);
 

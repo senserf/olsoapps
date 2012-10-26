@@ -14,8 +14,9 @@
 extern lword		master_ts;
 extern appfl_t		app_flags;
 extern word		bat;
-//dupa in tarp.h... why, if uncommented, it crashes picomp?
-// extern nid_t		local_host, master_host;
+//dupa in tarp.h... why, if uncommented, it crashes picomp
+// (they're in tarp.h)
+//extern nid_t		local_host, master_host;
 
 char * get_mem (word state, word len);
 void  init ();

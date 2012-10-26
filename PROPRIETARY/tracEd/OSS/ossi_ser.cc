@@ -15,7 +15,7 @@
 #include "msg.h"
 #include "msg_dcl.h"
 
-// dupa: should we state / explain that static fsm's are illegal?
+// dupa: have we stated / explained that static fsm's are illegal?
 fsm ossi_in;
 
 fsm ossi_init {

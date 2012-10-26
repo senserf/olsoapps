@@ -24,6 +24,7 @@
 #define MAS_QUANT	(3* DEL_QUANT)
 #define OSS_QUANT	MAX_UINT
 
+// on some WARSAW boards, _R is switched with _B
 #define LED_R   0
 #define LED_G   1
 #define LED_B   2
@@ -55,6 +56,6 @@ typedef union {
 			m_chg  	:1,
 			hb	:8;
 	} f;
-} appfl_t; // dupa check sizeof(appfl_t)
+} appfl_t;
 
 #endif

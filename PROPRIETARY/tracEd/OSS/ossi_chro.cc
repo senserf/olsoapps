@@ -65,7 +65,7 @@ fsm smurph_but {
 fsm ossi_init {
 	state OI_UP:
 		_buttons_action ( ini_but );
-		ezlcd_init (); // dupa: would double _init be harmful?
+		ezlcd_init (); // dupa: can double _init be harmful?
 		buzzer_init (); // buzzer is a part of UI
 
 	state OI_LOOP:
@@ -201,8 +201,6 @@ fsm del_lcdoff {
 		ezlcd_off ();
 		finish;
 }
-
-// #define dupa(a...) emul(77,a)
 
 static void b4 () {
 	

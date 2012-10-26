@@ -1,4 +1,5 @@
-// dupa remove after Pawel does board_options
+// dupa so, what do we do with board_options? If nothing, let's add this to
+// WARSAW as well... or wait until we do a sensor module...
 #define SENSOR_BATTERY	(-1)
 
 // VUEE doesn't inherit all from BOARDS, it needs some redefines:
@@ -6,12 +7,13 @@
 #define VUEE_LIB_PLUG_TARP
 #define VUEE_LIB_PLUG_NULL
 
-// dupa: CHRONOS needs it?
-#ifdef BOARD_CHRONOS
-#define UART_INPUT_BUFFER_LENGTH 1
-#else
+#ifndef BOARD_CHRONOS
+// as it is in WARSAW board_options
 #define UART_INPUT_BUFFER_LENGTH 32
 #endif
+
+// dupa:  perhaps we can have an option to change diag to emul (in stdattr.h)?
+// #define diag(a...)	emul(99,a)
 
 #define CC1100 1
 
