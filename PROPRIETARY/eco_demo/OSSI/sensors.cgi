@@ -9,9 +9,11 @@ set	Files(SMAP)	"sensors.xml"
 ###############################################################################
 
 package provide xml 1.0
-#
-# Mini XML parser
-#
+###############################################################################
+# Mini XML parser. Copyright (C) 2008-12 Olsonet Communications Corporation.
+###############################################################################
+
+### Last modified PG111008A ###
 
 namespace eval XML {
 
@@ -163,7 +165,7 @@ proc xftag { s } {
 
 	set kwd [string tolower $kwd]
 
-	# decode any attributes
+	# decode the attributes
 	set attr ""
 	array unset atts
 
@@ -209,11 +211,14 @@ proc xftag { s } {
 
 proc xadv { s kwd } {
 #
-# Returns the text + the list of children for the current tag
+# Returns the text + the list of children for the current tag. A child looks
+# like this:
+#
+#	text:		<"" the_text>
+#	element:	<tag attributes children_list>
 #
 	upvar $s str
 
-	set txt ""
 	set chd ""
 
 	while 1 {
@@ -224,7 +229,12 @@ proc xadv { s kwd } {
 			if { $kwd != "" } {
 				error "unterminated tag: <$kwd ...>"
 			}
-			return [list "$txt$str" $chd]
+
+			if { $str != "" } {
+				# a tailing text item
+				lappend chd [list "" $str]
+				return $chd
+			}
 		}
 
 		set md [lindex $tag 0]
@@ -232,19 +242,22 @@ proc xadv { s kwd } {
 		set kw [lindex $tag 2]
 		set at [lindex $tag 3]
 
-		append txt $fr
+		if { $fr != "" } {
+			# append a text item
+			lappend chd [list "" $fr]
+		}
 
 		if { $md == 0 } {
 			# opening, not self-closing
 			set cl [xadv str $kw]
 			# inclusion ?
-			set tc [list $kw [lindex $cl 0] $at [lindex $cl 1]]
+			set tc [list $kw $at $cl]
 			if ![xincl str $tc] {
 				lappend chd $tc
 			}
 		} elseif { $md == 2 } {
 			# opening, self-closing
-			set tc [list $kw "" $at ""]
+			set tc [list $kw $at ""]
 			if ![xincl str $tc] {
 				lappend chd $tc
 			}
@@ -253,9 +266,8 @@ proc xadv { s kwd } {
 			if { $kw != $kwd } {
 				error "mismatched tag: <$kwd ...> </$kw>"
 			}
-			# we are done with the tag - check for file
-			# inclusion
-			return [list $txt $chd]
+			# we are done with the tag
+			return $chd
 		}
 	}
 }
@@ -301,7 +313,7 @@ proc sxml_parse { s } {
 
 	set v [xadv str ""]
 
-	return [list root [lindex $v 0] "" [lindex $v 1]]
+	return [list root "" $v]
 }
 
 proc sxml_name { s } {
@@ -311,15 +323,47 @@ proc sxml_name { s } {
 
 proc sxml_txt { s } {
 
-	return [string trim [lindex $s 1]]
+	set txt ""
+
+	foreach t [lindex $s 2] {
+		if { [lindex $t 0] == "" } {
+			append txt [lindex $t 1]
+		}
+	}
+
+	return $txt
 }
 
-proc sxml_attr { s n } {
+proc sxml_snippet { s } {
 
-	set al [lindex $s 2]
+	if { [lindex $s 0] != "" } {
+		return ""
+	}
+
+	return [lindex $s 1]
+}
+
+proc sxml_attr { s n { e "" } } {
+
+	if { $e != "" } {
+		# flag to tell the difference between an empty attribute and
+		# its complete lack
+		upvar $e ef
+		set ef 0
+	}
+
+	if { [lindex $s 0] == "" } {
+		# this is a text
+		return ""
+	}
+
+	set al [lindex $s 1]
 	set n [string tolower $n]
 	foreach a $al {
 		if { [lindex $a 0] == $n } {
+			if { $e != "" } {
+				set ef 1
+			}
 			return [lindex $a 1]
 		}
 	}
@@ -328,17 +372,30 @@ proc sxml_attr { s n } {
 
 proc sxml_children { s { n "" } } {
 
-	set cl [lindex $s 3]
+	# this is automatically null for a text
+	set cl [lindex $s 2]
 
-	if { $n == "" } {
+	if { $n == "+" } {
+		# all including text
 		return $cl
 	}
 
 	set res ""
 
-	foreach c $cl {
-		if { [lindex $c 0] == $n } {
-			lappend res $c
+	if { $n == "" } {
+		# tagged elements only
+		foreach c $cl {
+			if { [lindex $c 0] != "" } {
+				lappend res $c
+			}
+		}
+		return $res
+	} else {
+		# all with the given tag name
+		foreach c $cl {
+			if { [lindex $c 0] == $n } {
+				lappend res $c
+			}
 		}
 	}
 
@@ -347,7 +404,8 @@ proc sxml_children { s { n "" } } {
 
 proc sxml_child { s n } {
 
-	set cl [lindex $s 3]
+	# null for a text
+	set cl [lindex $s 2]
 
 	foreach c $cl {
 		if { [lindex $c 0] == $n } {
@@ -358,6 +416,17 @@ proc sxml_child { s n } {
 	return ""
 }
 
+proc sxml_yes { item attr } {
+#
+# A useful shortcut
+#
+	if { [string tolower [string index [sxml_attr $item $attr] 0]] == \
+		"y" } {
+			return 1
+	}
+	return 0
+}
+
 namespace export sxml_*
 
 ### end of XML namespace ######################################################
@@ -365,6 +434,10 @@ namespace export sxml_*
 }
 
 namespace import ::XML::*
+
+###############################################################################
+# End of Mini XML parser ######################################################
+###############################################################################
 
 ###############################################################################
 
