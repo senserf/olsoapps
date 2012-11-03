@@ -17,7 +17,7 @@
     <nodes>
 	<defaults>
 	<xi:include href="tag.xml"/>
-	<highlight fg="green" bg="white">magenta blue</highlight>
+	<highlight fg="black" bg="white">magenta blue</highlight>
 	</defaults>
 	<node number="0" type="war" hid="0xBACA000A">
 	    <location>400.0 210.0</location>

@@ -29,7 +29,7 @@ typedef struct msgStatsStruct {
 	word		mem;
 	word		mmin;
 	word		stack;
-	word		batter; // dupa: bater->bat conflicts with global
+	word		batter; // bater->bat conflicts with global
 } msgStatsType;
 
 #define in_stats(buf, field)   (((msgStatsType *)(buf))->field)

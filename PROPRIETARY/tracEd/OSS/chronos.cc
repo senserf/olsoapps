@@ -4,7 +4,7 @@
 /* ==================================================================== */
 
 // for now, a modified copy from CHRONOS/RFTEST
-// dupa: perhaps we can have it lower and cheaper than form
+// perhaps we can have it lower and cheaper than form, later
 #include "form.h"
 #ifndef __SMURPH__
 static void chro_lcd (const char *txt, word fr, word to) {

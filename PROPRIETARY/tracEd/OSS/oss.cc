@@ -19,8 +19,7 @@ void rel_cmd (cmd_t * cmd) {
 /*
 - Caller must NOT free req->cmd nor req
 - If we ever want to put req on a beacon, this rather belongs to OSS
-  (not so with periodic msgs... dupa: I'm not sure if this distinction is
-   convincing)
+  (not so with periodic msgs.)
 */ 
 sint req_in (req_t * req) {
 	sint rc = 0, st = 0;
@@ -75,8 +74,8 @@ sint req_in (req_t * req) {
 			break;
 
 		case 'r':
-			// dupa: with somewhat redundant rx flag, we can avoid
-			// 'empty' on/off calls. Should we?
+			// somewhat redundant rx flag would avoid
+			// 'empty' on/off calls, but this here is harmless
 			if (req->cmd->arg_c > 0) {
 				if (req->cmd->argv_w[0]) {
 					net_opt (PHYSOPT_RXON, NULL);

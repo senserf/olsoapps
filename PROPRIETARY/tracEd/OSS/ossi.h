@@ -5,7 +5,7 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-// the header becomes invisible if it moves to OSSI(subdir) dupa
+// the header becomes invisible if it moves to OSSI(subdir)
 #ifdef BOARD_CHRONOS
 //+++ ossi_chro.cc
 

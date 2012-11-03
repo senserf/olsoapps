@@ -3,7 +3,7 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-/* dupa: we have a fundamental problem: what is OSSI, what is UI, what are
+/* We have a fundamental problem: what is OSSI, what is UI, what are
    'other' i/f. There is no clear division (e.g. and actualtor can belong
    anywhere, depending on the application). I'm afraid grand unifications
    like these attempts here must end with crap good for nothing but standard
@@ -65,7 +65,7 @@ fsm smurph_but {
 fsm ossi_init {
 	state OI_UP:
 		_buttons_action ( ini_but );
-		ezlcd_init (); // dupa: can double _init be harmful?
+		ezlcd_init ();
 		buzzer_init (); // buzzer is a part of UI
 
 	state OI_LOOP:
@@ -75,10 +75,16 @@ fsm ossi_init {
 			runfsm ossi_in;
 			finish;
 		}
-
+		buzzer_on ();
 		ezlcd_on ();
 		chro_nn (1, local_host);
 		chro_lo ("UIOFF"); // this is equivalent of init_str
+		when (TRIG_OSSI, OI_LOOP);
+		delay (200, OI_BUZOFF);
+		release;
+
+	state OI_BUZOFF:
+		buzzer_off ();
 		when (TRIG_OSSI, OI_LOOP);
 		delay (5000, OI_LOFF);
 		release;
@@ -223,7 +229,7 @@ static void b4 () {
 	killall (rcv);
 
 	// keep these last; we won't return from here as we were called from
-	// one of them: (dupa: this is a bit weird(?))
+	// one of them
 	killall (ossi_init);
 	killall (ossi_in);
 }
@@ -251,7 +257,7 @@ here. It would be easier to skip the req_t req struct and process directly from
 do_but(), but simplicity is not the goal here... Also, remember that reqs may
 be remote.
 
-dupa: Does all this crap make any sense? Can we have multiple i/f's structured
+Does all this make any sense? Can we have multiple i/f's structured
 similarly without too much overhead on one of them? Note that a common structs
 may lead to ossi libraries...
 */
