@@ -14,10 +14,7 @@
 #define	UART_DRIVER			1
 #endif
 
-#define CC1100 1
-#define RADIO_USE_LEDS 0
-#define LEDS_DRIVER	1
-#define LEDS_BLINKING	1
+#define CC1100 				1
 
 #define	dbg_0(c)	do { } while (0)
 #define	dbg_1(c)	do { } while (0)

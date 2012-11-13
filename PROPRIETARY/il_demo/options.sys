@@ -12,8 +12,8 @@
 #endif
 
 // Note: this is just define or not, no value
-#define	VUEE_LIB_PLUG_TARP
-#define	VUEE_LIB_PLUG_NULL
+//#define	VUEE_LIB_PLUG_TARP
+//#define	VUEE_LIB_PLUG_NULL
 
 #ifdef BOARD_WARSAW_BLUE
 #define UART_DRIVER                     2
