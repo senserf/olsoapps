@@ -41,7 +41,8 @@ static const calentry_t Cal [] = THERMOCOUPLE_CALIBRATION;
 
 typedef	struct {
 
-	word Second, Temperature;
+	word DeltaT,		// Time to reach the temperature from prev step
+	     Temperature;	// Target temperature at the end of this step
 
 } profentry_t;
 
@@ -70,22 +71,12 @@ static sint addProfEntry (word sec, word tmp) {
 
 	word i, j;
 
-	for (i = 0; i < NProfEntries; i++)
-		if (Prof [i].Second >= sec)
-			break;
+	if (NProfEntries == MAXPROFENTRIES)
+		return 1;
 
-	if (i == NProfEntries || Prof [i].Second > sec) {
-		// Must grow the array
-		if (NProfEntries == MAXPROFENTRIES)
-			return 1;
-		// Grow the array
-		for (j = NProfEntries; j > i; j--)
-			Prof [j] = Prof [j - 1];
-		NProfEntries++;
-	}
-
-	Prof [i].Second = sec;
-	Prof [i].Temperature = tmp;
+	Prof [NProfEntries].DeltaT = sec;
+	Prof [NProfEntries].Temperature = tmp;
+	NProfEntries++;
 	return 0;
 }
 
@@ -145,183 +136,199 @@ static void setOven (word val) {
 
 // ============================================================================
 
-// The absolute value of error will be truncated to this much (in deg C * 10),
-// i.e., 100 deg, to give us some value to normalize things to. Generally, it
-// makes sense to assume that the heater should be set to max if the error is
-// larger than something reasonably large
-#define	ERROR_BOUND	1000
+// The controllable span of error in degrees * 10. Any error larger than that
+// in the down direction results in full throttle. The control value is scaled
+// to the Span.
+static	word	Span  = DEFAULT_SPAN,
+		GainI = DEFAULT_INTEGRATOR_GAIN,
+		GainD = DEFAULT_DIFFERENTIATOR_GAIN;
 
 // Max setting of PW (pulse witdth)
 #define	MAXPWI		1024
 
-// Gain multiplier: after multiplication, the gain is divided by ERROR_BOUND.
-// For GAINMULT == 100 and, say, GainP == 1, one degree error (10) translates
-// into one unit of PW.
-#define	GAINMULT	100
+static	word	TA,	// Target temperature for this second
+		CU,	// Current temperature at this second
+		CV;	// Control value
 
-// Max gain (for sanity). We set it to an absurdly high value where 1 deg error
-// translates into full PW. Decent values should be reasonably small.
-#define	MAXGAIN		MAXPWI
-
-// Max integrator bound
-#define	MAXIBOUND	10
-
-// Gain multiplied by MAXPWI for normalization
-static	lint	GainP = DEFAULT_GAIN_P * GAINMULT,
-		GainI = DEFAULT_GAIN_I * GAINMULT,
-		GainD = DEFAULT_GAIN_D * GAINMULT;
-
-static	sint	Integrator,
+static	sint	ER;
+		
+static	lword	Integrator,
 		Differentiator;
 
-static	sint 	MinIntegrator = -DEFAULT_INTG_B * ERROR_BOUND,
-		MaxIntegrator = +DEFAULT_INTG_B * ERROR_BOUND;
-
-static	sint	ER;		// Error
-static	word	CV,		// Control value, i.e., PW from 0 to MAXPWI
-		TA,		// Target temperature
-		CU,		// Current temperature
-		TM,		// Elapsed time in seconds
-		T0,		// Initial temperature
-		PX;		// Profile index
-
-static lword	LS;		// Last second
-
-static	lint	TG, PP, II, DD;	// We expose them all for the show
-
 static void controller () {
-//
+
+	lint t;
+
 	ER = (sint) TA - (sint) CU;
 
-	// the error is in deg C * 10, but truncated at some max
-
-	if (ER > ERROR_BOUND)
-		ER = ERROR_BOUND;
-	else if (ER < -ERROR_BOUND)
-		ER = -ERROR_BOUND;
-
-	if ((Integrator += ER) > MaxIntegrator)
-		Integrator = MaxIntegrator;
-	else if (Integrator < MinIntegrator)
-		Integrator = MinIntegrator;
-
-	PP = (GainP * ER) / ERROR_BOUND;
-	II = (GainI * Integrator) / ERROR_BOUND;
-	DD = (GainD * (Differentiator - CU)) / ERROR_BOUND;
-
-	Differentiator = CU;
-
-	TG = PP + II + DD;
-
-	if (TG < 0)
+	if (ER < 0) {
+		// This part is not controlled, just switch the oven off
+		Integrator = 0;
+		Differentiator = CU;
 		CV = 0;
-	else if (TG > MAXPWI)
-		CV = MAXPWI;
-	else
-		CV = (word) TG;
-}
-
-void target () {
-//
-// Target temperature at time TM
-//
-	sint t0, t1;
-	word s0, s1;
-	lint tmp;
-
-	while (1) {
-		// Locate the right end of the interval
-		if (PX >= NProfEntries) {
-			TA = 0;
-			return;
-		}
-		if (TM <= Prof [PX].Second)
-			break;
-		PX++;
-	}
-
-	// The left end
-	if (PX == 0) {
-		// We are at the left end
-		t0 = (sint)T0;
-		s0 = 0;
-	} else {
-		t0 = (sint)(Prof [PX-1].Temperature);
-		s0 = Prof [PX-1].Second;
-	}
-
-	t1 = (sint)(Prof [PX].Temperature);
-	s1 = Prof [PX].Second;
-
-	// Interpolate
-	if (s1 == s0) {
-		TA = (word) t1;
 		return;
 	}
 
-	tmp = (t1 - t0);
-	tmp = (tmp * (TM - s0))/(s1 - s0);
-	TA = (word)(t0 + (sint)tmp);
+	if (ER >= Span) {
+		// Large error, full throttle, but clear the integrator (not
+		// sure if this is right)
+		Integrator = 0;
+		Differentiator = CU;
+		CV = MAXPWI;
+		return;
+	}
+
+	// The first component: proportional to error, normalized to Span
+	t = (lint)ER * MAXPWI;
+
+	// The integrator component: GainI is between 0 and 1024
+	t += Integrator * GainI;
+
+	// The differentiator component: GainD is between 0 and 1024
+	t -= ((lint)CU - Differentiator) * GainD;
+
+	// Normalize
+	t /= Span;
+
+	if (t < 0)
+		CV = 0;
+	else if (t > MAXPWI)
+		CV = MAXPWI;
+	else
+		CV = (word) t;
+		
+	// We don't bound the integrator for now, let's see what happens
+	Integrator += ER;
+
+	Differentiator = CU;
 }
 
 // ============================================================================
 
-sint Notifier;
+word	FT,		// Final temperature at the end of segment
+	ST,		// Starting temperature at the beginning of segment
+	FS,		// Target time (final second of the segment)
+	SS,		// Starting time of the segment
+	CS,		// Current second of the run
+	SD;		// Segment duration
+
+sint	CP;		// Current profile segment
+
+Boolean	UP,		// Direction (heating, cooling)
+	TR;		// Target reached
+
+lint	TD;		// Temperature difference across the segment
+
+lword	LS;		// Last second
+
+sint	Notifier;
+
+static void init_target () {
+
+	CS = FS = 0;
+	CP = -1;
+	UP = YES;
+	FT = CU;
+	Differentiator = CU;
+	Integrator = 0;
+	LS = seconds ();
+	TR = YES;
+}
+
+static void target () {
+//
+// Target temperature at time TM
+//
+	if (!TR)
+		// Target temperature not reached yet
+		TR = (UP && CU >= FT || !UP && CU <= FT);
+
+	if (TR && CS >= FS) {
+		// Segment done
+		if (++CP >= NProfEntries) {
+			TA = 0;
+			// Done
+			return;
+		}
+		ST = FT;
+		FT = Prof [CP] . Temperature;
+		SS = CS;
+		FS = CS + (SD = Prof [CP] . DeltaT);
+		UP = (FT > CU);
+		TD = (lint)FT - (lint)ST;
+		TR = NO;
+	}
+
+	if (CS >= FS || SD == 0)
+		TA = FT;
+	else
+		TA = (word) (ST + (sint) ( (TD * (CS - SS)) / SD ) );
+}
+
+// ============================================================================
 
 fsm notifier {
 
 	state LOOP:
 
-		ser_outf (LOOP, "!%u %u->%u %u (%ld, %ld, %ld, %ld)\r\n",
-			TM, CU, TA, CV, TG, PP, II, DD);
-
+		ser_outf (LOOP, "!T %u [P=%u,U=%u,T=%u] %u->%u, %u\r\n",
+			CS, CP, FS, FT, CU, TA, CV);
+			
 	initial state WAIT_FOR_EVENT:
 
 		when (&Notifier, LOOP);
 }
 
+
 fsm reflow {
 
 	state INIT:
 
+		LS = seconds ();
+
+	state START:
+
+		lword cs;
 		word t;
+
+		if ((cs = seconds ()) == LS) {
+			delay (1, START);
+			release;
+		}
+
+		LS = cs;
 
 		// Initial temperature
 		read_sensor (WNONE, THERMOCOUPLE, &t);
-		Differentiator = CU = T0 = temp (t);
-		Integrator = 0;
-		LS = seconds ();
-		TM = (word)(-1);
+		CU = temp (t);
 		Notifier = runfsm notifier;
-		PX = 0;
+		init_target ();
 
 	state LOOP:
+
+		target ();
+
+		if (TA == 0)
+			sameas FINISH;
+		controller ();
+		trigger (&Notifier);
+
+	state NEXT:
 
 		lword cs;
 		word t;
 
 		// Adjust to the next second boundary
 		if ((cs = seconds ()) == LS) {
-			delay (1, LOOP);
+			delay (1, NEXT);
 			release;
 		}
 
-		TM += (word)(cs - LS);
 		LS = cs;
+		CS++;
 
 		read_sensor (WNONE, THERMOCOUPLE, &t);
 		CU = temp (t);
-		target ();
-
-		if (TA == 0)
-			// This means we are done
-			sameas FINISH;
-
-		controller ();
-		setOven (CV);
-
-		ptrigger (Notifier, &Notifier);
-
 		sameas LOOP;
 
 	state FINISH:
@@ -418,10 +425,9 @@ fsm root {
 
 	ser_out (RS_BANNER,
 		"\r\nCommands:\r\n"
-		" g p i d    -> set gain\r\n"
-		" i b        -> set integrator bound\r\n"
+		" g s i d    -> set parameters\r\n"
 		" e          -> erase profile\r\n"
-		" p s t ...  -> add profile entry\r\n"
+		" p d t ...  -> add profile entry\r\n"
 		" s          -> show parameters\r\n"
 		" r          -> run\r\n"
 		" a          -> abort\r\n"
@@ -457,7 +463,6 @@ fsm root {
 	switch (ibuf [0]) {
 
 		case 'g' : proceed RS_SETGAIN;
-		case 'i' : proceed RS_SETINTEGRATOR;
 		case 'e' : proceed RS_PROFERASE;
 		case 'p' : proceed RS_PROFSET;
 		case 's' : proceed RS_SHOW;
@@ -481,27 +486,15 @@ fsm root {
 	lint r [3];
 
 	for (i = 0; i < 3; i++) {
-		g = pnum ();
-		if (EF || g < 0 || g > MAXGAIN)
+		r [i] = pnum ();
+		if (r [i] < 0 || r [1] > 1024)
 			proceed RS_ERR;
-		r [i] = (lint) GAINMULT * g;
 	}
 
-	GainP = r [0];
+	// This one cannot be too small
+	Span  = r [0] > 10 ? r [0] : 10;
 	GainI = r [1];
 	GainD = r [2];
-	proceed RS_RCMD;
-
-  state RS_SETINTEGRATOR:
-
-	sint g;
-
-	g = pnum ();
-	if (EF || g < 0 || g > MAXIBOUND)
-		proceed RS_ERR;
-
-	MinIntegrator = -g;
-	MaxIntegrator =  g;
 	proceed RS_RCMD;
 
   state RS_PROFERASE:
@@ -534,6 +527,7 @@ PBad:
 		}
 		if (r < t)
 			goto PBad;
+
 		if (addProfEntry ((word)s, (word)r))
 			goto PBad;
 	}
@@ -541,12 +535,8 @@ PBad:
 
   state RS_SHOW:
 
-	ser_outf (RS_SHOW, "G: %u %u %u, I: %u, P: %u\r\n",
-		(word)(GainP / GAINMULT),
-		(word)(GainI / GAINMULT),
-		(word)(GainD / GAINMULT),
-		(word)(MaxIntegrator / ERROR_BOUND),
-		NProfEntries);
+	ser_outf (RS_SHOW, "S/I/D: %u %u %u, NPE: %u\r\n",
+		Span, GainI, GainD, NProfEntries);
 
 	VV = 0;
 
@@ -556,7 +546,7 @@ PBad:
 		proceed RS_RCMD;
 
 	ser_outf (RS_SHOW_PROF, " P%u: %u %u.%u\r\n", VV,
-		Prof [VV] . Second,
+		Prof [VV] . DeltaT,
 		Prof [VV] . Temperature / 10,
 		Prof [VV] . Temperature % 10);
 

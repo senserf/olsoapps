@@ -91,33 +91,26 @@
 			{ 2560,	1023 },	\
 	}
 
-// ============================================================================
-// GAINS: Proportional, Integral, Differential; gain range is 0 - 1024, the
-// useful range is probably much smaller, like 0 - 50?
-// ============================================================================
-#define	DEFAULT_GAIN_P	5
-#define	DEFAULT_GAIN_I	0
-#define	DEFAULT_GAIN_D	0
+// The range is 10 - 1024, lower values mean more aggressive control
+#define	DEFAULT_SPAN			200
+
+// The range is 0 - 1024, higher values mean more aggresive control
+#define	DEFAULT_INTEGRATOR_GAIN		0
+
+// The range is 0 - 1024, higher values mean more damping (less overshooting)
+#define	DEFAULT_DIFFERENTIATOR_GAIN	0
 
 // ============================================================================
-// Integrator bound, the range is 0 - 10, inactive if integrator gain is 0
-// ============================================================================
-#define	DEFAULT_INTG_B	2
-
-// ============================================================================
-// Default profile for illustration, taken from:
-// http://www.compuphase.com/electronics/reflowsolderprofiles.htm
-//                       Sec, tmp [in degs * 10, 1000 == 100 deg C]
+// Default profile (taken from Gerry's document)
+//                   Duration, tmp [in degs * 10, 1000 == 100 deg C]
 #define	DEFAULT_PROFILE	{		\
-			{  60, 1000 },	\
-			{  85, 1500 },	\
-			{ 180, 1500 },	\
-			{ 210, 2000 },	\
-			{ 240, 2460 },	\
-			{ 270, 2460 },	\
-			{ 300, 1500 },	\
-			{ 360,  250 },  \
+			{   0, 1500 },  \
+			{ 101, 1830 },	\
+			{  88, 2200 },	\
+			{  37, 1830 },	\
+			{  19, 1500 },	\
+			{   0,  800 },	\
 	}
 
 // The number of points
-#define	DEFAULT_PROFILE_N	8
+#define	DEFAULT_PROFILE_N	6
