@@ -311,6 +311,7 @@ fsm reflow {
 		if (TA == 0)
 			sameas FINISH;
 		controller ();
+		setOven (CV);
 		trigger (&Notifier);
 
 	state NEXT:
@@ -487,7 +488,7 @@ fsm root {
 
 	for (i = 0; i < 3; i++) {
 		r [i] = pnum ();
-		if (r [i] < 0 || r [1] > 1024)
+		if (r [i] < 0 || r [i] > 1024)
 			proceed RS_ERR;
 	}
 
