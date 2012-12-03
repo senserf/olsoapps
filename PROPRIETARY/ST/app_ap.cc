@@ -43,12 +43,12 @@ const blink_t PPS0 [] = { { LR, VB }, { LN, VB }, { LR, VB }, { LN, VB },
 // LED scheme:
 //
 // 	RESET:		alternating R-G-Y
-//	No msg for 1h:	fast R blink
+//	No msg for 1h:	alternating R-G-Y fast
 //	None: 		G blink
-//	S3:		G Y
-//	s2:   		Y
-//	s1:   		R Y
-//	s0:   		R
+//	S3:		Y blink
+//	s2:   		R blink
+//	s1:   		R R R -
+//	s0:   		R R R R -
 //
 
 // ============================================================================

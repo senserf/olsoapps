@@ -274,9 +274,44 @@ namespace export unames_*
 
 namespace import ::UNAMES::*
 
+package provide tooltips 1.0
+
 ###############################################################################
 # TOOLTIPS ####################################################################
 ###############################################################################
+
+namespace eval TOOLTIPS {
+
+variable ttps
+
+proc tip_init { { fo "" } { wi "" } { bg "" } { fg "" } } {
+#
+# Font, wrap length, i.e., width (in pixels)
+#
+	variable ttps
+
+	if { $fo == "" } {
+		set fo "TkSmallCaptionFont"
+	}
+
+	if { $wi == "" } {
+		set wi 320
+	}
+
+	if { $bg == "" } {
+		set bg "lightyellow"
+	}
+
+	if { $fg == "" } {
+		set fg "black"
+	}
+
+	set ttps(FO) $fo
+	set ttps(WI) $wi
+	set ttps(BG) $bg
+	set ttps(FG) $fg
+
+}
 
 proc tip_set { w t } {
 
@@ -288,7 +323,8 @@ proc tip_set { w t } {
 
 proc tip_show { w t } {
 
-	global tcl_platform FO PM
+	global tcl_platform
+	variable ttps
 
 	set px [winfo pointerx .]
 	set py [winfo pointery .]
@@ -311,8 +347,8 @@ proc tip_show { w t } {
 		wm attributes $tip -topmost 1
 	}
 
-	pack [label $tip.label -bg lightyellow -fg black -text $t \
-		-justify left -wraplength $PM(TWR) -font $FO(SMA)]
+	pack [label $tip.label -bg $ttps(BG) -fg $ttps(FG) -text $t \
+		-justify left -wraplength $ttps(WI) -font $ttps(FO)]
 
 	set wi [winfo reqwidth $tip.label]
 	set hi [winfo reqheight $tip.label]
@@ -339,6 +375,18 @@ proc tip_show { w t } {
         bind $w.ttip <Any-Enter> { destroy %W }
         bind $w.ttip <Any-Leave> { destroy %W }
 }
+
+namespace export tip_*
+
+}
+
+namespace import ::TOOLTIPS::*
+
+###############################################################################
+# End of TOOLTIPS #############################################################
+###############################################################################
+
+package require tooltips
 
 ###############################################################################
 # ISO 3309 CRC ################################################################
@@ -406,7 +454,7 @@ proc pt_chks { wa } {
 	return $chs
 }
 
-proc pt_abort { ln } {
+proc pt_abort { msg } {
 
 	tk_dialog "Abort!" "Fatal error: ${msg}!" "" 0 "OK"
 	terminate
@@ -1454,6 +1502,8 @@ proc setsparams { } {
 			failed to write: $err"
 		set PM(RCF) ""
 	}
+
+	catch { close $fd }
 }
 
 ###############################################################################
@@ -1573,7 +1623,7 @@ proc log_toggle { } {
 ###############################################################################
 # This circumvents a bug in Cygwin native Tcl whereby "readable" on a COM port
 # causes Windows to lose text events (at least this is how much I understand
-# abou the bug. So in such a case, the readable event is emulated by timer
+# about the bug. So in such a case, the readable event is emulated by timer
 # callbacks. This is ugly (FIXME), but hopefully I will remove it some day.
 ###############################################################################
 
@@ -1667,6 +1717,8 @@ proc send_command { buf } {
 }
 
 proc bypass { on } {
+
+	global ST
 
 	if $on {
 		set ST(BYP) 2
@@ -5128,6 +5180,8 @@ proc initialize { } {
 
 ###############################################################################
 ###############################################################################
+
+tip_init
 
 # Debug flag
 set ST(DBG)	0

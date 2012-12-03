@@ -1,4 +1,15 @@
 // Insert here applications-specific options
+#undef	TCV_PRESENT
+#define	TCV_PRESENT	1
+
+#undef	UART_DRIVER
+#define	UART_DRIVER	0
+
+#undef	UART_TCV
+#define	UART_TCV	1
+
+#define	UART_TCV_MODE	UART_TCV_MODE_N
+
 #undef	DIAG_MESSAGES
 #define	DIAG_MESSAGES	2
 
@@ -95,10 +106,10 @@
 #define	DEFAULT_SPAN			200
 
 // The range is 0 - 1024, higher values mean more aggresive control
-#define	DEFAULT_INTEGRATOR_GAIN		0
+#define	DEFAULT_INTEGRATOR_GAIN		10
 
 // The range is 0 - 1024, higher values mean more damping (less overshooting)
-#define	DEFAULT_DIFFERENTIATOR_GAIN	0
+#define	DEFAULT_DIFFERENTIATOR_GAIN	5
 
 // ============================================================================
 // Default profile (taken from Gerry's document)
@@ -114,3 +125,20 @@
 
 // The number of points
 #define	DEFAULT_PROFILE_N	6
+
+// ============================================================================
+// Oven model parameters for tests ============================================
+// ============================================================================
+
+#define	MAX_OVEN_TEMP	2600
+#define	MIN_OVEN_TEMP	 250
+
+#define	HEATING_FACTOR	15
+#define	MIN_HEATING	10	// 1 degree per second
+#define	MAX_HEATING	40	// 4 degrees per second
+
+#define	COOLING_FACTOR	5
+#define	MIN_COOLING	4
+#define	MAX_COOLING	20
+
+#define	RANDOM_NUMBER_GENERATOR	2

@@ -5,6 +5,7 @@
 
 #include "sysio.h"
 #include "sensors.h"
+#include "oss.h"
 
 #ifndef	__SMURPH__
 #include "board_pins.h"
@@ -13,29 +14,50 @@
 #define	max6675_off() CNOP
 #endif
 
-heapmem {10, 90};
-
-#include "ser.h"
-#include "serf.h"
-#include "form.h"
-
 // ============================================================================
 
 #define	IBUFLEN		82
 #define	THERMOCOUPLE	0	// Temperature sensor
 #define	OVEN		0	// Oven PWM actuator
 
+#define	MAXTEMP		3000	// 10 * degrees
+#define	MAXSEGDUR	1000	// seconds
+
 // ============================================================================
 
-typedef	struct {
+#define	LED_RED		0
+#define	LED_GREEN	1
+#define	LED_YELLOW	2
 
-	word Value, Reading;
+static byte led_stat [3];
 
-} calentry_t;
+static void led_toggle (word d) {
 
-static const calentry_t Cal [] = THERMOCOUPLE_CALIBRATION;
+	led_stat [d] = 1 - led_stat [d];
+	leds (d, led_stat [d]);
+}
 
-#define	CalLength	(sizeof (Cal) / sizeof (calentry_t))
+static void leds_clear () {
+
+	fastblink (0);
+	led_stat [0] = led_stat [1] = led_stat [2] = 0;
+	leds (0, 0);
+	leds (1, 0);
+	leds (2, 0);
+}
+
+// ============================================================================
+
+static word unpack2 (byte *b) {
+
+	return (word)(b[0]) | ((word)(b[1]) << 8);
+}
+
+static void pack2 (byte *b, word val) {
+
+	b [0] = (byte) val;
+	b [1] = (byte) (val >> 8);
+}
 
 // ============================================================================
 
@@ -81,12 +103,117 @@ static sint addProfEntry (word sec, word tmp) {
 }
 
 // ============================================================================
+// The controllable span of error in degrees * 10. Any error larger than that
+// in the down direction results in full throttle. The control value is scaled
+// to the Span.
+// ============================================================================
+static	word	Span  = DEFAULT_SPAN,
+		GainI = DEFAULT_INTEGRATOR_GAIN,
+		GainD = DEFAULT_DIFFERENTIATOR_GAIN;
 
-static word temp (word r) {
+// Max setting of PW (pulse witdth)
+#define	MAXPWI		1024
+
+static	word	TA,	// Target temperature for this second
+		CU,	// Current temperature at this second
+		CV = 0;	// Control value
+
+static	sint	ER;
+		
+static	lword	Integrator,
+		Differentiator;
+
+static 	Boolean	Reflow, Emulation;
+
+// ============================================================================
+// Here is a crude and naive oven model for tests =============================
+// ============================================================================
+
+word ModelTemp = MIN_OVEN_TEMP;
+
+static void tupd () {
 //
-// Converts the sensor reading to temperature in deg C * 10
+// Run every second
 //
-	word a, b, c, v, v0, v1, r0, r1;
+	word upd;
+
+	if (CV) {
+		// Heating
+		upd = (word)(((lint)CV * HEATING_FACTOR) / ModelTemp);
+		if (upd > MAX_HEATING)
+			upd = MAX_HEATING;
+		else if (upd < MIN_HEATING)
+			upd = MIN_HEATING;
+		if ((upd += ModelTemp) > MAX_OVEN_TEMP)
+			ModelTemp = MAX_OVEN_TEMP;
+		else
+			ModelTemp = upd;
+	} else {
+		// Cooling
+		upd = (word)(((lint)ModelTemp * COOLING_FACTOR) /
+			MIN_OVEN_TEMP);
+		if (upd > MAX_COOLING)
+			upd = MAX_COOLING;
+		else if (upd < MIN_COOLING)
+			upd = MIN_COOLING;
+		if ((upd = ModelTemp - upd) < MIN_OVEN_TEMP)
+			ModelTemp = MIN_OVEN_TEMP;
+		else
+			ModelTemp = upd;
+	}
+
+	// Random fluctuations
+	upd = rnd ();
+	if (upd & 0x10)
+		ModelTemp += (upd & 3);
+	else
+		ModelTemp -= (upd & 3);
+}
+
+fsm oven_model {
+
+	state OM_INIT:
+
+		ModelTemp = MIN_OVEN_TEMP;
+		CV = 0;
+
+	state OM_LOOP:
+
+		if (!Emulation)
+			finish;
+		tupd ();
+		delay (1020 + (rnd () & 3), OM_LOOP);
+}
+
+// ============================================================================
+// ============================================================================
+
+typedef	struct {
+
+	word Value, Reading;
+
+} calentry_t;
+
+static const calentry_t Cal [] = THERMOCOUPLE_CALIBRATION;
+
+#define	CalLength	(sizeof (Cal) / sizeof (calentry_t))
+
+static void setOven () {
+
+	if (!Emulation)
+		write_actuator (WNONE, OVEN, &CV);
+}
+
+static word temp () {
+//
+// Reads the temp sensor and converts the reading to temperature in deg C * 10
+//
+	word a, b, c, v, v0, v1, r, r0, r1;
+
+	if (Emulation)
+		return ModelTemp;
+
+	read_sensor (WNONE, THERMOCOUPLE, &r);
 
 	a = 0;
 	b = CalLength - 1;
@@ -125,35 +252,8 @@ RetC:
 	return (v + 5) / 10;
 }
 
-static word OvenSetting;
-
-static void setOven (word val) {
-
-	OvenSetting = val;
-	// This actuator needs no state
-	write_actuator (WNONE, OVEN, &OvenSetting);
-}
-
 // ============================================================================
-
-// The controllable span of error in degrees * 10. Any error larger than that
-// in the down direction results in full throttle. The control value is scaled
-// to the Span.
-static	word	Span  = DEFAULT_SPAN,
-		GainI = DEFAULT_INTEGRATOR_GAIN,
-		GainD = DEFAULT_DIFFERENTIATOR_GAIN;
-
-// Max setting of PW (pulse witdth)
-#define	MAXPWI		1024
-
-static	word	TA,	// Target temperature for this second
-		CU,	// Current temperature at this second
-		CV;	// Control value
-
-static	sint	ER;
-		
-static	lword	Integrator,
-		Differentiator;
+// ============================================================================
 
 static void controller () {
 
@@ -221,14 +321,12 @@ lint	TD;		// Temperature difference across the segment
 
 lword	LS;		// Last second
 
-sint	Notifier;
-
 static void init_target () {
 
 	CS = FS = 0;
 	CP = -1;
 	UP = YES;
-	FT = CU;
+	FT = MIN_OVEN_TEMP;
 	Differentiator = CU;
 	Integrator = 0;
 	LS = seconds ();
@@ -267,31 +365,71 @@ static void target () {
 
 // ============================================================================
 
-fsm notifier {
+static void out_reflow_status (word st) {
 
-	state LOOP:
+	byte *buf;
 
-		ser_outf (LOOP, "!T %u [P=%u,U=%u,T=%u] %u->%u, %u\r\n",
-			CS, CP, FS, FT, CU, TA, CV);
-			
-	initial state WAIT_FOR_EVENT:
+	if ((buf = oss_outu (st, 12)) == NULL)
+		return;
 
-		when (&Notifier, LOOP);
+	buf [0] = OSS_CMD_U_REP;
+	buf [1] = Emulation;
+
+	pack2 (buf +  2, CS);
+	pack2 (buf +  4, CU);
+	pack2 (buf +  6, CV);
+	pack2 (buf +  8, CP);
+	pack2 (buf + 10, TA);
+
+	oss_send (buf);
 }
 
+static void out_heartbeat (word st, word t) {
+
+	byte *buf;
+
+	if ((buf = oss_outu (st, 8)) == NULL)
+		return;
+
+	buf [0] = OSS_CMD_U_HBE;
+	buf [1] = Emulation;
+	buf [2] = 0x31;
+	buf [3] = 0x7A;
+
+	pack2 (buf + 4, t);
+	pack2 (buf + 6, CV);
+
+	oss_send (buf);
+}
 
 fsm reflow {
 
-	state INIT:
+	word t;
 
+	state IDLE:
+
+		// Heartbeat report
+		t = temp ();
+		led_toggle (LED_GREEN);
+
+	state HEARTBEAT:
+
+		out_heartbeat (HEARTBEAT, t);
+
+		if (!Reflow) {
+			delay (1024, IDLE);
+			release;
+		}
+
+		// Initialize for reflow
 		LS = seconds ();
 
 	state START:
 
 		lword cs;
-		word t;
 
 		if ((cs = seconds ()) == LS) {
+			// Wait for the nearest second boundary
 			delay (1, START);
 			release;
 		}
@@ -299,25 +437,27 @@ fsm reflow {
 		LS = cs;
 
 		// Initial temperature
-		read_sensor (WNONE, THERMOCOUPLE, &t);
-		CU = temp (t);
-		Notifier = runfsm notifier;
+		CU = temp (NULL);
+		leds_clear ();
 		init_target ();
 
 	state LOOP:
 
 		target ();
 
-		if (TA == 0)
+		if (TA == 0 || !Reflow)
 			sameas FINISH;
 		controller ();
-		setOven (CV);
-		trigger (&Notifier);
+		setOven ();
+
+	state NOTIFY:
+
+		out_reflow_status (NOTIFY);
+		led_toggle (LED_YELLOW);
 
 	state NEXT:
 
 		lword cs;
-		word t;
 
 		// Adjust to the next second boundary
 		if ((cs = seconds ()) == LS) {
@@ -328,261 +468,147 @@ fsm reflow {
 		LS = cs;
 		CS++;
 
-		read_sensor (WNONE, THERMOCOUPLE, &t);
-		CU = temp (t);
+		CU = temp (NULL);
 		sameas LOOP;
 
 	state FINISH:
 
-		ser_out (FINISH, "Finishing\r\n");
-
+		Reflow = NO;
+		CV = 0;
+		setOven ();
 		delay (1024, DONE);
 		release;
 
 	state DONE:
 
-		ser_out (DONE, "End Reflow Cycle\r\n");
-		killall (notifier);
-		finish;
+		leds_clear ();
+		sameas IDLE;
 }
 
 // ============================================================================
 
-static char ibuf [IBUFLEN], *ibp;
-static Boolean EF;
+static void rq_handler (word st, byte *cmd, word cmdlen) {
 
-static void nosp () {
-//
-// Skip blanks
-//
-	while (isspace (*ibp) || *ibp == ',')
-		ibp++;
-}
 
-static Boolean eol () {
-//
-// True if ibuf is at EOL
-//
-	nosp ();
-	return (*ibp == '\0');
-}
+	switch (*cmd) {
 
-static sint pnum () {
-//
-// Parse a sint
-//
-	char c;
-	Boolean pos;
-	sint res, tmp;
+		case OSS_CMD_RSC:
 
-	nosp ();
-	pos = YES;
-	if (*ibp == '-') {
-		pos = NO;
-		ibp++;
-	} else if (*ibp == '+') {
-		ibp++;
+			// Reconnection
+			Reflow = NO;
+			killall (oven_model);
+			Emulation = NO;
+			oss_ack (st, OSS_CMD_ACK);
+			return;
+
+		case OSS_CMD_D_RUN: {
+
+			word ns, m, i, du, tm;
+
+			// Start reflow
+			if (cmdlen < 16) {
+SErr:
+				oss_ack (st, OSS_CMD_NAK);
+				return;
+			}
+
+			ns = cmd [1];
+
+			if (ns > 24 || ns < 2 || (ns * 4) > (cmdlen - 8))
+				goto SErr;
+
+			Span  = unpack2 (cmd + 2);
+			GainI = unpack2 (cmd + 4);
+			GainD = unpack2 (cmd + 6);
+
+			if (Span < 10 || Span > 1024)
+				goto SErr;
+
+			if (GainI > 1024 || GainD > 1024)
+				goto SErr;
+
+			NProfEntries = 0;
+			m = 8;
+			for (i = 0; i < ns; i++) {
+				du = unpack2 (cmd + m);
+				m += 2;
+				tm = unpack2 (cmd + m);
+				m += 2;
+				if (du > MAXSEGDUR || tm > MAXTEMP)
+					goto SErr;
+				addProfEntry (du, tm);
+			}
+
+			oss_ack (st, OSS_CMD_ACK);
+
+			Reflow = YES;
+			return;
+
+		}
+
+		case OSS_CMD_D_ABT:
+
+			Reflow = NO;
+			oss_ack (st, OSS_CMD_ACK);
+			return;
+
+		case OSS_CMD_D_SET: {
+
+			word ov;
+
+			if (Reflow) {
+				oss_ack (st, OSS_CMD_NAK);
+				return;
+			}
+
+			if (cmdlen < 4)
+				goto SErr;
+
+			ov = unpack2 (cmd + 2);
+			if (ov > 1024)
+				goto SErr;
+
+			oss_ack (st, OSS_CMD_ACK);
+
+			CV = ov;
+			setOven ();
+			return;
+		}
+
+		case OSS_CMD_D_EMU:
+
+			if (cmd [1]) {
+				// Emulation on
+				Emulation = YES;
+				if (!running (oven_model))
+					runfsm oven_model;
+			} else {
+				killall (oven_model);
+				Emulation = NO;
+			}
+
+		default:
+
+			goto SErr;
+
 	}
-
-	if (!isdigit (*ibp)) {
-		EF = YES;
-		return 0;
-	}
-
-	for (res = 0; isdigit (*ibp); ibp++) {
-		tmp = res * 10 - (*ibp - '0');
-		if (tmp > res)
-			// Overflow
-			EF = YES;
-		res = tmp;
-	}
-
-	if (pos) {
-		if ((res = -res) < 0)
-			EF = YES;
-	}
-
-	return res;
 }
 
 // ============================================================================
 
 fsm root {
 
-  word VV, TT;
+	state INIT:
 
-  state RS_INIT:
+		leds_clear ();
+		setOven ();
+		// The thermocouple is constantly on
+		max6675_on ();
+		oss_init (rq_handler);
 
-	setOven (0);
-	// The thermocouple is constantly on
-	max6675_on ();
+		leds_clear ();
+		runfsm reflow;
 
-  state RS_BANNER:
-
-	// Note: we can use the same protocol in the target (GUI) praxis.
-	// There is no need for checksums/acks, because 1) the 's' command
-	// can be used to verify a controller setting, 2) a running reflow
-	// process will produce periodic reports
-
-	ser_out (RS_BANNER,
-		"\r\nCommands:\r\n"
-		" g s i d    -> set parameters\r\n"
-		" e          -> erase profile\r\n"
-		" p d t ...  -> add profile entry\r\n"
-		" s          -> show parameters\r\n"
-		" r          -> run\r\n"
-		" a          -> abort\r\n"
-		" o n        -> set oven\r\n"
-		" t          -> read temp\r\n"
-	);
-
-  state RS_RCMD:
-
-	ser_out (RS_RCMD, "Ready:\r\n");
-
-  state RS_READ:
-
-	ser_in (RS_READ, ibuf, IBUFLEN);
-
-	// Input, if we are running, force abort
-	if (!running (reflow))
-		sameas RS_PARSE;
-
-	killall (reflow);
-	killall (notifier);
-	setOven (0);
-
-  state RS_ABORT:
-
-	ser_out (RS_ABORT, "Aborted\r\n");
-
-  state RS_PARSE:
-
-	ibp = ibuf + 1;
-	EF = NO;
-
-	switch (ibuf [0]) {
-
-		case 'g' : proceed RS_SETGAIN;
-		case 'e' : proceed RS_PROFERASE;
-		case 'p' : proceed RS_PROFSET;
-		case 's' : proceed RS_SHOW;
-		case 'r' : proceed RS_RUN;
-		case 'a' : proceed RS_RCMD;	// Do nothing
-		case 'o' : proceed RS_OVEN;
-		case 't' : proceed RS_TEMP;
-	}
-
-	proceed RS_BANNER;
-
-  state RS_ERR:
-
-	ser_out (RS_ERR, "Error!!!\r\n");
-	proceed RS_RCMD;
-
-  state RS_SETGAIN:
-
-	word i;
-	sint g;
-	lint r [3];
-
-	for (i = 0; i < 3; i++) {
-		r [i] = pnum ();
-		if (r [i] < 0 || r [i] > 1024)
-			proceed RS_ERR;
-	}
-
-	// This one cannot be too small
-	Span  = r [0] > 10 ? r [0] : 10;
-	GainI = r [1];
-	GainD = r [2];
-	proceed RS_RCMD;
-
-  state RS_PROFERASE:
-
-	NProfEntries = 0;
-	proceed RS_RCMD;
-
-  state RS_PROFSET:
-
-	sint s, t, r, d;
-
-	while (!eol ()) {
-		s = pnum ();
-		if (EF || s < 0) {
-PBad:
-			NProfEntries = 0;
-			proceed RS_ERR;
-		}
-		t = pnum ();
-		if (EF || t < 0)
-			goto PBad;
-		// Check for decimal tenths
-		r = t * 10;
-		if (*ibp == '.') {
-			ibp++;
-			d = pnum ();
-			if (EF || d < 0 || d > 9)
-				goto PBad;
-			r += d;
-		}
-		if (r < t)
-			goto PBad;
-
-		if (addProfEntry ((word)s, (word)r))
-			goto PBad;
-	}
-	proceed RS_RCMD;
-
-  state RS_SHOW:
-
-	ser_outf (RS_SHOW, "S/I/D: %u %u %u, NPE: %u\r\n",
-		Span, GainI, GainD, NProfEntries);
-
-	VV = 0;
-
-  state RS_SHOW_PROF:
-
-	if (VV >= NProfEntries)
-		proceed RS_RCMD;
-
-	ser_outf (RS_SHOW_PROF, " P%u: %u %u.%u\r\n", VV,
-		Prof [VV] . DeltaT,
-		Prof [VV] . Temperature / 10,
-		Prof [VV] . Temperature % 10);
-
-	VV++;
-	proceed RS_SHOW_PROF;
-
-  state RS_RUN:
-
-	if (NProfEntries < MINPROFENTRIES)
-		proceed RS_ERR;
-
-	runfsm reflow;
-	proceed RS_RCMD;
-
-  state RS_OVEN:
-
-	word v;
-
-	v = pnum ();
-	if (EF || v < 0)
-		v = 0;
-	else if (v > 1024)
-		v = 1024;
-
-	setOven (v);
-	proceed RS_RCMD;
-
-  state RS_TEMP:
-
-	read_sensor (RS_TEMP, THERMOCOUPLE, &VV);
-	TT = temp (VV);
-
-  state RS_TEMP_REPORT:
-
-	ser_outf (RS_TEMP_REPORT, "T: %u.%u, %u <%x>\r\n",
-		TT / 10, TT % 10, VV, VV);
-	proceed RS_RCMD;
+		
+		finish;
 }
