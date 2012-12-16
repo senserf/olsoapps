@@ -2340,7 +2340,7 @@ proc uart_read { msg } {
 		return
 	}
 
-	binary scan $msg cucusususususu a em sec tem ovs seg tar
+	binary scan $msg cucusususususu a em sec tem ovn seg tar
 
 	if { $a != 0x01 } {
 		# trc "BAD report signature"
@@ -2362,7 +2362,7 @@ proc uart_read { msg } {
 	}
 
 	set ST(WRU) 0
-	new_sample $sec $tem $ovs $seg $tar
+	new_sample $sec $tem $ovn $seg $tar
 }
 
 proc handshake_ok { } {
@@ -4476,7 +4476,6 @@ proc do_setparam { p v } {
 		# change
 		if { $WN($x,M) != "" } {
 			# not the first one, mark the profile as modified
-trc "SETP $p $v"
 			set ST(MOD) 1
 		}
 		set WN($x,M) $WN($x)

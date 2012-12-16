@@ -454,6 +454,8 @@ proc pt_chks { wa } {
 	return $chs
 }
 
+proc bgerror { err } { }
+
 proc pt_abort { msg } {
 
 	tk_dialog "Abort!" "Fatal error: ${msg}!" "" 0 "OK"

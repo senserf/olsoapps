@@ -31,9 +31,9 @@
 static int tcv_ope_ack (int, int, va_list);
 static int tcv_clo_ack (int, int);
 static int tcv_rcv_ack (int, address, int, int*, tcvadp_t*);
-static int tcv_frm_ack (address, int, tcvadp_t*);
-static int tcv_out_ack (address, int);
-static int tcv_xmt_ack (address, int);
+static int tcv_frm_ack (address, tcvadp_t*);
+static int tcv_out_ack (address);
+static int tcv_xmt_ack (address);
 
 //
 // This is the timeout function of the plugin; it used to be NULL in our
@@ -45,7 +45,7 @@ static int tcv_xmt_ack (address, int);
 #error "S: both TCV_TIMERS and TCV_HOOKS must be set!!!"
 #endif
 
-static int tcv_tmt_ack (address, int);
+static int tcv_tmt_ack (address);
 
 trueconst tcvplug_t plug_ack =
 		{ tcv_ope_ack, tcv_clo_ack, tcv_rcv_ack, tcv_frm_ack,
@@ -157,20 +157,20 @@ static int tcv_rcv_ack (int phy, address p, int len, int *ses, tcvadp_t *bnd) {
 	return TCV_DSP_DROP;
 }
 
-static int tcv_frm_ack (address p, int phy, tcvadp_t *bounds) {
+static int tcv_frm_ack (address p, tcvadp_t *bounds) {
 
 	// As before
 	return bounds->head = bounds->tail = 0;
 }
 
-static int tcv_out_ack (address p, int s) {
+static int tcv_out_ack (address p) {
 
 	// As before: disposition for a "wnp" packet
 	return TCV_DSP_XMT;
 
 }
 
-static int tcv_xmt_ack (address p, int s) {
+static int tcv_xmt_ack (address p) {
 //
 // Called when a packet has been transmitted by the PHY
 //
@@ -227,7 +227,7 @@ HoldIt:
 	return TCV_DSP_DROP;
 }
 
-static int tcv_tmt_ack (address p, int s) {
+static int tcv_tmt_ack (address p) {
 //
 // Called when the packet's timer goes off: retransmit at high priority
 //

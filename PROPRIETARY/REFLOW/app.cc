@@ -437,7 +437,7 @@ fsm reflow {
 		LS = cs;
 
 		// Initial temperature
-		CU = temp (NULL);
+		CU = temp ();
 		leds_clear ();
 		init_target ();
 
@@ -468,7 +468,7 @@ fsm reflow {
 		LS = cs;
 		CS++;
 
-		CU = temp (NULL);
+		CU = temp ();
 		sameas LOOP;
 
 	state FINISH:

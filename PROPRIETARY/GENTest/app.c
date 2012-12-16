@@ -95,9 +95,9 @@ static word send_delay (void) {
 static int tcv_ope (int, int, va_list);
 static int tcv_clo (int, int);
 static int tcv_rcv (int, address, int, int*, tcvadp_t*);
-static int tcv_frm (address, int, tcvadp_t*);
-static int tcv_out (address, int);
-static int tcv_xmt (address, int);
+static int tcv_frm (address, tcvadp_t*);
+static int tcv_out (address);
+static int tcv_xmt (address);
 
 const tcvplug_t plug_test =
 		{ tcv_ope, tcv_clo, tcv_rcv, tcv_frm, tcv_out, tcv_xmt, NULL,
@@ -181,18 +181,18 @@ SkipClone:
 	return TCV_DSP_RCV;
 }
 
-static int tcv_frm (address p, int phy, tcvadp_t *bounds) {
+static int tcv_frm (address p, tcvadp_t *bounds) {
 
 	return bounds->head = bounds->tail = 0;
 }
 
-static int tcv_out (address p, int s) {
+static int tcv_out (address p) {
 
 	return TCV_DSP_XMT;
 
 }
 
-static int tcv_xmt (address p, int s) {
+static int tcv_xmt (address p) {
 
 	return TCV_DSP_DROP;
 }

@@ -2,7 +2,7 @@
 
 fsm oss_in;
 
-static sint SFR, SFU;
+static sint SFD;
 
 static cmdfun_t oss_cmdfun;
 
@@ -13,7 +13,7 @@ byte *oss_outu (word st, sint len) {
 	if ((len & 1))
 		len++;
 
-	if ((pkt = tcv_wnp (st, SFU, len)) == NULL)
+	if ((pkt = tcv_wnpu (st, SFD, len)) == NULL)
 		return NULL;
 
 	return ((byte*)pkt) + 2;
@@ -26,7 +26,7 @@ byte *oss_outr (word st, sint len) {
 	if ((len & 1))
 		len++;
 
-	if ((pkt = tcv_wnp (st, SFR, len)) == NULL)
+	if ((pkt = tcv_wnp (st, SFD, len)) == NULL)
 		return NULL;
 
 	return ((byte*)pkt) + 2;
@@ -43,8 +43,7 @@ void oss_init (cmdfun_t f) {
 
 	phys_uart (OSS_PHY, OSS_MAXPLEN, OSS_UART);
 	tcv_plug (OSS_PLUG, &plug_boss);
-	if ((SFR = tcv_open (WNONE, OSS_PHY, OSS_PLUG, 0)) < 0 ||
-	    (SFU = tcv_open (WNONE, OSS_PHY, OSS_PLUG, 1)) < 0  )
+	if ((SFD = tcv_open (WNONE, OSS_PHY, OSS_PLUG, 0)) < 0)
 		syserror (ENODEVICE, "uart");
 
 	// Start the driver
@@ -78,7 +77,7 @@ fsm oss_in {
 
 	state LOOP:
 
-		pkb = tcv_rnp (LOOP, SFR);
+		pkb = tcv_rnp (LOOP, SFD);
 
 		if (((byte*)pkb) [2] == OSS_CMD_NOP)
 			goto Ignore;

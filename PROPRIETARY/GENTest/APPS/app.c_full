@@ -90,7 +90,7 @@ static word send_delay (void) {
 static int tcv_ope (int, int, va_list);
 static int tcv_clo (int, int);
 static int tcv_rcv (int, address, int, int*, tcvadp_t*);
-static int tcv_frm (address, int, tcvadp_t*);
+static int tcv_frm (address, tcvadp_t*);
 static int tcv_out (address);
 static int tcv_xmt (address);
 
@@ -176,7 +176,7 @@ SkipClone:
 	return TCV_DSP_RCV;
 }
 
-static int tcv_frm (address p, int phy, tcvadp_t *bounds) {
+static int tcv_frm (address p, tcvadp_t *bounds) {
 
 	return bounds->head = bounds->tail = 0;
 }

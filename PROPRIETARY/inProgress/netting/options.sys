@@ -70,5 +70,5 @@
 #define CC1100_FREQ_FREQ0_VALUE 0xE8
 
 // I can't see expected difference with odr in VUEE... FIXME
-// #define TARP_RTR        2
+#define TARP_RTR        2
 
