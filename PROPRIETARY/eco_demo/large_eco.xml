@@ -12,7 +12,7 @@
 	<node number="0" type="peg" hid="0xBACA000A">
 	    <sensors>
 	    	<input source="socket"></input>
-	    	<sensor number="-1" vsize="2" delay="0.01" init="2030">
+	    	<sensor index="-1" vsize="2" delay="0.01" init="2030">
 			2047
 			<label fg="red" bg="yellow">Voltage</label>
 		</sensor>
@@ -24,7 +24,7 @@
 	<node number="1" type="peg" hid="0xBACA000B">
 	    <sensors>
 	    	<input source="socket"></input>
-	    	<sensor number="-1" vsize="2" delay="0.01" init="2028">
+	    	<sensor index="-1" vsize="2" delay="0.01" init="2028">
 			2047
 			<label index="-1" fg="red" bg="yellow">Voltage</label>
 		</sensor>

@@ -756,23 +756,39 @@ fsm sens {
 		sens_data.ee.ds = wall_date (0);
 		lh_time = seconds();
 #ifdef SENSOR_LIST
+
+#ifdef BOARD_WARSAW_ILS
+#define SESL0	-2
+#define SESL1	-1
+#define SESL2	0
+#define SESL3	1
+#else
+#define SESL0   0
+#define SESL1   1
+#define SESL2   2
+#define SESL3   3
+#endif
 	entry SE_0:
-		read_sensor (SE_0, 0, &sens_data.ee.sval[0]);
+		read_sensor (SE_0, SESL0, &sens_data.ee.sval[0]);
 
 	entry SE_1:
-		read_sensor (SE_1, 1,  &sens_data.ee.sval[1]);
+		read_sensor (SE_1, SESL1,  &sens_data.ee.sval[1]);
 
 	entry SE_2:
-		read_sensor (SE_2, 2,  &sens_data.ee.sval[2]);
+		read_sensor (SE_2, SESL2,  &sens_data.ee.sval[2]);
 
 	entry SE_3:
-		read_sensor (SE_3, 3, &sens_data.ee.sval[3]);
+		read_sensor (SE_3, SESL3, &sens_data.ee.sval[3]);
 
 	entry SE_4:
 		read_sensor (SE_4, 4, &sens_data.ee.sval[4]);
 
 	entry SE_5:
 		read_sensor (SE_5, 5, &sens_data.ee.sval[5]);
+#undef SESL0
+#undef SESL1
+#undef SESL2
+#undef SESL3
 
 #else
 		app_diag (D_WARNING, "FAKE SENSORS");

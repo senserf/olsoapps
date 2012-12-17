@@ -4,18 +4,6 @@
 #define	VUEE_LIB_PLUG_TARP
 #define	VUEE_LIB_PLUG_NULL
 
-#define	TCV_PRESENT			1
-#define	TCV_HOOKS			0
-#define	TCV_TIMERS			0
-
-#ifdef	BOARD_WARSAW_BLUE
-#define	UART_DRIVER			2
-#else
-#define	UART_DRIVER			1
-#endif
-
-#define CC1100 				1
-
 #define	dbg_0(c)	do { } while (0)
 #define	dbg_1(c)	do { } while (0)
 #define	dbg_2(c)	do { } while (0)
@@ -120,12 +108,15 @@
 
 #define EE_ERASE_ON_NEW_FLASH	0
 
-// Do not override the BOARD
-//#ifdef STORAGE_SDCARD
-//#undef STORAGE_SDCARD
-//#endif
-//#define STORAGE_SDCARD	 	1
+// don't override BOARD def.
+#ifndef STORAGE_SDCARD
+#define STORAGE_SDCARD	 	0
+#endif
+
 #define SD_KEEP_IDLE		1
 
 #define BCAST_SATEST_MSG 	1
+
+// CHANNEL at comip.ca perpetual demo is 4
+#define RADIO_DEFAULT_CHANNEL   4
 

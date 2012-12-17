@@ -1,0 +1,61 @@
+#ifndef __app_h__
+#define __app_h__
+/* ==================================================================== */
+/* Copyright (C) Olsonet Communications, 2012                           */
+/* All rights reserved.                                                 */
+/* ==================================================================== */
+
+#include "sysio.h"
+#include "msg.h"
+
+#define DEL_QUANT	(10 << 10)
+#define AUD_QUANT	(2* DEL_QUANT)
+#define MAS_QUANT	(3* DEL_QUANT)
+#define OSS_QUANT	MAX_UINT
+
+// trigger / when ids
+#define TRIGGER_BASE_ID	77
+
+#define TRIG_MASTER	(TRIGGER_BASE_ID +0)
+#define TRIG_BEAC_PUSH	(TRIGGER_BASE_ID +1)
+#define TRIG_BEAC_DOWN	(TRIGGER_BASE_ID +2)
+// end of trigger / when ids
+
+typedef struct {
+	word	id;
+	word	frssi :8;
+	word	brssi :8;
+} odre_t;
+
+typedef struct {
+	msgOdrType	msg;
+	odre_t		oe[10];
+} odr_t;
+
+typedef struct {
+	msgDispType	msg;
+	char		str[40];
+} disp_t;
+
+typedef struct {
+	msgTraceType	msg; // just for consistency
+} trac_t;
+
+typedef struct {
+	char *	mpt;
+	byte	freq;
+	word	vol;
+	word	cur;
+} beac_t;
+
+typedef union {
+	word w;
+	struct {
+		word tparam	:8;
+		word polev	:3;
+		word rx		:1;
+		word spare	:4;
+	} f;
+} fim_t;
+
+#endif

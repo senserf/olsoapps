@@ -1,0 +1,74 @@
+#define SENSOR_BATTERY	(-1)
+
+#ifdef UART_INPUT_BUFFER_LENGTH
+#undef UART_INPUT_BUFFER_LENGTH
+#endif
+#define UART_INPUT_BUFFER_LENGTH 80
+
+
+// VUEE doesn't inherit all from BOARDS, it needs some redefines:
+#ifdef  __SMURPH__
+#define VUEE_LIB_PLUG_TARP
+#define VUEE_LIB_PLUG_NULL
+
+// #define diag(a...)	emul(99,a)
+
+#define CC1100 1
+
+#define dbg_0(c)        do { } while (0)
+#define dbg_1(c)        do { } while (0)
+#define dbg_2(c)        do { } while (0)
+#define dbg_3(c)        do { } while (0)
+#define dbg_4(c)        do { } while (0)
+#define dbg_5(c)        do { } while (0)
+#define dbg_6(c)        do { } while (0)
+#define dbg_7(c)        do { } while (0)
+#define dbg_8(c)        do { } while (0)
+#define dbg_9(c)        do { } while (0)
+#define dbg_a(c)        do { } while (0)
+#define dbg_b(c)        do { } while (0)
+#define dbg_c(c)        do { } while (0)
+#define dbg_d(c)        do { } while (0)
+#define dbg_e(c)        do { } while (0)
+#define dbg_f(c)        do { } while (0)
+
+#endif
+
+
+// reference: board_options.sys in WARSAW
+#ifdef RADIO_USE_LEDS
+#undef RADIO_USE_LEDS
+#endif
+#define RADIO_USE_LEDS 	7
+
+#ifdef CRYSTAL2_RATE
+#undef CRYSTAL2_RATE
+#endif
+#define CRYSTAL2_RATE	0
+
+#ifdef STORAGE_AT45XXX
+#undef STORAGE_AT45XXX
+#endif
+#define STORAGE_AT45XXX	0
+
+#ifdef TCV_TIMERS
+#undef TCV_TIMERS
+#endif
+#define TCV_TIMERS	1
+
+#ifdef TCV_HOOKS
+#undef TCV_HOOKS
+#endif
+#define TCV_HOOKS	1
+
+// debug diags
+// #define D_DEBUG	defined
+
+// Europe:
+#define CC1100_FREQ_FREQ2_VALUE 0x20
+#define CC1100_FREQ_FREQ1_VALUE 0x65
+#define CC1100_FREQ_FREQ0_VALUE 0xE8
+
+// I can't see expected difference with odr in VUEE... FIXME
+#define TARP_RTR        2
+

@@ -67,13 +67,17 @@
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
-		<sensor number="0" vsize="2" delay="0.6">2047</sensor>
-		<sensor number="1" vsize="2" delay="0.220">16483</sensor>
-		<sensor number="2" vsize="2" delay="0.06">3339</sensor>
-		<sensor number="3" vsize="2" delay="0.6">2000</sensor>
-		<sensor number="4" vsize="2" delay="0.85">4095</sensor>
+		<sensor index="0" vsize="2" delay="0.6">2047</sensor>
+		<sensor index="1" vsize="2" delay="0.220">16483</sensor>
+		<sensor index="2" vsize="2" delay="0.06">3339</sensor>
+		<sensor index="3" vsize="2" delay="0.6">2000</sensor>
+		<sensor index="4" vsize="2" delay="0.85">4095</sensor>
 		<!-- dummy -->
-		<sensor number="5" vsize="2" delay="0.0">1</sensor>
+		<sensor index="5" vsize="2" delay="0.0">1</sensor>
+		<!-- Voltage sensor -->
+		<sensor index="-1" vsize="2" delay="0.0" init="2600">
+		                        2703
+		</sensor>
 	    </sensors>
 	    <preinit tag="MHOST" type="word">0</preinit>
 	    <preinit tag="NID" type="word">85</preinit>
@@ -82,7 +86,7 @@
 	    <sensors>
 	    	<input source="socket"></input>
 		<output target="socket"></output>
-		<sensor number="0" vsize="2" delay="0.01">2047</sensor>
+		<sensor index="-1" vsize="2" delay="0.01">2047</sensor>
 	    </sensors>
 	    <location>5.0 5.0</location>
 	    <preinit tag="MHOST" type="word">10</preinit>

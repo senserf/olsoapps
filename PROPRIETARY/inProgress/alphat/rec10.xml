@@ -1,0 +1,48 @@
+<network nodes="10" radio="10">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer display="yes"></roamer>
+    </display>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<node number="0" hid="0xBACA000A">
+	    <location>1.0 1.0</location>
+	</node>
+
+	<node number="1" start="on" hid="0xBACA0001">
+	    <location>1.0 101.0</location>
+	</node>
+        <node number="2" start="on" hid="0xBACA0002">
+            <location>1.0 201.0</location>
+        </node>
+        <node number="3" start="on" hid="0xBACA0003">
+            <location>101.0 201.0</location>
+        </node>
+
+	<node number="4" start="on" hid="0xBACA0004">
+	    <location>201.0 201.0</location>
+	</node>
+        <node number="5" start="on" hid="0xBACA0005">
+            <location>301.0 201.0</location>
+        </node>
+        <node number="6" start="on" hid="0xBACA0006">
+            <location>301.0 101.0</location>
+        </node>
+
+       <node number="7" start="on" hid="0xBACA0007">
+            <location>301.0 1.0</location>
+        </node>
+
+	<node number="8" start="on" hid="0xBACA0008">
+	    <location>201.0 1.0</location>
+	</node>
+        <node number="9" start="on" hid="0xBACA0009">
+            <location>101.0 1.0</location>
+        </node>
+    </nodes>
+</network>
