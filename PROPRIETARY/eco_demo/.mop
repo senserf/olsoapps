@@ -1,3 +1,0 @@
-#!/bin/sh
-cleanapp
-cp options_nogood.sys options.sys
