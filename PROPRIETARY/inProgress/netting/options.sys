@@ -6,14 +6,9 @@
 #define UART_INPUT_BUFFER_LENGTH 80
 
 
-// VUEE doesn't inherit all from BOARDS, it needs some redefines:
 #ifdef  __SMURPH__
-#define VUEE_LIB_PLUG_TARP
-#define VUEE_LIB_PLUG_NULL
 
 // #define diag(a...)	emul(99,a)
-
-#define CC1100 1
 
 #define dbg_0(c)        do { } while (0)
 #define dbg_1(c)        do { } while (0)
@@ -35,7 +30,7 @@
 #else
 
 #ifdef BOARD_WARSAW_BLUE
-#define BT_MODULE_LINKMATIC
+#define BT_MODULE_LINKMATIK
 #endif
 
 #endif
