@@ -18,30 +18,38 @@ typedef struct msgMasterStruct {
 
 typedef struct msgDispStruct {
 	headerType      header;
-	word		ref :7;
-	word		ret :1;
-	word		len :6;
-	word		spare :2;
+	word		refh;
+	word		refl;
+	word		rack  :1;
+	word		len   :6;
+	word		spare :9;
 } msgDispType;
 
 #define in_disp(buf, field)   (((msgDispType *)(buf))->field)
 
 typedef struct msgOdrStruct {
 	headerType      header;
-	word		ref :7;
-	word		ret :1;
-	word		hok :4;
-	word		hko :4;
+	word		refh;
+	word		refl;
+	word		hok   :4;
+	word		hko   :4;
+	word		ret   :1; // return path?
+	word		rack  :1; // request for ack
+	word		spare :6;
 } msgOdrType;
 
 #define in_odr(buf, field)   (((msgOdrType *)(buf))->field)
 
 typedef struct msgTraceStruct {
         headerType      header;
+	lword		ref;
 } msgTraceType;
+#define in_trace(buf, field)  (((msgTraceType *)(buf))->field)
 
 typedef struct msgTraceAckStruct {
         headerType      header;
+	word		refh;
+	word		refl;
         word            fcount;
 } msgTraceAckType;
 #define in_traceAck(buf, field)  (((msgTraceAckType *)(buf))->field)

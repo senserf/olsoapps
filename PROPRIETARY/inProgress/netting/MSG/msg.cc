@@ -42,39 +42,42 @@ fsm mbeacon {
 // more or less universal beacon with semi-private data settable by separate
 // operations
 fsm msgbeac {
-	byte oref;
-	byte siz;
+	lword oref;
+	sint siz;
 
 	// assumed set: mpt, freq, vol set, cur == 1
 	state MSGB_INI:
 		switch (in_header(beac.mpt, msg_type)) {
 			case msg_odr:
-				oref = odr.msg.ref;
+				oref = ((lword)odr.msg.refh << 16) +
+					odr.msg.refl;
 				siz = sizeof(msgOdrType) +
 					(odr.msg.hko +1) * sizeof(odre_t);
 				break;
 			case msg_disp:
-				oref = disp.msg.ref;
+				oref = ((lword)disp.msg.refh << 16) +
+					disp.msg.refl;
 				siz = sizeof(msgDispType) + disp.msg.len +1;
 				break;
 			default:
-				oref = 0;
+				oref = trac.msg.ref;
 				siz = sizeof(msgTraceType);
 		}
 
 	state MSGB_LOOP:
+		lword tref = oref == 0 ? seconds() : oref + beac.cur;
+
 		switch (in_header(beac.mpt, msg_type)) {
 			case msg_odr:
-				if (oref == 0)
-					odr.msg.ref = (word)seconds();
-				else
-					odr.msg.ref = oref + beac.cur;
+				odr.msg.refh = (word)(tref >> 16);
+				odr.msg.refl = (word)tref;
 				break;
 			case msg_disp:
-				if (oref == 0)
-					disp.msg.ref = (word)seconds();
-				else
-					disp.msg.ref = oref + beac.cur;
+				disp.msg.refh = (word)(tref >> 16);
+				disp.msg.refl = (word)tref;
+				break;
+			default:
+				trac.msg.ref = tref;
 		}
 
 		send_msg (beac.mpt, siz);
@@ -89,10 +92,15 @@ fsm msgbeac {
 	state MSGB_DOWN:
 		switch (in_header(beac.mpt, msg_type)) {
 			case msg_odr:
-				odr.msg.ref = oref;
+				odr.msg.refh = (word)(oref >> 16);
+				odr.msg.refl = (word)oref;
 				break;
 			case msg_disp:
-				disp.msg.ref = oref;
+				disp.msg.refh = (word)(oref >> 16);
+				disp.msg.refl = (word)oref;
+				break;
+			default:
+				trac.msg.ref = oref;
 		}
 		beac.cur = 0;
 		finish;
@@ -233,8 +241,8 @@ static void msg_disp_in (char * buf, word rssi, word siz) {
 
 	ossi_disp_out (buf);
 
-	if (in_disp(buf, ret)) { // write back
-		in_disp(buf, ret) = 0;
+	if (in_disp(buf, rack)) { // write back
+		in_disp(buf, rack) = 0;
 		in_header(buf, rcv) = in_header(buf, snd);
 		in_header(buf, hco) = 0;
 		send_msg (buf, siz);
@@ -256,7 +264,9 @@ static void msg_odr_in (char * buf, word rssi, word siz) {
 	if (in_odr (buf, hok) == in_odr (buf, hko))
 		in_odr (buf, ret) = 1;
 
-	if (in_odr (buf, hok) != 0) { // forward
+	// forward if not at source and either fwd or requested ack
+	if (in_odr (buf, hok) != 0 && (
+		in_odr (buf, ret) == 0 || in_odr (buf, rack))) {
 
 		in_header(buf, rcv) = in_odr (buf, ret) ?
 			(oep + in_odr (buf, hok) -1)->id :
@@ -265,7 +275,10 @@ static void msg_odr_in (char * buf, word rssi, word siz) {
 		send_msg (buf, siz); // I'm not entirely sure if this is ok...
 	}
 
-	ossi_odr_out (buf);
+	// show if transient set or at endpoints
+	if (fim_set.f.stran || in_odr (buf, hok) == 0 ||
+			in_odr (buf, hok) == in_odr (buf, hko))
+		ossi_odr_out (buf);
 }
 #undef oep
 
@@ -296,6 +309,10 @@ static void msg_trace_in (char * buf, word rssi) {
         in_header (b, rcv) = in_header (buf, snd);
         // hco is 0
         in_traceAck(b, fcount) = in_header(buf, hoc) & 0x7F;
+
+	// copy ref#
+	in_traceAck(b, refh) = (word)(in_trace(buf, ref) >> 16);
+	in_traceAck(b, refl) = (word)in_trace(buf, ref);
 
         // fwd part
         if (in_header(buf, msg_type) != msg_traceB &&

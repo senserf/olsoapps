@@ -16,6 +16,7 @@
 #include "msg_dcl.h"
 #include "sensors.h"
 #include "net.h"
+#include "storage.h"
 
 // msg_isTrace tells TARP to morph packets. msg_traceB doesn't morph on the
 // way forward, but does so backwards. For our needs here, we shouldn't really
@@ -82,10 +83,11 @@ static char disp_msgt (char * m) {
 #undef msgt
 
 static word set_disp (char * buf) {
-	word w, w1, w2;
+	lword re;
+	word w1, w2;
 	char s[40];
 
-	if (scan (buf, "%u %u %u %s", &w, &w1, &w2, s) != 4)
+	if (scan (buf, "%lu %u %u %s", &re, &w1, &w2, s) != 4)
 		return 0; // will display values
 
 	if (beac.mpt && in_header(beac.mpt, msg_type) == msg_disp &&
@@ -96,23 +98,25 @@ static word set_disp (char * buf) {
 	disp.msg.header.rcv	 	= w1;
 	disp.msg.header.hco 		= 0;
 
-	disp.msg.ref = w;
-	disp.msg.ret = w2 ? 1 : 0;
+	disp.msg.refh = (word)(re >> 16);
+	disp.msg.refl = (word)re;
+	disp.msg.rack = w2 ? 1 : 0;
 
-	if ((w = strlen (s)) > 39) {
-		w = 40; s[39] = '\0'; //oh shut up
+	if ((w1 = strlen (s)) > 39) {
+		w1 = 40; s[39] = '\0'; //oh shut up
 	}
-	disp.msg.len = w;
+	disp.msg.len = w1;
 	strcpy (disp.str, s);
 	return 0;
 }
 
 static word set_odr (char * buf) {
-	word c, w[10];
+	lword re;
+	word c, ac, w[9];
 
-	if ((c = scan (buf, "%u %u %u %u %u %u %u %u %u %u", &w[0], &w[1],
-			&w[2], &w[3], &w[4], &w[5], &w[6], &w[7], &w[8],
-			&w[9])) < 2)
+	if ((c = scan (buf, "%lu %u %u %u %u %u %u %u %u %u %u", &re, &ac,
+			&w[0], &w[1], &w[2], &w[3], &w[4], &w[5], &w[6], &w[7],
+			&w[8])) < 3)
 		return 0;
 
 	if (beac.mpt && in_header(beac.mpt, msg_type) == msg_odr &&
@@ -120,39 +124,44 @@ static word set_odr (char * buf) {
 		return 1; // locked
 
 	odr.msg.header.msg_type 	= msg_odr;
-	odr.msg.header.rcv 		= w[1];
+	odr.msg.header.rcv 		= w[0];
 	odr.msg.header.hco 		= 1;
 
-	odr.msg.ref = w[0];
+	odr.msg.refh = (word)(re >> 16);
+	odr.msg.refl = (word)re;
+	odr.msg.rack = ac ? 1 : 0;
 	odr.msg.ret = 0;
 	odr.msg.hok = 0;
-	odr.msg.hko = c -1;
+	odr.msg.hko = c -2;
 	odr.oe[0].id = local_host;
 
 	// assuming 0s: odr.oe[0].frssi = 0; odr.oe[0].brssi = 0;
 
-	for (w[0] = 1; w[0] < 10; w[0]++)
-		if (w[0] < c)
-			odr.oe[w[0]].id = w[w[0]];
+	for (ac = 1; ac < 10; ac++)
+		if (ac < c - 1)
+			odr.oe[ac].id = w[ac -1];
 		else
-			odr.oe[w[0]].id = 0; // previous req could be longer
+			odr.oe[ac].id = 0; // previous req could be longer
 
 	return 0;
 }
 
 static word set_trace (char * buf) {
+	lword re;
 	word c, t, d, h;
 
 	if (msg_seedsTr (trac.msg.header.msg_type) && beac.cur != 0)
 		return 1; // locked
 
-	c = scan (buf, "%u %u %u", &t, &d, &h);
-	if (c < 3)
+	c = scan (buf, "%lu %u %u %u", &re, &t, &d, &h);
+	if (c < 4)
 		h = 0;
-	if (c < 2)
+	if (c < 3)
 		d = 3;
+	if (c < 2)
+		t = 0;
 	if (c < 1)
-		return 0; // show; t = 0 must be explicit
+		return 0; // show; ref# = 0 must be explicit
 
 	switch (d) { // direction
 		case 0:
@@ -169,6 +178,7 @@ static word set_trace (char * buf) {
 	}
 	trac.msg.header.rcv = t;
 	trac.msg.header.hco = h;
+	trac.msg.ref = re;
 	return 0;
 }
 
@@ -266,6 +276,7 @@ fsm ossi_in {
 			case 'x': proceed OI_XMIT;
 			case 'F': proceed OI_FIM;
 			case 'm': proceed OI_MAS;
+			case 't': proceed OI_TRANS;
 		}
 		proceed OI_ILL;
 
@@ -284,6 +295,12 @@ fsm ossi_in {
 				 highlight_clear();
 			 }
 		}
+		proceed OI_STATS;
+
+	state OI_TRANS:
+
+		if (scan (ibuf+1, "%u", &w) > 0)
+			fim_set.f.stran = w ? 1 : 0;
 		proceed OI_STATS;
 
 	state OI_SETS:
@@ -417,7 +434,7 @@ fsm ossi_in {
 
 		cp = form (NULL, stats_str, local_host,
 			       	seconds(), master_host, master_ts, m[0], m[1],
-			       	stackfree(), w);
+			       	stackfree(), w, fim_set.f.stran);
 
 	state OI_STATEND:
 		ser_out (OI_STATEND, cp);
@@ -439,8 +456,9 @@ fsm ossi_in {
 	 	proceed OI_CLR;
 
 	state OI_SHOW_DISP:
-		ser_outf (OI_SHOW_DISP, disp_str, disp.msg.ref,
-			disp.msg.header.rcv, disp.msg.ret,
+		ser_outf (OI_SHOW_DISP, disp_str, ((lword)disp.msg.refh << 16) +
+							disp.msg.refl,
+			disp.msg.header.rcv, disp.msg.rack,
 			disp.msg.len, disp.str);
 	 	proceed OI_CLR;
 
@@ -462,13 +480,14 @@ fsm ossi_in {
 			w = 77; // ??
 	    }
 	state OI_SHOW_TRACEND:
-		ser_outf (OI_SHOW_TRACEND, trac_str, trac.msg.header.rcv, w,
-				trac.msg.header.hco);
+		ser_outf (OI_SHOW_TRACEND, trac_str, trac.msg.ref,
+			trac.msg.header.rcv, w, trac.msg.header.hco);
 		proceed OI_CLR;
 
 	state OI_SHOW_ODR:
-		ser_outf (OI_SHOW_ODR, odr_str, odr.msg.hko, odr.msg.ref,
-			odr.oe[1].id,
+		ser_outf (OI_SHOW_ODR, odr_str, odr.msg.hko,
+			((lword)odr.msg.refh << 16) + odr.msg.refl,
+			odr.msg.rack, odr.oe[1].id,
 			odr.oe[2].id, odr.oe[3].id, odr.oe[4].id, odr.oe[5].id,
 			odr.oe[6].id, odr.oe[7].id, odr.oe[8].id, odr.oe[9].id);
 		proceed OI_CLR;
@@ -520,10 +539,14 @@ void ossi_trace_out (char * buf, word rssi) {
 			 NULL)
 		goto Cleanup;
 
-	if ((lines[cnt++] = form (NULL, "%lu: tr(%u) %u %u %u:\r\n",
+	if ((lines[cnt++] = form (NULL, "%lu: tr(%u) #%lu %u %u %u:\r\n",
 			seconds(),
 			in_header(buf, snd),
-                        in_header(buf, msg_type),
+			(in_header(buf, msg_type) == msg_trace1) ?
+				in_trace(buf, ref) :
+				((lword)in_traceAck(buf, refh) << 16) +
+						in_traceAck(buf, refl),
+			in_header(buf, msg_type),
                         (in_header(buf, msg_type) == msg_trace1) ?
 				in_header(buf, seq_no) : // this is handy
 				in_traceAck(buf, fcount),
@@ -588,9 +611,10 @@ void ossi_odr_out (char * b) {
 			 NULL)
 		goto Cleanup;
 
-	if ((lines[cnt++] = form (NULL, "%lu(%u): odr(%u) [%u.%u.%u]:\r\n",
-			seconds(), (word)seconds() & 127,
-			in_odr(b, ref), in_odr(b, ret), in_odr(b, hok),
+	if ((lines[cnt++] = form (NULL, "%lu: odr #%lu [%u.%u.%u]:\r\n",
+			seconds(),
+			((lword)in_odr(b, refh) << 16) + in_odr(b, refl),
+			in_odr(b, ret), in_odr(b, hok),
 			in_odr(b, hko))) == NULL)
 		goto Cleanup;
 
@@ -645,9 +669,10 @@ void ossi_disp_out (char * b) {
 		return;
 
 	if ((out->buf = form (NULL,
-			"%lu(%u): disp fr %u.%u #%u ret %u %u<%s>\r\n",
-		seconds(), (word)seconds() & 127, in_header(b, snd),
-		in_header(b, hoc), in_disp(b, ref), in_disp(b, ret),
+			"%lu: disp #%lu fr %u.%u ack %u %u<%s>\r\n",
+		seconds(),
+		((lword)in_disp(b, refh) << 16) + in_disp(b, refl),
+		in_header(b, snd), in_header(b, hoc), in_disp(b, rack),
 		in_disp(b, len), b + sizeof(msgDispType))) == NULL) {
 			ufree (out);
 			return;

@@ -54,7 +54,8 @@ typedef union {
 		word tparam	:8;
 		word polev	:3;
 		word rx		:1;
-		word spare	:4;
+		word stran	:1; // show transient odr (not really in FIM)
+		word spare	:3;
 	} f;
 } fim_t;
 

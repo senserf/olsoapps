@@ -32,8 +32,13 @@
 #define dbg_e(c)        do { } while (0)
 #define dbg_f(c)        do { } while (0)
 
+#else
+
+#ifdef BOARD_WARSAW_BLUE
+#define BT_MODULE_LINKMATIC
 #endif
 
+#endif
 
 // reference: board_options.sys in WARSAW
 #ifdef RADIO_USE_LEDS
@@ -65,10 +70,9 @@
 // #define D_DEBUG	defined
 
 // Europe:
-#define CC1100_FREQ_FREQ2_VALUE 0x20
-#define CC1100_FREQ_FREQ1_VALUE 0x65
-#define CC1100_FREQ_FREQ0_VALUE 0xE8
+// #define CC1100_FREQ_FREQ2_VALUE 0x20
+// #define CC1100_FREQ_FREQ1_VALUE 0x65
+// #define CC1100_FREQ_FREQ0_VALUE 0xE8
 
-// I can't see expected difference with odr in VUEE... FIXME
 #define TARP_RTR        2
 

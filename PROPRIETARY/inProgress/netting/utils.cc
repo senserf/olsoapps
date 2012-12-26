@@ -9,6 +9,10 @@
 #include "oss_dcl.h"
 #include "net.h"
 #include "storage.h"
+#if defined BOARD_WARSAW_BLUE && ! defined __SMURPH__
+#include "ser.h"
+#endif
+
 
 char * get_mem (word state, word len) {
 	char * buf = (char *)umalloc (len);
@@ -47,6 +51,10 @@ void init () {
 		halt();
 	}
 
+#if defined BOARD_WARSAW_BLUE && ! defined __SMURPH__
+	ser_select (1);
+#endif
+
 	tarp_ctrl.param = fim_set.f.tparam;
 	pl = fim_set.f.polev;
 	if (fim_set.f.rx)
@@ -68,6 +76,7 @@ word fim_read() {
 
 	if (i > 0) {
 		fim_set.w = if_read (--i);
+		fim_set.f.stran = 0; // not FIM, just the flag's placeholder
 		return i;
 	}
 
@@ -75,6 +84,7 @@ word fim_read() {
 	fim_set.f.tparam = tarp_ctrl.param;
 	fim_set.f.polev = DEF_PLEV;
 	fim_set.f.rx = 1;
+	fim_set.f.stran = 0;
 	return IFLASH_SIZE;
 }
 

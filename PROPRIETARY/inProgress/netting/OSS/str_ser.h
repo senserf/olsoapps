@@ -10,9 +10,9 @@
 static trueconst char welcome_str[] = 
 	"Netting commands:\r\n\r\n"
 	"s (set / show) disp, odr, trace, beacon, TARP:\r\n"
-	"sd [ref# dst <string>]\r\n"
-	"so [ref# hop1 ... hop9]\r\n"
-	"st [ dst [ dir(3) [ hops(0) ]]]\r\n"
+	"sd [ref# dst ack <string>]\r\n"
+	"so [ref# ack hop1 ... hop9]\r\n"
+	"st [ref# [dst(0) [ dir(3) [ hops(0) ]]]]\r\n"
 	"sb [ (d,o,t) freq (<64) volume (>0) ]\r\n"
 	"sT *CAREFUL* [plev rx fwd slack rte tlev]\r\n"
 	"s (show node status)\r\n\r\n"
@@ -26,6 +26,7 @@ static trueconst char welcome_str[] =
 	"Fe(rase)\r\n"
 	"F (read)\r\n\r\n"
 	"m(aster) [1/0]\r\n"
+	"t(ransient) [1/0]\r\n"
 	"h(elp)\r\n"
 	"q(uit)\r\n";
 
@@ -40,18 +41,19 @@ static trueconst char notset_str[] = "Not set\r\n";
 static trueconst char lck_str[] = "Locked\r\n";
 
 static trueconst char stats_str[] =
-	"%u at %lu: M %u at %lu mem %u.%u.%u bat %u\r\n";
+	"%u at %lu: M %u at %lu mem %u.%u.%u bat %u trans %u\r\n";
 
 static trueconst char tarp_str[] =
 	"Plev %u rx %u fwd %u slack %u rte %u tlev %u\r\n";
 
 static trueconst char beac_str[] = "Beac %c(%u) freq %u %u of %u\r\n";
 
-static trueconst char disp_str[] = "Disp #%u to %u ret %u len %u <%s>\r\n";
+static trueconst char disp_str[] = "Disp #%lu to %u ack %u len %u <%s>\r\n";
 
-static trueconst char odr_str[] = "Odr(%u) #%u %u %u %u %u %u %u %u %u %u\r\n";
+static trueconst char odr_str[] = "Odr(%u) #%lu ack %u "
+					"[%u %u %u %u %u %u %u %u %u]\r\n";
 
-static trueconst char trac_str[] = "Trace to %u dir %u hco %u\r\n";
+static trueconst char trac_str[] = "Trace #%lu to %u dir %u hco %u\r\n";
 
 static trueconst char fim_str[] = "FIM(%u): plev %u rx %u fwd %u slack %u"
 					" rte %u tlev %u\r\n";
