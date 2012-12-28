@@ -19,9 +19,9 @@ idiosyncratic int tr_offset (headerType *h) {
 	sint i;
 	if (h->msg_type == msg_trace || h->msg_type == msg_traceF ||
 			h->msg_type == msg_trace1) // fwd dir
-		return 2 + sizeof(msgTraceType) + 2 *
-			((h->hoc & 0x7F) -1);
-	i = 2 + sizeof(msgTraceAckType) + 2 * (h->hoc & 0x7F);
+		return 2 + sizeof(msgTraceType) + 2 * (h->hoc -1);
+
+	i = 2 + sizeof(msgTraceAckType) + 2 * h->hoc;
 	if (h->msg_type == msg_traceAck) // birectional
 		i += 2 * (((msgTraceAckType *)h)->fcount -1);
 

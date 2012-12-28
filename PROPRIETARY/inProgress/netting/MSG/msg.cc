@@ -288,7 +288,7 @@ static void msg_trace_in (char * buf, word rssi) {
 
         if (in_header(buf, msg_type) != msg_traceB)
                 len = sizeof(msgTraceAckType) +
-                        (in_header(buf, hoc) & 0x7F) * 2;
+                        in_header(buf, hoc) * 2;
         else
                 len = sizeof(msgTraceAckType) + 2;
 
@@ -308,7 +308,7 @@ static void msg_trace_in (char * buf, word rssi) {
 
         in_header (b, rcv) = in_header (buf, snd);
         // hco is 0
-        in_traceAck(b, fcount) = in_header(buf, hoc) & 0x7F;
+        in_traceAck(b, fcount) = in_header(buf, hoc);
 
 	// copy ref#
 	in_traceAck(b, refh) = (word)(in_trace(buf, ref) >> 16);
@@ -316,10 +316,10 @@ static void msg_trace_in (char * buf, word rssi) {
 
         // fwd part
         if (in_header(buf, msg_type) != msg_traceB &&
-                        (in_header(buf, hoc) & 0x7F) > 1)
+                        in_header(buf, hoc) > 1)
                 memcpy (b + sizeof(msgTraceAckType),
                                 buf + sizeof(msgTraceType),
-                                2 * ((in_header(buf, hoc) & 0x7F) -1));
+                                2 * (in_header(buf, hoc) -1));
 
         // note that this node is counted in hoc, but is not appended yet, so:
         *((byte *)b + len - 2) = (byte)local_host;

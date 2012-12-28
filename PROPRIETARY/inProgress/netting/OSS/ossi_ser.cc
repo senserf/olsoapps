@@ -97,6 +97,7 @@ static word set_disp (char * buf) {
 	disp.msg.header.msg_type 	= msg_disp;
 	disp.msg.header.rcv	 	= w1;
 	disp.msg.header.hco 		= 0;
+	disp.msg.header.prox		= 0;
 
 	disp.msg.refh = (word)(re >> 16);
 	disp.msg.refl = (word)re;
@@ -126,6 +127,7 @@ static word set_odr (char * buf) {
 	odr.msg.header.msg_type 	= msg_odr;
 	odr.msg.header.rcv 		= w[0];
 	odr.msg.header.hco 		= 1;
+	odr.msg.header.prox		= 1;
 
 	odr.msg.refh = (word)(re >> 16);
 	odr.msg.refl = (word)re;
@@ -177,7 +179,7 @@ static word set_trace (char * buf) {
 			trac.msg.header.msg_type = msg_trace;
 	}
 	trac.msg.header.rcv = t;
-	trac.msg.header.hco = h;
+	trac.msg.header.hco = h; // we deliberately do NOT set prox
 	trac.msg.ref = re;
 	return 0;
 }
@@ -529,7 +531,7 @@ void ossi_trace_out (char * buf, word rssi) {
 			in_header(buf, msg_type) != msg_trace1)
                 num = in_traceAck(buf, fcount);
         if (in_header(buf, msg_type) != msg_traceFAck)
-                num += in_header(buf, hoc) & 0x7F;
+                num += in_header(buf, hoc);
         if (in_header(buf, msg_type) == msg_traceAck ||
 		in_header(buf, msg_type) == msg_trace1)
                 num--; // dst counted twice
@@ -550,7 +552,7 @@ void ossi_trace_out (char * buf, word rssi) {
                         (in_header(buf, msg_type) == msg_trace1) ?
 				in_header(buf, seq_no) : // this is handy
 				in_traceAck(buf, fcount),
-                        in_header(buf, hoc) & 0x7F)) == NULL)
+                        in_header(buf, hoc))) == NULL)
 		goto Cleanup;
 
         while (num--) {
