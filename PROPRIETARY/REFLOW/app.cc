@@ -272,14 +272,21 @@ static void controller () {
 	if (ER >= Span) {
 		// Large error, full throttle, but clear the integrator (not
 		// sure if this is right)
-		Integrator = 0;
-		Differentiator = CU;
-		CV = MAXPWI;
+		if (ER) {
+			// If ER == 0 (implying that Span is zero), retain
+			// previous setting
+			Integrator = 0;
+			Differentiator = CU;
+			CV = MAXPWI;
+		}
 		return;
 	}
 
 	// The first component: proportional to error, normalized to Span
-	t = (lint)ER * MAXPWI;
+	if (ER == 0)
+		t = (lint)CV;
+	else
+		t = (lint)ER * MAXPWI;
 
 	// The integrator component: GainI is between 0 and 1024
 	t += Integrator * GainI;
@@ -521,7 +528,7 @@ SErr:
 			GainI = unpack2 (cmd + 4);
 			GainD = unpack2 (cmd + 6);
 
-			if (Span < 10 || Span > 1024)
+			if (Span < MINIMUM_SPAN || Span > 1024)
 				goto SErr;
 
 			if (GainI > 1024 || GainD > 1024)

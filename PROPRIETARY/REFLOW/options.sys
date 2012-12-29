@@ -102,6 +102,9 @@
 			{ 2560,	1023 },	\
 	}
 
+// Minimum SPAN
+#define	MINIMUM_SPAN			0
+
 // The range is 10 - 1024, lower values mean more aggressive control
 #define	DEFAULT_SPAN			200
 

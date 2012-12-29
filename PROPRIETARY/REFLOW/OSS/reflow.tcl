@@ -86,7 +86,7 @@ set PM(SPT) [expr $PM(MXT) - $PM(MNT)]
 ###############################################################################
 
 set PROF(PR) {
-	{ CSpan { 10 1024 } }
+	{ CSpan { 0 1024 } }
 	{ Integrator { 0 1024 } }
 	{ Differentiator { 0 1024 } }
 }
@@ -2665,7 +2665,7 @@ proc mk_rootwin { win } {
 	#######################################################################
 
 	set row 0
-	foreach p { "S" "I" "D" } l { 10 0 0 } {
+	foreach p { "S" "I" "D" } l { 0 0 0 } {
 		label $f.l$p -text " $p: " -anchor w -font $FO(FIX)
 		grid $f.l$p -column 0 -row $row -sticky w
 		set WN(PA$p,M) ""
