@@ -32,19 +32,17 @@ static byte *PTI = NULL, PTIL;
 #define	LED_RED		0
 #define	LED_GREEN	1
 #define	LED_YELLOW	2
-static byte led_stat [3];
 
-static led_toggle (word led) {
-
-	led_stat [led] = 1 - led_stat [led];
-	leds (led, led_stat [led]);
-}
-
-static leds_clear () {
+static led (word led, word mode) {
 
 	leds_all (0);
 	fastblink (0);
-	led_stat [0] = led_stat [1] = led_stat [2] = 0;
+
+	if (mode) {
+		if (mode > 2)
+			fastblink (1);
+		leds (led, mode);
+	}
 }
 
 // ============================================================================
@@ -157,9 +155,6 @@ fsm band_sampler {
 
 		init_freq ();
 		sn = 0;
-		led_toggle (LED_YELLOW);
-		leds (LED_GREEN, 0);
-		leds (LED_RED, 0);
 
 	state FREQ_UPDATE:
 
@@ -217,9 +212,6 @@ fsm freq_sampler {
 	state LOOP:
 
 		max = sn = 0;
-		led_toggle (LED_YELLOW);
-		leds (LED_GREEN, 0);
-		leds (LED_RED, 0);
 
 	state WAIT_SAMPLE:
 
@@ -240,7 +232,6 @@ fsm freq_sampler {
 	state FIFO_FLUSH:
 
 		if (RX_FIFO_READY) {
-			leds (LED_GREEN, 1);
 			if (Mode > 1)
 				out_fifo (FIFO_FLUSH);
 			rrf_enter_rx ();
@@ -266,7 +257,6 @@ fsm freq_sampler {
 	state INJECT:
 
 		// Wait for channel assessment
-		leds (LED_RED, 1);
 		sacc = 0;
 
 	state CCLEAR:
@@ -319,7 +309,6 @@ static void reset_all () {
 		ufree (PTI);
 		PTI = NULL;
 	}
-	leds_clear ();
 }
 
 static void start_all () {
@@ -331,11 +320,13 @@ static void start_all () {
 		    ((lword) rrf_get_reg (CCxxx0_FREQ1) <<  8) |
 		    ((lword) rrf_get_reg (CCxxx0_FREQ0)      );
 
-	leds_clear ();
-	if (Mode)
+	if (Mode) {
 		runfsm freq_sampler;
-	else
+		led (LED_GREEN, 2);
+	} else {
 		runfsm band_sampler;
+		led (LED_GREEN, 3);
+	}
 }
 
 // ============================================================================
@@ -345,12 +336,12 @@ static void rq_handler (word st, byte *cmd, word cmdlen) {
 	switch (*cmd) {
 
 		case OSS_CMD_RSC: {
-#if 1
+#if 0
 			reset ();
 #else
 			// Kill the sampler process
 			reset_all ();
-			oss_ack (st, OSS_CMD_ACK);
+			oss_ack (st, OSS_CMD_RSC);
 #endif
 			return;
 		}
@@ -370,7 +361,7 @@ static void rq_handler (word st, byte *cmd, word cmdlen) {
 			if (cmdlen < 10) {
 SErr:
 				oss_ack (st, OSS_CMD_NAK);
-				leds (LED_RED, 0);
+				led (LED_RED, 3);
 				return;
 			}
 
@@ -400,7 +391,6 @@ SErr:
 			word i;
 			sint len;
 
-			leds (LED_RED, 1);
 			// The minimum is cmd npairs + 2 bytes
 			if (cmdlen < 4)
 				goto SErr;
@@ -415,7 +405,6 @@ SErr:
 			for (i = 2; i < len; i += 2)
 				rrf_mod_reg (cmd [i], cmd+1+i, 0);
 
-			leds (LED_RED, 0);
 			return;
 		}
 
@@ -428,7 +417,6 @@ SErr:
 			word i;
 			byte *buf;
 
-			leds (LED_RED, 1);
 			if (cmdlen < 3)
 				goto SErr;
 
@@ -447,7 +435,6 @@ SErr:
 			for (i = 2; i < len; i++)
 				buf [i] = rrf_get_reg (cmd [i]);
 			oss_send (buf);
-			leds (LED_RED, 0);
 			return;
 		}
 
@@ -458,7 +445,6 @@ SErr:
 			//	len
 			//	bytes
 
-			leds (LED_RED, 1);
 			if (cmdlen < 4)
 				goto SErr;
 
@@ -468,7 +454,6 @@ SErr:
 			oss_ack (st, OSS_CMD_ACK);
 
 			rrf_mod_reg (cmd [1], cmd + 3, cmd [2]);
-			leds (LED_RED, 0);
 			return;
 
 		case OSS_CMD_D_GRGB: {
@@ -478,7 +463,6 @@ SErr:
 			//	len
 			byte *buf;
 
-			leds (LED_RED, 1);
 			if (cmdlen < 3 || cmd [2] > OSS_SAMPLES)
 				goto SErr;
 
@@ -490,7 +474,6 @@ SErr:
 
 			rrf_get_reg_burst (cmd [1], buf + 2, cmd [2]);
 			oss_send (buf);
-			leds (LED_RED, 0);
 			return;
 		}
 
@@ -498,7 +481,6 @@ SErr:
 
 			byte *buf;
 
-			leds (LED_RED, 1);
 			if ((buf = oss_outr (st, 4)) == NULL)
 				// Cannot happen
 				goto SErr;
@@ -509,7 +491,7 @@ SErr:
 			buf [3] = OSS_MAG2;
 
 			oss_send (buf);
-			leds (LED_RED, 0);
+			led (LED_YELLOW, 2);
 			return;
 		}
 
@@ -518,7 +500,6 @@ SErr:
 			// Len
 			// Bytes to be written to TX FIFO
 
-			leds (LED_RED, 1);
 			if (cmdlen < 3)
 				goto SErr;
 
@@ -548,7 +529,7 @@ fsm root {
 
 	state INIT:
 
-		leds_clear ();
+		led (0, 0);
 		oss_init (rq_handler);
 		// Init RF, power down, default registers
 		rrf_init ();
@@ -557,5 +538,5 @@ fsm root {
 
 		// Hold on to your slot
 		when (root, RELAX);
-		leds (LED_GREEN, 1);
+		led (LED_GREEN, 1);
 }

@@ -272,11 +272,11 @@ static void controller () {
 	if (ER >= Span) {
 		// Large error, full throttle, but clear the integrator (not
 		// sure if this is right)
+		Integrator = 0;
+		Differentiator = CU;
 		if (ER) {
 			// If ER == 0 (implying that Span is zero), retain
 			// previous setting
-			Integrator = 0;
-			Differentiator = CU;
 			CV = MAXPWI;
 		}
 		return;

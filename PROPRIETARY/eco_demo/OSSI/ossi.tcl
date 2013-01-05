@@ -9,49 +9,546 @@ exec tclsh "$0" "$@"
 ##################################################################
 
 ##################################################################
+##################################################################
 
-proc msource { f } {
 #
-# Intelligent 'source'
+# Removed msource as being a pain in the ass; the "packages" are simply copied
+# here from PICOS/Scripts. Any way to make it both convenient and reliable does
+# not work, unless we want to make it unnecessarily "serious".
 #
-	if ![catch { uplevel #0 source $f } ] {
-		# found it right here
-		return
+
+package provide xml 1.0
+###############################################################################
+# Mini XML parser. Copyright (C) 2008-11 Olsonet Communications Corporation.
+###############################################################################
+
+namespace eval XML {
+
+proc xstring { s } {
+#
+# Extract a possibly quoted string
+#
+	upvar $s str
+
+	if { [xspace str] != "" } {
+		error "illegal white space"
 	}
 
-	set dir "Scripts"
-	set lst ""
+	set c [string index $str 0]
+	if { $c == "" } {
+		error "empty string illegal"
+	}
 
-	for { set i 0 } { $i < 10 } { incr i } {
-		set dir "../$dir"
-		set dno [file normalize $dir]
-		if { $dno == $lst } {
-			# no progress
+	if { $c != "\"" } {
+		# no quote; this is formally illegal in XML, but let's be
+		# pragmatic
+		regexp "^\[^ \t\n\r\>\]+" $str val
+		set str [string range $str [string length $val] end]
+		return [xunesc $val]
+	}
+
+	# the tricky way
+	if ![regexp "^.(\[^\"\]*)\"" $str match val] {
+		error "missing \" in string"
+	}
+	set str [string range $str [string length $match] end]
+
+	return [xunesc $val]
+}
+
+proc xunesc { str } {
+#
+# Remove escapes from text
+#
+	regsub -all "&amp;" $str "\\&" str
+	regsub -all "&quot;" $str "\"" str
+	regsub -all "&lt;" $str "<" str
+	regsub -all "&gt;" $str ">" str
+	regsub -all "&nbsp;" $str " " str
+
+	return $str
+}
+
+proc xspace { s } {
+#
+# Skip white space
+#
+	upvar $s str
+
+	if [regexp -indices "^\[ \t\r\n\]+" $str ix] {
+		set ix [lindex $ix 1]
+		set match [string range $str 0 $ix]
+		set str [string range $str [expr $ix + 1] end]
+		return $match
+	}
+
+	return ""
+}
+
+proc xcmnt { s } {
+#
+# Skip a comment
+#
+	upvar $s str
+
+	set sav $str
+
+	set str [string range $str 4 end]
+	set cnt 1
+
+	while 1 {
+		set ix [string first "-->" $str]
+		set iy [string first "<!--" $str]
+		if { $ix < 0 } {
+			error "unterminated comment: [string range $sav 0 15]"
+		}
+		if { $iy > 0 && $iy < $ix } {
+			incr cnt
+			set str [string range $str [expr $iy + 4] end]
+		} else {
+			set str [string range $str [expr $ix + 3] end]
+			incr cnt -1
+			if { $cnt == 0 } {
+				return
+			}
+		}
+	}
+}
+
+proc xftag { s } {
+#
+# Find and extract the first tag in the string
+#
+	upvar $s str
+
+	set front ""
+
+	while 1 {
+		# locate the first tag
+		set ix [string first "<" $str]
+		if { $ix < 0 } {
+			set str "$front$str"
+			return ""
+		}
+		append front [string range $str 0 [expr $ix - 1]]
+		set str [string range $str $ix end]
+		# check for a comment
+		if { [string range $str 0 3] == "<!--" } {
+			# skip the comment
+			xcmnt str
+			continue
+		}
+		set et ""
+		if [regexp -nocase "^<(/)?\[a-z:_\]" $str ix et] {
+			# this is a tag
 			break
 		}
-		if ![catch { uplevel #0 source [file join $dir $f] } ] {
-			# found it
-			return
+		# skip the thing and keep going
+		append front "<"
+		set str [string range $str 1 end]
+	}
+
+	if { $et != "" } {
+		set tm 1
+	} else {
+		set tm 0
+	}
+
+	if { $et != "" } {
+		# terminator, skip the '/', so the text is positioned at the
+		# beginning of keyword
+		set ix 2
+	} else {
+		set ix 1
+	}
+
+	# starting at the keyword
+	set str [string range $str $ix end]
+
+	if ![regexp -nocase "^(\[a-z0-9:_\]+)(.*)" $str ix kwd str] {
+		# error
+		error "illegal tag: [string range $str 0 15]"
+	}
+
+	set kwd [string tolower $kwd]
+
+	# decode any attributes
+	set attr ""
+	array unset atts
+
+	while 1 {
+		xspace str
+		if { $str == "" } {
+			error "unterminated tag: <$et$kwd"
+		}
+		set c [string index $str 0]
+		if { $c == "/" } {
+			# self-terminating
+			if { $tm != 0 || [string index $str 1] != ">" } {
+				error "broken self-terminating tag:\
+					<$et$kwd ... [string range $str 0 15]"
+			}
+			set str [string range $str 2 end]
+			return [list 2 $front $kwd $attr]
+		}
+		if { $c == ">" } {
+			# done
+			set str [string range $str 1 end]
+			# term preceding_text keyword attributes
+			return [list $tm $front $kwd $attr]
+		}
+		# this must be a keyword
+		if ![regexp -nocase "^(\[a-z\]\[a-z0-9_\]*)=" $str match atr] {
+			error "illegal attribute: <$et$kwd ... [string range \
+				$str 0 15]"
+		}
+		set atr [string tolower $atr]
+		if [info exists atts($attr)] {
+			error "duplicate attribute: <$et$kwd ... $atr"
+		}
+		set atts($atr) ""
+		set str [string range $str [string length $match] end]
+		if [catch { xstring str } val] {
+			error "illegal attribute value: \
+				<$et$kwd ... $atr=[string range $str 0 15]"
+		}
+		lappend attr [list $atr $val]
+	}
+}
+
+proc xadv { s kwd } {
+#
+# Returns the text + the list of children for the current tag
+#
+	upvar $s str
+
+	set txt ""
+	set chd ""
+
+	while 1 {
+		# locate the nearest tag
+		set tag [xftag str]
+		if { $tag == "" } {
+			# no more
+			if { $kwd != "" } {
+				error "unterminated tag: <$kwd ...>"
+			}
+			return [list "$txt$str" $chd]
+		}
+
+		set md [lindex $tag 0]
+		set fr [lindex $tag 1]
+		set kw [lindex $tag 2]
+		set at [lindex $tag 3]
+
+		append txt $fr
+
+		if { $md == 0 } {
+			# opening, not self-closing
+			set cl [xadv str $kw]
+			# inclusion ?
+			set tc [list $kw [lindex $cl 0] $at [lindex $cl 1]]
+			if ![xincl str $tc] {
+				lappend chd $tc
+			}
+		} elseif { $md == 2 } {
+			# opening, self-closing
+			set tc [list $kw "" $at ""]
+			if ![xincl str $tc] {
+				lappend chd $tc
+			}
+		} else {
+			# closing
+			if { $kw != $kwd } {
+				error "mismatched tag: <$kwd ...> </$kw>"
+			}
+			# we are done with the tag - check for file
+			# inclusion
+			return [list $txt $chd]
+		}
+	}
+}
+
+proc xincl { s tag } {
+#
+# Process an include tag
+#
+	set kw [lindex $tag 0]
+
+	if { $kw != "include" && $kw != "xi:include" } {
+		return 0
+	}
+
+	set fn [sxml_attr $tag "href"]
+
+	if { $fn == "" } {
+		error "href attribute of <$kw ...> is empty"
+	}
+
+	if [catch { open $fn "r" } fd] {
+		error "cannot open include file $fn: $fd"
+	}
+
+	if [catch { read $fd } fi] {
+		catch { close $fd }
+		error "cannot read include file $fn: $fi"
+	}
+
+	# merge it
+	upvar $s str
+
+	set str $fi$str
+
+	return 1
+}
+
+proc sxml_parse { s } {
+#
+# Builds the XML tree from the provided string
+#
+	upvar $s str
+
+	set v [xadv str ""]
+
+	return [list root [lindex $v 0] "" [lindex $v 1]]
+}
+
+proc sxml_name { s } {
+
+	return [lindex $s 0]
+}
+
+proc sxml_txt { s } {
+
+	return [string trim [lindex $s 1]]
+}
+
+proc sxml_attr { s n { e "" } } {
+
+	if { $e != "" } {
+		# flag to tell the difference between an empty attribute and
+		# its complete lack
+		upvar $e ef
+	}
+
+	set al [lindex $s 2]
+	set n [string tolower $n]
+	foreach a $al {
+		if { [lindex $a 0] == $n } {
+			if { $e != "" } {
+				set ef 1
+			}
+			return [lindex $a 1]
+		}
+	}
+	if { $e != "" } {
+		set ef 0
+	}
+	return ""
+}
+
+proc sxml_children { s { n "" } } {
+
+	set cl [lindex $s 3]
+
+	if { $n == "" } {
+		return $cl
+	}
+
+	set res ""
+
+	foreach c $cl {
+		if { [lindex $c 0] == $n } {
+			lappend res $c
 		}
 	}
 
-	# failed
-	puts stderr "Cannot locate file $f 'sourced' by the script."
+	return $res
+}
+
+proc sxml_child { s n } {
+
+	set cl [lindex $s 3]
+
+	foreach c $cl {
+		if { [lindex $c 0] == $n } {
+			return $c
+		}
+	}
+
+	return ""
+}
+
+proc sxml_yes { item attr } {
+#
+# A useful shortcut
+#
+	if { [string tolower [string index [sxml_attr $item $attr] 0]] == \
+		"y" } {
+			return 1
+	}
+	return 0
+}
+
+namespace export sxml_*
+
+### end of XML namespace ######################################################
+
+}
+
+namespace import ::XML::*
+
+###############################################################################
+# End of Mini XML parser ######################################################
+###############################################################################
+
+
+package provide log 1.0
+###############################################################################
+# Log functions. Copyright (C) 2008-11 Olsonet Communications Corporation.
+###############################################################################
+
+namespace eval LOGGING {
+
+variable Log
+
+proc abt { m } {
+
+	puts stderr $m
 	exit 99
 }
 
-msource xml.tcl
-msource log.tcl
+proc log_open { { fname "" } { maxsize "" } { maxvers "" } } {
+
+	variable Log
+
+	if { $fname == "" } {
+		if ![info exists Log(FN)] {
+			set Log(FN) "log"
+		}
+	} else {
+		set Log(FN) $fname
+	}
+
+	if { $maxsize == "" } {
+		if ![info exists Log(MS)] {
+			set Log(MS) 5000000
+		}
+	} else {
+		set Log(MS) $maxsize
+	}
+
+	if { $maxvers == "" } {
+		if ![info exists Log(MV)] {
+			set Log(MV) 4
+		}
+	} else {
+		set Log(MV) $maxvers
+	}
+
+	if [info exists Log(FD)] {
+		# close previous log
+		catch { close $Log(FD) }
+		unset Log(FD)
+	}
+
+	if [catch { file size $Log(FN) } fs] {
+		# not present
+		if [catch { open $Log(FN) "w" } fd] {
+			abt "Cannot open log file $Log(FN): $fd"
+		}
+		# empty log
+		set Log(SZ) 0
+	} else {
+		# log file exists
+		if [catch { open $Log(FN) "a" } fd] {
+			abt "Cannot open log file $log(FN): $fd"
+		}
+		set Log(SZ) $fs
+	}
+	set Log(FD) $fd
+	set Log(CD) 0
+}
+
+proc rotate { } {
+
+	variable Log
+
+	catch { close $Log(FD) }
+	unset Log(FD)
+
+	for { set i $Log(MV) } { $i > 0 } { incr i -1 } {
+		set tfn "$Log(FN).$i"
+		set ofn $Log(FN)
+		if { $i > 1 } {
+			append ofn ".[expr $i - 1]"
+		}
+		catch { file rename -force $ofn $tfn }
+	}
+
+	log_open
+}
+
+proc outlm { m } {
+
+	variable Log
+
+	catch {
+		puts $Log(FD) $m
+		flush $Log(FD)
+	}
+
+	incr Log(SZ) [string length $m]
+	incr Log(SZ)
+
+	if { $Log(SZ) >= $Log(MS) } {
+		rotate
+	}
+}
+
+proc log { m } {
+
+	variable Log 
+
+	if ![info exists Log(FD)] {
+		# no log filr
+		return
+	}
+
+	set sec [clock seconds]
+	set day [clock format $sec -format %d]
+	set hdr [clock format $sec -format "%H:%M:%S"]
+
+	if { $day != $Log(CD) } {
+		# day change
+		set today "Today is "
+		append today [clock format $sec -format "%h $day, %Y"]
+		if { $Log(CD) == 0 } {
+			# startup
+			outlm "$hdr #### $today ####"
+		} else {
+			outlm "00:00:00 #### BIM! BOM! $today ####"
+		}
+		set Log(CD) $day
+	}
+
+	outlm "$hdr $m"
+}
+
+namespace export log*
+
+### end of LOGGING namespace ##################################################
+
+}
+
+namespace import ::LOGGING::log*
+
+###############################################################################
+# End of Log functions
+###############################################################################
 
 package require xml 1.0
 package require log 1.0
-
-##################################################################
-#
-# Run isource ossi.tcl my_ossi.tct (see README.txt) to create a
-# location-independent version of this script
-#
-##################################################################
 
 if [catch { package require mysqltcl } ] {
 	set SQL_present 0
@@ -94,6 +591,7 @@ proc data_out_db { cid lab val } {
 
 	if { $DBFlag != "Y" } {
 		# no external database
+                msg "no external database"
 		return
 	}
 
@@ -101,6 +599,10 @@ proc data_out_db { cid lab val } {
 		msg "database undefined, -x request ignored"
 		return
 	}
+
+
+        #msg "DBINFO: -user $DBASE(user) -db $DBASE(name) -host\
+        #        $DBASE(host) -password $DBASE(password) "
 
 	if [catch { mysql::connect -user $DBASE(user) -db $DBASE(name) -host\
 		$DBASE(host) -password $DBASE(password) } con] {
@@ -118,6 +620,8 @@ proc data_out_db { cid lab val } {
 	}
 
 	set timestamp [clock format $Time -format %Y%m%d%H%M%S]
+
+
 
 	if [catch { mysql::exec $con "INSERT INTO observations\
 	  (NID, SID, time, value) VALUES ($cid, $sid, $timestamp, $val)" } nr] {
@@ -138,6 +642,7 @@ proc data_out { cid lab nam val } {
 
 	if { $Files(DATA) == "" } {
 		# no data logging
+                #msg "no data logging."
 		return
 	}
 
@@ -184,18 +689,6 @@ proc nannin { n } {
 		return 1
 	}
 	if { $num < 0 } {
-		return 1
-	}
-	return 0
-}
-
-proc nanxin { n } {
-#
-# Not a nonnegative Hex Number
-#
-	upvar $n num
-
-	if [catch { expr 0x$num } num] {
 		return 1
 	}
 	return 0
@@ -276,17 +769,17 @@ proc abinI { s l } {
 	append str [binary format I $l]
 }
 
-proc dbinQ { s } {
+proc dbinB { s } {
 #
-# decode return code from string s
+# decode one binary byte from string s
 #
 	upvar $s str
 	if { $str == "" } {
 		return -1
 	}
-	binary scan $str I val
-	set str [string range $str 4 end]
-	return [expr $val & 0xff]
+	binary scan $str c val
+	set str [string range $str 1 end]
+	return [expr ($val & 0x000000ff)]
 }
 
 proc uart_tmout { } {
@@ -328,7 +821,7 @@ proc uart_sokin { } {
 
 	uart_ctmout
 
-	if { [catch { read $Uart(TS) 4 } res] || $res == "" } {
+	if { [catch { read $Uart(TS) 1 } res] || $res == "" } {
 		# disconnection
 		catch { close $Uart(TS) }
 		set Uart(TS) ""
@@ -336,7 +829,7 @@ proc uart_sokin { } {
 		return
 	}
 
-	set code [dbinQ res]
+	set code [dbinB res]
 
 	if { $code != 129 } {
 		catch { close $Uart(TS) }
@@ -671,7 +1164,7 @@ proc read_map { } {
 			# the default
 			set pl 7
 		} else {
-			if [nanxin pl] {
+			if [nannin pl] {
 				smerr "illegal power level in collector $ix"
 				return 0
 			}
@@ -850,7 +1343,7 @@ proc read_map { } {
 		set snames($sn) ""
 		# just the index
 		lappend sl $si
-		# this is where we store full sensor record
+		# this is where we stroe full sensor record
 		set sbn($no) $sl
 
 		# add to the global list; the index is equal to the sensor's
@@ -1465,11 +1958,13 @@ proc input_avrp { inp } {
 			break
 		}
 
+                #msg "Value 1 = $value"
 		# remove from the string
 		set ix [expr [string first $value $inp] + \
 			[string length $value]]
 		set inp [string range $inp $ix end]
 
+                #msg "Value 2 = $value"
 		# locate the sensor
 		set nf 1
 		foreach s $SBN($cid) {
@@ -1495,25 +1990,33 @@ proc input_avrp { inp } {
 			}
 		}
 
+                #msg "Value before convert  = $value"
 		if { !$nf } {
 			# convert
 			set co [lindex $cv 1]
+                #        msg "co = $co"
+                #        msg "eval co = {eval $co}"
 			if [catch { eval $co } err] {
 				msg "conversion failed for $sn, collector $cid:\
 					$err"
 				continue
-			}
+			} 
+
 		}
+
+                #msg "Value after convert  = $value"
 
 		# the value is ready
 		value_update $s $value
 		# database
+                #msg "data_out_db $cid $uc  $value"
 		data_out_db $cid $uc $value
 		# log
 		data_out $cid $uc $sn $value
 
 		incr uc
 	}
+
 	msg "updated $uc values from collector $cid"
 }
 
@@ -1538,8 +2041,7 @@ proc cmd_cpoll { co } {
 	# static parameters
 	set dp [lindex $no 2]
 
-	uart_write "c $co $ag [lindex $dp 1] -1 [lindex $dp 2] [format %x \
-		[lindex $dp 0]]"
+	uart_write "c $co $ag [lindex $dp 1] -1 [lindex $dp 2] [lindex $dp 0]"
 }
 
 proc cmd_apoll { ag } {
@@ -1865,9 +2367,9 @@ set DBFlag ""
 
 while { $argv != "" } {
 
-	set fg [string trim [lindex $argv 0]]
+	set fg [lindex $argv 0]
 	set argv [lrange $argv 1 end]
-	set va [string trim [lindex $argv 0]]
+	set va [lindex $argv 0]
 	if { $va == "" || [string index $va 0] == "-" } {
 		set va ""
 	} else {
@@ -1918,7 +2420,7 @@ while { $argv != "" } {
 			bad_usage
 		}
 		if { $va != "" } {
-			if [nannin va] {
+			if [napin va] {
 				bad_usage
 			}
 			set Uart(NODE) $va
@@ -1990,14 +2492,6 @@ while { $argv != "" } {
 		continue
 	}
 
-	if { $fg == "-v" } {
-		if [info exists Files(SVAL)] {
-			bad_usage
-		}
-		set Files(SVAL) $va
-		continue
-	}
-
 	if { $va == "" } {
 		bad_usage
 	}
@@ -2018,6 +2512,14 @@ while { $argv != "" } {
 		continue
 	}
 
+	if { $fg == "-v" } {
+		if [info exists Files(SVAL)] {
+			bad_usage
+		}
+		set Files(SVAL) $va
+		continue
+	}
+
 	if { $fg == "-c" } {
 		if [info exists Files(ECMD)] {
 			bad_usage
@@ -2025,7 +2527,6 @@ while { $argv != "" } {
 		set Files(ECMD) $va
 		continue
 	}
-	bad_usage
 }
 
 if { $Uart(MODE) == "" } {
@@ -2071,7 +2572,7 @@ if ![info exists Files(SMAP)] {
 if ![info exists Files(SVAL)] {
 	set Files(SVAL) ""
 } elseif { $Files(SVAL) == "" } {
-	set Files(SVAL) "values"
+	set FIles(SVAL) "values"
 }
 
 if ![info exists Files(ECMD)] {

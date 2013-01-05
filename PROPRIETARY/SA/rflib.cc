@@ -338,8 +338,9 @@ void rrf_mod_reg (byte addr, byte *val, word length) {
 	sint i;
 	byte r;
 
-	if ((r = addr & 0x3F) >= CCxxx0_RCCTRL1 && r <= CCxxx0_TEST0)
+	if ((r = (addr & 0x3F)) >= CCxxx0_RCCTRL1 && r <= CCxxx0_TEST0)
 		// Ignore write to test registers
+		return;
 
 	if (length == 0) {
 		// a simple register (at least this is what we suspect); also
