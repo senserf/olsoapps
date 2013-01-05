@@ -41,7 +41,7 @@ if [file isdirectory "/dev"] {
 
 ###############################################################################
 
-set ST(VER) 0.01
+set ST(VER) 0.02
 
 ## double exit avoidance flag
 set DEAF 0
@@ -388,11 +388,19 @@ namespace import ::TOOLTIPS::*
 
 package require tooltips
 
+package provide boss 1.0
+
 ###############################################################################
-# ISO 3309 CRC ################################################################
+# BOSS ########################################################################
 ###############################################################################
 
-set CRCTAB {
+namespace eval BOSS {
+
+###############################################################################
+# ISO 3309 CRC + supplementary stuff needed by the protocol module ############
+###############################################################################
+
+variable CRCTAB {
     0x0000  0x1021  0x2042  0x3063  0x4084  0x50a5  0x60c6  0x70e7
     0x8108  0x9129  0xa14a  0xb16b  0xc18c  0xd1ad  0xe1ce  0xf1ef
     0x1231  0x0210  0x3273  0x2252  0x52b5  0x4294  0x72f7  0x62d6
@@ -427,9 +435,73 @@ set CRCTAB {
     0x6e17  0x7e36  0x4e55  0x5e74  0x2e93  0x3eb2  0x0ed1  0x1ef0
 }
 
-proc pt_chks { wa } {
+variable B
 
-	global CRCTAB
+# abort function (in case of internal fatal error, considered impossible)
+set B(ABR) ""
+
+# diag output function
+set B(DGO) ""
+
+# character zero (aka NULL)
+set B(ZER) [format %c [expr 0x00]]
+
+# the ACK flag
+set B(ACK) [expr 0x04]
+
+# direct packet type
+set B(MAD) [expr 0xAC]
+
+# acked packet type
+set B(MAP) [expr 0xAD]
+
+# preamble byte
+set B(IPR) [format %c [expr 0x55]]
+
+# diag preamble (for packet modes) = ASCII DLE
+set B(DPR) [format %c [expr 0x10]]
+
+# output busy flag (current message pending) + output event variable; also
+# used as main event trigger for all vital events
+set B(OBS) 0
+
+# output queue
+set B(OQU) ""
+
+# reception automaton state
+set B(STA) 0
+
+# reception automaton remaining byte count
+set B(CNT) 0
+
+# send callback
+set B(SCB) ""
+
+# long retransmit interval
+set B(RTL) 2048
+
+# short retransmit interval
+set B(RTS) 250
+
+# function to call on packet reception
+set B(DFN) "bo_nop"
+
+# function to call on UART close (which can happen asynchronously)
+set B(UCF) ""
+
+# low-level reception timer
+set B(TIM)  ""
+
+# packet timeout (msec), once reception has started
+set B(PKT) 80
+
+###############################################################################
+
+proc bo_nop { args } { }
+
+proc bo_chks { wa } {
+
+	variable CRCTAB
 
 	set nb [string length $wa]
 
@@ -454,293 +526,173 @@ proc pt_chks { wa } {
 	return $chs
 }
 
-proc bgerror { err } { }
+proc bo_abort { msg } {
 
-proc pt_abort { msg } {
+	variable B
 
-	tk_dialog "Abort!" "Fatal error: ${msg}!" "" 0 "OK"
-	terminate
+	if { $B(ABR) != "" } {
+		$B(ABR) $msg
+		exit 1
+	}
+
+	catch { puts stderr $msg }
+	exit 1
 }
 
-proc pt_diag { } {
+proc bo_diag { } {
 
-	global ST CH
+	variable B
 
-	if { [string index $ST(BUF) 0] == $CH(ZER) } {
+	if { [string index $B(BUF) 0] == $B(ZER) } {
 		# binary
-		set ln [string range $ST(BUF) 3 5]
+		set ln [string range $B(BUF) 3 5]
 		binary scan $ln cuSu lv code
-		puts "DIAG: \[[format %02x $lv] -> [format %04x $code]\]"
+		set ln "\[[format %02x $lv] -> [format %04x $code]\]"
 	} else {
 		# ASCII
-		puts "DIAG: [string trim $ST(BUF)]"
-	}
-	flush stdout
-}
-
-proc pt_ishex { c } {
-	return [regexp -nocase "\[0-9a-f\]" $c]
-}
-
-proc pt_isoct { c } {
-	return [regexp -nocase "\[0-7\]" $c]
-}
-
-proc pt_stparse { line } {
-#
-# Parse a UNIX string into a list of hex codes; update the source to point to
-# the first character behind the string
-#
-	upvar $line ln
-
-	set nc [string index $ln 0]
-	if { $nc != "\"" } {
-		error "illegal string delimiter: $nc"
+		set ln "[string trim $B(BUF)]"
 	}
 
-	# the original - for errors
-	set or "\""
+	if { $B(DGO) != "" } {
+		$B(DGO) $ln
+	} else {
+		puts "DIAG: $ln"
+		flush stdout
+	}
+}
 
-	set ln [string range $ln 1 end]
+proc gize { fun } {
 
-	set vals ""
+	if { $fun != "" && [string range $fun 0 1] != "::" } {
+		set fun "::$fun"
+	}
 
-	while 1 {
-		set nc [string index $ln 0]
-		if { $nc == "" } {
-			error "unterminated string: $or"
+	return $fun
+}
+
+proc lize { fun } {
+
+	return "::BOSS::$fun"
+}
+
+proc bo_emu_readable { fun } {
+#
+# Emulates auto read on readable UART
+#
+	variable B
+
+	if [$fun] {
+		# a void call, increase the timeout
+		if { $B(ROT) < 40 } {
+			incr B(ROT)
 		}
-		set ln [string range $ln 1 end]
-		if { $nc == "\"" } {
-			# done (this version assumes that the sentinel must be
-			# explicit, append 0x00 if this is a problem)
-			return $vals
-		}
-		if { $nc == "\\" } {
-			# escapes
-			set c [string index $ln 0]
-			if { $c == "" } {
-				# delimiter error, will be diagnosed at next
-				# turn
-				continue
-			}
-			if { $c == "x" } {
-				# get hex digits
-				set ln [string range $ln 1 end]
-				while 1 {
-					set d [string index $ln 0]
-					if ![pt_ishex $d] {
-						break
-					}
-					append c $d
-					set ln [string range $ln 1 end]
-				}
-				if [catch { expr 0$c % 256 } val] {
-					error "illegal hex escape in string: $c"
-				}
-				lappend vals $val
-				continue
-			}
-			if [pt_isoct $c] {
-				if { $c != 0 } {
-					set c "0$c"
-				}
-				# get octal digits
-				set ln [string range $ln 1 end]
-				while 1 {
-					set d [string index $ln 0]
-					if ![pt_isoct $d] {
-						break
-					}
-					append c $d
-					set ln [string range $ln 1 end]
-				}
-				if [catch { expr $c % 256 } val] {
-					error \
-					    "illegal octal escape in string: $c"
-				}
-				lappend vals $val
-				continue
-			}
-			set ln [string range $ln 1 end]
-			set nc $c
-			continue
-		}
-		scan $nc %c val
-		lappend vals [expr $val % 256]
+	} else {
+		set B(ROT) 0
 	}
+
+	set B(ONR) [after $B(ROT) "[lize bo_emu_readable] $fun"]
 }
 
-###############################################################################
-# The "S" module yanked from piter ############################################
-###############################################################################
-
-# UART FD
-set ST(SFD) 	""
-
-# character zero (aka NULL)
-set CH(ZER)	[format %c [expr 0x00]]
-
-# diag preamble (for packet modes) = ASCII DLE
-set CH(DPR)	[format %c [expr 0x10]]
-
-# maximum message length
-set PM(MPL)	132
-
-# UART bit rate
-set PM(DSP) 	115200
-
-# Binary flag (a constant, can be fixed in code, but let is stay for
-# compatibility with the original package
-set ST(BIN)	1
-
-# output busy flag (current message pending) + output event variable; also
-# used as main event trigger for all vital events
-set ST(OBS)	0
-
-# current outgoing message
-set ST(OUT)	""
-
-# queue of outgoing messages
-set ST(OQU)	""
-
-# send callback
-set ST(SCB)	""
-
-# readable emulation callback
-set ST(ONR)	""
-
-# low-level reception timer
-set ST(TIM)  ""
-
-# reception automaton initial state
-set ST(STA) 0
-
-# reception automaton remaining byte count
-set ST(CNT) 0
-
-# output queue bypass flag == not allowed; values: 0 - NA, 1 - tmp off,
-# 2 - tmp on, 3 - permanent
-set ST(BYP) 0
-
-# app-level input function
-set ST(DFN)	"nop"
-
-# packet timeout (msec), once reception has started
-set IV(PKT)	80
-
-# short retransmit interval
-set IV(RTS)	250
-
-# long retransmit interval
-set IV(RTL)	2000
-
-proc nop { args } { }
-
-###############################################################################
-# Module: mode == S ###########################################################
-###############################################################################
-
-proc mo_init_s { } {
+proc bo_fnwrite { msg } {
 #
-# Initialize
+# Writes a packet to the UART
 #
-	global CH ST PM
-
-	mo_reset_s
-
-	# ACK flag
-	set CH(ACK) 4
-	# Direct
-	set CH(MAD) [expr 0xAC]
-	# AB
-	set CH(MAP) [expr 0xAD]
-	set CH(IPR) [format %c [expr 0x55]]
-	set ST(MOD) "S"
-	#
-	set ST(STA) 0
-	set ST(CNT) 0
-	set ST(BUF) ""
-
-	# User packet length: in the S mode, the Network ID field is used by
-	# the protocol
-
-	set PM(UPL) [expr $PM(MPL) - 2]
-
-	fconfigure $ST(SFD) -buffering full -translation binary
-
-	# start the write callback for the persistent stream
-	mo_send_s
-}
-
-proc mo_send_s { } {
-#
-# Callback for sending packets out
-#
-	global ST IV CH
-	
-	# cancel the callback, in case called explicitly
-	if { $ST(SCB) != "" } {
-		catch { after cancel $ST(SCB) }
-		set ST(SCB) ""
-	}
-
-	if !$ST(OBS) {
-		# just in case
-		set ST(OUT) ""
-	}
-	# if len is nonzero, an outgoing message is pending; note: its length
-	# has been checked already (and is <= MAXPL)
-	set len [string length $ST(OUT)]
-
-	set flg [expr $CH(CUR) | ( $CH(EXP) << 1 )]
-
-	if { $len == 0 } {
-		# ACK only
-		set flg [expr $flg | $CH(ACK)]
-	}
-
-	mo_fnwrite_s "[binary format cc $CH(MAP) $flg]$ST(OUT)"
-
-	set ST(SCB) [after $IV(RTL) mo_send_s]
-}
-
-proc mo_fnwrite_s { msg } {
-#
-	global PM CH ST
+	variable B
 
 	set ln [string length $msg]
-	if { $ln > $PM(MPL) } {
-		pt_abort "Assert mo_frame_s: length > max"
+	if { $ln > $B(MPL) } {
+		bo_abort "assert fnwrite: $ln > max ($B(MPL))"
 	}
 
 	if { $ln < 2 } {
-		pt_abort "Assert mo_frame_s: length < min"
+		bo_abort "assert fnwrite: length ($ln) < 2"
 	}
 
 	if [expr $ln & 1] {
-		append msg $CH(ZER)
+		# need a filler zero byte
+		append msg $B(ZER)
 		incr ln -1
 	} else {
 		incr ln -2
 	}
 
 	if [catch {
-		puts -nonewline $ST(SFD) \
-			"$CH(IPR)[binary format c $ln]$msg[binary format s\
-				[pt_chks $msg]]"
-		flush $ST(SFD)
+		puts -nonewline $B(SFD) \
+			"$B(IPR)[binary format c $ln]$msg[binary format s\
+				[bo_chks $msg]]"
+		flush $B(SFD)
 	}] {
-		trc "Closing connection on write error"
-		close_uart
+		boss_close "BOSS write error"
 	}
 }
 
-proc mo_rawread_s { } {
+proc bo_send { } {
+#
+# Callback for sending packets out
+#
+	variable B
+	
+	# cancel the callback, in case called explicitly
+	if { $B(SCB) != "" } {
+		catch { after cancel $B(SCB) }
+		set B(SCB) ""
+	}
+
+	if !$B(OBS) {
+		# just in case, this is a consistency invariant
+		set B(OUT) ""
+	}
+
+	set len [string length $B(OUT)]
+	# if len is nonzero, an outgoing message is pending; its length
+	# has been checked already (and is <= MAXPL)
+
+	set flg [expr $B(CUR) | ( $B(EXP) << 1 )]
+
+	if { $len == 0 } {
+		# ACK only
+		set flg [expr $flg | $B(ACK)]
+	}
+
+	bo_fnwrite "[binary format cc $B(MAP) $flg]$B(OUT)"
+
+	set B(SCB) [after $B(RTL) [lize bo_send]]
+}
+
+proc bo_write { msg { byp 0 } } {
+#
+# Write out a message
+#
+	variable B
+
+	set lm [expr $B(MPL) - 2]
+
+	if { [string length $msg] > $lm } {
+		# truncate the message to size, probably a bad idea
+		set msg [string range $msg 0 [expr $lm - 1]]
+	}
+
+	if $byp {
+		# immediate output, direct protocol
+		bo_fnwrite "[binary format cc $B(MAD) 0]$msg"
+		return
+	}
+
+	if $B(OBS) {
+		bo_abort "assert write: output busy"
+	}
+
+	set B(OUT) $msg
+	set B(OBS) 1
+
+	bo_send
+}
+
+proc bo_rawread { } {
 #
 # Called whenever data is available on the UART (mode S)
 #
-	global ST PM
+	variable B
 #
 #  STA = 0  -> Waiting for preamble
 #        1  -> Waiting for the length byte
@@ -756,52 +708,49 @@ proc mo_rawread_s { } {
 
 		if { $chunk == "" } {
 
-			if [catch { read $ST(SFD) } chunk] {
+			if [catch { read $B(SFD) } chunk] {
 				# nonblocking read, ignore errors
 				set chunk ""
 			}
 
 			if { $chunk == "" } {
 				# check for timeout
-				if { $ST(TIM) != "" } {
+				if { $B(TIM) != "" } {
 					# reset
-					catch { after cancel $ST(TIM) }
-					set ST(TIM) ""
-					set ST(STA) 0
-				} elseif { $ST(STA) != 0 } {
+					catch { after cancel $B(TIM) }
+					set B(TIM) ""
+					set B(STA) 0
+				} elseif { $B(STA) != 0 } {
 					# something has started, set up timer
-					global IV
-					set ST(TIM) \
-					     [after $IV(PKT) mo_rawread_x]
+					set B(TIM) \
+				            [after $B(PKT) [lize bo_rawread]]
 				}
 				return $void
 			}
 			# there is something to process, cancel timeout
-			if { $ST(TIM) != "" } {
-				catch { after cancel $ST(TIM) }
-				set ST(TIM) ""
+			if { $B(TIM) != "" } {
+				catch { after cancel $B(TIM) }
+				set B(TIM) ""
 			}
 			set void 0
 		}
 
 		set bl [string length $chunk]
 
-		switch $ST(STA) {
+		switch $B(STA) {
 
 		0 {
-			# waiting for packet preamble
-			global CH
 			# Look up the preamble byte in the received string
 			for { set i 0 } { $i < $bl } { incr i } {
 				set c [string index $chunk $i]
-				if { $c == $CH(IPR) } {
+				if { $c == $B(IPR) } {
 					# preamble found
-					set ST(STA) 1
+					set B(STA) 1
 					break
 				}
-				if { $c == $CH(DPR) } {
+				if { $c == $B(DPR) } {
 					# diag preamble
-					set ST(STA) 3
+					set B(STA) 3
 					break
 				}
 			}
@@ -820,59 +769,57 @@ proc mo_rawread_s { } {
 			# up to MPL - 2)
 			binary scan [string index $chunk 0] cu bl
 			set chunk [string range $chunk 1 end]
-			if { [expr $bl & 1] || $bl > [expr $PM(MPL) - 2] } {
+			if { [expr $bl & 1] || $bl > [expr $B(MPL) - 2] } {
 				# reset
-				set ST(STA) 0
+				set B(STA) 0
 				continue
 			}
 			# how many bytes to expect
-			set ST(CNT) [expr $bl + 4]
-			set ST(BUF) ""
+			set B(CNT) [expr $bl + 4]
+			set B(BUF) ""
 			# found
-			set ST(STA) 2
+			set B(STA) 2
 		}
 
 		2 {
 			# packet reception, filling the buffer
-			if { $bl < $ST(CNT) } {
-				append ST(BUF) $chunk
+			if { $bl < $B(CNT) } {
+				append B(BUF) $chunk
 				set chunk ""
-				incr ST(CNT) -$bl
+				incr B(CNT) -$bl
 				continue
 			}
 
 			# end of packet, reset
-			set ST(STA) 0
+			set B(STA) 0
 
-			if { $bl == $ST(CNT) } {
-				append ST(BUF) $chunk
+			if { $bl == $B(CNT) } {
+				append B(BUF) $chunk
 				set chunk ""
 				# we have a complete buffer
-				mo_receive_s
+				bo_receive
 				continue
 			}
 
 			# merged packets
-			append ST(BUF) [string range $chunk 0 \
-				[expr $ST(CNT) - 1]]
-			set chunk [string range $chunk $ST(CNT) end]
-			mo_receive_s
+			append B(BUF) [string range $chunk 0 [expr $B(CNT) - 1]]
+			set chunk [string range $chunk $B(CNT) end]
+			bo_receive
 		}
 
 		3 {
 			# waiting for the end of a diag header
-			global CH
-			set chunk [string trimleft $chunk $CH(DPR)]
+			set chunk [string trimleft $chunk $B(DPR)]
 			if { $chunk != "" } {
-				set ST(BUF) ""
+				set B(BUF) ""
 				# look at the first byte of diag
-				if { [string index $chunk 0] == $CH(ZER) } {
+				if { [string index $chunk 0] == $B(ZER) } {
 					# a binary diag, length == 7
-					set ST(CNT) 7
-					set ST(STA) 5
+					set B(CNT) 7
+					set B(STA) 5
 				} else {
 					# ASCII -> wait for NL
-					set ST(STA) 4
+					set B(STA) 4
 				}
 			}
 		}
@@ -881,55 +828,55 @@ proc mo_rawread_s { } {
 			# waiting for NL ending a diag
 			set c [string first "\n" $chunk]
 			if { $c < 0 } {
-				append ST(BUF) $chunk
+				append B(BUF) $chunk
 				set chunk ""
 				continue
 			}
 
-			append ST(BUF) [string range $chunk 0 $c]
+			append B(BUF) [string range $chunk 0 $c]
 			set chunk [string range $chunk [expr $c + 1] end]
 			# reset
-			set ST(STA) 0
-			pt_diag
+			set B(STA) 0
+			bo_diag
 		}
 
 		5 {
 			# waiting for CNT bytes of binary diag
-			if { $bl < $ST(CNT) } {
-				append ST(BUF) $chunk
+			if { $bl < $B(CNT) } {
+				append B(BUF) $chunk
 				set chunk ""
-				incr ST(CNT) -$bl
+				incr B(CNT) -$bl
 				continue
 			}
 			# reset
-			set ST(STA) 0
-			append ST(BUF) [string range $chunk 0 \
-				[expr $ST(CNT) - 1]]
-
-			set chunk [string range $chunk $ST(CNT) end]
-			pt_diag
+			set B(STA) 0
+			append B(BUF) [string range $chunk 0 [expr $B(CNT) - 1]]
+			set chunk [string range $chunk $B(CNT) end]
+			bo_diag
 		}
 
 		default {
-			set ST(STA) 0
+			set B(STA) 0
 		}
 		}
 	}
 }
 
-proc mo_receive_s { } {
+proc bo_receive { } {
 #
-# Handle received packet
+# Handle a received packet
 #
-	global ST CH IV
+	variable B
+	
+	# dmp "RCV" $B(BUF)
 
 	# validate CRC
-	if [pt_chks $ST(BUF)] {
+	if [bo_chks $B(BUF)] {
 		return
 	}
 
 	# strip off the checksum
-	set msg [string range $ST(BUF) 0 end-2]
+	set msg [string range $B(BUF) 0 end-2]
 	set len [string length $msg]
 
 	if { $len < 2 } {
@@ -942,23 +889,15 @@ proc mo_receive_s { } {
 
 	# trim the message
 	set msg [string range $msg 2 end]
-	if !$ST(BIN) {
-		# character mode, strip the sentinel, if any
-		set cu [string first $CH(ZER) $msg]
-		if { $cu >= 0 } {
-			set msg [string range $msg 0 [expr $cu - 1]]
-		}
-	}
 
-	if { $pr == $CH(MAD) } {
+	if { $pr == $B(MAD) } {
 		# direct, receive right away, nothing else to do
-		dump "RD" $msg
-		$ST(DFN) $msg
+		$B(DFN) $msg
 		# count received messages as a form of heartbeat
 		return
 	}
 
-	if { $pr != $CH(MAP) } {
+	if { $pr != $B(MAP) } {
 		# wrong magic
 		return
 	}
@@ -967,18 +906,18 @@ proc mo_receive_s { } {
 	set ex [expr ($fg & 2) >> 1]
 	set ac [expr $fg & 4]
 
-	if $ST(OBS) {
+	if $B(OBS) {
 		# we have an outgoing message
-		if { $ex != $CH(CUR) } {
+		if { $ex != $B(CUR) } {
 			# expected != our current, we are done with this
 			# packet
-			set ST(OUT) ""
-			set CH(CUR) $ex
-			set ST(OBS) 0
+			set B(OUT) ""
+			set B(CUR) $ex
+			set B(OBS) 0
 		}
 	} else {
 		# no outgoing message, set current to expected
-		set CH(CUR) $ex
+		set B(CUR) $ex
 	}
 
 	if $ac {
@@ -986,89 +925,444 @@ proc mo_receive_s { } {
 		return
 	}
 
-	if { $cu != $CH(EXP) } {
+	if { $cu != $B(EXP) } {
 		# not what we expect, speed up the NAK
-		catch { after cancel $ST(SCB) }
-		set ST(SCB) [after $IV(RTS) mo_send_s]
+		catch { after cancel $B(SCB) }
+		set B(SCB) [after $B(RTS) [lize bo_send]]
 		return
 	}
 
 	# receive it
-	dump "RS" $msg
-	$ST(DFN) $msg
+	$B(DFN) $msg
 
 	# update expected
-	set CH(EXP) [expr 1 - $CH(EXP)]
+	set B(EXP) [expr 1 - $B(EXP)]
 
 	# force an ACK
-	mo_send_s
+	bo_send
 }
 
-proc mo_write_s { msg byp } {
+proc boss_reset { } {
 #
-# Send out a message
+# Protocol reset
 #
-	global ST PM CH
+	variable B
 
-	dump "W$byp" $msg
+	# queue of outgoing messages
+	set B(OQU) ""
 
-	set lm [expr $PM(MPL) - 2]
-	if { [string length $msg] > $lm } {
-		set msg [string range $msg 0 [expr $lm - 1]]
+	# current outgoing message
+	set B(OUT) ""
+
+	# output busy flag
+	set B(OBS) 0
+
+	# expected
+	set B(EXP) 0
+
+	# current
+	set B(CUR) 0
+
+	if { $B(SCB) != "" } {
+		# abort the callback
+		catch { after cancel $B(SCB) }
+		set B(SCB) ""
 	}
-
-	if $byp {
-		# immediate output, direct protocol
-		mo_fnwrite_s "[binary format cc $CH(MAD) 0]$msg"
-		return
-	}
-
-	if $ST(OBS) {
-		pt_abort "Assert mo_write_s: output busy"
-	}
-
-	set ST(OUT) $msg
-	set ST(OBS) 1
-	mo_send_s
 }
 
-proc mo_reset_s { } {
+proc boss_init { ufd mpl { clo "" } { emu 0 } } {
+#
+# Initialize: 
+#
+#	ufd - UART descriptor
+#	mpl - max packet length
+#	clo - function to call on UART close (can happen asynchronously)
+#	emu - emulate 'readable'
+#
+	variable B
 
-	global ST CH
+	boss_reset
 
-	set ST(OQU) ""
-	set ST(OUT) ""
-	set ST(OBS) 0
+	set B(STA) 0
+	set B(CNT) 0
+	set B(BUF) ""
 
-	set CH(EXP) 0
-	set CH(CUR) 0
+	set B(SFD) $ufd
+	set B(MPL) $mpl
 
-	set ST(BYP) 1
+	set B(UCF) $clo
+
+	# User packet length: in the S mode, the Network ID field is used by
+	# the protocol
+	set B(UPL) [expr $B(MPL) - 2]
+
+	fconfigure $B(SFD) -buffering full -translation binary
+
+	# start the write callback for the persistent stream
+	bo_send
+
+	# insert the auto-input handler
+	if $emu {
+		# the readable flag doesn't work for UART on some Cygwin
+		# setups
+		set B(ROT) 1
+		bo_emu_readable "[lize bo_rawread]"
+	} else {
+		# do it the easy way
+		fileevent $B(SFD) readable "[lize bo_rawread]"
+	}
 }
 
-proc mo_stop_s { } {
+proc boss_oninput { { fun "" } } {
+#
+# Declares a function to be called when a packet is received
+#
+	variable B
 
-	global ST
+	if { $fun == "" } {
+		set fun "bo_nop"
+	} else {
+		set fun [gize $fun]
+	}
 
-	foreach cb { "SCB" "TIM" } {
-		# kill callbacks
-		if { $ST($cb) != "" } {
-			catch { after cancel $ST($cb) }
-			set ST($cb) ""
+	set B(DFN) $fun
+}
+
+proc boss_trigger { } {
+	set ::BOSS::B(OBS) $::BOSS::B(OBS)
+}
+
+proc boss_wait { } {
+
+	variable B
+
+	if !$B(OBS) {
+		# not busy
+		if { $B(OQU) != "" } {
+			# something in queue
+			if { $B(SFD) != "" } {
+				bo_write [lindex $B(OQU) 0]
+				set B(OQU) [lrange $B(OQU) 1 end]
+			} else {
+				# drop everything, this is just a precaution
+				set B(OQU) ""
+			}
 		}
 	}
 
-	mo_reset_s
-
-	set ST(STA) 0
-	set ST(CNT) 0
-	set ST(BUF) ""
+	vwait ::BOSS::B(OBS)
 }
 
-set MODULE(S) [list mo_init_s mo_rawread_s mo_write_s mo_reset_s mo_stop_s]
+proc boss_stop { } {
+#
+# Stop the protocol
+#
+	variable B
+
+	foreach cb { "SCB" "TIM" } {
+		# kill callbacks
+		if { $B($cb) != "" } {
+			catch { after cancel $B($cb) }
+			set B($cb) ""
+		}
+	}
+
+	boss_reset
+
+	set B(STA) 0
+	set B(CNT) 0
+	set B(BUF) ""
+}
+
+proc boss_close { { err "" } } {
+#
+# Close the UART (externally or internally, which can happen asynchronously)
+#
+	variable B
+
+	if { [info exist B(ONR)] && $B(ONR) != "" } {
+		# we have been emulating 'readable', kill the callback
+		catch { after cancel $B(ONR) }
+		unset B(ONR)
+	}
+
+	if { $B(UCF) != "" } {
+		# any extra function to call?
+		set bucf $B(UCF)
+		# prevents recursion loops
+		set B(UCF) ""
+		$bucf $err
+	}
+
+	catch { close $B(SFD) }
+
+	set B(SFD) ""
+
+	# stop the protocol
+	boss_stop
+
+	boss_oninput
+
+	boss_trigger
+}
+
+proc boss_send { buf { urg 0 } } {
+#
+# This is the user-level output function
+#
+	variable B
+
+	if { $B(SFD) == "" } {
+		# ignore if disconnected, this shouldn't happen
+		return
+	}
+
+	# dmp "SND<$urg>" $buf
+
+	if $urg {
+		bo_write $buf 1
+		return
+	}
+
+	lappend B(OQU) $buf
+
+	boss_trigger
+}
+
+proc boss_timeouts { slow { fast 0 } } {
+#
+# Sets the timeouts:
+#
+#	slow	periodic ACKS
+#	fast	nack after unexpected packet
+#
+	variable B
+
+	set B(RTL) $slow
+	if $fast {
+		set B(RTS) $fast
+	}
+
+	if { $B(SCB) != "" } {
+		bo_send
+	}
+}
+
+namespace export boss_*
+
+}
+
+namespace import ::BOSS::*
 
 ###############################################################################
-lassign $MODULE(S) ST(IFN) ST(GFN) ST(OFN) ST(RFN) ST(SFN)
+# End of BOSS #################################################################
+###############################################################################
+
+package require boss
+
+proc trigger { } { boss_trigger }
+
+proc event_loop { } { boss_wait }
+
+###############################################################################
+
+package provide autoconnect 1.0
+
+package require unames
+
+###############################################################################
+# Autoconnect #################################################################
+###############################################################################
+
+namespace eval AUTOCONNECT {
+
+proc gize { fun } {
+
+	if { $fun != "" && [string range $fun 0 1] != "::" } {
+		set fun "::$fun"
+	}
+
+	return $fun
+}
+
+proc lize { fun } {
+
+	return "::AUTOCONNECT::$fun"
+}
+
+proc autocn_heartbeat { } {
+#
+# Called to provide connection heartbeat, typically after a message reception
+#
+	variable ACB
+
+	incr ACB(LRM)
+}
+
+proc autocn_start { op cl hs hc cc { po "" } } {
+#
+# op - open function
+# cl - close function
+# hs - command to issue handshake message
+# hc - handshake condition (if true, handshake has been successful)
+# cc - connection condition (if false, connection has been broken)
+# po - poll function (to kick the node if no heartbeat)
+# 
+	variable ACB
+
+	set ACB(OPE) [gize $op]
+	set ACB(CLO) [gize $cl]
+	set ACB(HSH) [gize $hs]
+	set ACB(HSC) [gize $hc]
+	set ACB(CNC) [gize $cc]
+	set ACB(POL) [gize $po]
+
+	# last device scan time
+	set ACB(LDS) 0
+
+	# automaton state
+	set ACB(STA) "L"
+
+	# hearbeat variables
+	set ACB(RRM) -1
+	set ACB(LRM) -1
+
+	ac_callback
+}
+
+proc ac_callback { } {
+#
+# This callback checks if we are connected and if not tries to connect us
+# automatically to the node
+#
+	variable ACB
+
+	# trc "AC S=$ACB(STA)"
+	if { $ACB(STA) == "R" } {
+		if ![$ACB(CNC)] {
+			set ACB(STA) "L"
+			after 100 [lize ac_callback]
+			return
+		}
+		# we are connected, check for heartbeat
+		if { $ACB(RRM) == $ACB(LRM) } {
+			# stall?
+			if { $ACB(POL) != "" } { $ACB(POL) }
+			set ACB(STA) "T"
+			set ACB(FAI) 0
+			after 1000 [lize ac_callback]
+			return
+		}
+		set ACB(RRM) $ACB(LRM)
+		# we are connected, no need to panic
+		after 2000 [lize ac_callback]
+		return
+	}
+
+	if { $ACB(STA) == "T" } {
+		# counting heartbeat failures
+		if ![$ACB(CNC)] {
+			set ACB(STA) "L"
+			after 100 [lize ac_callback]
+			return
+		}
+		if { $ACB(RRM) == $ACB(LRM) } {
+			if { $ACB(FAI) == 5 } {
+				set ACB(STA) "L"
+				$ACB(CLO)
+				after 100 [lize ac_callback]
+				return
+			}
+			incr ACB(FAI)
+			if { $ACB(POL) != "" } { $ACB(POL) }
+			after 600 [lize ac_callback]
+			return
+		}
+		set ACB(RRM) $ACB(LRM)
+		set ACB(STA) "R"
+		after 2000 [lize ac_callback]
+		return
+	}
+	
+	#######################################################################
+
+	if { $ACB(STA) == "L" } {
+		# Main loop
+		set tm [clock seconds]
+		if { $tm > [expr $ACB(LDS) + 5] } {
+			# last scan for new devices was done more than 5 sec
+			# ago, rescan
+			unames_scan
+			set ACB(DVS) [lindex [unames_choice] 0]
+			set ACB(DVL) [llength $ACB(DVS)]
+			set ACB(LDS) $tm
+			# trc "AC RESCAN: $ACB(DVS), $ACB(DVL)"
+		}
+		# index into the device table
+		set ACB(CUR) 0
+		set ACB(STA) "N"
+		after 250 [lize ac_callback]
+		return
+	}
+
+	#######################################################################
+
+	if { $ACB(STA) == "N" } {
+		# trc "AC N CUR=$ACB(CUR), DVL=$ACB(DVL)"
+		# try to open a new UART
+		if { $ACB(CUR) >= $ACB(DVL) } {
+			if { $ACB(DVL) == 0 } {
+				# no devices
+				set ACB(LDS) 0
+				after 1000 [lize ac_callback]
+				return
+			}
+			set ACB(STA) "L"
+			after 100 [lize ac_callback]
+			return
+		}
+
+		set dev [lindex $ACB(DVS) $ACB(CUR)]
+		incr ACB(CUR)
+		if { [$ACB(OPE) $dev] == 0 } {
+			after 100 [lize ac_callback]
+			return
+		}
+
+		$ACB(HSH)
+
+		set ACB(STA) "C"
+		after 2000 [lize ac_callback]
+		return
+	}
+
+	if { $ACB(STA) == "C" } {
+		# check if handshake established
+		if [$ACB(HSC)] {
+			# yep, assume connection OK
+			set ACB(STA) "R"
+			after 2000 [lize ac_callback]
+			return
+		}
+		# sorry, try another one
+		# trc "AC C -> CLOSING"
+		$ACB(CLO)
+		set ACB(STA) "N"
+		after 100 [lize ac_callback]
+		return
+	}
+
+	set ACB(STA) "L"
+	after 1000 [lize ac_callback]
+}
+
+namespace export autocn_*
+
+}
+
+namespace import ::AUTOCONNECT::*
+
+###############################################################################
 ###############################################################################
 
 proc cw { } {
@@ -1091,7 +1385,7 @@ proc md_click { val { lv 0 } } {
 #
 # Generic done event for modal windows/dialogs
 #
-	global Mod ST
+	global Mod
 
 	if { [info exists Mod($lv,EV)] && $Mod($lv,EV) == 0 } {
 		set Mod($lv,EV) $val
@@ -1132,7 +1426,7 @@ proc md_wait { { lv 0 } } {
 #
 # Wait for an event on the modal dialog
 #
-	global ST Mod
+	global Mod
 
 	set Mod($lv,EV) 0
 
@@ -1201,8 +1495,7 @@ proc terminate { } {
 
 	if $ST(SIP) {
 		# send a reset request to the node
-		send_reset
-		wack 0xFE 1000
+		send_abort 1
 	}
 
 	exit 0
@@ -1389,7 +1682,7 @@ proc hencode { buf } {
 
 proc getsparams { } {
 #
-# Retrieve parameters from RC file
+# Retrieve parameters from the RC file
 #
 	global RC PM Params RGroups PLayouts
 
@@ -1623,144 +1916,70 @@ proc log_toggle { } {
 }
 
 ###############################################################################
-# This circumvents a bug in Cygwin native Tcl whereby "readable" on a COM port
-# causes Windows to lose text events (at least this is how much I understand
-# about the bug. So in such a case, the readable event is emulated by timer
-# callbacks. This is ugly (FIXME), but hopefully I will remove it some day.
-###############################################################################
-
-proc readcb { fun } {
-
-	global ST
-
-	if [$fun] {
-		# a void call, increase the timeout
-		if { $ST(ROT) < 40 } {
-			incr ST(ROT)
-		}
-	} else {
-		set ST(ROT) 0
-	}
-
-	set ST(ONR) [after $ST(ROT) "readcb $fun"]
-}
-
-proc onreadable { fun } {
-#
-# This circumvents a bug (FIXME)
-#
-	global ST
-
-	if { $ST(SYS) == "L" || $ST(DEV) != "L" } {
-		# we have no problem unless this doesn't hold, i.e., we are
-		# on Windows running Cygwin native Tcl
-		fileevent $ST(SFD) readable $fun
-		return
-	}
-
-	# emulate the callback by a timer
-	set ST(ROT) 1
-	readcb $fun
-}
-
-###############################################################################
-
-proc event_loop { } {
-#
-# Main event loop to handle outgoing I/O
-#
-	global ST
-
-	if !$ST(OBS) {
-		# not busy
-		if { $ST(OQU) != "" } {
-			# something in queue
-			if { $ST(SFD) != "" } {
-				$ST(OFN) [lindex $ST(OQU) 0] 0
-				set ST(OQU) [lrange $ST(OQU) 1 end]
-			} else {
-				# drop everything, this is just a precaution
-				set ST(OQU) ""
-			}
-		}
-	}
-	vwait ST(OBS)
-}
-
-proc trigger { } {
-#
-# Trigger a global event
-#
-	global ST
-
-	set ST(OBS) $ST(OBS)
-}
-
-proc send_command { buf } {
-
-	global ST
-
-	if { $ST(SFD) == "" } {
-		# ignore if disconnected, shouldn't happen
-		trc "Ignored, disconnected"
-		return
-	}
-
-	if { $ST(BYP) > 1 } {
-		# queue bypass
-		$ST(OFN) $buf 1
-		trc "Bypassed"
-		return
-	}
-
-	lappend ST(OQU) $buf
-
-	trigger
-}
-
-proc bypass { on } {
-
-	global ST
-
-	if $on {
-		set ST(BYP) 2
-	} else {
-		set ST(BYP) 1
-	}
-}
-
-###############################################################################
 
 proc send_reset { } {
 
-	send_command [binary format c 0xFF]
-	send_command [binary format c 0xFE]
+	boss_send [binary format c 0xFF]
+	boss_send [binary format c 0xFE]
 }
 
-proc send_handshake { { pure "" } } {
+proc send_abort { { urg 0 } } {
 
-	if { $pure == "" } {
-		send_reset
+	# issue urgent reset, twice, but it is unlikely that more
+	# than one reset will be triggered this way
+	set msg [binary format c 0xFE]
+	if $urg {
+		boss_send $msg 1
+		boss_send $msg 1
+		boss_send $msg 1
+	} else {
+		boss_send [binary format c 0xFF]
+		boss_send $msg
 	}
-	send_command [binary format c 0x05]
+}
+
+proc send_handshake { } {
+
+	send_abort
+	set msg [binary format c 0x05]
+	boss_send $msg
+	boss_send $msg
+}
+
+proc send_poll { } {
+
+	boss_send [binary format c 0x05]
+}
+
+proc handshake_ok { } {
+
+	global ST
+
+	return $ST(HSK)
 }
 
 ###############################################################################
 
-proc open_uart { udev } {
+proc uart_open { udev } {
 
 	global PM ST
 
+	set emu 0
 	if { $ST(SYS) == "L" } {
 		set accs { RDWR NOCTTY NONBLOCK }
 	} else {
 		set accs "r+"
+		if { $ST(DEV) == "L" } {
+			# native Tcl on Cygwin
+			set emu 1
+		}
 	}
 
-	trc "opening [unames_unesc $udev] $accs"
+	set d [unames_unesc $udev]
+	# trc "opening $d $accs"
 
-	if [catch { open [unames_unesc $udev] $accs } ST(SFD)] {
-		trc "failed: $ST(SFD)"
+	if [catch { open $d $accs } ST(SFD)] {
+		# trc "failed: $ST(SFD)"
 		set ST(SFD) ""
 		return 0
 	}
@@ -1772,28 +1991,32 @@ proc open_uart { udev } {
 		return 0
 	}
 
-	# module initializer
-	$ST(IFN)
+	set ST(UDV) $udev
 
-	# input processor
-	set ST(DFN) "first_input"
+	# handshake condition not met
+	set_status "handshake $ST(UDV)"
+	set ST(HSK) 0
 
-	# UART reader
-	onreadable $ST(GFN)
+	# configure the protocol
+	boss_init $ST(SFD) $PM(MPL) uart_close $emu
 
-	# send the first command
-	send_handshake
+	# input function
+	boss_oninput uart_first_read
+
+	# timeouts
+	boss_timeouts $PM(LTM,H) $PM(STM)
 
 	return 1
 }
 
-proc close_uart { } {
+proc uart_close { { err "" } } {
 
 	global ST
 
-	if { [info exist ST(ONR)] && $ST(ONR) != "" } {
-		catch { after cancel $ST(ONR) }
-		set ST(ONR) ""
+	# trc "close UART: $err"
+
+	if $ST(SIP) {
+		send_abort 1
 	}
 
 	catch { close $ST(SFD) }
@@ -1801,175 +2024,46 @@ proc close_uart { } {
 
 	clear_sip
 
-	$ST(SFN)
+	set_status "disconnected"
 
-	set ST(DFN) "nop"
-
-	# global event
 	trigger
 }
 
-proc first_input { msg } {
+proc uart_connected { } {
+
+	global ST
+
+	return [expr { $ST(SFD) != "" }]
+}
+
+proc uart_first_read { msg } {
 #
 # To establish a handshake (receive a magic byte) from the node
 #
-	global ST
+	global ST PM
 
-	trc "first input: [string length $msg]"
+	# dmp "FIR" $msg
 	if { [string length $msg] < 4 } {
 		return
 	}
 
 	binary scan $msg cucucucu a b c d
-	trc "handshake: $a $b $c $d"
+	# trc "handshake: $a $b $c $d"
 
 	if { $a != 0x05 || $b != 0xCE || $c != 0x31 || $d != 0x7A } {
 		# still not it
 		return
 	}
 
-	# OK, reset the input function, this is what we have been waiting for
-	set ST(DFN) "read_data"
+	# handshake condition met
+	set ST(HSK) 1
+	set_status "connected $ST(UDV)"
+	boss_oninput uart_read
 
-	# global event
+	clear_sip
+	update_widgets
+
 	trigger
-}
-
-proc auto_connect_callback { } {
-#
-# This callback checks if we are connected and if not tries to connect us
-# automatically to the node
-#
-	global ST ACB
-
-	if ![info exists ACB(LDS)] {
-		# the first time around
-		trc "ACB: init"
-		set ACB(LDS) 0
-		set ACB(STA) "L"
-		set ACB(RRM) -1
-	}
-
-	if { $ACB(STA) == "R" && $ST(SFD) != "" } {
-		trc "ACB: connected"
-		if { $ST(RRM) == $ACB(RRM) } {
-			# stall?
-			send_handshake only
-			set ACB(STA) "T"
-			set ACB(FAI) 0
-			after 1000 auto_connect_callback
-			return
-		}
-		set ACB(RRM) $ST(RRM)
-		# we are connected, no need to panic
-		after 2000 auto_connect_callback
-		return
-	}
-
-	if { $ACB(STA) == "T" } {
-		if { $ST(SFD) == "" } {
-			set ACB(STA) "L"
-			after 100 auto_connect_callback
-			return
-		}
-		if { $ST(RRM) == $ACB(RRM) } {
-			if { $ACB(FAI) == 5 } {
-				set ACB(STA) "L"
-				trc "ACB: stalled connection"
-				close_uart
-				after 100 auto_connect_callback
-				return
-			}
-			incr ACB(FAI)
-			send_handshake only
-			after 600 auto_connect_callback
-			return
-		}
-		set ACB(RRM) $ST(RRM)
-		set ACB(STA) "R"
-		after 2000 auto_connect_callback
-		return
-	}
-	
-	set_status "disconnected"
-
-	#######################################################################
-
-	if { $ACB(STA) == "L" } {
-		# Main loop
-		set tm [clock seconds]
-		if { $tm > [expr $ACB(LDS) + 5] } {
-			# last scan for new devices was done more than 5 sec
-			# ago, rescan
-			trc "ACB: rescan"
-			unames_scan
-			set ACB(DVS) [lindex [unames_choice] 0]
-			set ACB(DVL) [llength $ACB(DVS)]
-			set ACB(LDS) $tm
-		}
-		# index into the device table
-		set ACB(CUR) 0
-		set ACB(STA) "N"
-		after 250 auto_connect_callback
-		return
-	}
-
-	#######################################################################
-
-	if { $ACB(STA) == "N" } {
-		# try to open a new UART
-		if { $ACB(CUR) >= $ACB(DVL) } {
-			if { $ACB(DVL) == 0 } {
-				# no devices
-				set ACB(LDS) 0
-				trc "ACB: no devices"
-				after 1000 auto_connect_callback
-				return
-			}
-			set ACB(STA) "L"
-			after 100 auto_connect_callback
-			return
-		}
-
-		set dev [lindex $ACB(DVS) $ACB(CUR)]
-		incr ACB(CUR)
-		trc "ACB: trying $dev"
-		if { [open_uart $dev] == 0 } {
-			trc "ACB: $dev doesn't open"
-			after 100 auto_connect_callback
-			return
-		}
-
-		set_status "handshake"
-
-		trc "ACB: connected, waiting for handshake"
-		set ACB(STA) "C"
-		after 1000 auto_connect_callback
-		return
-	}
-
-	if { $ACB(STA) == "C" } {
-		# check if handshake established
-		if { $ST(DFN) == "read_data" } {
-			# yep, assume connection OK
-			trc "ACB: handshake OK, we are set"
-			update_widgets
-			set ACB(STA) "R"
-			set_status "connected"
-			clear_sip
-			after 2000 auto_connect_callback
-			return
-		}
-		# sorry, try another one
-		close_uart
-		set ACB(STA) "N"
-		after 100 auto_connect_callback
-		return
-	}
-
-	trc "ACB: fall through, state $ACB(STA)"
-	set ACB(STA) "L"
-	after 1000 auto_connect_callback
 }
 
 proc ack_timeout { } {
@@ -2002,14 +2096,16 @@ proc wack { cmd { tim 8000 } } {
 	}
 }
 
-proc read_data { msg } {
+proc uart_read { msg } {
 
 	global ST PM
 
-	incr ST(RRM)
+	autocn_heartbeat
 
 	set len [expr [string length $msg] - 1]
 	binary scan $msg cu code
+
+	# dmp "REA<$len,$code>" $msg
 
 	foreach c $ST(ECM) {
 		if { $code == $c } {
@@ -2023,7 +2119,7 @@ proc read_data { msg } {
 
 	if { $code == 2 } {
 		if { $len < $PM(NSA) } {
-			trc "Bad sample, $len bytes instead of $PM(NSA)"
+			# trc "Bad sample, $len bytes instead of $PM(NSA)"
 			return
 		}
 		set msg [string range $msg 1 end]
@@ -2180,7 +2276,7 @@ proc clear_sip { } {
 #
 # Enter the idle state after re-connection
 #
-	global ST WN
+	global ST WN PM
 
 	if $ST(SIP) {
 		set ST(SIP) 0
@@ -2188,6 +2284,8 @@ proc clear_sip { } {
 		update_widgets
 		inject_button_status
 	}
+
+	boss_timeouts $PM(LTM,I)
 }
 
 proc do_start_stop { } {
@@ -2231,7 +2329,7 @@ proc do_start_stop { } {
 	set SM(fs) $fs
 	set SM(mo) $mo
 
-	trc "SEP: $mo, $RC(FCE)<$fc>, $RC(BAN)<$fs>, $RC(STA), $RC(ISD)"
+	# trc "SEP: $mo, $RC(FCE)<$fc>, $RC(BAN)<$fs>, $RC(STA), $RC(ISD)"
 
 	# reset the node
 	send_reset
@@ -2258,10 +2356,11 @@ proc do_start_stop { } {
 	append cmd [pack1 $RC(STA)]
 	append cmd [pack1 $RC(ISD)]
 
-	send_command $cmd
+	boss_send $cmd
 
 	set ST(SIP) [expr $mo + 1]
 	$WN(SSB) configure -text "Stop"
+	boss_timeouts $PM(LTM,S)
 
 	for { set i 0 } { $i < $PM(NSA) } { incr i } {
 		set SM($i) $RC(GRS)
@@ -3417,16 +3516,18 @@ proc reg_write { name } {
 
 	if $RG($name,L) {
 		# burst
+		# trc "RWB: $name, $RG($name,A), $RG($name,L) == $val"
 		set cmd [binary format ccc 0x06 $RG($name,A) $RG($name,L)]
 		foreach v $val {
 			append cmd [pack1 $v]
 		}
 	} else {
 		# single
+		# trc "RWS: $name, $RG($name,A) == $val"
 		set cmd [binary format cccc 0x03 1 $RG($name,A) $val]
 	}
 
-	send_command $cmd
+	boss_send $cmd
 	if { [wack 0xFD 2000] < 0 } {
 		return "Failed to write register $name, node response timeout"
 	}
@@ -3476,7 +3577,7 @@ proc regs_write { } {
 	}
 
 	# write single-valued registers
-	send_command $cmd
+	boss_send $cmd
 	if { [wack 0xFD 3000] < 0 } {
 		return "Failed to write single-valued registers, node response\
 			timeout"
@@ -3527,7 +3628,7 @@ proc reg_read { name } {
 		set cmd [binary format ccc $wai 1 $RG($name,A)]
 	}
 
-	send_command $cmd
+	boss_send $cmd
 
 	if { [wack $wai 2000] < 0 } {
 		return "Failed to read register $name, node response timeout"
@@ -3631,7 +3732,7 @@ proc regs_read { } {
 	}
 
 	# read all single-valued registers
-	send_command $cmd
+	boss_send $cmd
 
 	if { [wack 0x04 2000] < 0 } {
 		return "Failed to read registers, node response timeout"
@@ -5028,7 +5129,7 @@ proc inject_execute { this } {
 
 	log "Injecting packet \[[tstamp]\] (length=[string length $pkt]):"
 	log [string trimleft [hencode $pkt]]
-	send_command "[binary format cc 0x08 [string length $pkt]]$pkt"
+	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
 	set ret [wack { 0xFD 0xFC } 4000]
 	if { $ret < 0 } {
 		alert "Node response timeout"
@@ -5101,7 +5202,7 @@ proc inject_repeat_callback { this } {
 		length=[string length $pkt]):"
 	log [string trimleft [hencode $pkt]]
 
-	send_command "[binary format cc 0x08 [string length $pkt]]$pkt"
+	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
 	set ret [wack { 0xFD 0xFC } 4000]
 	if { $ret < 0 } {
 		log "repeat injection failed (node response timeout)"
@@ -5146,7 +5247,7 @@ proc trc { msg } {
 	puts $msg
 }
 
-proc dump { hd buf } {
+proc dmp { hd buf } {
 
 	global ST
 
@@ -5167,7 +5268,7 @@ proc initialize { } {
 		set ST(DBG) 1
 	}
 
-	trc "Starting"
+	# trc "Starting"
 
 	getsparams
 
@@ -5185,11 +5286,34 @@ proc initialize { } {
 
 tip_init
 
+# UART FD
+set ST(SFD) 	""
+
+# UART device
+set ST(UDV)	""
+
+# Handshake status
+set ST(HSK)	0
+
 # Debug flag
 set ST(DBG)	0
 
+# maximum message length
+set PM(MPL)	132
+
+# UART bit rate
+set PM(DSP) 	115200
+
 # tip text wrap length (pixels)
 set PM(TWR)	320
+
+# long timeouts: handshake, idle, sampling
+set PM(LTM,H)	64
+set PM(LTM,I)	512
+set PM(LTM,S)	1024
+
+# short timeout
+set PM(STM)	32
 
 # Handshake timeout: short, long
 set PM(HST)	{ 2000 8000 }
@@ -5203,6 +5327,11 @@ set ST(ECM)	""
 set ST(ECM,C)	0
 set ST(ECM,M)	""
 set ST(ECM,T)	""
+
+###############################################################################
+
+# character zero (aka NULL)
+set CH(ZER)	[format %c [expr 0x00]]
 
 ###############################################################################
 
@@ -6232,6 +6361,7 @@ regtip	RCCTRL0S	"Contains the RCCTRL0 value from the last run of the\
 
 initialize
 
-auto_connect_callback
+autocn_start uart_open boss_close send_handshake handshake_ok uart_connected \
+	send_poll
 
 while 1 { event_loop }
