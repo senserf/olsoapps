@@ -499,7 +499,7 @@ set B(PKT) 80
 
 proc bo_nop { args } { }
 
-proc bo_chks { wa } {
+proc boss_chks { wa } {
 
 	variable CRCTAB
 
@@ -619,7 +619,7 @@ proc bo_fnwrite { msg } {
 	if [catch {
 		puts -nonewline $B(SFD) \
 			"$B(IPR)[binary format c $ln]$msg[binary format s\
-				[bo_chks $msg]]"
+				[boss_chks $msg]]"
 		flush $B(SFD)
 	}] {
 		boss_close "BOSS write error"
@@ -871,7 +871,7 @@ proc bo_receive { } {
 	# dmp "RCV" $B(BUF)
 
 	# validate CRC
-	if [bo_chks $B(BUF)] {
+	if [boss_chks $B(BUF)] {
 		return
 	}
 
@@ -1138,6 +1138,9 @@ proc boss_timeouts { slow { fast 0 } } {
 #
 	variable B
 
+	if { $slow == 0 } {
+		set slow 1000000000
+	}
 	set B(RTL) $slow
 	if $fast {
 		set B(RTS) $fast
@@ -1199,7 +1202,7 @@ proc autocn_heartbeat { } {
 	incr ACB(LRM)
 }
 
-proc autocn_start { op cl hs hc cc { po "" } } {
+proc autocn_start { op cl hs hc cc { po "" } { dl "" } } {
 #
 # op - open function
 # cl - close function
@@ -1207,6 +1210,7 @@ proc autocn_start { op cl hs hc cc { po "" } } {
 # hc - handshake condition (if true, handshake has been successful)
 # cc - connection condition (if false, connection has been broken)
 # po - poll function (to kick the node if no heartbeat)
+# dl - explicit device list
 # 
 	variable ACB
 
@@ -1216,6 +1220,7 @@ proc autocn_start { op cl hs hc cc { po "" } } {
 	set ACB(HSC) [gize $hc]
 	set ACB(CNC) [gize $cc]
 	set ACB(POL) [gize $po]
+	set ACB(DLI) $dl
 
 	# last device scan time
 	set ACB(LDS) 0
@@ -1292,8 +1297,20 @@ proc ac_callback { } {
 		if { $tm > [expr $ACB(LDS) + 5] } {
 			# last scan for new devices was done more than 5 sec
 			# ago, rescan
-			unames_scan
-			set ACB(DVS) [lindex [unames_choice] 0]
+			if { $ACB(DLI) != "" } {
+				set ACB(DVS) ""
+				foreach d $ACB(DLI) {
+					if [catch { expr $d } n] {
+						lappend ACB(DVS) $d
+					} else {
+						lappend ACB(DVS) \
+							[unames_ntodev $d]
+					}
+				}
+			} else {
+				unames_scan
+				set ACB(DVS) [lindex [unames_choice] 0]
+			}
 			set ACB(DVL) [llength $ACB(DVS)]
 			set ACB(LDS) $tm
 			# trc "AC RESCAN: $ACB(DVS), $ACB(DVL)"
@@ -1485,9 +1502,11 @@ proc confirm { msg } {
 
 proc terminate { } {
 
-	global DEAF ST
+	global DEAF ST PM
 
 	if $DEAF { return }
+
+	# catch { destroy . }
 
 	set DEAF 1
 
@@ -1495,7 +1514,9 @@ proc terminate { } {
 
 	if $ST(SIP) {
 		# send a reset request to the node
-		send_abort 1
+		boss_timeouts $PM(LTM,H)
+		send_reset 1
+		wack 0xFE $PM(SDL)
 	}
 
 	exit 0
@@ -1620,6 +1641,99 @@ proc valid_ban { n { res "" } } {
 	}
 
 	return 1
+}
+
+proc ishex { c } {
+	return [regexp -nocase "\[0-9a-f\]" $c]
+}
+
+proc isoct { c } {
+	return [regexp -nocase "\[0-7\]" $c]
+}
+
+proc stparse { line } {
+#
+# Parse a UNIX string into a list of hex codes; update the source to point to
+# the first character behind the string
+#
+	upvar $line ln
+
+	set nc [string index $ln 0]
+	if { $nc != "\"" } {
+		error "illegal string delimiter: $nc"
+	}
+
+	# the original - for errors
+	set or "\""
+
+	set ln [string range $ln 1 end]
+
+	set vals ""
+
+	while 1 {
+		set nc [string index $ln 0]
+		if { $nc == "" } {
+			error "unterminated string: $or"
+		}
+		set ln [string range $ln 1 end]
+		if { $nc == "\"" } {
+			# done (this version assumes that the sentinel must be
+			# explicit, append 0x00 if this is a problem)
+			return $vals
+		}
+		if { $nc == "\\" } {
+			# escapes
+			set c [string index $ln 0]
+			if { $c == "" } {
+				# delimiter error, will be diagnosed at next
+				# turn
+				continue
+			}
+			if { $c == "x" } {
+				# get hex digits
+				set ln [string range $ln 1 end]
+				while 1 {
+					set d [string index $ln 0]
+					if ![ishex $d] {
+						break
+					}
+					append c $d
+					set ln [string range $ln 1 end]
+				}
+				if [catch { expr 0$c % 256 } val] {
+					error "illegal hex escape in string: $c"
+				}
+				lappend vals $val
+				continue
+			}
+			if [isoct $c] {
+				if { $c != 0 } {
+					set c "0$c"
+				}
+				# get octal digits
+				set ln [string range $ln 1 end]
+				while 1 {
+					set d [string index $ln 0]
+					if ![isoct $d] {
+						break
+					}
+					append c $d
+					set ln [string range $ln 1 end]
+				}
+				if [catch { expr $c % 256 } val] {
+					error \
+					    "illegal octal escape in string: $c"
+				}
+				lappend vals $val
+				continue
+			}
+			set ln [string range $ln 1 end]
+			set nc $c
+			continue
+		}
+		scan $nc %c val
+		lappend vals [expr $val % 256]
+	}
 }
 
 proc freq_decode { val } {
@@ -1860,21 +1974,32 @@ proc log_open { } {
 	toplevel $w
 	wm title $w "Log"
 
-	set c $w.log
+	set f [frame $w.lf]
+	pack $f -side top -expand y -fill both
+	set c $f.log
 
 	set WN(LOG) [text $c -width 80 -height 24 -borderwidth 2 \
 		-setgrid true -wrap none \
-		-yscrollcommand "$w.scrolly set" \
-		-xscrollcommand "$w.scrollx set" \
+		-yscrollcommand "$f.scrolly set" \
+		-xscrollcommand "$f.scrollx set" \
 		-font $FO(LOG) \
 		-exportselection 1 -state normal]
 
-	scrollbar $w.scrolly -command "$c yview"
-	scrollbar $w.scrollx -orient horizontal -command "$c xview"
+	scrollbar $f.scrolly -command "$c yview"
+	scrollbar $f.scrollx -orient horizontal -command "$c xview"
 
-	pack $w.scrolly -side right -fill y
-	pack $w.scrollx -side bottom -fill x
+	pack $f.scrolly -side right -fill y
+	pack $f.scrollx -side bottom -fill x
 	pack $c -side top -expand y -fill both
+
+	set f [frame $w.bf]
+	pack $f -side top -expand n -fill both
+
+	button $f.c -text "Close" -command "log_toggle"
+	pack $f.c -side right
+
+	button $f.k -text "Clear" -command "log_clear"
+	pack $f.k -side left
 
 	bind $w <Destroy> log_close
 	bind $w <ButtonRelease-1> "tk_textCopy $w"
@@ -1889,8 +2014,22 @@ proc log_open { } {
 	}
 
 	$c yview -pickplace end
+	$c configure -state disabled
 
 	$WN(LOB) configure -text "Packet Log Off"
+}
+
+proc log_clear { } {
+
+	global WN
+
+	if { $WN(LOG) == "" } {
+		return
+	}
+
+	$WN(LOG) configure -state normal
+	$WN(LOG) delete 1.0 end
+	$WN(LOG) configure -state disabled
 }
 
 proc log_close { } {
@@ -1917,30 +2056,23 @@ proc log_toggle { } {
 
 ###############################################################################
 
-proc send_reset { } {
+proc send_reset { { urg 0 } } {
+
+	set t [binary format c 0xFE]
+
+	if $urg {
+		boss_send $t 1
+		boss_send $t 1
+		boss_send $t 1
+	}
 
 	boss_send [binary format c 0xFF]
 	boss_send [binary format c 0xFE]
 }
 
-proc send_abort { { urg 0 } } {
-
-	# issue urgent reset, twice, but it is unlikely that more
-	# than one reset will be triggered this way
-	set msg [binary format c 0xFE]
-	if $urg {
-		boss_send $msg 1
-		boss_send $msg 1
-		boss_send $msg 1
-	} else {
-		boss_send [binary format c 0xFF]
-		boss_send $msg
-	}
-}
-
 proc send_handshake { } {
 
-	send_abort
+	send_reset
 	set msg [binary format c 0x05]
 	boss_send $msg
 	boss_send $msg
@@ -2016,7 +2148,7 @@ proc uart_close { { err "" } } {
 	# trc "close UART: $err"
 
 	if $ST(SIP) {
-		send_abort 1
+		send_reset 1
 	}
 
 	catch { close $ST(SFD) }
@@ -2098,7 +2230,7 @@ proc wack { cmd { tim 8000 } } {
 
 proc uart_read { msg } {
 
-	global ST PM
+	global ST PM DEAF
 
 	autocn_heartbeat
 
@@ -2115,6 +2247,12 @@ proc uart_read { msg } {
 			trigger
 			return
 		}
+	}
+
+	if $DEAF {
+		# closing; ignore any input even if the UART is still open; it
+		# can be, because we want to (try to) stop the node
+		return
 	}
 
 	if { $code == 2 } {
@@ -2173,6 +2311,10 @@ proc process_band_sample { smp } {
 		set SM($i) [expr $v * $alpha + (1.0 - $alpha) * $SM($i)]
 		if { $SM($i) > $MX($i) } {
 			set MX($i) $SM($i)
+			if { $SM($i) > $MX(P,V) } {
+				set MX(P,V) $SM($i)
+				set MX(P,F) $i
+			}
 		}
 		incr i
 	}
@@ -2299,7 +2441,8 @@ proc do_start_stop { } {
 
 	if $ST(SIP) {
 		# stop scan
-		send_reset
+		boss_timeouts $PM(LTM,H)
+		send_reset 1
 		if { [wack 0xFE] < 0 } {
 			alert "Node reset timeout"
 		}
@@ -2364,8 +2507,9 @@ proc do_start_stop { } {
 
 	for { set i 0 } { $i < $PM(NSA) } { incr i } {
 		set SM($i) $RC(GRS)
-		set MX($i) $RC(GRS)
 	}
+
+	reset_max
 
 	# this is the end-buffer pointer for freq samples
 	set SM(IN) 0
@@ -2405,7 +2549,7 @@ proc nsbox { w lab min max var row { lst "" } } {
 		lappend WN($lst) $b
 	}
 
-	grid $b -column 1 -row $row -sticky nes
+	grid $b -column 1 -row $row -sticky news
 
 	return $b
 }
@@ -2499,7 +2643,7 @@ proc draw_y_ticks { xc } {
 #
 # Draw y ticks along the vertical axis
 #
-	global WN RC FO
+	global ST WN RC FO
 
 	if { $xc == $WN(xh) } {
 		# center line
@@ -2515,23 +2659,57 @@ proc draw_y_ticks { xc } {
 		set tan "e"
 	}
 
-	set y [expr $WN(MVT) / 2]
-	set yt [expr $WN(ye) - $WN(MVT) / 4]
+	set D [expr $RC(MRS) - $RC(GRS)]
+	set nv [expr $D / 8.0]
 
-	while { $y <= $yt } {
-
-		set ya [yco $y]
-
-		set val [expr (double($y - $WN(ys)) / ($WN(ye) - $WN(ys))) * \
-			($RC(MRS) - $RC(GRS)) * 0.5]
-
-		$WN(CAN) create line $x0 $ya $x1 $ya -fill $WN(AXC) -tags axis
-
-		$WN(CAN) create text $xt $ya -text [format " %1.2f dB" $val] \
-			-anchor $tan -font $FO(SMA) -fill $WN(AXC) -tags axis
-
-		incr y $WN(MVT)
+	foreach ns { 1 2 5 10 15 20 25 30 50 } {
+		# calculate the step
+		if { $ns > $nv } {
+			break
+		}
 	}
+
+	if { $ns == 1 } {
+		set nt 1
+	} else {
+		set nt [expr $ns / 2]
+	}
+
+	set DM [expr $D - $nt]
+
+	if $ST(SSM) {
+		# DB
+		for { set y $ns } { $y <= $DM } { incr y $ns } {
+			set ya [stoy [expr $y + $RC(GRS)]]
+			$WN(CAN) create line $x0 $ya $x1 $ya -fill $WN(AXC) \
+				-tags axis
+			$WN(CAN) create text $xt $ya -text \
+				[format " %1d dB" $y] -anchor $tan \
+				-font $FO(SMA) -fill $WN(AXC) -tags axis
+		}
+	} else {
+		# RSSI
+		set st [expr (($RC(GRS) + $nt) / $ns) * $ns]
+		if { [expr $st - $RC(GRS)] < $nt } {
+			set st [expr $st + $ns]
+		}
+		set DM [expr $DM + $RC(GRS)]
+		for { set y $st } { $y <= $DM } { incr y $ns } {
+			set ya [stoy $y]
+			$WN(CAN) create line $x0 $ya $x1 $ya -fill $WN(AXC) \
+				-tags axis
+			$WN(CAN) create text $xt $ya -text \
+				[format " %1d" $y] -anchor $tan \
+				-font $FO(SMA) -fill $WN(AXC) -tags axis
+		}
+
+
+
+		
+
+	}
+
+	
 }
 
 proc draw_axes { } {
@@ -2582,12 +2760,21 @@ proc draw_axes { } {
 	}
 }
 
+proc stoy { v } {
+#
+# Converts RSSI sample into graph y
+#
+	global RC WN
+
+	return [yco [expr round((double($v - $RC(GRS))/($RC(MRS) - $RC(GRS))) \
+	 * $WN(yd)) + $WN(ys)]]
+}
+
 proc draw_freq_sample { } {
 #
 	global WN SM RC PM
 
 	set xa [expr $WN(xs) + $WN(SEF) - 1]
-	set yv [expr double($RC(MRS) - $RC(GRS))]
 	set ix $SM(IN)
 	set yp 0
 	for { set i 0 } { $i < $PM(NSS) } { incr i } {
@@ -2602,8 +2789,9 @@ proc draw_freq_sample { } {
 		} elseif { $v > $RC(MRS) } {
 			set v $RC(MRS)
 		}
-		set y [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) +\
-			$WN(ys)]]
+
+		set y [stoy $v]
+
 		if { $yp > 0 } {
 			$WN(CAN) create line $xa $yp $xa $y $xb $y \
 				-fill $WN(SMC) -width 1 -tags smp
@@ -2621,15 +2809,13 @@ proc draw_freq_max { } {
 	global WN MX RC PM
 
 	set v $MX(0)
-	set yv [expr double($RC(MRS) - $RC(GRS))]
 
 	if { $v < $RC(GRS) } {
 		set v $RC(GRS)
 	} elseif { $v > $RC(MRS) } {
 		set v $RC(MRS)
 	}
-	set y \
-	     [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) + $WN(ys)]]
+	set y [stoy $v]
 
 	$WN(CAN) create line $WN(xs) $y $WN(xe) $y -fill $WN(MXC) \
 		-width 1 -tags smp
@@ -2640,7 +2826,6 @@ proc draw_band_sample { } {
 	global WN SM RC PM
 
 	set xa $WN(xs)
-	set yv [expr double($RC(MRS) - $RC(GRS))]
 	for { set i 0 } { $i < $PM(NSA) } { incr i } {
 		set xb [expr $xa + $WN(SEF)]
 		set v $SM($i)
@@ -2649,8 +2834,7 @@ proc draw_band_sample { } {
 		} elseif { $v > $RC(MRS) } {
 			set v $RC(MRS)
 		}
-		set y [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) +\
-			$WN(ys)]]
+		set y [stoy $v]
 		$WN(CAN) create line $xa $y $xb $y -fill $WN(SMC) -width 2 \
 			-tags smp
 		set xa $xb
@@ -2659,10 +2843,9 @@ proc draw_band_sample { } {
 
 proc draw_band_max { } {
 #
-	global WN MX RC PM
+	global WN MX RC PM FO
 
 	set xa $WN(xs)
-	set yv [expr double($RC(MRS) - $RC(GRS))]
 	set yp 0
 	for { set i 0 } { $i < $PM(NSA) } { incr i } {
 		set xb [expr $xa + $WN(SEF)]
@@ -2672,8 +2855,7 @@ proc draw_band_max { } {
 		} elseif { $v > $RC(MRS) } {
 			set v $RC(MRS)
 		}
-		set y [yco [expr round((double($v - $RC(GRS))/$yv) * $WN(yd)) +\
-			$WN(ys)]]
+		set y [stoy $v]
 		if { $yp > 0 } {
 			$WN(CAN) create line $xa $yp $xa $y $xb $y \
 				-fill $WN(MXC) -width 1 -tags smp
@@ -2684,6 +2866,16 @@ proc draw_band_max { } {
 		set xa $xb
 		set yp $y
 	}
+
+	if { $MX(P,V) != "" } {
+		# show the current peak
+		lassign [band_width] fr up
+		set f [expr ((($MX(P,F) + 0.5) * ($up - $fr)) / $PM(NSA)) + $fr]
+		$WN(CAN) create text $WN(PXF) $WN(PYF) -text \
+			[format "Pk: %1d/%1.2f" [expr round($MX(P,V))] $f] \
+			-fill $WN(PCO) -tags smp \
+			-anchor w
+	}
 }
 
 proc reset_max { } {
@@ -2692,6 +2884,8 @@ proc reset_max { } {
 
 	for { set i 0 } { $i < $PM(NSA) } { incr i } {
 		set MX($i) 0
+		set MX(P,V) ""
+		set MX(P,F) ""
 	}
 }
 
@@ -2804,6 +2998,33 @@ proc fix_min_isd { } {
 	$WN(ISB) configure -from $min
 }
 
+proc set_sscale_button { } {
+
+	global ST WN
+
+	if $ST(SSM) {
+		set t "dB"
+	} else {
+		set t "RSSI"
+	}
+	
+	$WN(SGB) configure -text $t
+}
+
+proc set_sscale { } {
+
+	global ST
+
+	if $ST(SSM) {
+		set ST(SSM) 0
+	} else {
+		set ST(SSM) 1
+	}
+
+	set_sscale_button
+	redraw
+}
+
 proc band_menu_click { w n } {
 #
 # Handles a selection from the band menu
@@ -2818,7 +3039,7 @@ proc band_menu_click { w n } {
 	redraw
 }
 
-proc set_averaging { w } {
+proc set_averaging { } {
 #
 # Sets one of the three frequency parameters
 #
@@ -2993,7 +3214,7 @@ proc mk_rootwin { win } {
 	label $x.cl -text "Center frequency (MHz): " -anchor w
 	grid $x.cl -column 0 -row 0 -sticky nsw
 
-	button $x.cb -textvariable RC(FCE) -anchor e \
+	button $x.cb -textvariable RC(FCE) -anchor c \
 		-command "set_center_frequency $x.cb"
 
 	lappend WN(RWI,SIP) $x.cb
@@ -3046,25 +3267,35 @@ proc mk_rootwin { win } {
 	label $x.al -text "Averaging:  "
 	grid $x.al -column 0 -row 2 -sticky nsw
 
-	button $x.ab -text "-" -anchor e -command "set_averaging $x.ab"
+	button $x.ab -text "-" -anchor c -command "set_averaging"
 	set WN(AVB) $x.ab
 	set_averaging_button
 	fix_min_isd
-	grid $x.ab -column 1 -row 2 -sticky nes
+	grid $x.ab -column 1 -row 2 -sticky news
+
+	#######################################################################
+
+	label $x.gl -text "Signal scale:  "
+	grid $x.gl -column 0 -row 3 -sticky nsw
+
+	button $x.gb -text "-" -anchor c -command "set_sscale"
+	set WN(SGB) $x.gb
+	set_sscale_button
+	grid $x.gb -column 1 -row 3 -sticky news
 
 	#######################################################################
 
 	label $x.ml -text "Track maximum:  "
-	grid $x.ml -column 0 -row 3 -sticky nsw
+	grid $x.ml -column 0 -row 4 -sticky nsw
 
 	frame $x.uf
-	grid $x.uf -column 1 -row 3 -sticky nes
+	grid $x.uf -column 1 -row 4 -sticky news
 	
 	checkbutton $x.uf.mb -variable RC(TMX)
 	pack $x.uf.mb -side left
 
 	button $x.uf.mc -text Rst -command reset_max
-	pack $x.uf.mc -side right
+	pack $x.uf.mc -side right -fill x -expand 1
 
 	#######################################################################
 
@@ -4265,7 +4496,7 @@ proc inject_value_to_bytes { val typ siz } {
 		set val "\"$val\""
 	}
 
-	if [catch { pt_stparse val } vals] {
+	if [catch { stparse val } vals] {
 		error $vals
 	}
 
@@ -5097,7 +5328,7 @@ proc inject_build_packet { this } {
 		if [expr [string length $pkt] & 1] {
 			append pkt $CH(ZER)
 		}
-		set pkt "$pkt[pt_chks $pkt]"
+		set pkt "$pkt[boss_chks $pkt]"
 	}
 
 	return $pkt
@@ -5264,8 +5495,15 @@ proc initialize { } {
 
 	unames_init $ST(DEV) $ST(SYS)
 
-	if { [lindex $argv 0] == "-D" } {
-		set ST(DBG) 1
+	# explicit device list
+	set edl ""
+
+	foreach a $argv {
+		if { [string index $a 0] != "-" } {
+			lappend edl $a
+		} elseif { $a == "-D" } {
+			set ST(DBG) 1
+		}
 	}
 
 	# trc "Starting"
@@ -5279,6 +5517,8 @@ proc initialize { } {
 	update_widgets
 
 	redraw
+
+	return $edl
 }
 
 ###############################################################################
@@ -5307,10 +5547,13 @@ set PM(DSP) 	115200
 # tip text wrap length (pixels)
 set PM(TWR)	320
 
-# long timeouts: handshake, idle, sampling
+# timeouts: handshake, idle, sampling
 set PM(LTM,H)	64
 set PM(LTM,I)	512
-set PM(LTM,S)	1024
+set PM(LTM,S)	0
+
+# soft delay before closing the UART to give the node a chance to stop
+set PM(SDL)	8000
 
 # short timeout
 set PM(STM)	32
@@ -5320,6 +5563,9 @@ set PM(HST)	{ 2000 8000 }
 
 # scan in progress
 set ST(SIP)	0
+
+# signal scale mode 0-RSSI, 1-dB
+set ST(SSM)	0
 
 # expected command list, actual command code, or -1 for timeout, the message,
 # timer
@@ -5362,7 +5608,7 @@ set WN(CAH) 512
 set WN(MHT) 70
 
 # minimum separation between ticks on vertical axis
-set WN(MVT) 90
+set WN(MVT) 50
 
 # x-tick height
 set WN(XTS) 4
@@ -5390,6 +5636,11 @@ set WN(RBC) "#F9D6A4"
 
 # W-button color
 set WN(WBC) "#FCADA6"
+
+# x,y-offsets + color of peak text
+set WN(PXF) 12
+set WN(PYF) 16
+set WN(PCO) "#00FF00"
 
 # slider width
 set WN(SLW) 400
@@ -6359,9 +6610,7 @@ regtip	RCCTRL0S	"Contains the RCCTRL0 value from the last run of the\
 ###############################################################################
 ###############################################################################
 
-initialize
-
 autocn_start uart_open boss_close send_handshake handshake_ok uart_connected \
-	send_poll
+	send_poll [initialize]
 
 while 1 { event_loop }

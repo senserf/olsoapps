@@ -1,4 +1,5 @@
 #include "oss.h"
+#include "tcvplug.h"
 
 fsm oss_in;
 
@@ -48,6 +49,11 @@ void oss_init (cmdfun_t f) {
 
 	// Start the driver
 	runfsm oss_in;
+}
+
+void oss_erase () {
+
+	tcv_erase (SFD, TCV_DSP_XMTU);
 }
 
 void oss_ack (word st, byte cmd) {

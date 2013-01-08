@@ -336,11 +336,12 @@ static void rq_handler (word st, byte *cmd, word cmdlen) {
 	switch (*cmd) {
 
 		case OSS_CMD_RSC: {
-#if 0
+#if 1
 			reset ();
 #else
 			// Kill the sampler process
 			reset_all ();
+			oss_erase ();
 			oss_ack (st, OSS_CMD_RSC);
 #endif
 			return;
