@@ -42,5 +42,6 @@ void oss_ack (word, byte);
 byte *oss_outu (word, sint);
 byte *oss_outr (word, sint);
 void oss_send (byte*);
+void oss_erase ();
 
 #endif
