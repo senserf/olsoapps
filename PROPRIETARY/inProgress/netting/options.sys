@@ -71,3 +71,10 @@
 
 #define TARP_RTR        2
 
+#define ODR_MHOP_SERV_EXPER present
+
+#ifdef BOARD_WARSAW_BLUE
+#undef UART_RATE
+#define UART_RATE 115200
+#endif
+
