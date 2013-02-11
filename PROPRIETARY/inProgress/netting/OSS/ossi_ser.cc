@@ -613,11 +613,19 @@ void ossi_odr_out (char * b) {
 			 NULL)
 		goto Cleanup;
 
+#ifdef ODR_MHOP_SERV_EXPER
+	if ((lines[cnt++] = form (NULL, "%lu: odr %lu ",
+			seconds(),
+			((lword)in_odr(b, refh) << 16) + in_odr(b, refl)
+			)) == NULL)
+
+#else
 	if ((lines[cnt++] = form (NULL, "%lu: odr #%lu [%u.%u.%u]:\r\n",
 			seconds(),
 			((lword)in_odr(b, refh) << 16) + in_odr(b, refl),
 			in_odr(b, ret), in_odr(b, hok),
 			in_odr(b, hko))) == NULL)
+#endif
 		goto Cleanup;
 
         while (num--) {
@@ -627,13 +635,19 @@ void ossi_odr_out (char * b) {
 				i++;
 		} else
 			i = 0;
-			
+
+#ifdef ODR_MHOP_SERV_EXPER
+		if ((lines[cnt++] = form (NULL, "%u%s",
+				((odre_t *)ptr)->id,
+				num == 0 ? "\r\n" : " ")) == NULL)
+#else
 		if ((lines[cnt++] = form (NULL, " %u: %c(%u %u %u)%c\r\n",
 				cnt -1, i == 1 ? '>' : ' ',
 				((odre_t *)ptr)->id,
 				((odre_t *)ptr)->frssi,
 				((odre_t *)ptr)->brssi,
 				i == 2 ? '<' : ' ')) == NULL)
+#endif
 			goto Cleanup;
                 ptr += sizeof(odre_t);
 	}

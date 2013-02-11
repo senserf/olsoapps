@@ -41,11 +41,6 @@
 #endif
 #define RADIO_USE_LEDS 	7
 
-#ifdef CRYSTAL2_RATE
-#undef CRYSTAL2_RATE
-#endif
-#define CRYSTAL2_RATE	0
-
 #ifdef STORAGE_AT45XXX
 #undef STORAGE_AT45XXX
 #endif
@@ -70,4 +65,16 @@
 // #define CC1100_FREQ_FREQ0_VALUE 0xE8
 
 #define TARP_RTR        2
+
+#define ODR_MHOP_SERV_EXPER present
+
+#ifdef BOARD_WARSAW_BLUE
+#undef UART_RATE
+#define UART_RATE 115200
+#else
+#ifdef CRYSTAL2_RATE
+#undef CRYSTAL2_RATE
+#endif
+#define CRYSTAL2_RATE   0
+#endif
 
