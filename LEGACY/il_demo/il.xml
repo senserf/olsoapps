@@ -1,7 +1,7 @@
 <network nodes="14" radio="14">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
-    <xi:include href="channel.xml"/>
+    <xi:include href="CHANNELS/legacy_short.xml"/>
     <nodes>
 	<defaults>
 	<xi:include href="tag.xml"/>

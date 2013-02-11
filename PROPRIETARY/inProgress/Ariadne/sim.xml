@@ -1,57 +1,7 @@
 <network nodes="6">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
-    <channel>
-        <shadowing bn="-110.0dBm" syncbits="8">
-		RP(d) = received power at distance d
-		XP    = transmitted power
-		X     = lognormal random Gaussian component
- 		=======================================================
-		RP(d)/XP [dB] = -10 x 5.1 x log(d/1.0m) + X(1.0) - 33.5
- 		=======================================================
-	</shadowing>
-	<cutoff>-115.0dBm</cutoff>
-	<ber>
-		Interpolated ber table:
-		======================
-		  SIR		  BER
-		50.0dB		1.0E-6
-		40.0dB		2.0E-6
-		30.0dB		5.0E-6
-		20.0dB		1.0E-5
-		10.0dB		1.0E-4
-		 5.0dB		1.0E-3
-		 2.0dB		1.0E-1
-		 0.0dB		2.0E-1
-		-2.0dB		5.0E-1
-		-5.0dB		9.9E-1
-	</ber>
-	<frame>12 0</frame>
-	<rssi>
-		0	-202.0
-	       255	53.0
-       </rssi>
-	<power>
-		0	-30.0dBm
-                1	-15.0dBm
-                2	-10.0dBm
-                3	 -5.0dBm
-                4	  0.0dBm
-                5	  5.0dBm
-                6	  7.0dBm
-                7	 10.0dBm
-	</power>
-	<rates boost="yes">
-		0	4800	3dB
-		1	10000	0dB
-		2	38400	-4dB
-		3	200000	-10dB
-	</rates>
-	<channels number="255">
-		Cross channel separation
-		20dB 29dB 38dB 46dB 54dB 62dB 70dB 78dB 86dB 94dB 102dB
-	</channels>
-    </channel>
+    <xi:include href="CHANNELS/legacy_very_short.xml"/>
     <nodes>
 	<defaults>
 	    <memory>8666 bytes</memory>
