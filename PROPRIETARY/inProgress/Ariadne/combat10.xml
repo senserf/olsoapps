@@ -1,0 +1,47 @@
+<network nodes="10" radio="10">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer display="yes"></roamer>
+    </display>
+    <xi:include href="CHANNELS/tabulated.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<node number="0" type="peg" hid="0xBACA0505">
+	    <location>5.0 5.0</location>
+	</node>
+	<node number="1" type="peg" start="on" hid="0xBACA0F05">
+	    <location>15.0 5.0</location>
+	</node>
+        <node number="2" type="peg" start="on" hid="0xBACA1905">
+            <location>25.0 5.0</location>
+        </node>
+        <node number="3" type="peg" start="on" hid="0xBACA2305">
+            <location>35.0 5.0</location>
+        </node>
+
+	<node number="4" type="peg" start="on" hid="0xBACA050F">
+	    <location>5.0 15.0</location>
+	</node>
+        <node number="5" type="peg" start="on" hid="0xBACA0F0F">
+            <location>15.0 15.0</location>
+        </node>
+        <node number="6" type="peg" start="on" hid="0xBACA190F">
+            <location>25.0 15.0</location>
+        </node>
+
+       <node number="7" type="peg" start="on" hid="0xBACA230F">
+            <location>35.0 15.0</location>
+        </node>
+
+	<node number="8" type="peg" tart="on" hid="0xBACA0519">
+	    <location>5.0 25.0</location>
+	</node>
+        <node number="9" type="peg" start="on" hid="0xBACA0F19">
+            <location>15.0 25.0</location>
+        </node>
+    </nodes>
+</network>

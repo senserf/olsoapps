@@ -42,6 +42,15 @@ idiosyncratic void set_master_chg () {
 	app_flags |= 2;
 }
 
+/*
+1 - not this msg
+2 - handle
+(0 - don't pay attention even to dummy acks)
+*/
+idiosyncratic word  guide_rtr (headerType *  b) {
+        return (b->rcv == 0) ? 1 : 2;
+}
+
 // ============================================================================
 
 #ifdef __SMURPH__

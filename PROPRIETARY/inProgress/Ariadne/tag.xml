@@ -1,0 +1,45 @@
+	    <memory>8666 bytes</memory>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <leds number="3">
+	    	<output target="socket"></output>
+		<label>--Error -</label>
+		<label>--Master</label>
+		<label>-Battery</label>
+	    </leds>
+	    <iflash size="256,2"></iflash>
+		<eeprom size="524288"></eeprom>
+	    <uart rate="9600" bsize="12">
+		<input source="socket"></input>
+		<output target="socket" type="held"></output>
+	    </uart>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor index="-1" vsize="2" delay="0.01" init="2600">2703
+			<label fg="maroon">Battery</label>
+		</sensor>
+		<sensor index="0" vsize="2" delay="0.01" init="10">1000
+			<label>AccMeter</label>
+		</sensor>
+	    </sensors>
+	    <emul>
+		<output target="socket" type="held"></output>
+	    </emul>
+	    <ptracker>
+		<output target="socket"/>
+		<module id="cpu">0.3 0.0077</module>
+		<module id="radio">0.0004 16.0 30.7 30.7</module>
+		<module id="storage">0.030 0.030 10.0 15.0 17.0 16.0</module>
+		<module id="sensors">0.0 2.5</module>
+	    </ptracker>

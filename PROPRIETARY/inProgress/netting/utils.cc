@@ -77,6 +77,7 @@ word fim_read() {
 	if (i > 0) {
 		fim_set.w = if_read (--i);
 		fim_set.f.stran = 0; // not FIM, just the flag's placeholder
+		fim_set.f.ofmt = 0;  // same
 		return i;
 	}
 
@@ -85,6 +86,7 @@ word fim_read() {
 	fim_set.f.polev = DEF_PLEV;
 	fim_set.f.rx = 1;
 	fim_set.f.stran = 0;
+	fim_set.f.ofmt = 0;
 	return IFLASH_SIZE;
 }
 
