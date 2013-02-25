@@ -27,6 +27,7 @@ static trueconst char welcome_str[] =
 	"F (read)\r\n\r\n"
 	"m(aster) [1/0]\r\n"
 	"t(ransient) [1/0]\r\n"
+	"f(ormat) [1/0]\r\n"
 	"h(elp)\r\n"
 	"q(uit)\r\n";
 
@@ -41,7 +42,7 @@ static trueconst char notset_str[] = "Not set\r\n";
 static trueconst char lck_str[] = "Locked\r\n";
 
 static trueconst char stats_str[] =
-	"%u at %lu: M %u at %lu mem %u.%u.%u bat %u trans %u\r\n";
+	"%u at %lu: M %u at %lu mem %u.%u.%u bat %u trans %u ofmt %u\r\n";
 
 static trueconst char tarp_str[] =
 	"Plev %u rx %u fwd %u slack %u rte %u tlev %u\r\n";

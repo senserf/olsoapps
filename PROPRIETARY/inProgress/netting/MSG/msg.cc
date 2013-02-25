@@ -261,6 +261,11 @@ static void msg_odr_in (char * buf, word rssi, word siz) {
 		(oep + in_odr (buf, hok))->frssi = rssi;
 	}
 
+#ifdef ODR_FILL_BCAST
+	if ((oep + in_odr (buf, hok))->id == 0)
+		(oep + in_odr (buf, hok))->id = local_host;
+#endif
+
 	if (in_odr (buf, hok) == in_odr (buf, hko))
 		in_odr (buf, ret) = 1;
 

@@ -279,6 +279,7 @@ fsm ossi_in {
 			case 'F': proceed OI_FIM;
 			case 'm': proceed OI_MAS;
 			case 't': proceed OI_TRANS;
+			case 'f': proceed OI_OFMT;
 		}
 		proceed OI_ILL;
 
@@ -303,6 +304,12 @@ fsm ossi_in {
 
 		if (scan (ibuf+1, "%u", &w) > 0)
 			fim_set.f.stran = w ? 1 : 0;
+		proceed OI_STATS;
+
+	state OI_OFMT:
+
+		if (scan (ibuf+1, "%u", &w) > 0)
+			fim_set.f.ofmt = w ? 1 : 0;
 		proceed OI_STATS;
 
 	state OI_SETS:
@@ -436,7 +443,8 @@ fsm ossi_in {
 
 		cp = form (NULL, stats_str, local_host,
 			       	seconds(), master_host, master_ts, m[0], m[1],
-			       	stackfree(), w, fim_set.f.stran);
+			       	stackfree(), w, fim_set.f.stran,
+				fim_set.f.ofmt);
 
 	state OI_STATEND:
 		ser_out (OI_STATEND, cp);
@@ -613,20 +621,21 @@ void ossi_odr_out (char * b) {
 			 NULL)
 		goto Cleanup;
 
-#ifdef ODR_MHOP_SERV_EXPER
-	if ((lines[cnt++] = form (NULL, "%lu: odr %lu ",
+	if (fim_set.f.ofmt) {
+	    if ((lines[cnt++] = form (NULL, "%lu: odr %lu ",
 			seconds(),
 			((lword)in_odr(b, refh) << 16) + in_odr(b, refl)
 			)) == NULL)
+		goto Cleanup;
 
-#else
-	if ((lines[cnt++] = form (NULL, "%lu: odr #%lu [%u.%u.%u]:\r\n",
+	} else {
+	    if ((lines[cnt++] = form (NULL, "%lu: odr #%lu [%u.%u.%u]:\r\n",
 			seconds(),
 			((lword)in_odr(b, refh) << 16) + in_odr(b, refl),
 			in_odr(b, ret), in_odr(b, hok),
 			in_odr(b, hko))) == NULL)
-#endif
 		goto Cleanup;
+	}
 
         while (num--) {
 		if (in_odr(b, hok) == cnt -1) {
@@ -636,19 +645,24 @@ void ossi_odr_out (char * b) {
 		} else
 			i = 0;
 
-#ifdef ODR_MHOP_SERV_EXPER
-		if ((lines[cnt++] = form (NULL, "%u%s",
+		if (fim_set.f.ofmt) {
+
+		    if ((lines[cnt++] = form (NULL, "%u%s",
 				((odre_t *)ptr)->id,
 				num == 0 ? "\r\n" : " ")) == NULL)
-#else
-		if ((lines[cnt++] = form (NULL, " %u: %c(%u %u %u)%c\r\n",
+			goto Cleanup;
+
+		} else {
+
+		    if ((lines[cnt++] = form (NULL, " %u: %c(%u %u %u)%c\r\n",
 				cnt -1, i == 1 ? '>' : ' ',
 				((odre_t *)ptr)->id,
 				((odre_t *)ptr)->frssi,
 				((odre_t *)ptr)->brssi,
 				i == 2 ? '<' : ' ')) == NULL)
-#endif
 			goto Cleanup;
+		}
+
                 ptr += sizeof(odre_t);
 	}
 
