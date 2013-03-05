@@ -28,27 +28,30 @@ typedef	struct {
 } blink_t;
 
 const blink_t PRST [] = { { LR, NB }, { LG, NB }, { LY, NB }, { 0, 0 } };
+
 const blink_t PPNO [] = { { LR, VB }, { LG, VB }, { LY, VB }, { 0, 0 } };
+
 const blink_t PPOK [] = { { LG, NB }, { LN, NB }, { 0, 0 } };
-const blink_t PPS3 [] = { { LY, NB }, { LN, NB }, { 0, 0 } };
-const blink_t PPS2 [] = { { LR, NB }, { LN, NB }, { 0, 0 } };
 
-const blink_t PPS1 [] = { { LR, VB }, { LN, VB }, { LR, VB }, { LN, VB },
-			  { LR, NB }, { LN, FB }, { 0, 0 } };
-
-const blink_t PPS0 [] = { { LR, VB }, { LN, VB }, { LR, VB }, { LN, VB },
-			  { LR, VB }, { LN, VB }, { LR, NB }, { LN, FB },
+const blink_t PPS3 [] = { { LY, NB }, { LN, NB }, { LG, NB }, { LN, NB },
 			  { 0, 0 } };
+
+const blink_t PPS2 [] = { { LY, NB }, { LN, NB }, { 0, 0 } };
+
+const blink_t PPS1 [] = { { LR, NB }, { LN, NB }, { LY, NB }, { LN, NB },
+			  { 0, 0 } };
+
+const blink_t PPS0 [] = { { LR, NB }, { LN, NB }, { 0, 0 } };
 
 // LED scheme:
 //
 // 	RESET:		alternating R-G-Y
 //	No msg for 1h:	alternating R-G-Y fast
 //	None: 		G blink
-//	S3:		Y blink
-//	s2:   		R blink
-//	s1:   		R R R -
-//	s0:   		R R R R -
+//	s3:		G blink Y blink
+//	s2:   		Y blink
+//	s1:   		R blink Y blink
+//	s0:   		R blink
 //
 
 // ============================================================================
