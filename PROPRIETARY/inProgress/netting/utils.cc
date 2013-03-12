@@ -51,6 +51,8 @@ void init () {
 		halt();
 	}
 
+// FIXME: gerry and bolutek
+// #if defined BOARD_WARSAW_BLUE && ! defined __SMURPH__ && ! defined BT_MODULE_BOLUTEK
 #if defined BOARD_WARSAW_BLUE && ! defined __SMURPH__
 	ser_select (1);
 #endif

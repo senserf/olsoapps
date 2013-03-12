@@ -1,0 +1,53 @@
+<network nodes="12" radio="12">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer display="yes"></roamer>
+    </display>
+    <xi:include href="channel.xml"/>
+	
+    <nodes>
+		<defaults>
+			<xi:include href="tag.xml"/>
+			<highlight fg="black" bg="white">magenta blue</highlight>
+		</defaults>
+		<node number="0" hid="0xBACA0064">
+			<location>0.0 5.1</location>
+		</node>
+		<node number="1" start="on" hid="0xBACA0065">
+			<location>10.0 4.8</location>
+		</node>
+		<node number="2" start="on" hid="0xBACA0066">
+			<location>24.5 4.6</location>
+		</node>
+		<node number="3" start="on" hid="0xBACA0067">
+			<location>32.4 4.3</location>
+		</node>
+		<node number="4" start="on" hid="0xBACA0068">
+			<location>1.4 13.1</location>
+		</node>
+        <node number="5" start="on" hid="0xBACA0069">
+            <location>8.8 13.5</location>
+        </node>
+        <node number="6" start="on" hid="0xBACA006A">
+            <location>21.8 14.3</location>
+        </node>
+       <node number="7" start="on" hid="0xBACA006B">
+            <location>30.6 13.3</location>
+        </node>
+		<node number="8" start="on" hid="0xBACA006C">
+			<location>24.7 21.7</location>
+		</node>
+        <node number="9" start="on" hid="0xBACA006D">
+            <location>32.2 21.5</location>
+        </node>
+        <node number="10" start="off" hid="0xBACA004D">
+            <location>23.3 11.9</location>
+			<color solid="tomato1"/>
+        </node>	
+        <node number="11" start="off" hid="0xBACA0096">
+            <location>33.1 12.5</location>
+			<color solid="tomato1"/>
+        </node>		
+    </nodes>
+</network>
