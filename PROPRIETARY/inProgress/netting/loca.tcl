@@ -9,7 +9,7 @@ proc bad_use { } {
 }
 
 proc get_input { } {
-	global argv argc infiles fdout_f fdout_b
+	global argv argc infiles qu_f db_f qu_b db_b
 
 	if { $argc < 2 } {
 		bad_use
@@ -19,14 +19,21 @@ proc get_input { } {
     set outfile [string trimright [lindex $argv end]]
 	set infiles [lreplace $argv end end]
 
-	if [catch { open [concat ${outfile}_f] a+ } fdout_f] {
-		err "Cannot open a+ [concat ${outfile}_f]"
+	if [catch { open [concat ${outfile}_db_f] a+ } db_f] {
+		err "Cannot open a+ [concat ${outfile}_db_f]"
 	}
 	
-	if [catch { open [concat ${outfile}_b] a+ } fdout_b] {
-		err "Cannot open a+ [concat ${outfile}_b]"
+	if [catch { open [concat ${outfile}_db_b] a+ } db_b] {
+		err "Cannot open a+ [concat ${outfile}_db_b]"
 	}
-
+	
+	if [catch { open [concat ${outfile}_qu_f] a+ } qu_f] {
+		err "Cannot open a+ [concat ${outfile}_qu_f]"
+	}
+	
+	if [catch { open [concat ${outfile}_qu_b] a+ } qu_b] {
+		err "Cannot open a+ [concat ${outfile}_qu_b]"
+	}
 }
 
 set DEBUG 0
@@ -84,14 +91,15 @@ proc proc_file { fdin } {
 
 proc write_stuff { } {
 
-	global body_b body_f count fdout_f fdout_b
+	global body_b body_f count db_f db_b qu_f qu_b
 
 	if [array exists count] {
 		foreach {ref val} [array get body_b] {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts "dict_b error: $ref $val"
 			} else {
-				puts $fdout_b "[expr $id / 256] [expr $id % 256] $id 0x80000000 $count($ref)$val"
+				puts $db_b "[expr $id / 256] [expr $id % 256] $id 0x80000000 $count($ref)$val"
+				puts $qu_b "l $id 0 $count($ref)$val"				
 				dbg "file_b [expr $id / 256] [expr $id % 256] $id 0x80000000 $count($ref)$val"
 			}
 		}
@@ -99,7 +107,8 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts "dict_f error: $ref $val"
 			} else {
-				puts $fdout_f "[expr $id / 256] [expr $id % 256] $id 0x80000000 $count($ref)$val"
+				puts $db_f "[expr $id / 256] [expr $id % 256] $id 0x80000000 $count($ref)$val"
+				puts $qu_f "l $id 0 $count($ref)$val"				
 				dbg "file_f [expr $id / 256] [expr $id % 256] $id 0x80000000 $count($ref)$val"
 			}
 		}
@@ -109,11 +118,11 @@ proc write_stuff { } {
 }
 
 # main
-global body_b body_f count fdout_b fdout_f infiles
+global body_b body_f count db_f db_b qu_f qu_b infiles
 
 get_input
-puts $fdout_b "DBVersion 1"
-puts $fdout_f "DBVersion 1"
+puts $db_b "DBVersion 1"
+puts $db_f "DBVersion 1"
 
 foreach fil $infiles {
 
@@ -126,7 +135,9 @@ foreach fil $infiles {
 }
 
 write_stuff
-close $fdout_b
-close $fdout_f
+close $db_b
+close $db_f
+close $qu_b
+close $qu_f
 exit 0
 
