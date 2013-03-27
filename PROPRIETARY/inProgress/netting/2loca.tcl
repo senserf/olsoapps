@@ -4,12 +4,25 @@ exec tclsh "$0" "$@"
 
 proc bad_use { } {
 
-	puts stderr "Usage: rssi inFiles outFile"
+	puts stderr "Usage: 2loca inFiles outFile"
+	exit 1
+}
+set DEBUG 0
+if $DEBUG {
+	proc dbg { t } {
+		puts $t
+	}
+} else {
+	proc dbg { t } { }
+}
+
+proc err { m } {
+	puts stderr "***$m"
 	exit 1
 }
 
 proc get_input { } {
-	global argv argc infiles qu_pf qu_tf db_pf db_tf qu_pb qu_tb db_pb db_tb outtakes
+	global argv argc infiles qu_pf qu_tf db_pf db_tf qu_pb qu_tb db_pb db_tb outtakes slr samples
 
 	if { $argc < 2 } {
 		bad_use
@@ -54,24 +67,18 @@ proc get_input { } {
 	if [catch { open [concat ${outfile}_outtakes] a+ } outtakes] {
 		err "Cannot open a+ [concat ${outfile}_outtakes]"
 	}
-}
-
-set DEBUG 0
-if $DEBUG {
-	proc dbg { t } {
-		puts $t
+		
+	if [catch { open [concat ${outfile}_slr] a+ } slr] {
+		err "Cannot open a+ [concat ${outfile}_slr]"
 	}
-} else {
-	proc dbg { t } { }
-}
 
-proc err { m } {
-	puts stderr "***$m"
-	exit 1
+	if [catch { open [concat ${outfile}_samples] a+ } samples] {
+		err "Cannot open a+ [concat ${outfile}_samples]"
+	}
 }
 
 proc rogue { id } {
-	set dont { 150 } ;# rogue nodes
+	set dont { 777 666 } ;# rogue nodes
 	if { [lsearch $dont $id] == -1 } {
 		return 0
 	}
@@ -80,7 +87,7 @@ proc rogue { id } {
 
 proc proc_file { fdin } {
 
-	global count_t count_p list_t list_p peg_b peg_f tag_b tag_f outtakes
+	global count_t count_p list_t list_p list_ch peg_b peg_f tag_b tag_f outtakes
 		
 	set ref  0
 	while { [gets $fdin line] >= 0 } {
@@ -131,6 +138,8 @@ proc proc_file { fdin } {
 					append tag_b($lh$ref) " $id1 $rss0b"
 					append tag_f($lh$ref) " $id1 $rss1f"
 				}
+				lappend list_ch($lh#$id1) $rss1f
+				lappend list_ch($id1#$lh) $rss0b
 				set lin 2
 				if { $hop < 2 } {
 					set ref 0
@@ -165,52 +174,126 @@ proc proc_file { fdin } {
 						dbg "do $id1$ref $id2 $rss1b $rss2f"
 					}
 				}
+				lappend list_ch($id1#$id2) $rss2f
+				lappend list_ch($id2#$id1) $rss1b
 				set ref 0
 			}
 		}
 	}
 }
 
-proc coord { id } {
-# combat10.xml
-	set xy(1285) "5 5"
-	set xy(3845) "15 5"
-	set xy(6405) "25 5"
-	set xy(8965) "35 5"
-	set xy(8975) "35 15"
-	set xy(6415) "25 15"
-	set xy(3855) "15 15"
-	set xy(1295) "5 15"
-	set xy(1305) "5 25"
-	set xy(3865) "15 25"
-	set xy(10) "10 10"
-#combReal.xml
-	set xy(100) "0 5.1"
-	set xy(101) "10.0 4.8"
-	set xy(102) "24.5 4.6"
-	set xy(103) "32.4 4.3"
-	set xy(104) "1.4 13.1"
-	set xy(105) "8.8 13.5"
-	set xy(106) "21.8 14.3"
-	set xy(107) "30.6 13.3"
-	set xy(108) "24.7 21.7"
-	set xy(109) "32.2 21.5"
-	set xy(77) "23.3 11.9"
-	set xy(150) "33.1 12.5"
-
-	if [info exists xy($id)] {
-		return $xy($id)
+proc load_coord { } {
+	global cX cY
+	
+	set cnt 0
+	
+	if [catch { open _coord r } coord] {
+		err "Cannot open r _coord"
 	}
-	return "0.0 0.0"
+
+	while { [gets $coord line] >= 0 } {
+		dbg $line
+
+		if [regexp {^#} $line] {
+			continue
+		}
+		
+#		id X Y
+		if [regexp {[ \t]*([0-9]+)[ \t]*([.0-9]+)[ \t]*([.0-9]+)} $line nulik id X Y] {
+		
+			if { [info exist cX($id)] || [info exist cY($id)] } {
+				err "duplicate $id"
+			}
+			set cX($id) $X
+			set cY($id) $Y
+			incr cnt
+			dbg "$line $cnt: $id $X $Y"
+		}
+	}
+	close $coord
+	puts "loaded $cnt coord"
+}
+	
+proc coord { id x_ptr y_ptr } {
+	global cX cY
+	upvar $x_ptr x
+	upvar $y_ptr y
+	set x 0
+	set y 0
+# this below can barf (and get caught)
+	set x $cX($id)
+	set y $cY($id)
+	return 0
 }
 
+proc write_samples { } {
+
+	global list_ch slr samples outtakes
+
+	foreach { ids lrss } [array get list_ch] {
+		if ![regexp {^([0-9]+)#([0-9]+)$} $ids nulek s d] {
+			puts $outtakes "samples err $ids $rss"
+		} else {
+			foreach rss $list_ch($ids) {
+				if [catch { coord $s sx sy }] {
+					puts $outtakes "coord $s $sx $sy"
+					continue
+				}
+				if [catch { coord $d dx dy }] {
+					puts $outtakes "coord $d $dx $dy"
+					continue
+				}
+				puts $samples "$sx $sy $dx $dy $rss"
+				
+				# let's try to construct slr				
+				if [catch { expr { sqrt ( [expr ($sx - $dx) * ($sx - $dx) + ($sy - $dy) * ($sy - $dy)] ) \
+								 } } dist] {
+					puts $outtakes "math $s $d: $sx $sy $dx $dy"
+					continue
+				}
+				set dist [format "%.2f" $dist]
+				
+				# one for all SLR
+				if [info exist dtab($dist)] {
+					set dtab($dist) [expr { $dtab($dist) + $rss }]
+					incr dtabc($dist)
+				} else {
+					set dtab($dist) $rss
+					set dtabc($dist) 1
+					set dtabn($dist) 0
+				}
+
+				#per node SLR
+				set key [expr { $dist + $s * 1000.0 }] 
+				if [info exist dtab($key)] {
+					set dtab($key) [expr { $dtab($key) + $rss }]
+					incr dtabc($key)
+				} else {
+					set dtab($key) $rss
+					set dtabc($key) 1
+					set dtabn($key) $s
+				}
+			}
+		}
+	}
+
+	foreach { d } [lsort -real [array names dtab]] {
+		puts $slr " $dtabn($d) [format "%.2f" [expr { $d - $dtabn($d) * 1000.0 }]] \
+								[expr { $dtab($d) / $dtabc($d) }] $dtabc($d)"
+	}	
+}
+	
 proc write_stuff { } {
 
-	global peg_b tag_b peg_f tag_f count_t count_p db_pf db_pb db_tf db_tb qu_pf qu_pb qu_tf qu_tb outtakes
+	global peg_b tag_b peg_f tag_f count_t count_p \
+			db_pf db_pb db_tf db_tb qu_pf qu_pb qu_tf qu_tb outtakes
 
 # perhaps we can read in or include this stuff... later
-	set lim(db_t) 10
-	set lim(db_p) 9
+# let's move limits 1 down from perfect
+#	set lim(db_t) 10
+#	set lim(db_p) 9
+	set lim(db_t) 9
+	set lim(db_p) 8
 	set lim(qu_t) 3
 	set lim(qu_p) 3
 	
@@ -219,34 +302,42 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_tb error: $ref $val"
 			} else {
+				if [catch { coord $id x y }] {
+					puts $outtakes "coord $id $x $y"
+					continue
+				}
 				if { $count_t($ref) < $lim(db_t) } {
-					puts $outtakes "db_tb below $lim(db_t) $id: $count_t($ref)$val"
+					puts $outtakes "db_tb below $lim(db_t) $id:$x $y $id 0x00000000 $count_t($ref)$val"
 				} else {
-					puts $db_tb "[coord $id] $id 0x00000000 $count_t($ref)$val"
+					puts $db_tb "$x $y $id 0x00000000 $count_t($ref)$val"
 				}
 				if { $count_t($ref) < $lim(qu_t) } {
-					puts $outtakes "qu_tb below $lim(qu_t) $id: $count_t($ref)$val"
+					puts $outtakes "qu_tb below $lim(qu_t) $id:l $id 0 $count_t($ref)$val"
 				} else {
 					puts $qu_tb "l $id 0 $count_t($ref)$val"				
 				}
-				dbg "file_tb [coord $id] $id 0x00000000 $count_t($ref)$val"
+				dbg "file_tb $x $y $id 0x00000000 $count_t($ref)$val"
 			}
 		}
 		foreach {ref val} [array get tag_f] {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_tf error: $ref $val"
 			} else {
+				if [catch { coord $id x y }] {
+					puts $outtakes "coord $id $x $y"
+					continue
+				}
 				if { $count_t($ref) < $lim(db_t) } {
-					puts $outtakes "db_tf below $lim(db_t) $id: $count_t($ref)$val"
+					puts $outtakes "db_tf below $lim(db_t) $id:$x $y $id 0x00000000 $count_t($ref)$val"
 				} else {
-					puts $db_tf "[coord $id] $id 0x00000000 $count_t($ref)$val"
+					puts $db_tf "$x $y $id 0x00000000 $count_t($ref)$val"
 				}
 				if { $count_t($ref) < $lim(qu_t) } {
-					puts $outtakes "qu_tf below $lim(qu_t) $id: $count_t($ref)$val"
+					puts $outtakes "qu_tf below $lim(qu_t) $id:l $id 0 $count_t($ref)$val"
 				} else {
 					puts $qu_tf "l $id 0 $count_t($ref)$val"				
 				}
-				dbg "file_tf [coord $id] $id 0x00000000 $count_t($ref)$val"
+				dbg "file_tf $x $y $id 0x00000000 $count_t($ref)$val"
 			}
 		}
 	} else {
@@ -258,69 +349,84 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_pb error: $ref $val"
 			} else {
+				if [catch { coord $id x y }] {
+					puts $outtakes "coord $id $x $y"
+					continue
+				}
 				if { $count_p($ref) < $lim(db_p) } {
-					puts $outtakes "db_pb below $lim(db_p) $id: $count_p($ref)$val"
+					puts $outtakes "db_pb below $lim(db_p) $id:$x $y $id 0x80000000 $count_p($ref)$val"
 				} else {
-					puts $db_pb "[coord $id] $id 0x80000000 $count_p($ref)$val"
+					puts $db_pb "$x $y $id 0x80000000 $count_p($ref)$val"
 				}
 				if { $count_p($ref) < $lim(qu_p) } {
-					puts $outtakes "qu_pb below $lim(qu_p) $id: $count_p($ref)$val"
+					puts $outtakes "qu_pb below $lim(qu_p) $id:l $id 0 $count_p($ref)$val"
 				} else {
 					puts $qu_pb "l $id 0 $count_p($ref)$val"				
 				}
-				dbg "file_pb [coord $id] $id 0x80000000 $count_p($ref)$val"
+				dbg "file_pb $x $y $id 0x80000000 $count_p($ref)$val"
 			}
 		}
 		foreach {ref val} [array get peg_f] {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_pf error: $ref $val"
 			} else {
+				if [catch { coord $id x y }] {
+					puts $outtakes "coord $id $x $y"
+					continue
+				}
 				if { $count_p($ref) < $lim(db_p) } {
-					puts $outtakes "db_pf below $lim(db_p) $id: $count_p($ref)$val"
+					puts $outtakes "db_pf below $lim(db_p) $id:$x $y $id 0x80000000 $count_p($ref)$val"
 				} else {
-					puts $db_pf "[coord $id] $id 0x80000000 $count_p($ref)$val"
+					puts $db_pf "$x $y $id 0x80000000 $count_p($ref)$val"
 				}
 				if { $count_p($ref) < $lim(qu_p) } {
-					puts $outtakes "qu_pf below $lim(qu_p) $id: $count_p($ref)$val"
+					puts $outtakes "qu_pf below $lim(qu_p) $id:l $id 0 $count_p($ref)$val"
 				} else {
 					puts $qu_pf "l $id 0 $count_p($ref)$val"				
 				}
-				dbg "file_pf [coord $id] $id 0x80000000 $count_p($ref)$val"
+				dbg "file_pf $x $y $id 0x80000000 $count_p($ref)$val"
 			}
 		}
 	} else {
-		err "no peg data"
+		puts "no peg data"
 	}
 	
 }
 
 # main & all globals
-global peg_b peg_f tag_b tag_f count_t count_p list_t list_p \
-       db_pf db_pb qu_pf qu_pb db_tf db_tb qu_tf qu_tb outtakes infiles
+global peg_b peg_f tag_b tag_f count_t count_p list_t list_p list_ch \
+       db_pf db_pb qu_pf qu_pb db_tf db_tb qu_tf qu_tb slr samples outtakes infiles
 
+load_coord
 get_input
+
+set he "#\n#verloca 0.1\n#[clock format [clock seconds] -format "%y/%m/%d at %H:%M:%S"]\n#"
+
 puts $db_pb "DBVersion 1"
 puts $db_pf "DBVersion 1"
-puts $db_tb "DBVersion 1"
-puts $db_tf "DBVersion 1"
 
-puts $outtakes "Patterns\n?multihop? line"
-puts $outtakes "out lin: line"
-puts $outtakes "rogue id:lin line"
+puts $outtakes "$he\n#Patterns\n#?multihop? line"
+puts $outtakes "#out lin: line"
+puts $outtakes "#rogue id:lin line"
+puts $outtakes "#coord id x y"
+puts $outtakes "#math s d: sx sy dx dy"
 
-puts $outtakes "dict_tb error: ref val"
-puts $outtakes "dict_tf error: ref val"
-puts $outtakes "dict_pb error: ref val"
-puts $outtakes "dict_pf error: ref val"
+puts $outtakes "#dict_tb error: ref val"
+puts $outtakes "#dict_tf error: ref val"
+puts $outtakes "#dict_pb error: ref val"
+puts $outtakes "#dict_pf error: ref val"
 
-puts $outtakes "db_tb below lim(db_t): count_t(ref)"
-puts $outtakes "qu_tb below lim(qu_t): count_t(ref)"
-puts $outtakes "db_tf below lim(db_t): count_t(ref)"
-puts $outtakes "qu_tf below lim(qu_t): count_t(ref)"
-puts $outtakes "db_pb below lim(db_p): count_p(ref)"
-puts $outtakes "qu_pb below lim(qu_p): count_p(ref)"
-puts $outtakes "db_pf below lim(db_p): count_p(ref)"
-puts $outtakes "qu_pf below lim(qu_p): count_p(ref)\n========="
+puts $outtakes "#db_tb below lim(db_t): count_t(ref)"
+puts $outtakes "#qu_tb below lim(qu_t): count_t(ref)"
+puts $outtakes "#db_tf below lim(db_t): count_t(ref)"
+puts $outtakes "#qu_tf below lim(qu_t): count_t(ref)"
+puts $outtakes "#db_pb below lim(db_p): count_p(ref)"
+puts $outtakes "#qu_pb below lim(qu_p): count_p(ref)"
+puts $outtakes "#db_pf below lim(db_p): count_p(ref)"
+puts $outtakes "#qu_pf below lim(qu_p): count_p(ref)\n#========="
+
+puts $samples $he
+puts $slr $he
 
 foreach fil $infiles {
 
@@ -333,14 +439,27 @@ foreach fil $infiles {
 }
 
 write_stuff
+write_samples
+
 close $db_pb
 close $db_pf
-close $qu_pb
-close $qu_pf
 close $db_tb
 close $db_tf
+
+puts $qu_pb q
+close $qu_pb
+
+puts $qu_pf q
+close $qu_pf
+
+puts $qu_tb q
 close $qu_tb
+
+puts $qu_tf q
 close $qu_tf
+
 close $outtakes
+close $samples
+close $slr
 exit 0
 

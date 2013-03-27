@@ -4,7 +4,7 @@
     <display>
     	<roamer display="yes"></roamer>
     </display>
-    <xi:include href="channel.xml"/>
+    <xi:include href="combReal_ch.xml"/>
 	
     <nodes>
 		<defaults>

@@ -1,0 +1,23 @@
+<channel bn="-108.0dBm">
+	<!-- all comments inherited from CHANNELS
+		My SA shows RSSI = 60 when no traffic. Taken at its face value,
+	     	that means -108.0dBm background noise.
+	-->
+        <propagation type="sampled" samples="oo_samples.txt"
+		average="4,1.0">
+                <!--
+                        Based on the empirical data collected by Wlodek
+                        and Gerry, and trying to take RSSI at its face
+                        value (which is a huge leap of faith), I am
+                        assuming a steady drop of 10dB per 50m, past
+                        the 20m range.
+                -->
+                          0.1m     -30.0dB      1.0dB
+                          5.0m     -53.0dB      2.0dB
+                         20.0m     -59.0dB      3.0dB
+                         50.0m     -65.0dB      4.0dB
+                        400.0m    -135.0dB      8.0dB
+        </propagation>
+
+	<xi:include href="CHANNELS/common.xml"/>
+</channel>
