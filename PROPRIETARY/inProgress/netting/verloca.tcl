@@ -177,7 +177,7 @@ global g_count g_dist g_dx g_dy g_distM g_dxM g_dyM out_ver outtakes infiles
 get_input
 load_coord
 
-set he "#\n#verloca 0.1\n#[clock format [clock seconds] -format "%y/%m/%d at %H:%M:%S"]\n#"
+set he "#\n#verloca 1.0\n#[clock format [clock seconds] -format "%y/%m/%d at %H:%M:%S"]\n#"
 puts $out_ver $he
 puts $outtakes $he
 puts $outtakes "#Patterns\n#unparsed: line\n#math id: X x Y x\n#coord id x y\n"

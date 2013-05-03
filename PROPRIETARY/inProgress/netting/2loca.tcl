@@ -7,6 +7,11 @@ proc bad_use { } {
 	puts stderr "Usage: 2loca inFiles outFile"
 	exit 1
 }
+
+set WIFIDAT(max)		25	;# anything WIFI level > -25 is as RSSI 255
+set WIFIDAT(ncount) 	1000 ;# WIFI node ids (likely, we'll have to write them out in a _wifi file)
+set WIFIDAT(combine)	1	;# if nonzero, tag's lines combine CC and WIFI; otherwise they're separated
+
 set DEBUG 0
 if $DEBUG {
 	proc dbg { t } {
@@ -87,12 +92,24 @@ proc rogue { id } {
 
 proc proc_file { fdin } {
 
-	global count_t count_p list_t list_p list_ch peg_b peg_f tag_b tag_f outtakes
-		
-	set ref  0
+	global count_t count_p list_t list_p list_ch peg_b peg_f tag_b tag_f outtakes WIFIDAT
+			
+	set ref   0
+	set coolh 0
+	
 	while { [gets $fdin line] >= 0 } {
 		dbg $line
 
+		if [regexp {^#} $line] {
+			continue
+		}
+
+#		e.g. "1366995548763 Coords: 384.0cm X 291.0cm"
+		if [regexp {Coords: +([0-9]+)[\.| ].*[x|X] *([0-9]+)[\.| |$]} $line nulik myX myY] {
+			set coolh [expr ($myX / 10) * 10000 + $myY / 10]	;# it is xxxxyyyy in *deci*meters
+			puts "Coords $coolh: $myX $myY"	;# I'm not sure if we want to output this...
+		}
+		
 #		e.g. "8312: odr #8310 [1.0.9]:"
 		if [regexp {odr (#[0-9]+).*([0-9])\]:$} $line nulik ref hop] {	;# prepend # to ref, for #0 != 0
 			dbg "odr $ref $hop"
@@ -103,13 +120,70 @@ proc proc_file { fdin } {
 			}
 			continue
 		}
-	
+
+#		Another kludge,this time to combine WIFI with ad-hoc
+		if { $coolh != 0 } { ;# WIFI is useless without coords
+
+#           e.g. 1366995550236 WIFI: SSID: CombatVoice, BSSID: 00:16:ca:3a:e6:c0, 
+#                capabilities: [WPA-PSK-TKIP+CCMP][WPA2-PSK-TKIP+CCMP][ESS], level: -54, frequency: 2437
+			if [regexp {^([0-9]+) WIFI:.*SSID: (.+), BSSID: ([0-9a-f:]+),.*level: +-([0-9]+),} \
+				$line nulik ts nam ss lev] {
+
+#			when we want to combine, WIFI still can be out of ref, hopefully all entries for a single scan
+			if { !$WIFIDAT(combine) || $ref == 0 } {
+					set wifiref "#[expr ($ts / 1000) % 10000]" ;# ca. 3 hrs of unique refs
+				} else {
+					set wifiref $ref ;# we want to combine WIFI with our RF
+				}
+				dbg "wifi $wifiref $ss $lev"
+				
+				if ![info exist WIFIDAT($ss)] {
+					incr WIFIDAT(ncount)
+					set WIFIDAT($ss) $WIFIDAT(ncount)
+					puts $outtakes "wifi map $nam $ss $WIFIDAT(ncount)"
+				}
+				
+				set lev [expr 255 - ($lev - $WIFIDAT(max)) * 2]
+				if { $lev > 255} {
+					set lev 255
+				}
+				if { $lev < 0 } {
+					set lev 0
+				}
+
+				if [info exist count_t($coolh$wifiref)] {
+					if { [lsearch $list_t($coolh$wifiref) $WIFIDAT($ss)] == -1 } {
+						incr count_t($coolh$wifiref)
+						lappend list_t($coolh$wifiref) $WIFIDAT($ss)
+						append tag_b($coolh$wifiref) " $WIFIDAT($ss) $lev"
+#						tag_f formally should not be updated; however, the counters would have to be
+#						separated or combined wifi and cc lines would be faulty
+						append tag_f($coolh$wifiref) " $WIFIDAT($ss) $lev"
+						dbg "append wifi $coolh$wifiref $WIFIDAT($ss) $lev"
+					}
+				} else {
+					set count_t($coolh$wifiref) 1
+					lappend list_t($coolh$wifiref) $WIFIDAT($ss)
+					append tag_b($coolh$wifiref) " $WIFIDAT($ss) $lev"
+					append tag_f($coolh$wifiref) " $WIFIDAT($ss) $lev"
+					dbg "do wifi $coolh$wifiref $WIFIDAT($ss) $lev"
+				}
+				lappend list_ch($WIFIDAT($ss)#$coolh) $lev
+			}
+		}
+				
 		if { $ref != 0 } {
 		
 #			e.g. " 0:  (1285 0 166)<"
 			if [regexp {^ 0: +\(([0-9]+) ([0-9]+) ([0-9]+)\)<} $line nulik lh nulik rss0b] {
 				dbg "0: $lh $rss0b"
 				set lin 1
+				
+#				kludge with multiple coords for a single lh
+				set truelh	$lh
+				if { $coolh != 0 } { ;# assumed cm, after our android frontend
+					set lh $coolh
+				}
 			} 
 			
 			if [regexp {^ 1: +\(([0-9]+) ([0-9]+) ([0-9]+)} $line nulik id1 rss1f rss1b] {
@@ -141,7 +215,7 @@ proc proc_file { fdin } {
 				lappend list_ch($lh#$id1) $rss1f
 				lappend list_ch($id1#$lh) $rss0b
 				set lin 2
-				if { $hop < 2 } {
+				if { !$WIFIDAT(combine) && $hop < 2 } {
 					set ref 0
 				}
 			}
@@ -157,7 +231,7 @@ proc proc_file { fdin } {
 					set ref 0
 					continue
 				}
-				if { $id2 != $lh } {	;# don't do the ping-pong entries
+				if { $id2 != $truelh } {	;# don't do the ping-pong entries
 					if [info exist count_p($id1$ref)] {
 						if { [lsearch $list_p($id1$ref) $id2] == -1 } {
 							incr count_p($id1$ref)
@@ -220,6 +294,13 @@ proc coord { id x_ptr y_ptr } {
 	upvar $y_ptr y
 	set x 0
 	set y 0
+	
+	if { $id > 10000 } { ;# kludge for moving ids replaced with current coords
+		set x [format "%.1f" [expr ($id / 10000) / 10.0]]
+		set y [format "%.1f" [expr ($id % 10000) / 10.0]]
+		return 0
+	}
+	
 # this below can barf (and get caught)
 	set x $cX($id)
 	set y $cY($id)
@@ -234,7 +315,7 @@ proc write_samples { } {
 		if ![regexp {^([0-9]+)#([0-9]+)$} $ids nulek s d] {
 			puts $outtakes "samples err $ids $rss"
 		} else {
-			foreach rss $list_ch($ids) {
+			foreach rss $list_ch($ids) { ;# $lrss <-> $list_ch($ids)
 				if [catch { coord $s sx sy }] {
 					puts $outtakes "coord $s $sx $sy"
 					continue
@@ -290,10 +371,10 @@ proc write_stuff { } {
 
 # perhaps we can read in or include this stuff... later
 # let's move limits 1 down from perfect
-#	set lim(db_t) 10
-#	set lim(db_p) 9
-	set lim(db_t) 9
-	set lim(db_p) 8
+	set lim(db_t) 10
+	set lim(db_p) 9
+#	set lim(db_t) 9
+#	set lim(db_p) 8
 	set lim(qu_t) 3
 	set lim(qu_p) 3
 	
@@ -302,6 +383,14 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_tb error: $ref $val"
 			} else {
+			
+#				queries don't need coords, do them first
+				if { $count_t($ref) < $lim(qu_t) } {
+					puts $outtakes "qu_tb below $lim(qu_t) $id:l $id 0 $count_t($ref)$val"
+				} else {
+					puts $qu_tb "l $id 0 $count_t($ref)$val"				
+				}
+				
 				if [catch { coord $id x y }] {
 					puts $outtakes "coord $id $x $y"
 					continue
@@ -311,11 +400,7 @@ proc write_stuff { } {
 				} else {
 					puts $db_tb "$x $y $id 0x00000000 $count_t($ref)$val"
 				}
-				if { $count_t($ref) < $lim(qu_t) } {
-					puts $outtakes "qu_tb below $lim(qu_t) $id:l $id 0 $count_t($ref)$val"
-				} else {
-					puts $qu_tb "l $id 0 $count_t($ref)$val"				
-				}
+
 				dbg "file_tb $x $y $id 0x00000000 $count_t($ref)$val"
 			}
 		}
@@ -323,6 +408,14 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_tf error: $ref $val"
 			} else {
+			
+#				queries don't need coords, do them first
+				if { $count_t($ref) < $lim(qu_t) } {
+					puts $outtakes "qu_tf below $lim(qu_t) $id:l $id 0 $count_t($ref)$val"
+				} else {
+					puts $qu_tf "l $id 0 $count_t($ref)$val"				
+				}
+				
 				if [catch { coord $id x y }] {
 					puts $outtakes "coord $id $x $y"
 					continue
@@ -332,11 +425,7 @@ proc write_stuff { } {
 				} else {
 					puts $db_tf "$x $y $id 0x00000000 $count_t($ref)$val"
 				}
-				if { $count_t($ref) < $lim(qu_t) } {
-					puts $outtakes "qu_tf below $lim(qu_t) $id:l $id 0 $count_t($ref)$val"
-				} else {
-					puts $qu_tf "l $id 0 $count_t($ref)$val"				
-				}
+
 				dbg "file_tf $x $y $id 0x00000000 $count_t($ref)$val"
 			}
 		}
@@ -349,6 +438,14 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_pb error: $ref $val"
 			} else {
+			
+#				queries don't need coords, do them first
+				if { $count_p($ref) < $lim(qu_p) } {
+					puts $outtakes "qu_pb below $lim(qu_p) $id:l $id 0 $count_p($ref)$val"
+				} else {
+					puts $qu_pb "l $id 0 $count_p($ref)$val"				
+				}
+				
 				if [catch { coord $id x y }] {
 					puts $outtakes "coord $id $x $y"
 					continue
@@ -358,11 +455,7 @@ proc write_stuff { } {
 				} else {
 					puts $db_pb "$x $y $id 0x80000000 $count_p($ref)$val"
 				}
-				if { $count_p($ref) < $lim(qu_p) } {
-					puts $outtakes "qu_pb below $lim(qu_p) $id:l $id 0 $count_p($ref)$val"
-				} else {
-					puts $qu_pb "l $id 0 $count_p($ref)$val"				
-				}
+
 				dbg "file_pb $x $y $id 0x80000000 $count_p($ref)$val"
 			}
 		}
@@ -370,6 +463,14 @@ proc write_stuff { } {
 			if ![regexp {^([0-9]+)#} $ref nulek id] {
 				puts $outtakes "dict_pf error: $ref $val"
 			} else {
+
+#				queries don't need coords, do them first
+				if { $count_p($ref) < $lim(qu_p) } {
+					puts $outtakes "qu_pf below $lim(qu_p) $id:l $id 0 $count_p($ref)$val"
+				} else {
+					puts $qu_pf "l $id 0 $count_p($ref)$val"				
+				}
+				
 				if [catch { coord $id x y }] {
 					puts $outtakes "coord $id $x $y"
 					continue
@@ -379,11 +480,7 @@ proc write_stuff { } {
 				} else {
 					puts $db_pf "$x $y $id 0x80000000 $count_p($ref)$val"
 				}
-				if { $count_p($ref) < $lim(qu_p) } {
-					puts $outtakes "qu_pf below $lim(qu_p) $id:l $id 0 $count_p($ref)$val"
-				} else {
-					puts $qu_pf "l $id 0 $count_p($ref)$val"				
-				}
+
 				dbg "file_pf $x $y $id 0x80000000 $count_p($ref)$val"
 			}
 		}
@@ -395,12 +492,12 @@ proc write_stuff { } {
 
 # main & all globals
 global peg_b peg_f tag_b tag_f count_t count_p list_t list_p list_ch \
-       db_pf db_pb qu_pf qu_pb db_tf db_tb qu_tf qu_tb slr samples outtakes infiles
-
+       db_pf db_pb qu_pf qu_pb db_tf db_tb qu_tf qu_tb slr samples outtakes infiles WIFIDAT
+		
 load_coord
 get_input
 
-set he "#\n#verloca 0.1\n#[clock format [clock seconds] -format "%y/%m/%d at %H:%M:%S"]\n#"
+set he "#\n#2loca 1.0\n#[clock format [clock seconds] -format "%y/%m/%d at %H:%M:%S"]\n#"
 
 puts $db_pb "DBVersion 1"
 puts $db_pf "DBVersion 1"
