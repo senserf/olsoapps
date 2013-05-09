@@ -448,6 +448,9 @@ proc snip_parse { cf } {
 	# invalidate the cache
 	snip_icache
 
+	# empty the storage
+	array unset SN
+
 	set ix 0
 
 	set snl [snip_getparam SNL]
