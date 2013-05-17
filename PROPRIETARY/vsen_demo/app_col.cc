@@ -145,7 +145,7 @@ static void init () {
 	ezlcd_init ();
 	ezlcd_on ();
 	//buzzer_init ();
-	chro_lo ("ILIAD");
+	chro_lo ("SENSR");
 	chro_nn (1, local_host);
 
 	memset (&sens_data, 0, sizeof (sensDatumType));
@@ -312,7 +312,6 @@ fsm rxsw {
 
 	entry RX_OFF:
 
-		// dupa CHRONOS chokes with RXOFF - MUST be investigated
 		net_opt (PHYSOPT_RXOFF, NULL);
 		net_diag_t (D_DEBUG, "Rx off %x",
 				net_opt (PHYSOPT_STATUS, NULL));
@@ -539,18 +538,45 @@ fsm pong {
 
 }
 
-static void cma_massage (address w) {
+#define IMMOB_COOL 15000
+fsm immob {
+
+	entry IM_INI:
+		wait_sensor (0, IM_MOT);
+		// wait_sensor embeds release
+		
+	entry IM_MOT:
+		trigger (ALRMS);
+		set_alrms;
+		delay (IMMOB_COOL, IM_INI);
+		release;
+}		
+#undef IMMOB_COOL
+
+// returns YES if the caller should read data for motionless sensor
+// IN dat - YES if (motionless) data read
+static Boolean cma_massage (address w, Boolean  dat) {
 	char * c = (char *) w;
 	word mi, ma;
-
-	if (c[0] != 0) { // motion 
+	
+	if (dat == NO) {
 		sens_data.sval[2] = c[0];
-		killall (buzz);
-		buzzer_off();
-		return;
+		if (c[0] != 0) { // motion
+		
+			if (running (immob)) {
+				if (!running (buzz)) {
+					runfsm buzz;
+				}
+			} else {
+				killall (buzz);
+				buzzer_off();
+			}
+			return NO;
+		}
+		return YES;
 	}
 
-	// I'm bored... anything faster?
+	// anything nicer?
 	if (c[1] > c[2])
 		mi = 2;
 	else
@@ -568,12 +594,15 @@ static void cma_massage (address w) {
 	sens_data.sval[2] +=  ((sint)(c[mi] + c[ma]) < 0) ?
 	       1000* mi + c[mi] : c[ma] + 1000* ma;
 
-	// start buzzing
-	if (!running (buzz))
-		runfsm buzz;
+	if (running (immob)) {
+		killall (buzz);
+		buzzer_off();
+	} else {
+		if (!running (buzz))
+			runfsm buzz;
+	}
+	return 0;
 }
-
-#define BATTERY_WARN	2250
 
 fsm sens {
 
@@ -600,24 +629,19 @@ fsm sens {
 	entry SE_1:
 		read_sensor (SE_1, -1, &sens_data.sval[1]);
 
-#ifndef __SMURPH__
 		// force measurement mode only when needed
 		read_sensor (WNONE, 0, w);
-		if (*(char*)w != 0) { // motion
-			sens_data.sval[2] = *(char *)w;
-			killall (buzz);
-			buzzer_off();
+		if (cma_massage (w, NO) == NO)
 			proceed (SE_3);
-		}
-#endif
 
 	entry SE_2: // motion without motion (orientation)
 		read_sensor (SE_2, 0,  w);
-		cma_massage (w);
-#ifndef __SMURPH__
-		// dupa temporary, vuee will be updated
+		(void)cma_massage (w, YES);
+		
+		// dupa if (running (immob)) trigger (trig_in_immob) else wait_sensor(0, WNONE)
+		// is this equivalent while wait_sensor() is hanging in immob?:
 		wait_sensor (0, WNONE);
-#endif
+
 	entry SE_3: // temp, pressure
 		read_sensor (SE_3, 1, w);
 #ifndef __SMURPH__
@@ -649,7 +673,6 @@ fsm sens {
 		trigger (SENS_DONE);
 		finish;
 }
-#undef BATTERY_WARN
 
 // b < 5 <-> button, else b is event
 void do_butt (word b) {
@@ -677,6 +700,7 @@ void do_butt (word b) {
 		killall (sens);
 		killall (pong);
 		killall (buzz);
+		killall (immob);
 		buzzer_off();
 		killall (rcv); // keep last: this fsm can call do_butt()!!
 
@@ -690,6 +714,22 @@ void do_butt (word b) {
 			cma3000_on (0, 1, 3);
 	}
 #endif
+
+	if (ev & (1 << 2)) {
+		if (pong_params.freq_maj >= 60)
+			pong_params.freq_maj = 10;
+		else
+			pong_params.freq_maj += 10;
+	}
+	
+	if (ev & (1 << 3)) {
+		if (buttons & (1 << 3))
+			killall (immob); // 'running (immob)' drives the reverse logic; alrm0 seems redundant
+		else
+			if (!running (immob))
+				runfsm immob;
+	}
+	
 	if (ev > (1<<4)) { // external event: note that we always trigger alrm
 		if (buttons & 0x1F & ev) {
 			chro_lo ("IGNOR");
@@ -711,8 +751,14 @@ void do_butt (word b) {
 		buttons = 0; // clear events
 	trigger (ALRMS);
 	set_alrms;
+	
 	chro_xx (1, buttons);
-	chro_xx (0, ev);
+	
+	if (ev & (1 << 2)) // show freq instead the freq. circling button
+		chro_nn (0, pong_params.freq_maj);
+	else
+		chro_xx (0, ev);
+	
 }
 
 #ifdef __SMURPH__

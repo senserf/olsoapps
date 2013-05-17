@@ -17,3 +17,16 @@ Things seem to work, but it is still work in progress:
 - we may want to make chronos functionality 'better', even without real reqs. Power budget should be doble checked with cma and the buzzer.
 
 ---
+May 17, 2013: Vsenet 1.1, (SENSR on CHRONOS). Mainly CHRONOS-related:
+
+- iltest.xml models a "flexible ILIAD" demo.
+- Buttons #0, #1 - just alarms (#2 represents local 'intercom' alarm). Button
+  #2 cycles freq. 60-10..-50-60 seconds, showing it in low row.
+  #3 toggles immobility - motion alarms.
+  #4 sleeps / resets. All are true alarms without debouncing (with quirky
+  side effects). Note a big and somewhat interesting effect: buzzer generates
+  motion (interrupts for motion alarms).
+- VUEE is closer to reality with wait_sensor() operational
+- deleted LEGACY/il_demo, I can't think of use for it.
+
+---

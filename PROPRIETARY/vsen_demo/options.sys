@@ -7,22 +7,6 @@
 // if we want sim. sensors
 #define SENSOR_LIST			present
 
-#define	TCV_PRESENT			1
-#define	TCV_HOOKS			0
-#define	TCV_TIMERS			0
-
-#undef	UART_DRIVER
-#undef	CC1100
-#undef	RADIO_USE_LEDS
-#undef	LEDS_DRIVER
-#undef	LEDS_BLINKING
-
-#define	UART_DRIVER			1
-#define CC1100 1
-#define RADIO_USE_LEDS 0
-#define LEDS_DRIVER	1
-#define LEDS_BLINKING	1
-
 #define	dbg_0(c)	do { } while (0)
 #define	dbg_1(c)	do { } while (0)
 #define	dbg_2(c)	do { } while (0)

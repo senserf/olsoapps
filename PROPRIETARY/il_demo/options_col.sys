@@ -15,6 +15,7 @@
 #define VUEE_LIB_PLUG_TARP
 #define VUEE_LIB_PLUG_NULL
 
+#undef UART_DRIVER
 #ifdef BOARD_WARSAW_BLUE
 #define UART_DRIVER                     2
 #else
