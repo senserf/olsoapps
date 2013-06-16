@@ -1,0 +1,106 @@
+<network nodes="12">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	    <xi:include href="node.xml"/>
+	</defaults>
+
+	<node number="0" type="peg" hid="0xBACA000A">
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-1" vsize="2" delay="0.01" init="2600">
+			2703
+		</sensor>
+	    </sensors>
+	    <location>5.0 5.0</location>
+	</node>
+
+        <node number="1" type="peg" hid="0xBACA000B">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>105.0 5.0</location>
+        </node>
+
+        <node number="2" type="peg" hid="0xBACA000C">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>205.0 5.0</location>
+        </node>
+
+        <node number="3" type="peg" hid="0xBACA000D">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>305.0 5.0</location>
+        </node>
+
+        <node number="4" type="peg" start="off" hid="0xBACA000E">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>5.0 305.0</location>
+        </node>
+
+        <node number="5" type="peg" start="off" hid="0xBACA000F">
+            <sensors>
+                <input source="socket"></input>
+                <output target="socket"></output>
+                <sensor number="-1" vsize="2" delay="0.01" init="2600">
+                        2703
+                </sensor>
+            </sensors>
+            <location>20.0 305.0</location>
+        </node>
+
+
+	<node number="6" type="simps" start="on" hid="0xBACA0065">
+	    <location>405.0 5.0</location>
+	    <xi:include href="senset_ils.xml"/>
+	</node>
+
+        <node number="7" type="simps" start="on" hid="0xBACA0066">
+            <location>415.0 15.0</location>
+            <xi:include href="senset_ils.xml"/>
+        </node>
+
+	<node number="8" type="simps" start="off" hid="0xBACA0067">
+	    <location>5.0 340.0</location>
+	    <xi:include href="senset_ils.xml"/>
+	</node>
+
+        <node number="9" type="simps" start="off" hid="0xBACA0068">
+            <location>50.0 340.0</location>
+            <xi:include href="senset_ils.xml"/>
+        </node>
+
+        <node number="10" type="col" start="on" hid="0xBACA00C9">
+            <location>350.0 50.0</location>
+            <xi:include href="senset_chro.xml"/>
+        </node>
+        <node number="11" type="col" start="off" hid="0xBACA00CA">
+            <location>50.0 305.0</location>
+            <xi:include href="senset_chro.xml"/>
+        </node>
+    </nodes>
+</network>

@@ -9,23 +9,7 @@
 #ifdef  __SMURPH__
 
 // #define diag(a...)	emul(99,a)
-
-#define dbg_0(c)        do { } while (0)
-#define dbg_1(c)        do { } while (0)
-#define dbg_2(c)        do { } while (0)
-#define dbg_3(c)        do { } while (0)
-#define dbg_4(c)        do { } while (0)
-#define dbg_5(c)        do { } while (0)
-#define dbg_6(c)        do { } while (0)
-#define dbg_7(c)        do { } while (0)
-#define dbg_8(c)        do { } while (0)
-#define dbg_9(c)        do { } while (0)
-#define dbg_a(c)        do { } while (0)
-#define dbg_b(c)        do { } while (0)
-#define dbg_c(c)        do { } while (0)
-#define dbg_d(c)        do { } while (0)
-#define dbg_e(c)        do { } while (0)
-#define dbg_f(c)        do { } while (0)
+// #define dbg_level 0
 
 // WARSAW*
 #else
@@ -78,13 +62,13 @@
 // #define D_DEBUG	present
 
 // Europe:
-// #define CC1100_FREQ_FREQ2_VALUE 0x20
-// #define CC1100_FREQ_FREQ1_VALUE 0x65
-// #define CC1100_FREQ_FREQ0_VALUE 0xE8
+#define CC1100_FREQ_FREQ2_VALUE 0x20
+#define CC1100_FREQ_FREQ1_VALUE 0x65
+#define CC1100_FREQ_FREQ0_VALUE 0xE8
 
 #define TARP_RTR        2
 
 #define ODR_FILL_BCAST present
 
-#define RADIO_DEFAULT_CHANNEL	8
+#define RADIO_DEFAULT_CHANNEL	129
 

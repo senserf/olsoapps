@@ -1,0 +1,15 @@
+<network nodes="250" radio="250">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer display="yes"></roamer>
+    </display>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="tag.xml"/>
+	<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<xi:include href="sq16.xml"/>
+    </nodes>
+</network>
