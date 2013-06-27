@@ -12,6 +12,8 @@ set WIFIDAT(max)		25	;# anything WIFI level > -25 is as RSSI 255
 set WIFIDAT(ncount) 	1000 ;# WIFI node ids (likely, we'll have to write them out in a _wifi file)
 set WIFIDAT(combine)	1	;# if nonzero, tag's lines combine CC and WIFI; otherwise they're separated
 
+set WIFIDAT(ignore)	0	;# no WIFI
+
 set DEBUG 0
 if $DEBUG {
 	proc dbg { t } {
@@ -128,6 +130,10 @@ proc proc_file { fdin } {
 #                capabilities: [WPA-PSK-TKIP+CCMP][WPA2-PSK-TKIP+CCMP][ESS], level: -54, frequency: 2437
 			if [regexp {^([0-9]+) WIFI:.*SSID: (.+), BSSID: ([0-9a-f:]+),.*level: +-([0-9]+),} \
 				$line nulik ts nam ss lev] {
+
+				if { $WIFIDAT(ignore) } {
+					continue
+				}
 
 #			when we want to combine, WIFI still can be out of ref, hopefully all entries for a single scan
 			if { !$WIFIDAT(combine) || $ref == 0 } {

@@ -80,6 +80,13 @@ proc coord { id x_ptr y_ptr } {
 	upvar $y_ptr y
 	set x 0
 	set y 0
+
+        if { $id > 10000 } { ;# kludge for moving ids replaced with current coords
+                set x [format "%.1f" [expr ($id / 10000) / 10.0]]
+                set y [format "%.1f" [expr ($id % 10000) / 10.0]]
+                return 0
+        }
+
 # can barf and get caught:
 	set x $cX($id)
 	set y $cY($id)
