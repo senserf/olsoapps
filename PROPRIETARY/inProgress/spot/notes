@@ -1,0 +1,68 @@
+SPOT (Spotting Pegs with Optional Tags) are copied from alfMay2013 and modified starting June 9, 2013. alfMay2013 seems the closest fit for intended functionality, but it may be a bad judgment, we'll see.
+
+I want to streamline and join vsen_demo (alfMay2013) with CHRONOS Tags, make Pegs with sensors and add 'netting' functionality to Pegs.
+
+As of end ofAugust, comparing with alfMay2013:
+
+- removed eeprom (ridiculous amount of code)
+- no setting Tags over RF (another ridiculous code burden)
+
+It compiles and runs under vuee. For details, to diff -r . .../alfMay2013,
+   I'm afraid quite frustrating exercise even for the author of this
+   piled and amalgamated crap. Incredible, but keepin mind these are offsprings
+   of everything since GENESIS (I mean the praxes for RFM ;-)
+
+
+---------------
+Copied notes:
+This vsens_demo shows non-uniform collectors handled by the same aggregators (and OSS(I)). PEG, TAG parts morphed from KRK_NED which was derived from eco_demo, see the notes there, for history.
+
+app_col adds even less compliant 'travelling collector' on CHRONOS board. This part came from il_demo, with several modifications. It still includes some il_demo functionality that is not used here. See notes there, especially for CHRONOS functionality. It is maintained here, plus a simple lcd_off after 15s of sleep. Since there is no remote buttons here, 'events' are folded into 'buttons'.
+
+To manage setups with Chronos, comparing with the previous submission, only the Master must be reflashed - plev and rssi are displayed as Chronos sensors. 
+
+econnect and piter (with piter_plug.tcl) are part of this adventure; the works should continue there, too, for the future OSSI module.
+
+It didn't go too well; I hope to continue it, with folding collectors back into one program and setting decent sensor modules. In general, this can be a playground for better modularity we plan for OSSI, storage, et al.
+
+---
+April 19, 2012: added WARSAW_SONAR (as simps), updated CHRONOS with the driver changes: if there has been motion within the reporting cycle (for demo it is 30s), the triggering axis is reported (1,2,3). Immobile chronos will attempt at report orientation: prevailing axis *1000 plus the reading shifted by 128 to [0, 255]. When there is no movement, chronos buzzes every 10s for 500ms. At reporting times, movements cancel the buzzing, so id any button. Note that buttons trigger reports, so repeated button press triggers 'immobility alarm'. Could be useful for various demoing scenarios.
+
+Things seem to work, but it is still work in progress:
+- nasty surprise with FIM: it doesn't get erased at flashing time. I disabled FIM for now.
+- sensor accuracy is bad, especially sonar's. We may wait for a real need, but as is, it is rather useless.
+- we may want to make chronos functionality 'better', even without real reqs. Power budget should be doble checked with cma and the buzzer.
+
+---
+May 17, 2013: Vsenet 1.1, (SENSR on CHRONOS). Mainly CHRONOS-related:
+
+- iltest.xml models a "flexible ILIAD" demo.
+- Buttons #0, #1 - just alarms (#2 represents local 'intercom' alarm). Button
+  #2 cycles freq. 60-10..-50-60 seconds, showing it in low row.
+  #3 toggles immobility - motion alarms.
+  #4 sleeps / resets. All are true alarms without debouncing (with quirky
+  side effects). Note a big and somewhat interesting effect: buzzer generates
+  motion (interrupts for motion alarms).
+- VUEE is closer to reality with wait_sensor() operational
+- deleted LEGACY/il_demo, I can't think of use for it.
+
+---
+
+Copied from vsen_demo to apply AT changes while in Lokeren.
+
+NOTE that this is a version of vsen_demo, while alphat was an early netting clone, now removed. The details below were recorded June 16, 2013, but were made in May while in Lokeren:
+
+- Dropped piter_plug.tcl and several models (*xml files).
+- Options.sys set for European channel 129.
+- Updated iltest.xml to remove arras, 10sht, eco12.
+- Reduced report format (rep_str).
+- Buttons:
+-- B0 triggers alarms without updating event mask (sort of 'change trigger');
+-- B1 as B0, but toggles event mask;
+-- B2 changes maj. freq 60->3600->10->20->30->40->50->60...;
+-- B3 cycles through pow. level vector: 0x7531->0x1111->0x2222...0x7777->0x7531;
+-- no sensor but int. voltage (particularly: no CMA3000). Leftover code is a particularly ugly mess;
+-- reporting on source nodes (in addition to the master). For clarity, local_host is reported in rep_str;
+
+--------
+

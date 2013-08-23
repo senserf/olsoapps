@@ -1,63 +1,35 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2006.			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2013.			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
 #include "diag.h"
-#include "app_peg.h"
+#include "app_peg_data.h"
 #include "msg_peg.h"
-
-#ifdef	__SMURPH__
-
-#include "node_peg.h"
-#include "stdattr.h"
-#include "threadhdrs_peg.h"
-
-#else	/* PICOS */
 
 #include "net.h"
 #include "tarp.h"
 
-#endif	/* SMURPH or PICOS */
-
-//#include "threadhdrs_peg.h"
-#include "attnames_peg.h"
-
 /*
  * "Virtual" stuff needed by NET & TARP =======================================
  */
-__PUBLF (NodePeg, int, tr_offset) (headerType *h) {
-	// Unused ??
-	return 0;
-}
+idiosyncratic int tr_offset (headerType *h) { return 0; }
 
-__PUBLF (NodePeg, Boolean, msg_isBind) (msg_t m) {
-	return NO;
-}
+idiosyncratic Boolean msg_isBind (msg_t m) { return NO; }
 
-__PUBLF (NodePeg, Boolean, msg_isTrace) (msg_t m) {
-	return NO;
-}
+idiosyncratic Boolean msg_isTrace (msg_t m) { return NO; }
 
-__PUBLF (NodePeg, Boolean, msg_isMaster) (msg_t m) {
-	return NO;
-}
+idiosyncratic Boolean msg_isMaster (msg_t m) { return NO; }
 
-__PUBLF (NodePeg, Boolean, msg_isNew) (msg_t m) {
-	return NO;
-}
+idiosyncratic Boolean msg_isNew (msg_t m) { return NO; }
 
-__PUBLF (NodePeg, Boolean, msg_isClear) (byte o) {
-	return YES;
-}
+idiosyncratic Boolean msg_isClear (byte o) { return YES; }
 
-__PUBLF (NodePeg, void, set_master_chg) () {
-	app_flags |= 2;
-}
+idiosyncratic void set_master_chg () { app_flags |= 2; }
 
 // ============================================================================
 
-__PUBLF (NodePeg, void, nbuVec) (char * s, byte b) {
+void nbuVec (char * s, byte b) {
 	int i = 7;
 	do {
 		s[7 - i] = (b & (1 << i)) ? '|' : '.';
@@ -65,7 +37,7 @@ __PUBLF (NodePeg, void, nbuVec) (char * s, byte b) {
 	} while (--i >= 0);
 }
 
-__PUBLF (NodePeg, int, find_tag) (word tag) {
+int find_tag (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (tagArray[i].id == tag) {
@@ -77,7 +49,7 @@ __PUBLF (NodePeg, int, find_tag) (word tag) {
 }
 
 // do NOT combine: real should be quite different
-__PUBLF (NodePeg, int, find_ign) (word tag) {
+int find_ign (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (ignArray[i].id == tag) {
@@ -88,7 +60,7 @@ __PUBLF (NodePeg, int, find_ign) (word tag) {
 	return -1;
 }
 
-__PUBLF (NodePeg, int, find_nbu) (word tag) {
+int find_nbu (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (nbuArray[i].id == tag) {
@@ -99,7 +71,7 @@ __PUBLF (NodePeg, int, find_nbu) (word tag) {
 	return -1;
 }
 
-__PUBLF (NodePeg, int, find_mon) (word tag) {
+int find_mon (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (monArray[i].id == tag) {
@@ -110,16 +82,7 @@ __PUBLF (NodePeg, int, find_mon) (word tag) {
 	return -1;
 }
 
-#ifdef __SMURPH__
-// VUEE uses standard string funcs... FIXME
-__PUBLF (NodePeg, void, strncpy) (char *d, const char *s, sint n) {
-	while (n-- && (*s != '\0'))
-		*d++ = *s++;
-	*d = '\0';
-}
-#endif
-
-__PUBLF (NodePeg, char*, get_mem) (word state, int len) {
+char * get_mem (word state, int len) {
 	char * buf = (char *)umalloc (len);
 	if (buf == NULL) {
 		app_diag (D_WARNING, "No mem %d", len);
@@ -131,7 +94,7 @@ __PUBLF (NodePeg, char*, get_mem) (word state, int len) {
 	return buf;
 }
 
-__PUBLF (NodePeg, void, init_tag) (word i) {
+void init_tag (word i) {
 	tagArray[i].id = 0;
 	tagArray[i].state = noTag;
 	tagArray[i].rssi = 0;
@@ -145,12 +108,12 @@ __PUBLF (NodePeg, void, init_tag) (word i) {
 	tagArray[i].desc[0] = '\0';
 }
 
-__PUBLF (NodePeg, void, init_ign) (word i) {
+void init_ign (word i) {
 	ignArray[i].id = 0;
 	ignArray[i].nick[0] = '\0';
 }
 
-__PUBLF (NodePeg, void, init_nbu) (word i) {
+void init_nbu (word i) {
 	nbuArray[i].id = 0;
 	nbuArray[i].what = 0;
 	nbuArray[i].dhook = 0;
@@ -158,12 +121,12 @@ __PUBLF (NodePeg, void, init_nbu) (word i) {
 	nbuArray[i].memo[0] = '\0';
 }
 
-__PUBLF (NodePeg, void, init_mon) (word i) {
+void init_mon (word i) {
 	monArray[i].id = 0;
 	monArray[i].nick[0] = '\0';
 }
 
-__PUBLF (NodePeg, void, init_tags) () {
+void init_tags () {
 	word i = LI_MAX;
 	while (i-- > 0) {
 		init_tag (i);
@@ -172,8 +135,7 @@ __PUBLF (NodePeg, void, init_tags) () {
 	}
 }
 
-__PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
-							Boolean updEvTime) {
+void set_tagState (word i, tagStateType state, Boolean updEvTime) {
 	tagArray[i].state = state;
 	tagArray[i].lastTime = seconds();
 	if (updEvTime)
@@ -181,7 +143,7 @@ __PUBLF (NodePeg, void, set_tagState) (word i, tagStateType state,
 	app_diag (D_DEBUG, "set_tagState in %u to %u", i, state);
 }
 
-__PUBLF (NodePeg, int, insert_tag) (char * buf) {
+int insert_tag (char * buf) {
 	int i = 0;
 
 	while (i < LI_MAX) {
@@ -205,7 +167,7 @@ __PUBLF (NodePeg, int, insert_tag) (char * buf) {
 	return -1;
 }
 
-__PUBLF (NodePeg, int, insert_nbu) (word id, word w, word v, word h, char *s) {
+int insert_nbu (word id, word w, word v, word h, char *s) {
 	int i = 0;
 
 	while (i < LI_MAX) {
@@ -225,7 +187,7 @@ __PUBLF (NodePeg, int, insert_nbu) (word id, word w, word v, word h, char *s) {
 	return -1;
 }
 
-__PUBLF (NodePeg, int, insert_ign) (word id, char * s) {
+int insert_ign (word id, char * s) {
 	int i = 0;
 
 	while (i < LI_MAX) {
@@ -242,7 +204,7 @@ __PUBLF (NodePeg, int, insert_ign) (word id, char * s) {
 	return -1;
 }
 
-__PUBLF (NodePeg, int, insert_mon) (word id, char * s) {
+int insert_mon (word id, char * s) {
 	int i = 0; 
 
 	while (i < LI_MAX) {
@@ -259,11 +221,9 @@ __PUBLF (NodePeg, int, insert_mon) (word id, char * s) {
 	return -1;
 }
 
-void mbeacon (word);
-//int mbeacon (word, address);
-//fsm mbeacon;
+fsm mbeacon;
 
-__PUBLF (NodePeg, void, check_tag) (word i) {
+void check_tag (word i) {
 
 	if (i >= LI_MAX) {
 		app_diag (D_FATAL, "tagAr bound %u", i);
@@ -340,7 +300,7 @@ __PUBLF (NodePeg, void, check_tag) (word i) {
 	}
 }
 
-__PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
+void send_msg (char * buf, int size) {
 	// it doesn't seem like a good place to filter out
 	// local host, but it's convenient, for now...
 
@@ -360,7 +320,7 @@ __PUBLF (NodePeg, void, send_msg) (char * buf, int size) {
 			in_header(buf, msg_type));
  }
 
-__PUBLF (NodePeg, int, check_msg_size) (char * buf, word size, word repLevel) {
+int check_msg_size (char * buf, word size, word repLevel) {
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial

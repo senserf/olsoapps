@@ -1,7 +1,7 @@
 #ifndef __msg_peg_h
 #define __msg_peg_h
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "msg_tarp.h"

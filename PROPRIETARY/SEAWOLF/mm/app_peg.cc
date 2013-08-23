@@ -1,25 +1,20 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "globals_peg.h"
-#include "threadhdrs_peg.h"
-
-// elsewhere may be a better place for this:
-#if CC1000
-#define INFO_PHYS_DEV INFO_PHYS_CC1000
-#endif
+#include "app_peg_data.h"
+#include "diag.h"
+#include "tarp.h"
+#include "net.h"
+#include "msg_peg.h"
+#include "ser.h"
+#include "serf.h"
+#include "storage.h"
 
 #if CC1100
 #define INFO_PHYS_DEV INFO_PHYS_CC1100
-#endif
-
-#if DM2200
-#define INFO_PHYS_DEV INFO_PHYS_DM2200
-#endif
-
-#ifndef INFO_PHYS_DEV
+#else
 #error "UNDEFINED RADIO"
 #endif
 
@@ -30,32 +25,66 @@
 #define CMD_READER	(&cmd_line)
 #define CMD_WRITER	((&cmd_line)+1)
 
+static char     *ui_ibuf        = NULL,
+                *ui_obuf        = NULL,
+                *cmd_line       = NULL;
+
+static word	batter		= 0;
+static word	tag_auditFreq	= 4; // in seconds
+
+// PicOS differs from VUEE
+#ifdef __SMURPH__
+word	host_pl	= 1;
+#else
+word    host_pl = 2;
+#endif
+word    app_flags               = DEF_APP_FLAGS;
+word    tag_eventGran           = 4;  // in seconds
+
+tagDataType     tagArray [LI_MAX];
+tagShortType    ignArray [LI_MAX];
+tagShortType    monArray [LI_MAX];
+nbuComType      nbuArray [LI_MAX];
+
+ledStateType    led_state       = {0, 0, 0};
+
+profi_t profi_att = 0xFFFF,
+	p_inc   = 0xFFFF,
+	p_exc   = 0;
+
+char    nick_att  [NI_LEN +1]           = "uninit"; //{'\0'};
+char    desc_att  [PEG_STR_LEN +1]      = "uninit desc"; //{'\0'};
+char    d_biz  [PEG_STR_LEN +1]         = "uninit biz"; //{'\0'};
+char    d_priv  [PEG_STR_LEN +1]        = "uninit priv"; //{'\0'};
+char    d_alrm  [PEG_STR_LEN +1]        = {'\0'};
+
+
 // =============
 // OSS reporting
 // =============
-strand (oss_out, char*)
-        entry (OO_RETRY)
+fsm oss_out (char*) {
+        state OO_RETRY:
 		if (data == NULL)
-			app_diag (D_SERIOUS, "NULL in oss_out");
+			app_diag (D_SERIOUS, oss_out_f_str);
 		else
 			ser_outb (OO_RETRY, data);
                 finish;
-endstrand
+}
 
-thread (mbeacon)
+fsm mbeacon {
 
-    entry (MB_START)
+    state MB_START:
 	delay (2048 + rnd() % 2048, MB_SEND); // 2 - 4s
 	release;
 
-    entry (MB_SEND)
+    state MB_SEND:
 	msg_profi_out (0);
 	proceed (MB_START);
 
-endthread
+}
 
 // Display node stats on UI
-__PUBLF (NodePeg, void, stats) (word state) {
+static void stats (word state) {
 
 	word faults0, faults1;
 	word mem0 = memfree(0, &faults0);
@@ -68,8 +97,7 @@ __PUBLF (NodePeg, void, stats) (word state) {
 			mem0, mem1, faults0, faults1);
 }
 
-__PUBLF (NodePeg, void, process_incoming) (word state, char * buf, word size,
-								word rssi) {
+static void process_incoming (word state, char * buf, word size, word rssi) {
 
   if (check_msg_size (buf, size, D_SERIOUS) != 0)
 	  return;
@@ -115,7 +143,7 @@ static word map_rssi (word r) {
 	if ((r >> 8) > 118) return 2;
 	return 1;
 #else
-	//diag ("dupa rssi %u", r >> 8);
+	//diag ("rssi %u", r >> 8);
 
 #if 0
 	plev 1:
@@ -139,58 +167,54 @@ static word map_rssi (word r) {
    --------------------
 */
 
-// In this model, a single rcv is forked once, and runs / sleeps all the time
-thread (rcv)
+fsm rcv {
 
-	entry (RC_INIT)
+	sint	packet_size = 0;
+	word	rssi = 0;
+	char   *buf_ptr = NULL;
 
-		rcv_packet_size = 0;
-		rcv_buf_ptr = NULL;
-		rcv_rssi = 0;
+	state RC_TRY:
 
-	entry (RC_TRY)
-
-		if (rcv_buf_ptr != NULL) {
-			ufree (rcv_buf_ptr);
-			rcv_buf_ptr = NULL;
-			rcv_packet_size = 0;
+		if (buf_ptr != NULL) {
+			ufree (buf_ptr);
+			buf_ptr = NULL;
+			packet_size = 0;
 		}
-    		rcv_packet_size = net_rx (RC_TRY, &rcv_buf_ptr, &rcv_rssi, 0);
-		if (rcv_packet_size <= 0) {
+    		packet_size = net_rx (RC_TRY, &buf_ptr, &rssi, 0);
+		if (packet_size <= 0) {
 			app_diag (D_SERIOUS, "net_rx failed (%d)",
-				rcv_packet_size);
-			proceed (RC_TRY);
+				packet_size);
+			proceed RC_TRY;
 		}
 
 		app_diag (D_DEBUG, "RCV (%d): %x-%u-%u-%u-%u-%u\r\n",			  
-		rcv_packet_size, in_header(rcv_buf_ptr, msg_type),
-			  in_header(rcv_buf_ptr, seq_no) & 0xffff,
-			  in_header(rcv_buf_ptr, snd),
-			  in_header(rcv_buf_ptr, rcv),
-			  in_header(rcv_buf_ptr, hoc) & 0xffff,
-			  in_header(rcv_buf_ptr, hco) & 0xffff);
+		packet_size, in_header(buf_ptr, msg_type),
+			  in_header(buf_ptr, seq_no) & 0xffff,
+			  in_header(buf_ptr, snd),
+			  in_header(buf_ptr, rcv),
+			  in_header(buf_ptr, hoc) & 0xffff,
+			  in_header(buf_ptr, hco) & 0xffff);
 
 		// that's how we could check which plugin is on
 		// if (net_opt (PHYSOPT_PLUGINFO, NULL) != INFO_PLUG_TARP)
 
-	entry (RC_MSG)
+	state RC_MSG:
 #if 0
-	dupa: will be needed for all sorts of calibrations
-//#endif
-		if (in_header(rcv_buf_ptr, msg_type) == msg_pong)
+	this may be needed for all sorts of calibrations
+		if (in_header(buf_ptr, msg_type) == msg_pong)
 			app_diag (D_UI, "rss (%d.%d): %d",
-				in_header(rcv_buf_ptr, snd),
-				in_pong(rcv_buf_ptr, level), rcv_rssi >> 8);
+				in_header(buf_ptr, snd),
+				in_pong(buf_ptr, level), rssi >> 8);
 		else
-			app_diag (D_UI, "rss %d from %d", rcv_rssi >> 8,
-					in_header(rcv_buf_ptr, snd));
+			app_diag (D_UI, "rss %d from %d", rssi >> 8,
+					in_header(buf_ptr, snd));
 #endif
-		process_incoming (RC_MSG, rcv_buf_ptr, rcv_packet_size,
-			map_rssi(rcv_rssi));
+		process_incoming (RC_MSG, buf_ptr, packet_size,
+			map_rssi(rssi));
 
-		proceed (RC_TRY);
+		proceed RC_TRY;
 
-endthread
+}
 
 /*
   --------------------
@@ -199,18 +223,18 @@ endthread
   --------------------
 */
 
-thread (audit)
+fsm audit {
 
-	nodata;
+	word ind;
 
-	entry (AS_START)
+	state AS_START:
 
 		if (tag_auditFreq == 0) {
 			app_diag (D_WARNING, "Audit stops");
 			finish;
 		}
 		read_sensor (AS_START, -1, &batter);
-		aud_ind = LI_MAX;
+		ind = LI_MAX;
 
 		// leds should be better... when we know what's needed
 		if (led_state.state != LED_OFF &&
@@ -221,9 +245,9 @@ thread (audit)
 
 		app_diag (D_DEBUG, "Audit starts");
 
-	entry (AS_TAGLOOP)
+	state AS_TAGLOOP:
 
-		if (aud_ind-- == 0) {
+		if (ind-- == 0) {
 			app_diag (D_DEBUG, "Audit ends");
 			if (led_state.color == LED_R) {
 				if (led_state.dura > 1) {
@@ -243,9 +267,9 @@ thread (audit)
 			release;
 		}
 
-		check_tag (aud_ind);
-		proceed (AS_TAGLOOP);
-endthread
+		check_tag (ind);
+		proceed AS_TAGLOOP;
+}
 
 /*
    --------------------
@@ -253,24 +277,22 @@ endthread
    CS_ <-> Command State
    --------------------
 */
-thread (cmd_in)
+fsm cmd_in {
 
-	nodata;
-
-	entry (CS_INIT)
+	state CS_INIT:
 
 		if (ui_ibuf == NULL)
 			ui_ibuf = get_mem (CS_INIT, UI_BUFLEN);
 
-	entry (CS_IN)
+	state CS_IN:
 
 		// hangs on the uart_a interrupt or polling
 		ser_in (CS_IN, ui_ibuf, UI_BUFLEN);
 		if (strlen(ui_ibuf) == 0)
 			// CR on empty line would do it
-			proceed (CS_IN);
+			proceed CS_IN;
 
-	entry (CS_WAIT)
+	state CS_WAIT:
 
 		if (cmd_line != NULL) {
 			when (CMD_WRITER, CS_WAIT);
@@ -280,9 +302,9 @@ thread (cmd_in)
 		cmd_line = get_mem (CS_WAIT, strlen(ui_ibuf) +1);
 		strcpy (cmd_line, ui_ibuf);
 		trigger (CMD_READER);
-		proceed (CS_IN);
+		proceed CS_IN;
 
-endthread
+}
 
 static char * stateName (word state) {
 	switch ((tagStateType)state) {
@@ -346,7 +368,7 @@ static char * descMark (word info, word list) {
 }
 
 // arg. list indicates calls from 'lt'; kludgy wrap for 'LT' for Android stuff
-__PUBLF (NodePeg, void, oss_profi_out) (word ind, word list) {
+void oss_profi_out (word ind, word list) {
 	char * lbuf = NULL;
 
     switch (oss_fmt) {
@@ -386,18 +408,18 @@ __PUBLF (NodePeg, void, oss_profi_out) (word ind, word list) {
 
     }
 
-    if (runstrand (oss_out, lbuf) == 0 ) {
-	app_diag (D_SERIOUS, "oss_out failed");
+    if (runfsm oss_out (lbuf) == 0 ) {
+	app_diag (D_SERIOUS, oss_out_f_str);
 	ufree (lbuf);
     }
 }
 
-__PUBLF (NodePeg, void, oss_data_out) (word ind) {
+void oss_data_out (word ind) {
 	// for now
 	oss_profi_out (ind, 0);
 }
 
-__PUBLF (NodePeg, void, oss_nvm_out) (nvmDataType * buf, word slot) {
+void oss_nvm_out (nvmDataType * buf, word slot) {
 	char * lbuf = NULL;
 
 	// no matter what format
@@ -409,13 +431,13 @@ __PUBLF (NodePeg, void, oss_nvm_out) (nvmDataType * buf, word slot) {
 		lbuf = form (NULL, nvm_ascii_def, slot, buf->id, buf->profi,
 			buf->nick, buf->desc, buf->dpriv, buf->dbiz);
 
-	if (runstrand (oss_out, lbuf) == 0 ) {
-		app_diag (D_SERIOUS, "oss_out failed");
+	if (runfsm oss_out (lbuf) == 0 ) {
+		app_diag (D_SERIOUS, oss_out_f_str);
 		ufree (lbuf);
 	}
 }
 
-__PUBLF (NodePeg, void, oss_alrm_out) (char * buf) {
+void oss_alrm_out (char * buf) {
 	char * lbuf = NULL;
 
     switch (oss_fmt) {
@@ -439,8 +461,8 @@ __PUBLF (NodePeg, void, oss_alrm_out) (char * buf) {
 		return;
     }
 
-    if (runstrand (oss_out, lbuf) == 0 ) {
-	    app_diag (D_SERIOUS, "oss_out failed");
+    if (runfsm oss_out (lbuf) == 0 ) {
+	    app_diag (D_SERIOUS, oss_out_f_str);
 	    ufree (lbuf);
     }
 }
@@ -454,16 +476,16 @@ __PUBLF (NodePeg, void, oss_alrm_out) (char * buf) {
    --------------------
 */
 
-thread (root)
+fsm root {
 
 	sint	i1;
-	word	w1, w2, w3, w4;
+	word	w1, w2, w3, w4, rt_ind, rt_id;
 	nvmDataType nvm_dat;
 	char	s1 [18]; // unless NI_LEN is greater
 
-	entry (RS_INIT)
+	state RS_INIT:
 	//w1 = memfree(0, &w2);
-	//diag ("dupa %u %u", w1, w2 );
+	//diag ("mem check %u %u", w1, w2 );
 
 #ifdef BOARD_WARSAW_BLUE
                 ser_select (1);
@@ -485,7 +507,7 @@ thread (root)
 		release;
 #endif
 		
-	entry (RS_PAUSE)
+	state RS_PAUSE:
 
 		if (net_init (INFO_PHYS_DEV, INFO_PLUG_TARP) < 0) {
 			app_diag (D_FATAL, "net_init failed");
@@ -493,9 +515,9 @@ thread (root)
 		}
 		net_opt (PHYSOPT_SETSID, &net_id);
 		net_opt (PHYSOPT_SETPOWER, &host_pl);
-		runthread (rcv);
-		runthread (cmd_in);
-		runthread (audit);
+		runfsm rcv;
+		runfsm cmd_in;
+		runfsm audit;
 		led_state.color = LED_G;
 		led_state.state = LED_ON;
 		leds (LED_G, LED_ON);
@@ -542,58 +564,58 @@ thread (root)
 		}
 
 		if (local_host != 0xDEAD)
-			runthread (mbeacon);
+			runfsm mbeacon;
 
-		proceed (RS_RCMD);
+		proceed RS_RCMD;
 
-	entry (RS_FREE)
+	state RS_FREE:
 
 		ufree (cmd_line);
 		cmd_line = NULL;
 		trigger (CMD_WRITER);
 
-	entry (RS_RCMD)
+	state RS_RCMD:
 
 		if (cmd_line == NULL) {
 			when (CMD_READER, RS_RCMD);
 			release;
 		}
 
-	entry (RS_DOCMD)
+	state RS_DOCMD:
 
 		switch (cmd_line[0]) {
-			case ' ': proceed (RS_FREE); // ignore blank
+			case ' ': proceed RS_FREE; // ignore blank
 			case 'q': reset();
 			case 'Q': ee_erase (WNONE, 0, 0); reset();
-			case 's': proceed (RS_SETS);
-			case 'p': proceed (RS_PROFILES);
+			case 's': proceed RS_SETS;
+			case 'p': proceed RS_PROFILES;
 			case '?':
-			case 'h': proceed (RS_HELPS);
-			case 'L': proceed (RS_LISTS);
-			case 'M': proceed (RS_MLIST);
-			case 'Z': proceed (RS_ZLIST);
-			case 'Y': proceed (RS_Y);
-			case 'N': proceed (RS_N);
-			case 'T': proceed (RS_TARGET);
-			case 'B': proceed (RS_BIZ);
-			case 'P': proceed (RS_PRIV);
-			case 'A': proceed (RS_ALRM);
-			case 'S': proceed (RS_STOR);
-			case 'R': proceed (RS_RETR);
-			case 'E': proceed (RS_ERA);
-			case 'X': proceed (RS_BEAC);
-			case 'U': proceed (RS_AUTO);
+			case 'h': proceed RS_HELPS;
+			case 'L': proceed RS_LISTS;
+			case 'M': proceed RS_MLIST;
+			case 'Z': proceed RS_ZLIST;
+			case 'Y': proceed RS_Y;
+			case 'N': proceed RS_N;
+			case 'T': proceed RS_TARGET;
+			case 'B': proceed RS_BIZ;
+			case 'P': proceed RS_PRIV;
+			case 'A': proceed RS_ALRM;
+			case 'S': proceed RS_STOR;
+			case 'R': proceed RS_RETR;
+			case 'E': proceed RS_ERA;
+			case 'X': proceed RS_BEAC;
+			case 'U': proceed RS_AUTO;
 			default:
 				form (ui_obuf, ill_str, cmd_line);
-				proceed (RS_UIOUT);
+				proceed RS_UIOUT;
 		}
 
-	entry (RS_SETS)
+	state RS_SETS:
 
 		w1 = strlen (cmd_line);
 		if (w1 < 2) {
 			form (ui_obuf, ill_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 		if (w1 > 2)
 			w1 -= 3;
@@ -612,19 +634,19 @@ thread (root)
 						local_host == 0xDEAD) {
 					local_host = rt_id = w1;
 					if (!running (mbeacon)) // shouldn't be
-							runthread (mbeacon);
+							runfsm mbeacon;
 					goto StoreAll;
 				}
 			}
 			form (ui_obuf, "Id: %u\r\n", local_host);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'n':
 			if (w1 > 0)
 				strncpy (nick_att, cmd_line +3,
 					w1 > NI_LEN ? NI_LEN : w1);
 			form (ui_obuf, "Nick: %s\r\n", nick_att);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'd':
 			if (w1 > 0)
@@ -632,7 +654,7 @@ thread (root)
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
 			form (ui_obuf, "Desc: %s\r\n", desc_att);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'b':
 			if (w1 > 0)
@@ -640,7 +662,7 @@ thread (root)
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
 			form (ui_obuf, "Biz: %s\r\n", d_biz);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'p':
 			if (w1 > 0)
@@ -648,7 +670,7 @@ thread (root)
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
 			form (ui_obuf, "Priv: %s\r\n", d_priv);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'a':
 			if (w1 > 0)
@@ -656,19 +678,19 @@ thread (root)
 					w1 > PEG_STR_LEN ?
 						PEG_STR_LEN : w1);
 			form (ui_obuf, "Alrm: %s\r\n", d_alrm);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  default:
 			form (ui_obuf, ill_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
-	entry (RS_PROFILES)
+	state RS_PROFILES:
 
 		w1 = strlen (cmd_line);
 		if (w1 < 2) {
 			form (ui_obuf, ill_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		switch (cmd_line[1]) {
@@ -677,31 +699,31 @@ thread (root)
 			if (scan (cmd_line +2, "%x", &w1) > 0)
 				profi_att = w1;
 			form (ui_obuf, "Profile: %x\r\n", profi_att);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'e':
 			if (scan (cmd_line +2, "%x", &w1) > 0)
 				p_exc = w1;
 			form (ui_obuf, "Exclude: %x\r\n", p_exc);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case 'i':
 			if (scan (cmd_line +2, "%x", &w1) > 0)
 				p_inc = w1;
 			form (ui_obuf, "Include: %x\r\n", p_inc);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  default:
 			form (ui_obuf, ill_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
-	entry (RS_HELPS)
+	state RS_HELPS:
 
 		w1 = strlen (cmd_line);
 		if (w1 < 2 || cmd_line[1] == ' ') {
 			ser_out (RS_HELPS, welcome_str);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		switch (cmd_line[1]) {
@@ -710,11 +732,11 @@ thread (root)
 			ser_outf (RS_HELPS, hs_str, nick_att, desc_att, d_biz,
 					d_priv, d_alrm,
 					profi_att, p_exc, p_inc);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 			
 		  case 'p':
 			stats (RS_HELPS);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 
 		  case 'z':
 			w2 = w3 = 0xFFFF;
@@ -722,7 +744,7 @@ thread (root)
 				scan (cmd_line +2, "%x %x", &w2, &w3);
 			rt_id = w2 & w3;
 			rt_ind = 7;
-			proceed (RS_Z_HELP);
+			proceed RS_Z_HELP;
 
 		  case 'e': // I know, but keep 'e' and 'z' separate
 			w2 = w3 = 0xFFFF;
@@ -730,27 +752,27 @@ thread (root)
 				scan (cmd_line +2, "%x %x", &w2, &w3);
 			rt_id = w2 & w3;
 			rt_ind = 15;
-			proceed (RS_E_HELP);
+			proceed RS_E_HELP;
 
 		  default:
 			form (ui_obuf, ill_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
-	entry (RS_Y)
+	state RS_Y:
 		if (scan (cmd_line +1, "%u", &w1) == 0 || w1 == 0) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		if ((i1 = find_tag (w1)) < 0) {
 			if ((i1 = find_ign (w1)) < 0) {
 				app_diag (D_WARNING, "No tag %u", w1);
-				proceed (RS_FREE);
+				proceed RS_FREE;
 			}
 			init_ign (i1);
 			form (ui_obuf, "ign: removed %u\r\n", w1);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		if (tagArray[i1].state == reportedTag)
@@ -760,18 +782,18 @@ thread (root)
 			set_tagState (i1, matchedTag, YES);
 
 		msg_data_out (w1, INFO_DESC);
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
 	// now all this is the same, but won't be...
-	entry (RS_BIZ)
+	state RS_BIZ:
 		if (scan (cmd_line +1, "%u", &w1) == 0 || w1 == 0) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		if ((i1 = find_tag (w1)) < 0) {
 			app_diag (D_WARNING, "No tag %u", w1);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		if (tagArray[i1].state == reportedTag)
@@ -781,17 +803,17 @@ thread (root)
 			set_tagState (i1, matchedTag, YES);
 
 		msg_data_out (w1, INFO_BIZ);
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_PRIV)
+	state RS_PRIV:
 		if (scan (cmd_line +1, "%u", &w1) == 0 || w1 == 0) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		if ((i1 = find_tag (w1)) < 0) {
 			app_diag (D_WARNING, "No tag %u", w1);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		if (tagArray[i1].state == reportedTag)
@@ -801,18 +823,18 @@ thread (root)
 			set_tagState (i1, matchedTag, YES);
 
 		msg_data_out (w1, INFO_PRIV);
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_TARGET)
+	state RS_TARGET:
 		if (scan (cmd_line +1, "%u", &w1) == 0 || w1 == 0) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		msg_profi_out (w1);
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_ALRM)
+	state RS_ALRM:
 		w1 = w2 = 0;
 		scan (cmd_line +1, "%u %u", &w1, &w2);
 #if 0
@@ -824,24 +846,24 @@ thread (root)
 		msg_alrm_out (w1, w2, NULL);
 		proceed (RS_FREE);
 
-	entry (RS_N)
+	state RS_N:
 		if (scan (cmd_line +1, "%u", &w1) == 0 || w1 == 0) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		if ((i1 = find_tag (w1)) < 0) {
 			app_diag (D_WARNING, "No tag %u", w1);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		insert_ign (tagArray[i1].id, tagArray[i1].nick);
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_ZLIST)
+	state RS_ZLIST:
 		if (strlen(cmd_line) < 3) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		switch (cmd_line[1]) {
@@ -849,7 +871,7 @@ thread (root)
 			if (scan (cmd_line +2, "%u %u %x %u %s",
 			    &w1, &w2, &w3, &w4, s1) != 5 || w1 == 0) {
 				form (ui_obuf, bad_str, cmd_line);
-				proceed (RS_UIOUT);
+				proceed RS_UIOUT;
 			}
 			if ((i1 = find_nbu (w1)) < 0) {
 				insert_nbu (w1, w2, w3, w4, s1);
@@ -861,12 +883,12 @@ thread (root)
 				strncpy (nbuArray[i1].memo, s1, NI_LEN);
 				form (ui_obuf, "NBuzz upd %u\r\n", w1);
 			}
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case '-':
 			if (scan (cmd_line +2, "%u", &w1) != 1 || w1 == 0) {
 				form (ui_obuf, bad_str, cmd_line);
-				proceed (RS_UIOUT);
+				proceed RS_UIOUT;
 			}
 			if ((i1 = find_nbu (w1)) < 0) {
 				form (ui_obuf, "NBuzz no %u\r\n", w1);
@@ -874,17 +896,17 @@ thread (root)
 				init_nbu (i1);
 				form (ui_obuf, "NBuzz del %u\r\n", w1);
 			}
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  default:
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
-	entry (RS_MLIST)
+	state RS_MLIST:
 		if (strlen(cmd_line) < 3) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
 		switch (cmd_line[1]) {
@@ -892,7 +914,7 @@ thread (root)
 			if (scan (cmd_line +2, "%u %s", &w1, s1) != 2 ||
 					w1 == 0) {
 				form (ui_obuf, bad_str, cmd_line);
-				proceed (RS_UIOUT);
+				proceed RS_UIOUT;
 			}
 			if ((i1 = find_mon (w1)) < 0) {
 				insert_mon (w1, s1);
@@ -901,12 +923,12 @@ thread (root)
 				strncpy (monArray[i1].nick, s1, NI_LEN);
 				form (ui_obuf, "Mon upd %u\r\n", w1);
 			}
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  case '-':
 			if (scan (cmd_line +2, "%u", &w1) != 1 || w1 == 0) {
 				form (ui_obuf, bad_str, cmd_line);
-				proceed (RS_UIOUT); 
+				proceed RS_UIOUT; 
 			}
 			if ((i1 = find_mon (w1)) < 0) {
 				form (ui_obuf, "Mon no %u\r\n", w1);
@@ -914,30 +936,30 @@ thread (root)
 				init_mon (i1);
 				form (ui_obuf, "Mon del %u\r\n", w1);
 			}
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 
 		  default:
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT); 
+			proceed RS_UIOUT; 
 		}
 
-	entry (RS_ERA)
+	state RS_ERA:
 		rt_id = 0;
 		scan (cmd_line +1, "%u", &rt_id);
 		if (rt_id == 0) {
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 		rt_ind = 0;
-		proceed (RS_E_NVM);
+		proceed RS_E_NVM;
 
-	entry (RS_STOR)
+	state RS_STOR:
 		rt_id = 0;
 		rt_ind = 0;
 		scan (cmd_line +1, "%u", &rt_id);
 
 		if (rt_id == 0)
-			proceed (RS_L_NVM);
+			proceed RS_L_NVM;
 StoreAll:
 		if (rt_id == local_host) {
 			memset (&nvm_dat, 0xFF, NVM_SLOT_SIZE);
@@ -954,55 +976,55 @@ StoreAll:
 						NVM_SLOT_SIZE))
 				app_diag (D_SERIOUS, "ee_write failed");
 
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		if ((i1 = find_tag (rt_id)) < 0) {
 			form (ui_obuf, "No curr tag %u\r\n", rt_id);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 		rt_id = i1;
-		proceed (RS_S_NVM);
+		proceed RS_S_NVM;
 
-	entry (RS_RETR)
+	state RS_RETR:
 		rt_id = 0;
 		rt_ind = 0;
 		scan (cmd_line +1, "%u", &rt_id);
-		proceed (RS_L_NVM);
+		proceed RS_L_NVM;
 
-	entry (RS_E_NVM)
+	state RS_E_NVM:
 		if (++rt_ind >= NVM_SLOT_NUM) { // starting at 1
 			app_diag (D_WARNING, "No nvm entry %u", rt_id);
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
 					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
 			app_diag (D_SERIOUS, "NMV read failed");
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 		if (nvm_dat.id == rt_id) {
 			memset (&nvm_dat, 0xFFFF, NVM_SLOT_SIZE);
 			if (ee_write (WNONE, NVM_OSET + rt_ind * NVM_SLOT_SIZE,
 					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
 				app_diag (D_SERIOUS, "ee_write failed");
-				proceed (RS_FREE); 
+				proceed RS_FREE; 
 			}
 			rt_id = 0;
 			rt_ind = 0;
-			proceed (RS_L_NVM);
+			proceed RS_L_NVM;
 		}
-		proceed (RS_E_NVM);
+		proceed RS_E_NVM;
 
-	entry (RS_S_NVM)
+	state RS_S_NVM:
 		if (++rt_ind >= NVM_SLOT_NUM) { // starting at 1
 			app_diag (D_WARNING, "NVM full");
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
 					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
 			app_diag (D_SERIOUS, "NMV read failed");
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		if (nvm_dat.id == 0xFFFF || nvm_dat.id == tagArray[rt_id].id) {
@@ -1032,55 +1054,55 @@ StoreAll:
 					(byte *)&nvm_dat, NVM_SLOT_SIZE))
 				app_diag (D_SERIOUS, "ee_write failed");
 
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
-		proceed (RS_S_NVM);
+		proceed RS_S_NVM;
 
-	entry (RS_LISTS)
+	state RS_LISTS:
 		rt_ind = 0;
 		switch (cmd_line[1]) {
 		  case 'z':
 			ser_out (RS_LISTS, nb_imp_str);
-			proceed (RS_L_NBU);
+			proceed RS_L_NBU;
 		  case 't':
 			ser_out (RS_LISTS, cur_tag_str);
-			proceed (RS_L_TAG);
+			proceed RS_L_TAG;
 		  case 'i':
 			ser_out (RS_LISTS, be_ign_str);
-			proceed (RS_L_IGN);
+			proceed RS_L_IGN;
 		  case 'm':
 			ser_out (RS_LISTS, be_mon_str);
-			proceed (RS_L_MON);
+			proceed RS_L_MON;
 		  default:
 			form (ui_obuf, bad_str, cmd_line);
-			proceed (RS_UIOUT);
+			proceed RS_UIOUT;
 		}
 
-	entry (RS_L_NVM)
+	state RS_L_NVM:
 		if (ee_read (NVM_OSET + NVM_SLOT_SIZE * rt_ind,
 					(byte *)&nvm_dat, NVM_SLOT_SIZE)) {
 			app_diag (D_SERIOUS, "NVM read failed");
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		}
 
 		if (nvm_dat.id != 0xFFFF && (rt_id == 0 || nvm_dat.id == rt_id))
 			oss_nvm_out (&nvm_dat, rt_ind);
 
 		if (++rt_ind < NVM_SLOT_NUM)
-			proceed (RS_L_NVM);
+			proceed RS_L_NVM;
 
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_L_TAG)
+	state RS_L_TAG:
 		if (tagArray[rt_ind].id != 0)
 			oss_profi_out (rt_ind, 1);
 
 		if (++rt_ind < LI_MAX)
-			proceed (RS_L_TAG);
+			proceed RS_L_TAG;
 
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_L_IGN)
+	state RS_L_IGN:
 		if (ignArray[rt_ind].id != 0)
 			ser_outf (RS_L_IGN, be_ign_el_str, ignArray[rt_ind].id,
 				ignArray[rt_ind].nick);
@@ -1088,9 +1110,9 @@ StoreAll:
 		if (++rt_ind < LI_MAX)
 			proceed (RS_L_IGN);
 
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_L_NBU)
+	state RS_L_NBU:
 		if (nbuArray[rt_ind].id != 0) {
 			nbuVec (s1, nbuArray[rt_ind].vect);
 			s1[8] = '\0';
@@ -1102,41 +1124,41 @@ StoreAll:
 		}
 
 		if (++rt_ind < LI_MAX)
-			proceed (RS_L_NBU);
+			proceed RS_L_NBU;
 
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_L_MON)
+	state RS_L_MON:
 		if (monArray[rt_ind].id != 0)
 			ser_outf (RS_L_MON, be_mon_el_str, monArray[rt_ind].id,
 				monArray[rt_ind].nick);
 
 		if (++rt_ind < LI_MAX)
-			proceed (RS_L_MON);
+			proceed RS_L_MON;
 
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-	entry (RS_Z_HELP)
+	state RS_Z_HELP:
 		if (rt_id & (1 << rt_ind))
 			ser_outf (RS_Z_HELP, hz_str, rt_ind, d_nbu[rt_ind]);
 		if (rt_ind == 0)
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		rt_ind--;
-		proceed (RS_Z_HELP);
+		proceed RS_Z_HELP;
 
-	entry (RS_E_HELP)
+	state RS_E_HELP:
 		if (rt_id & (1 << rt_ind))
 			ser_outf (RS_E_HELP, he_str, rt_ind, d_event[rt_ind]);
 		if (rt_ind == 0)
-			proceed (RS_FREE);
+			proceed RS_FREE;
 		rt_ind--;
-		proceed (RS_E_HELP);
+		proceed RS_E_HELP;
 
-	entry (RS_BEAC)
+	state RS_BEAC:
 		if (scan (cmd_line +1, "%u", &w1) > 0) {
 			if (w1) {
 				if (!running (mbeacon)) {
-					runthread (mbeacon);
+					runfsm mbeacon;
 					if (led_state.color == LED_B) {
 						led_state.color = LED_G;
 						leds (LED_B, LED_OFF);
@@ -1157,9 +1179,9 @@ StoreAll:
 		}
 		form (ui_obuf, "Beacon is%stransmitting\r\n",
 			       running (mbeacon) ?  " " : " not ");
-		proceed (RS_UIOUT);
+		proceed RS_UIOUT;
 
-	entry (RS_AUTO)
+	state RS_AUTO:
 		if (scan (cmd_line +1, "%u", &w1) > 0) {
 			if (w1)
 				set_autoack;
@@ -1168,12 +1190,11 @@ StoreAll:
 		}
 		form (ui_obuf, "Automatch is %s\r\n",
 				is_autoack ? "on" : "off");
-		proceed (RS_UIOUT);
+		proceed RS_UIOUT;
 
-	entry (RS_UIOUT)
+	state RS_UIOUT:
 		ser_out (RS_UIOUT, ui_obuf);
-		proceed (RS_FREE);
+		proceed RS_FREE;
 
-endthread
+}
 
-praxis_starter (NodePeg);

@@ -1,31 +1,16 @@
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2008.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#ifdef __SMURPH__
-#include "globals_peg.h"
-#include "threadhdrs_peg.h"
-#endif
-
 #include "diag.h"
-#include "app_peg.h"
+#include "app_peg_data.h"
 #include "msg_peg.h"
-
-#ifdef	__SMURPH__
-
-#include "node_peg.h"
-#include "stdattr.h"
-
-#else	/* PICOS */
 
 #include "net.h"
 
-#endif
 
-#include "attnames_peg.h"
-
-__PUBLF (NodePeg, void, msg_data_out) (nid_t peg, word info) {
+void msg_data_out (nid_t peg, word info) {
 	char * buf_out = get_mem (WNONE, sizeof(msgDataType));
 
 	if (buf_out == NULL)
@@ -45,7 +30,7 @@ __PUBLF (NodePeg, void, msg_data_out) (nid_t peg, word info) {
 	ufree (buf_out);
 }
 
-__PUBLF (NodePeg, void, msg_data_in) (char * buf) {
+void msg_data_in (char * buf) {
 	sint tagIndex;
 
 	if ((tagIndex = find_tag (in_header(buf, snd))) < 0) { // not found
@@ -71,7 +56,7 @@ __PUBLF (NodePeg, void, msg_data_in) (char * buf) {
 	oss_data_out (tagIndex);
 }
 
-__PUBLF (NodePeg, void, msg_profi_out) (nid_t peg) {
+void msg_profi_out (nid_t peg) {
 	char * buf_out = get_mem (WNONE, sizeof(msgProfiType));
 
 	if (buf_out == NULL)
@@ -88,7 +73,7 @@ __PUBLF (NodePeg, void, msg_profi_out) (nid_t peg) {
 	ufree (buf_out);
 }
 
-__PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level, char * desc) {
+void msg_alrm_out (nid_t peg, word level, char * desc) {
 	char * buf_out = get_mem (WNONE, sizeof(msgAlrmType));
 
 	if (buf_out == NULL)
@@ -120,7 +105,7 @@ __PUBLF (NodePeg, void, msg_alrm_out) (nid_t peg, word level, char * desc) {
 	ufree (buf_out);
 }
 
-__PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
+void msg_profi_in (char * buf, word rssi) {
 	sint tagIndex, nbu;
 	app_diag (D_DEBUG, "Profi %u", in_header(buf, snd));
 
@@ -206,7 +191,7 @@ __PUBLF (NodePeg, void, msg_profi_in) (char * buf, word rssi) {
 	}
 }
 
-__PUBLF (NodePeg, void, msg_alrm_in) (char * buf) {
+void msg_alrm_in (char * buf) {
 	app_diag (D_DEBUG, "Alrm %u", in_header(buf, snd));
 
 	if (find_ign (in_header(buf, snd)) >= 0) {
