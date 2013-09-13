@@ -1,13 +1,14 @@
-#ifndef __app_peg_h
-#define __app_peg_h
+#ifndef __app_sui_h
+#define __app_sui_h
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-//+++ "lib_app_peg.c" "msg_io_peg.c" trueconst_peg.cc
+//+++ "lib_app_sui.c" "msg_io_sui.c" trueconst_sui.cc
 
 #include "sysio.h"
+#include "app.h"
 #include "msg_tarp.h"
 
 #define DEF_APP_FLAGS 	0x0001
@@ -15,17 +16,7 @@
 #define set_autoack	(app_flags |= 1)
 #define clr_autoack	(app_flags &= ~1)
 
-#define clr_master_chg  (app_flags &= ~2)
-#define is_master_chg   (app_flags & 2)
-
-#define LI_MAX  6
-#define NI_LEN  7
-
-#if ANDROIDEMO
-#define PEG_STR_LEN 33
-#else
-#define PEG_STR_LEN 15
-#endif
+#define LI_MAX  10
 
 #define INFO_DESC	1
 #define INFO_BIZ	2
@@ -33,9 +24,10 @@
 #define INFO_NBUZZ	8
 #define INFO_ACK	16
 #define INFO_IN		(INFO_DESC | INFO_BIZ | INFO_PRIV)
-#define LED_R	0
+// LEDS switched to BGR on some boards...
+#define LED_R	2
 #define LED_G	1
-#define LED_B	2
+#define LED_B	0
 #define LED_N	3
 #define LED_OFF	0
 #define LED_ON	1
@@ -51,8 +43,6 @@ typedef enum {
 	fadingReportedTag, fadingConfirmedTag, fadingMatchedTag,
 	goneTag, sumTag
 } tagStateType;
-
-typedef word profi_t;
 
 typedef struct nvmDataStruct {
 	word	id;
@@ -104,11 +94,8 @@ typedef struct ledStateStruct {
 	word	dura:8;
 } ledStateType;
 
-#define clr_master_chg	(app_flags &= ~2)
-#define is_master_chg	(app_flags & 2)
-
-#define OSS_ASCII_DEF	0
-#define OSS_ASCII_RAW	1
-#define oss_fmt	OSS_ASCII_DEF
+#define OSS_ASCII_DEF   0
+#define OSS_ASCII_RAW   1
+#define oss_fmt OSS_ASCII_DEF
 
 #endif

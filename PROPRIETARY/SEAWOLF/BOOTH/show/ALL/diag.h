@@ -1,7 +1,7 @@
 #ifndef __diag_h__
 #define __diag_h__
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
+/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
@@ -101,5 +101,5 @@
 void  _app_diag (const char *, ...);
 void  _net_diag (const char *, ...);
 
-//+++ app_diag_peg.cc
+//+++ diag.cc
 #endif

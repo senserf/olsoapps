@@ -3,11 +3,12 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "app_peg_data.h"
+#include "app_sui_data.h"
 #include "diag.h"
 #include "tarp.h"
 #include "net.h"
-#include "msg_peg.h"
+#include "msg.h"
+#include "oss_sui.h"
 #include "ser.h"
 #include "serf.h"
 #include "storage.h"
@@ -19,7 +20,6 @@
 #endif
 
 #define UI_BUFLEN		UART_INPUT_BUFFER_LENGTH
-#define DEF_NID			85
 
 // Semaphores
 #define CMD_READER	(&cmd_line)
@@ -32,12 +32,15 @@ static char     *ui_ibuf        = NULL,
 static word	batter		= 0;
 static word	tag_auditFreq	= 4; // in seconds
 
-// PicOS differs from VUEE
-#ifdef __SMURPH__
-word	host_pl	= 1;
-#else
-word    host_pl = 2;
-#endif
+// Hunt part should be common for SUI and LCD and will be... when needed.
+// For now, let's hack it into alrm processing, with statics as in LCD
+static lword hts, hstart;
+static word hunt[4] = {1000, 1001, 1002, 1003};
+static word hunt_ind = 0;
+#define WIN_RSSI	200
+#define HUNT_END	3
+
+word	host_pl	= 7;
 word    app_flags               = DEF_APP_FLAGS;
 word    tag_eventGran           = 4;  // in seconds
 
@@ -48,38 +51,49 @@ nbuComType      nbuArray [LI_MAX];
 
 ledStateType    led_state       = {0, 0, 0};
 
-profi_t profi_att = 0xFFFF,
-	p_inc   = 0xFFFF,
-	p_exc   = 0;
+profi_t profi_att = (profi_t) PREINIT (PROF_SUI, "PROFI");
+profi_t p_inc = (profi_t) PREINIT (0xFFFF, "PINC");
+profi_t p_exc = (profi_t) PREINIT (0, "PEXC");
 
-char    nick_att  [NI_LEN +1]           = "uninit"; //{'\0'};
-char    desc_att  [PEG_STR_LEN +1]      = "uninit desc"; //{'\0'};
-char    d_biz  [PEG_STR_LEN +1]         = "uninit biz"; //{'\0'};
-char    d_priv  [PEG_STR_LEN +1]        = "uninit priv"; //{'\0'};
+#ifdef __SMURPH__
+// a bit costly, do it for vuee only, see strcpy at root's init
+const char * _nick_att_ini = (char *) PREINIT ("uninit", "NICK");
+const char * _desc_att_ini = (char *) PREINIT ("uninit desc", "DESC");
+const char * _d_biz_ini = (char *) PREINIT ("uninit biz", "DBIZ");
+const char * _d_priv_ini = (char *) PREINIT ("uninit priv", "DPRIV");
+#endif
+
+char    nick_att  [NI_LEN +1]          = "nick";
+char    desc_att  [PEG_STR_LEN +1]      = "desc";
+char    d_biz  [PEG_STR_LEN +1]         = "biz";
+char    d_priv  [PEG_STR_LEN +1]        = "priv";
 char    d_alrm  [PEG_STR_LEN +1]        = {'\0'};
-
-
-// =============
-// OSS reporting
-// =============
-fsm oss_out (char*) {
-        state OO_RETRY:
-		if (data == NULL)
-			app_diag_S (oss_out_f_str);
-		else
-			ser_outb (OO_RETRY, data);
-                finish;
-}
 
 fsm mbeacon {
 
     state MB_START:
-	delay (2048 + rnd() % 2048, MB_SEND); // 2 - 4s
+		delay (2048 + rnd() % 2048, MB_SEND); // 2 - 4s
+		release;
+
+    initial state MB_SEND:
+		msg_profi_out (0);
+		proceed (MB_START);
+
+}
+
+
+fsm abeacon (word target) {
+
+    state START:
+	if (local_host == PINDA_ID) 
+		delay (60000 + (rnd() % 2048), SEND);
+    	else
+		delay (2048 + rnd() % 2048, SEND); // 2 - 4s
 	release;
 
-    state MB_SEND:
-	msg_profi_out (0);
-	proceed (MB_START);
+    initial state SEND:
+		msg_alrm_out (target, local_host == PINDA_ID ? 9 : 0, NULL);
+		proceed (START);
 
 }
 
@@ -98,8 +112,9 @@ static void stats (word state) {
 }
 
 static void process_incoming (word state, char * buf, word size, word rssi) {
+	word hunting = 0;
 
-  if (check_msg_size (buf, size) != 0)
+	if (check_msg_size (buf, size) != 0)
 	  return;
 
   switch (in_header(buf, msg_type)) {
@@ -113,6 +128,46 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		return;
 
 	case msg_alrm:
+		// for now, a hack...
+		if (in_alrm(buf, profi) & PROF_TAG) {
+		
+			if (!(profi_att & PROF_HUNT) || hunt_ind >= HUNT_END ||
+					in_header(buf, snd) != hunt[hunt_ind])
+				return;
+				
+			// current hunt
+			hts = seconds();
+			if (in_header (buf, hoc) <= 1) {
+			
+				if (rssi >= WIN_RSSI) {
+
+					rssi = WIN_RSSI;
+
+					if (++hunt_ind >= HUNT_END) {
+						hunting = 2;
+					} else {
+						hunting = 1;
+						rssi = 0; // a new one counts
+					}
+				} 
+			}
+			form (in_alrm(buf, desc), "!TT!,%u,%u,%u,%u",
+				in_header (buf, hoc), 
+				WIN_RSSI - rssi, HUNT_END - hunt_ind, hunting);
+			form (d_alrm, "!TH!&%u&%u&%u&%u&%u", 
+				(word)(hts - hstart),
+				in_header (buf, hoc), WIN_RSSI - rssi, 
+				HUNT_END - hunt_ind, hunting);	
+
+			if (hunting >=2 ) {
+				if (!running (abeacon)) {
+					runfsm abeacon (PINDA_ID);
+				}
+			} else {
+				msg_alrm_out (PINDA_ID, 9, NULL);
+			}
+		}
+			
 		msg_alrm_in (buf);
 		return;
 
@@ -244,6 +299,16 @@ fsm audit {
 
 		app_diag_D ("Audit starts");
 
+		// hunt check
+		if ((profi_att & PROF_HUNT) && hunt_ind < HUNT_END &&
+				seconds() - hts > 10) {
+			form (d_alrm, "!TH!&%u&%u&%u&%u&%u",
+					(word)(seconds() - hstart),
+					0, 0, HUNT_END - hunt_ind, 0);
+			msg_alrm_out (PINDA_ID, 0, NULL);
+			oss_alrm_out (NULL);
+		}
+		
 	state AS_TAGLOOP:
 
 		if (ind-- == 0) {
@@ -305,167 +370,6 @@ fsm cmd_in {
 
 }
 
-static char * stateName (word state) {
-	switch ((tagStateType)state) {
-		case noTag:
-			return "noTag";
-		case newTag:
-			return "new";
-		case reportedTag:
-			return "reported";
-		case confirmedTag:
-			return "confirmed";
-		case fadingReportedTag:
-			return "fadingReported";
-		case fadingConfirmedTag:
-			return "fadingConfirmed";
-		case goneTag:
-			return "gone";
-		case sumTag:
-			return "sum";
-		case fadingMatchedTag:
-			return "fadingMatched";
-		case matchedTag:
-			return "matched";
-		default:
-			return "unknown?";
-	}
-}
-#if 0
-static char * locatName (word rssi, word pl) { // ignoring pl 
-	switch (rssi) {
-		case 3:
-			return "proxy";
-		case 2:
-			return "near";
-		case 1:
-			return "far";
-		case 0:
-			return "no";
-	}
-	return "rssi?";
-}
-#endif
-static char * descName (word info) {
-	if (info & INFO_PRIV) return "private";
-	if (info & INFO_BIZ) return "business";
-	if (info & INFO_DESC) return "intro";
-	// noombuzz is independent...
-	return "noDesc";
-}
-
-static char * descMark (word info, word list) {
-
-	if (list)
-		return "LT";
-
-	if (info & INFO_PRIV) return "PRIV";
-	if (info & INFO_BIZ) return "BIZ";
-	if (info & INFO_DESC) return "DESC";
-	// noombuzz is independent...
-	return "HELLO";
-}
-
-// arg. list indicates calls from 'lt'; kludgy wrap for 'LT' for Android stuff
-void oss_profi_out (word ind, word list) {
-	char * lbuf = NULL;
-
-    switch (oss_fmt) {
-	case OSS_ASCII_DEF:
-		lbuf = form (NULL, profi_ascii_def,
-#if ANDROIDEMO
-                        descMark(tagArray[ind].info, list),
-#endif
-			//locatName (tagArray[ind].rssi, tagArray[ind].pl),
-			 tagArray[ind].pl, tagArray[ind].rssi,
-			tagArray[ind].nick, tagArray[ind].id,
-			seconds() - tagArray[ind].evTime,
-#if ANDROIDEMO == 0
-			tagArray[ind].intim == 0 ? " " : " *intim* ",
-#endif
-			stateName (tagArray[ind].state),
-			tagArray[ind].profi,
-			descName (tagArray[ind].info),
-#if ANDROIDEMO == 0
-			(tagArray[ind].info & INFO_NBUZZ) ? " noombuzz)" : ")",
-#endif
-			tagArray[ind].desc);
-			break;
-
-	case OSS_ASCII_RAW:
-		lbuf = form (NULL, profi_ascii_raw,
-			tagArray[ind].nick, tagArray[ind].id,
-			tagArray[ind].evTime, tagArray[ind].lastTime,
-			tagArray[ind].intim, tagArray[ind].state,
-			tagArray[ind].profi, tagArray[ind].desc,
-			tagArray[ind].info,
-			tagArray[ind].pl, tagArray[ind].rssi);
-			break;
-	default:
-		app_diag_S ("**Unsupported fmt %u", oss_fmt);
-		return;
-
-    }
-
-    if (runfsm oss_out (lbuf) == 0 ) {
-	app_diag_S (oss_out_f_str);
-	ufree (lbuf);
-    }
-}
-
-void oss_data_out (word ind) {
-	// for now
-	oss_profi_out (ind, 0);
-}
-
-void oss_nvm_out (nvmDataType * buf, word slot) {
-	char * lbuf = NULL;
-
-	// no matter what format
-	if (slot == 0)
-		lbuf = form (NULL, nvm_local_ascii_def, slot, buf->id,
-			buf->profi, buf->local_inc, buf->local_exc,
-			buf->nick, buf->desc, buf->dpriv, buf->dbiz);
-	else
-		lbuf = form (NULL, nvm_ascii_def, slot, buf->id, buf->profi,
-			buf->nick, buf->desc, buf->dpriv, buf->dbiz);
-
-	if (runfsm oss_out (lbuf) == 0 ) {
-		app_diag_S (oss_out_f_str);
-		ufree (lbuf);
-	}
-}
-
-void oss_alrm_out (char * buf) {
-	char * lbuf = NULL;
-
-    switch (oss_fmt) {
-	case OSS_ASCII_DEF:
-		lbuf = form (NULL, alrm_ascii_def,
-			in_alrm(buf, nick), in_header(buf, snd),
-			in_alrm(buf, profi), in_alrm(buf, level),
-			in_header(buf, hoc), in_header(buf, rcv),
-			in_alrm(buf, desc));
-		break;
-
-	case OSS_ASCII_RAW:
-		lbuf = form (NULL, alrm_ascii_raw,
-			in_alrm(buf, nick), in_header(buf, snd),
-			in_alrm(buf, profi), in_alrm(buf, level),
-			in_header(buf, hoc), in_header(buf, rcv),
-			in_alrm(buf, desc));
-		break;
-	default:
-		app_diag_S ("**Unsupported fmt %u", oss_fmt);
-		return;
-    }
-
-    if (runfsm oss_out (lbuf) == 0 ) {
-	    app_diag_S (oss_out_f_str);
-	    ufree (lbuf);
-    }
-}
-
 // ==========================================================================
 
 /*
@@ -492,11 +396,19 @@ fsm root {
 
 		ser_out (RS_INIT, welcome_str);
 		ee_open ();
-#ifndef __SMURPH__
-		net_id = DEF_NID;
+		
+#ifdef __SMURPH__
+	strncpy (nick_att, _nick_att_ini, NI_LEN);
+	strncpy (desc_att, _desc_att_ini, PEG_STR_LEN);
+	strncpy (d_biz, _d_biz_ini, PEG_STR_LEN);
+	strncpy (d_priv, _d_priv_ini, PEG_STR_LEN);
 #endif
+		net_id = DEF_NID;
+
 		//tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
-		tarp_ctrl.param = 0xA3; // level 2, rec 2, slack 1, fwd on
+		tarp_ctrl.param = 0xA2; // level 2, rec 2, slack 1, fwd off(!?)
+		//we're departing from all forwarders beacause of flooding
+		//alrms from treasure tags (only they forward)
 
 		init_tags();
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
@@ -562,8 +474,22 @@ fsm root {
 		  }
 		}
 
-		if (local_host != 0xDEAD)
+		if (local_host != 0xDEAD &&
+				(profi_att & PROF_KIOSK) == 0 &&
+				(profi_att & PROF_TAG) == 0)
 			runfsm mbeacon;
+
+		if (profi_att & PROF_TAG) {
+			highlight_set (0, 0.0, NULL);
+			strcpy (d_alrm, "!TT!");
+			runfsm abeacon (0);
+			tarp_ctrl.param |= 1; // fwd ON
+		} else {
+			if (profi_att & PROF_KIOSK) {
+				strcpy (d_alrm, "!KI!&Combat R&D Booth");
+				runfsm abeacon (0);
+			}
+		}
 
 		proceed RS_RCMD;
 
@@ -603,6 +529,8 @@ fsm root {
 			case 'R': proceed RS_RETR;
 			case 'E': proceed RS_ERA;
 			case 'X': proceed RS_BEAC;
+			case 'a': proceed RS_ABEAC;
+			case 'H': proceed RS_HUNT;
 			case 'U': proceed RS_AUTO;
 			default:
 				form (ui_obuf, ill_str, cmd_line);
@@ -687,7 +615,9 @@ fsm root {
 	state RS_PROFILES:
 
 		w1 = strlen (cmd_line);
-		if (w1 < 2) {
+
+		if (w1 < 2 || w2 > 2 && cmd_line[2] != ' ' &&
+				cmd_line[2] != '&' && cmd_line[2] != '|') {
 			form (ui_obuf, ill_str, cmd_line);
 			proceed RS_UIOUT;
 		}
@@ -695,20 +625,41 @@ fsm root {
 		switch (cmd_line[1]) {
 
 		  case 'p':
-			if (scan (cmd_line +2, "%x", &w1) > 0)
-				profi_att = w1;
+			if (scan (cmd_line +3, "%x", &w1) > 0) {
+				if (cmd_line[2] == ' ') {
+					profi_att = w1;
+				} else if (cmd_line[2] == '|') {
+					profi_att |= w1;
+				} else {
+					profi_att &= ~w1;
+				}
+			}
 			form (ui_obuf, "Profile: %x\r\n", profi_att);
 			proceed RS_UIOUT;
 
 		  case 'e':
-			if (scan (cmd_line +2, "%x", &w1) > 0)
-				p_exc = w1;
+			if (scan (cmd_line +3, "%x", &w1) > 0) {
+				if (cmd_line[2] == ' ') {
+					p_exc = w1;
+				} else if (cmd_line[2] == '|') {
+					p_exc |= w1;
+				} else {
+					p_exc &= ~w1;
+				}
+			}
 			form (ui_obuf, "Exclude: %x\r\n", p_exc);
 			proceed RS_UIOUT;
 
 		  case 'i':
-			if (scan (cmd_line +2, "%x", &w1) > 0)
-				p_inc = w1;
+			if (scan (cmd_line +3, "%x", &w1) > 0) {
+				if (cmd_line[2] == ' ') {
+					p_inc = w1;
+				} else if (cmd_line[2] == '|') {
+					p_inc |= w1;
+				} else {
+					p_inc &= ~w1;
+				}
+			}
 			form (ui_obuf, "Include: %x\r\n", p_inc);
 			proceed RS_UIOUT;
 
@@ -1180,6 +1131,41 @@ StoreAll:
 			       running (mbeacon) ?  " " : " not ");
 		proceed RS_UIOUT;
 
+	state RS_HUNT:
+		if (scan (cmd_line +1, "%u", &w1) > 0) {
+			if (w1) {
+				profi_att |= PROF_HUNT;
+				p_exc &= ~PROF_TAG;
+				hunt_ind = 0;
+				hstart = seconds();
+			} else {
+				profi_att &= ~PROF_HUNT;
+				p_exc |= PROF_TAG;
+				killall (abeacon); // no mercy for others
+			}
+		}
+		form (ui_obuf, "HUNT O%s\r\n", (profi_att & PROF_HUNT) ?
+				"N" : "FF");
+		proceed RS_UIOUT;
+
+	state RS_ABEAC:
+		w2 = 0;
+		if (scan (cmd_line +1, "%u %u", &w1, &w2) > 0) {
+			if (w1) {
+				if (!running (abeacon)) {
+					runfsm abeacon(w2);
+				}
+						
+			} else {
+				if (running (abeacon)) {
+					killall (abeacon);
+				}
+			}
+		}
+		form (ui_obuf, "Alarm beacon(%u)  O%s\r\n", w2,
+			       running (abeacon) ?  "N" : "FF");
+		proceed RS_UIOUT;
+		
 	state RS_AUTO:
 		if (scan (cmd_line +1, "%u", &w1) > 0) {
 			if (w1)

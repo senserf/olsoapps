@@ -1,0 +1,41 @@
+#ifdef	__SMURPH__
+
+#define	VUEE_LIB_PLUG_NULL
+#define VUEE_LIB_PLUG_TARP
+
+#endif
+
+#ifdef CODE_LONG_INTS
+#undef CODE_LONG_INTS
+#endif
+#define CODE_LONG_INTS 1
+
+#ifdef DIAG_MESSAGES
+#undef DIAG_MESSAGES
+#endif
+#define DIAG_MESSAGES 0
+
+#ifdef SPIN_WHEN_HALTED
+#undef SPIN_WHEN_HALTED
+#endif
+#define SPIN_WHEN_HALTED 0
+
+#ifdef RANDOM_NUMBER_GENERATOR
+#undef RANDOM_NUMBER_GENERATOR
+#endif
+#define RANDOM_NUMBER_GENERATOR 2
+
+#ifdef RADIO_USE_LEDS
+#undef RADIO_USE_LEDS
+#endif
+#define RADIO_USE_LEDS 0
+
+// if defined, output for a 'presentation device'
+#define PD_FMT
+#define ANDROIDEMO 1
+
+//#undef STACK_SZIE
+//#define STACK_SIZE 512
+//#define CC1100_OLD_DRIVER 1
+
+#define RADIO_DEFAULT_CHANNEL	21

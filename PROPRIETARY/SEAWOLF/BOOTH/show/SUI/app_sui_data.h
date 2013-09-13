@@ -1,7 +1,7 @@
-#ifndef	__app_peg_data_h
-#define	__app_peg_data_h
+#ifndef	__app_sui_data_h
+#define	__app_sui_data_h
 
-#include "app_peg.h"
+#include "app_sui.h"
 
 extern word host_pl;
 
@@ -21,7 +21,7 @@ extern char d_alrm [PEG_STR_LEN +1];
 extern char nick_att [NI_LEN +1];
 extern ledStateType led_state;
 
-extern trueconst char oss_out_f_str[], d_event[][12], d_nbu[][12],
+extern /* true*/ const char oss_out_f_str[], d_event[][12], d_nbu[][12],
        welcome_str[], hs_str[], ill_str[], bad_str[], stats_str[],
        profi_ascii_def[], profi_ascii_raw[], alrm_ascii_def[],
        alrm_ascii_raw[], nvm_ascii_def[], nvm_local_ascii_def[],
@@ -37,7 +37,7 @@ int 	find_tag (word tag);
 int 	find_ign (word tag);
 int	find_mon (word tag);
 int	find_nbu (word tag);
-char * 	get_mem (word state, int len);
+// in app.h char * 	get_mem (word state, int len);
 void 	init_tag (word i);
 void	init_ign (word i);
 void	init_mon (word i);
@@ -57,10 +57,5 @@ void	msg_data_out (nid_t peg, word info);
 void	msg_alrm_in (char * buf);
 void	msg_alrm_out (nid_t peg, word level, char * desc);
 
-void 	oss_profi_out (word ind, word list);
-void	oss_data_out (word ind);
-void 	oss_alrm_out (char * buf);
-void	oss_nvm_out (nvmDataType * buf, word slot);
-
-void 	send_msg (char * buf, int size);
+// in app.h void 	send_msg (char * buf, int size);
 #endif

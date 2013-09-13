@@ -4,8 +4,9 @@
 /* ==================================================================== */
 
 #include "diag.h"
-#include "app_peg_data.h"
-#include "msg_peg.h"
+#include "app_sui_data.h"
+#include "msg.h"
+#include "oss_sui.h"
 
 #include "net.h"
 
@@ -19,6 +20,7 @@ void msg_data_out (nid_t peg, word info) {
 	in_header(buf_out, msg_type) = msg_data;
 	in_header(buf_out, rcv) = peg;
 	in_header(buf_out, hco) = 1;
+	in_header(buf_out, prox) = 1;
 	in_data(buf_out, info) = info;
 	if (info & INFO_PRIV)
 		strncpy (in_data(buf_out, desc), d_priv, PEG_STR_LEN);
@@ -65,6 +67,7 @@ void msg_profi_out (nid_t peg) {
 	in_header(buf_out, msg_type) = msg_profi;
 	in_header(buf_out, rcv) = peg;
 	in_header(buf_out, hco) = 1;
+	in_header(buf_out, prox) = 1;
 	in_profi(buf_out, profi) = profi_att;
 	in_profi(buf_out, pl) = host_pl;
 	strncpy (in_profi(buf_out, nick), nick_att, NI_LEN);
@@ -81,7 +84,8 @@ void msg_alrm_out (nid_t peg, word level, char * desc) {
 
 	in_header(buf_out, msg_type) = msg_alrm;
 	in_header(buf_out, rcv) = peg; 
-	in_header(buf_out, hco) = 0;
+	in_header(buf_out, hco) = (level == 9 ? 0 : 1);
+	in_header(buf_out, prox) = (level == 9 ? 0 : 1);
 	in_alrm(buf_out, level) = level;
 	in_alrm(buf_out, profi) = profi_att;
 	strncpy (in_alrm(buf_out, nick), nick_att, NI_LEN);

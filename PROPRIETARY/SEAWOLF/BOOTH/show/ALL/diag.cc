@@ -4,10 +4,7 @@
 /* ==================================================================== */
 
 #include "diag.h"
-#include "app_peg.h"
-#include "msg_peg.h"
 #include "form.h"
-#include "app_peg_data.h"
 
 void _app_diag (const char * fmt, ...) {
 
@@ -20,7 +17,11 @@ void _app_diag (const char * fmt, ...) {
 		diag ("no mem");
 		return;
 	}
+#ifdef __SMURPH__
+	emul (0, "app: %s", buf);
+#else
 	diag ("app: %s", buf);
+#endif
 	ufree (buf);
 }
 
@@ -34,7 +35,11 @@ void _net_diag (const char * fmt, ...) {
 		diag ("no mem");
 		return;
 	}
+#ifdef __SMURPH__
+	emul (0, "net: %s", buf);
+#else
 	diag ("net: %s", buf);
+#endif
 	ufree (buf);
 }
 

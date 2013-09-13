@@ -1,0 +1,25 @@
+#ifdef	__SMURPH__
+
+#define	VUEE_LIB_PLUG_NULL
+#define VUEE_LIB_PLUG_TARP
+
+#endif
+
+#ifdef DIAG_MESSAGES
+#undef DIAG_MESSAGES
+#endif
+#define DIAG_MESSAGES 2
+
+#ifdef RADIO_USE_LEDS
+#undef RADIO_USE_LEDS
+#endif
+#define RADIO_USE_LEDS 0
+
+#ifdef LEDS_DRIVER
+#undef LEDS_DRIVER
+#endif
+#define LEDS_DRIVER 1
+
+#define ANDROIDEMO 1
+
+#define RADIO_DEFAULT_CHANNEL	21
