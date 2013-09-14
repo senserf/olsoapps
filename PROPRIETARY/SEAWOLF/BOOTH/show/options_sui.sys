@@ -6,15 +6,20 @@
 #endif
 
 #ifdef BOARD_WARSAW_BLUE
+
+// #define BT_MODULE_LINKMATIK
+#define BT_MODULE_BTM182
+// #define BT_MODULE_BOLUTEK
+
+#ifndef BT_MODULE_BOLUTEK
 #undef UART_RATE
 #define UART_RATE                       115200
+#endif
+
 #define UART_DRIVER                     2
 #else
 #define UART_DRIVER                     1
 #endif
-
-#define BT_MODULE_LINKMATIK
-// #define BT_MODULE_BTM182
 
 #ifdef UART_INPUT_BUFFER_LENGTH
 #undef UART_INPUT_BUFFER_LENGTH

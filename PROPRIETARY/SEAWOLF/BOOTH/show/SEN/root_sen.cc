@@ -18,9 +18,9 @@
 #error "UNDEFINED RF"
 #endif
 
-#define LED_R 0
+#define LED_R 2
 #define LED_G 1
-#define LED_B 2
+#define LED_B 0
 
 word    host_pl 		= 7;
 word	sval[4];
@@ -62,18 +62,22 @@ static void msg_alrm_out (nid_t peg, word level, char * desc) {
 
 fsm abeacon {
 
-    state START:
+    state INIT:
+		delay (1048, SEND); // give sensors a chance...
+
+    state LOOP:
 		delay ((60 << 10) + rnd() % 2048, SEND); // 60 - 62s
 		when (&sstate, SEND);
 		release;
 
-    initial state SEND:
+    state SEND:
 		if (sstate != 0) {
-			form (d_alrm, "!SE!,%u,%u,%u,%u,%u", sstate -1,
+			form (d_alrm, "!SE!&%u&%u&%u&%u&%u", sstate -1,
 					sval[0], sval[1], sval[2], sval[3]); 
 			msg_alrm_out (PINDA_ID, 0, NULL);
+			diag ("%u %s", (word)seconds(), d_alrm);
 		}
-		proceed (START);
+		proceed (LOOP);
 
 }
 
@@ -90,7 +94,7 @@ fsm sens {
 		sstate = alrm = 0; // stay away
 		
 	state S_1:
-		read_sensor (S_1, -1,&sval[0]);
+		read_sensor (S_1, -1, &sval[0]);
 		if (sval[0] < BATT_TRIG)
 			alrm = 1;
 			
@@ -123,7 +127,7 @@ fsm sens {
 #endif
 
 #ifdef BOARD_WARSAW_10SHT
-#define SHT_TRIG	100
+#define SHT_TRIG	1800
 
 fsm sens {
 	word tmp[10];
@@ -133,16 +137,17 @@ fsm sens {
 		sstate = alrm = 0; // stay away
 		
 	state S_1:
-		read_sensor (S_1, &sval[0]);
+		read_sensor (S_1, -1, &sval[0]);
 		if (sval[0] < BATT_TRIG)
 			alrm = 1;
 			
 	state S1:
-		read_sensor (S1, &tmp[0]); // only humidity (0 - temp; 1 - RH)
+		read_sensor (S1, 1, &tmp[0]); // only rh (0 - temp; 1 - RH)
+		// for some reason, SHT have a run-up period of time with -1
 		sval[1] = tmp[0];
 		sval[2] = tmp[1];
 		sval[3] = tmp[2];
-		
+
 		if (sval[1] > SHT_TRIG)
 			alrm += 2;
 		if (sval[2] > SHT_TRIG)
@@ -150,7 +155,7 @@ fsm sens {
 		if (sval[3] > SHT_TRIG)
 			alrm += 8;
 
-		state = alrm +1;
+		sstate = alrm +1;
 		if (alrm) {
 			leds (LED_G, 0);
 			leds (LED_R, 1);

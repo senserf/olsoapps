@@ -69,42 +69,47 @@
 	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
 	</node>
 	<node number="2" type="sui" start="on" hid="0xBACA03E9">
-	    <location>150.0 50.0</location>
+	    <location>5.0 100.0</location>
 	    <preinit tag="NICK" type="string">TT1001</preinit>
 	    <preinit tag="DESC" type="string">Treasure Tag 1001</preinit>
 	    <preinit tag="PROFI" type="word">0x0021</preinit>
 	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
 	</node>
 	<node number="3" type="sui" start="on" hid="0xBACA03EA">
-	    <location>5.0 150.0</location>
+	    <location>100.0 100.0</location>
 	    <preinit tag="NICK" type="string">TT1002</preinit>
 	    <preinit tag="DESC" type="string">Treasure Tag 1002</preinit>
 	    <preinit tag="PROFI" type="word">0x0021</preinit>
 	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
 	</node>
 	<node number="4" type="sui" start="on" hid="0xBACA03EB">
-	    <location>150.0 150.0</location>
+	    <location>100.0 50.0</location>
 	    <preinit tag="NICK" type="string">TT1003</preinit>
 	    <preinit tag="DESC" type="string">Treasure Tag 1003</preinit>
 	    <preinit tag="PROFI" type="word">0x0021</preinit>
 	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
 	</node>
 
-<!-- Sensors -->
+<!-- Sensors (no preinits; just documenting data here) -->
 	<node number="5" type="sen" start="on" hid="0xBACA07D0">
 	    <location>5.0 65.0</location>
-	    <preinit tag="NICK" type="string">SE2000</preinit>
-	    <preinit tag="DESC" type="string">Sensor 2000</preinit>
+	    <preinit tag="NICK" type="string">SENSOR</preinit>
+	    <preinit tag="DESC" type="string">-</preinit>
+	    <preinit tag="PROFI" type="word">0x0018</preinit>
+
 	</node>
 	<node number="6" type="sen" start="on" hid="0xBACA07D1">
 	    <location>5.0 80.0</location>
-	    <preinit tag="NICK" type="string">SE2001</preinit>
-	    <preinit tag="DESC" type="string">Sensor 2001</preinit>
+	    <preinit tag="NICK" type="string">SENSOR</preinit>
+	    <preinit tag="DESC" type="string">-</preinit>
+	    <preinit tag="PROFI" type="word">0x0018</preinit>
+
 	</node>
-	<node number="7" type="sen" start="on" hid="0xBACA07D2">
-	    <location>5.0 95.0</location>
-	    <preinit tag="NICK" type="string">SE2002</preinit>
-	    <preinit tag="DESC" type="string">Sensor 2002</preinit>
+	<node number="7" type="sen" start="off" hid="0xBACA07D2">
+	    <location>150.0 150.0</location>
+	    <preinit tag="NICK" type="string">SENSOR</preinit>
+	    <preinit tag="DESC" type="string">-</preinit>
+	    <preinit tag="PROFI" type="word">0x0018</preinit>
 	</node>
 
 <!-- Vendors -->

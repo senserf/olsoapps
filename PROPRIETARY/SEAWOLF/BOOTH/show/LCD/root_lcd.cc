@@ -140,7 +140,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		if (!running (abeacon)) {
 			runfsm abeacon;
 		}
-		chro_hi ("WON");
+		chro_hi ("FINI");
 		chro_nn (0, (word)(seconds() - hstart));
 	} else {
 		msg_alrm_out (PINDA_ID, 0, NULL);
@@ -334,6 +334,7 @@ fsm root {
 		profi_att |= PROF_HUNT;
 		p_exc &= ~PROF_TAG;
 		hunt_ind = 0;
+		shuffle_hunt (&hunt[0]);
 
 		hlo[0] = '0' + HUNT_END;
 		hunt_ind = 0;

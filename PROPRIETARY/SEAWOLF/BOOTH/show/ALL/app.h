@@ -35,5 +35,6 @@ typedef word profi_t;
 // in lib_app.cc:
 char * 	get_mem (word state, int len);
 void 	send_msg (char * buf, int size);
+void shuffle_hunt (word * a);
 
 #endif

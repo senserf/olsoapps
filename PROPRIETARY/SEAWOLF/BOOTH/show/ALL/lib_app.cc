@@ -55,3 +55,28 @@ void send_msg (char * buf, int size) {
 	} else
 		app_diag_S ("Tx %u failed", in_header(buf, msg_type));
  }
+
+void shuffle_hunt (word * a) { // quick hack: asuming 3-el perm. out of 4-el set
+
+	word tmp = rnd() % 4;
+	word swp;
+
+	if (tmp < 3) { // pick 3 <-> remove 1
+		swp = *(a + tmp); *(a + tmp) = *(a + 3); *(a + 3) = swp;
+	}
+
+	if (rnd() & 1) {
+		swp = *(a + 1); *(a + 1) = *a; *a = swp;
+	}
+
+	if (rnd() & 1) {
+		swp = *(a + 2); *(a + 2) = *(a + 1); *(a + 1) = swp;
+	}
+
+        if (rnd() & 1) {
+		swp = *a; *a = *(a + 2); *(a + 2) = swp;
+        }
+
+	diag ("shuffled %u %u %u", *a, *(a +1), *(a + 2));
+}
+

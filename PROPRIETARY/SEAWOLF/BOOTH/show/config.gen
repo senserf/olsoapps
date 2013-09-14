@@ -1,1 +1,1 @@
-{MOD IHEX} {TFN Image_nnnn.a43} {CNT 3} {FRM 100} {IFN Image_lcd.a43} {SRD C:/cygwin/home/Wlodek/GIT/PICOS/Apps/PROPRIETARY/SEAWOLF/BOOTH/show} {PFX BACA} {TRD C:/cygwin/home/Wlodek/GIT/PICOS/Apps/PROPRIETARY/SEAWOLF/BOOTH/show} {IDN BACADEAD}
+{MOD IHEX} {TFN Image_nnnn.a43} {CNT 1} {FRM 2000} {IFN Image_sen.a43} {SRD C:/cygwin/home/Wlodek/GIT/PICOS/Apps/PROPRIETARY/SEAWOLF/BOOTH/show} {PFX BACA} {TRD C:/cygwin/home/Wlodek/GIT/PICOS/Apps/PROPRIETARY/SEAWOLF/BOOTH/show} {IDN BACADEAD}

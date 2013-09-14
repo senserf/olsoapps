@@ -1137,6 +1137,7 @@ StoreAll:
 				profi_att |= PROF_HUNT;
 				p_exc &= ~PROF_TAG;
 				hunt_ind = 0;
+				shuffle_hunt (&hunt[0]);
 				hstart = seconds();
 			} else {
 				profi_att &= ~PROF_HUNT;
