@@ -151,13 +151,12 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 					}
 				} 
 			}
-			form (in_alrm(buf, desc), "!TT!,%u,%u,%u,%u",
-				in_header (buf, hoc), 
-				WIN_RSSI - rssi, HUNT_END - hunt_ind, hunting);
 			form (d_alrm, "!TH!&%u&%u&%u&%u&%u", 
 				(word)(hts - hstart),
 				in_header (buf, hoc), WIN_RSSI - rssi, 
-				HUNT_END - hunt_ind, hunting);	
+				HUNT_END - hunt_ind, hunting);
+			// same things go up to the phone (BT) and to PINDA
+			strcpy (in_alrm(buf, desc), d_alrm);
 
 			if (hunting >=2 ) {
 				if (!running (abeacon)) {
@@ -484,11 +483,17 @@ fsm root {
 			strcpy (d_alrm, "!TT!");
 			runfsm abeacon (0);
 			tarp_ctrl.param |= 1; // fwd ON
+#if 0
+if we want to do that, abeacon should be taking a uniquw string (not d_alrm).
+However, since PINDA is not mute, this !KI! abeacon doesn't make
+much sense
+
 		} else {
 			if (profi_att & PROF_KIOSK) {
 				strcpy (d_alrm, "!KI!&Combat R&D Booth");
 				runfsm abeacon (0);
 			}
+#endif
 		}
 
 		proceed RS_RCMD;
@@ -616,7 +621,7 @@ fsm root {
 
 		w1 = strlen (cmd_line);
 
-		if (w1 < 2 || w2 > 2 && cmd_line[2] != ' ' &&
+		if (w1 < 2 || w1 > 3 && cmd_line[2] != ' ' &&
 				cmd_line[2] != '&' && cmd_line[2] != '|') {
 			form (ui_obuf, ill_str, cmd_line);
 			proceed RS_UIOUT;
@@ -625,7 +630,7 @@ fsm root {
 		switch (cmd_line[1]) {
 
 		  case 'p':
-			if (scan (cmd_line +3, "%x", &w1) > 0) {
+			if (w1 > 3 && scan (cmd_line +3, "%x", &w1) > 0) {
 				if (cmd_line[2] == ' ') {
 					profi_att = w1;
 				} else if (cmd_line[2] == '|') {
@@ -638,7 +643,7 @@ fsm root {
 			proceed RS_UIOUT;
 
 		  case 'e':
-			if (scan (cmd_line +3, "%x", &w1) > 0) {
+			if (w1 > 3 && scan (cmd_line +3, "%x", &w1) > 0) {
 				if (cmd_line[2] == ' ') {
 					p_exc = w1;
 				} else if (cmd_line[2] == '|') {
@@ -651,7 +656,7 @@ fsm root {
 			proceed RS_UIOUT;
 
 		  case 'i':
-			if (scan (cmd_line +3, "%x", &w1) > 0) {
+			if (w1 > 3 && scan (cmd_line +3, "%x", &w1) > 0) {
 				if (cmd_line[2] == ' ') {
 					p_inc = w1;
 				} else if (cmd_line[2] == '|') {

@@ -3,7 +3,7 @@
 <network nodes="18">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
-    <xi:include href="CHANNELS/legacy_short.xml"/>
+    <xi:include href="CHANNELS/tabulated.xml"/>
     <nodes>
 	<defaults>
 	    <memory>8666 bytes</memory>
@@ -141,7 +141,7 @@
             <location>20.0 35.0</location>
 	    <preinit tag="NICK" type="string">Rejean</preinit>
 	    <preinit tag="DESC" type="string">Rejean Bourgault, Avaya</preinit>
-	    <preinit tag="PROFI" type="word">0x2D02</preinit>
+	    <preinit tag="PROFI" type="word">0x4B02</preinit>
 	    <preinit tag="PEXC" type="word">0x0028</preinit>
 	</node>
 	
@@ -149,7 +149,7 @@
             <location>35.0 35.0</location>
 	    <preinit tag="NICK" type="string">Eric</preinit>
 	    <preinit tag="DESC" type="string">Eric Belliveau, Avaya</preinit>
-	    <preinit tag="PROFI" type="word">0x2D02</preinit>
+	    <preinit tag="PROFI" type="word">0x2B02</preinit>
 	    <preinit tag="PEXC" type="word">0x0028</preinit>
 	</node>
 	
@@ -157,16 +157,16 @@
             <location>50.0 35.0</location>
 	    <preinit tag="NICK" type="string">Jean</preinit>
 	    <preinit tag="DESC" type="string">Jean Turgeon, Avaya</preinit>
-	    <preinit tag="PROFI" type="word">0xAD02</preinit>
+	    <preinit tag="PROFI" type="word">0xAB02</preinit>
 	    <preinit tag="PEXC" type="word">0x0028</preinit>
 	</node>
 	
 <!-- Phones -->
-	<node number="14" type="sui" start="off" hid="0xBACA00C8">
+	<node number="14" type="sui" start="on" hid="0xBACA00C8">
 	    <location>5.0 20.0</location>
 	    <preinit tag="NICK" type="string">Paul</preinit>
 	    <preinit tag="DESC" type="string">Paul Boone, Combat Networks</preinit>
-	    <preinit tag="PROFI" type="word">0x1601</preinit>
+	    <preinit tag="PROFI" type="word">0x8601</preinit>
 	    <preinit tag="PEXC" type="word">0x0028</preinit>
 	</node>
 	<node number="15" type="sui" start="off" hid="0xBACA00C9">

@@ -11,6 +11,9 @@
 #include "msg.h"
 #include "diag.h"
 #include "form.h"
+#include "ser.h"
+#include "serf.h"
+#include "storage.h"
 
 #if CC1100
 #define INFO_PHYS_DEV INFO_PHYS_CC1100
@@ -22,9 +25,18 @@
 #define LED_G 1
 #define LED_B 0
 
-word    host_pl 		= 7;
+#define BATT_TRIG 	2250
+
+#define WIRE_TRIG1 	3000
+#define WIRE_TRIG2	1900
+#define SHT_TRIG	1800
+
+// it's hard to be more wasteful... of course, this is just for now ;-)
+word    host_pl = 7;
 word	sval[4];
 word	sstate;
+word	thr[3];
+word	dia_fl = 0;
 
 profi_t profi_att = (PROF_SENS + PROF_RXOFF),
 	p_inc   = 0,
@@ -75,18 +87,14 @@ fsm abeacon {
 			form (d_alrm, "!SE!&%u&%u&%u&%u&%u", sstate -1,
 					sval[0], sval[1], sval[2], sval[3]); 
 			msg_alrm_out (PINDA_ID, 0, NULL);
-			diag ("%u %s", (word)seconds(), d_alrm);
+			if (dia_fl)
+				diag ("%u %s", (word)seconds(), d_alrm);
 		}
 		proceed (LOOP);
 
 }
 
-#define BATT_TRIG 	2250
-
 #ifdef BOARD_WARSAW_SZAMBO
-#define WIRE_TRIG1 	3000
-#define WIRE_TRIG2	1900
-
 fsm sens {
 	word alrm;
 
@@ -95,14 +103,14 @@ fsm sens {
 		
 	state S_1:
 		read_sensor (S_1, -1, &sval[0]);
-		if (sval[0] < BATT_TRIG)
+		if (sval[0] < thr[0])
 			alrm = 1;
 			
 	state S0:
 		read_sensor (S0, 0, &sval[1]);
-		if (sval[1] < WIRE_TRIG1) {
+		if (sval[1] < thr[1]) {
 			alrm += 2;
-			if (sval[1] < WIRE_TRIG2) {
+			if (sval[1] < thr[2]) {
 				alrm += 2; // 4 all together
 			}
 		}
@@ -118,7 +126,7 @@ fsm sens {
 		}
 
 #ifdef __SMURPH__
-// hack in timestamp and ++, just for testing
+// hack in timestamp and ++, just for tests
 		sval[2] = (word)seconds();
 		sval[3]++;
 #endif
@@ -127,8 +135,6 @@ fsm sens {
 #endif
 
 #ifdef BOARD_WARSAW_10SHT
-#define SHT_TRIG	1800
-
 fsm sens {
 	word tmp[10];
 	word alrm;
@@ -138,7 +144,7 @@ fsm sens {
 		
 	state S_1:
 		read_sensor (S_1, -1, &sval[0]);
-		if (sval[0] < BATT_TRIG)
+		if (sval[0] < thr[0])
 			alrm = 1;
 			
 	state S1:
@@ -148,11 +154,11 @@ fsm sens {
 		sval[2] = tmp[1];
 		sval[3] = tmp[2];
 
-		if (sval[1] > SHT_TRIG)
+		if (sval[1] > thr[1])
 			alrm += 2;
-		if (sval[2] > SHT_TRIG)
+		if (sval[2] > thr[1])
 			alrm += 4;
-		if (sval[3] > SHT_TRIG)
+		if (sval[3] > thr[1])
 			alrm += 8;
 
 		sstate = alrm +1;
@@ -164,7 +170,7 @@ fsm sens {
 			leds (LED_R, 0);
 			leds (LED_G, 1);
 		}
-		delay (2048, LOOP);
+		delay (2048 + rnd() % 2048, LOOP);
 }
 #endif
 
@@ -181,15 +187,87 @@ static void ini () {
     net_opt (PHYSOPT_SETPOWER, &host_pl);
 	net_opt (PHYSOPT_RXOFF, NULL);
 	leds (LED_G, 1);
+
+#ifdef BOARD_WARSAW_SZAMBO
+	if (if_read (0) == 0xFFFF) {
+		thr[0] = BATT_TRIG;
+		thr[1] = WIRE_TRIG1;
+		thr[2] = WIRE_TRIG2;
+	} else {
+		thr[0] = if_read (0);
+		thr[1] = if_read (1);
+		thr[2] = if_read (2);
+	}
+#endif
+
+#ifdef BOARD_WARSAW_10SHT
+	if (if_read (0) == 0xFFFF) {
+		thr[0] = BATT_TRIG;
+		thr[1] = SHT_TRIG;
+	} else {
+		thr[0] = if_read (0);
+		thr[1] = if_read (1);
+	}
+#endif
+
 	powerdown();
 }
 
+//added UI and FIM for thresholds
+#define IBUF_LEN	40
+
 fsm root {
 	word tempek;
-
+	char ibuf[IBUF_LEN];
+	
 	state INI:
 		ini();
 		runfsm sens;
 		runfsm abeacon;
-		finish;
+	
+	state WELCOME:
+		ser_outf (WELCOME, "%s thresholds: %u %u %u\r\ns "
+				"[<thr 0> [<thr 1> [< thr 2>]]]\r\nSA\r\n"
+				"d(iag)(%u) [1|0]\r\nq\r\n",
+			if_read (0) == 0xFFFF ? "Default" : "FIM", 
+			thr[0], thr[1], thr[2], dia_fl);
+
+		ibuf[0] = '\0';
+
+	state CMD:
+		word w[3];
+		
+		ser_in (CMD, ibuf, IBUF_LEN);
+		
+		if (ibuf[0] == 'q') reset();
+		
+		if (ibuf[0] == 'S' && ibuf[1] == 'A') {
+			if (if_read (0) != 0xFFFF)
+				if_erase (0);
+			if_write (0, thr[0]);
+			if_write (1, thr[1]);
+#ifdef BOARD_WARSAW_SZAMBO
+			if_write (2, thr[2]);
+#endif
+			proceed WELCOME;
+		}
+		
+		if (ibuf[0] == 's') {
+			w[0] = w[1] = w[2] = 0;
+			scan (ibuf +1, "%u %u %u", &w[0], &w[1], &w[2]);
+			if (w[0]) thr[0] = w[0];
+			if (w[1]) thr[1] = w[1];
+#ifdef BOARD_WARSAW_SZAMBO
+			if (w[2]) thr[2] = w[2];
+#endif
+		}
+
+		if (ibuf[0] == 'd') {
+			w[0] = 0;
+			scan (ibuf +1, "%u", &w[0]);
+			dia_fl = w[0] ? 1 : 0;
+		}
+		
+		proceed WELCOME;
+		
 }

@@ -15,11 +15,12 @@
 #endif
 #define RADIO_USE_LEDS 0
 
-#ifdef LEDS_DRIVER
-#undef LEDS_DRIVER
-#endif
-#define LEDS_DRIVER 1
-
 #define ANDROIDEMO 1
 
 #define RADIO_DEFAULT_CHANNEL	21
+
+#ifdef CRYSTAL2_RATE
+#undef CRYSTAL2_RATE
+#endif
+#define CRYSTAL2_RATE 0
+

@@ -224,7 +224,7 @@ fsm root {
 
 	state S_SLEEP:
 		chro_lo ("SLEEP");
-		chro_hi ("-");
+		chro_nn (1, local_host);
 		// wholesale slaughterhouse
 		net_opt (PHYSOPT_RXOFF, NULL);
 		killall (rcv);
