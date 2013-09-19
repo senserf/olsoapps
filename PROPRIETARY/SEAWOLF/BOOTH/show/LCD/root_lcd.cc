@@ -140,7 +140,7 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 		if (!running (abeacon)) {
 			runfsm abeacon;
 		}
-		chro_hi ("FINI");
+		chro_hi ("END");
 		chro_nn (0, (word)(seconds() - hstart));
 	} else {
 		msg_alrm_out (PINDA_ID, 0, NULL);

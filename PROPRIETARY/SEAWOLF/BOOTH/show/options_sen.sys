@@ -8,7 +8,12 @@
 #ifdef DIAG_MESSAGES
 #undef DIAG_MESSAGES
 #endif
+
+#ifdef BOARD_CHRONOS
+#define DIAG_MESSAGES 0
+#else
 #define DIAG_MESSAGES 2
+#endif
 
 #ifdef RADIO_USE_LEDS
 #undef RADIO_USE_LEDS
