@@ -685,7 +685,7 @@ set B(CNT) 0
 set B(SCB) ""
 
 # long retransmit interval
-set B(RTL) 2000
+set B(RTL) 2048
 
 # short retransmit interval
 set B(RTS) 250
@@ -706,7 +706,7 @@ set B(PKT) 80
 
 proc bo_nop { args } { }
 
-proc bo_chks { wa } {
+proc boss_chks { wa } {
 
 	variable CRCTAB
 
@@ -826,7 +826,7 @@ proc bo_fnwrite { msg } {
 	if [catch {
 		puts -nonewline $B(SFD) \
 			"$B(IPR)[binary format c $ln]$msg[binary format s\
-				[bo_chks $msg]]"
+				[boss_chks $msg]]"
 		flush $B(SFD)
 	}] {
 		boss_close "BOSS write error"
@@ -895,7 +895,17 @@ proc bo_write { msg { byp 0 } } {
 	bo_send
 }
 
-proc bo_rawread { } {
+proc bo_timeout { } {
+
+	variable B
+
+	if { $B(TIM) != "" } {
+		bo_rawread 1
+		set B(TIM) ""
+	}
+}
+
+proc bo_rawread { { tm 0 } } {
 #
 # Called whenever data is available on the UART (mode S)
 #
@@ -922,15 +932,17 @@ proc bo_rawread { } {
 
 			if { $chunk == "" } {
 				# check for timeout
-				if { $B(TIM) != "" } {
+				if $tm {
 					# reset
-					catch { after cancel $B(TIM) }
-					set B(TIM) ""
 					set B(STA) 0
 				} elseif { $B(STA) != 0 } {
 					# something has started, set up timer
-					set B(TIM) \
-				            [after $B(PKT) [lize bo_rawread]]
+					# if not running already
+					if { $B(TIM) == "" } {
+						set B(TIM) \
+				            	    [after $B(PKT) \
+							[lize bo_timeout]]
+					}
 				}
 				return $void
 			}
@@ -1074,9 +1086,11 @@ proc bo_receive { } {
 # Handle a received packet
 #
 	variable B
+	
+	# dmp "RCV" $B(BUF)
 
 	# validate CRC
-	if [bo_chks $B(BUF)] {
+	if [boss_chks $B(BUF)] {
 		return
 	}
 
@@ -1167,6 +1181,12 @@ proc boss_reset { } {
 
 	# current
 	set B(CUR) 0
+
+	if { $B(SCB) != "" } {
+		# abort the callback
+		catch { after cancel $B(SCB) }
+		set B(SCB) ""
+	}
 }
 
 proc boss_init { ufd mpl { clo "" } { emu 0 } } {
@@ -1227,7 +1247,9 @@ proc boss_oninput { { fun "" } } {
 	set B(DFN) $fun
 }
 
-proc boss_trigger { } { set ::BOSS::B(OBS) $::BOSS::B(OBS) }
+proc boss_trigger { } {
+	set ::BOSS::B(OBS) $::BOSS::B(OBS)
+}
 
 proc boss_wait { } {
 
@@ -1326,6 +1348,28 @@ proc boss_send { buf { urg 0 } } {
 	boss_trigger
 }
 
+proc boss_timeouts { slow { fast 0 } } {
+#
+# Sets the timeouts:
+#
+#	slow	periodic ACKS
+#	fast	nack after unexpected packet
+#
+	variable B
+
+	if { $slow == 0 } {
+		set slow 1000000000
+	}
+	set B(RTL) $slow
+	if $fast {
+		set B(RTS) $fast
+	}
+
+	if { $B(SCB) != "" } {
+		bo_send
+	}
+}
+
 namespace export boss_*
 
 }
@@ -1352,6 +1396,10 @@ package require unames
 
 namespace eval AUTOCONNECT {
 
+variable ACB
+
+array set ACB { CLO "" CBK "" }
+
 proc gize { fun } {
 
 	if { $fun != "" && [string range $fun 0 1] != "::" } {
@@ -1375,7 +1423,7 @@ proc autocn_heartbeat { } {
 	incr ACB(LRM)
 }
 
-proc autocn_start { op cl hs hc cc { po "" } } {
+proc autocn_start { op cl hs hc cc { po "" } { dl "" } } {
 #
 # op - open function
 # cl - close function
@@ -1383,6 +1431,7 @@ proc autocn_start { op cl hs hc cc { po "" } } {
 # hc - handshake condition (if true, handshake has been successful)
 # cc - connection condition (if false, connection has been broken)
 # po - poll function (to kick the node if no heartbeat)
+# dl - explicit device list
 # 
 	variable ACB
 
@@ -1392,6 +1441,9 @@ proc autocn_start { op cl hs hc cc { po "" } } {
 	set ACB(HSC) [gize $hc]
 	set ACB(CNC) [gize $cc]
 	set ACB(POL) [gize $po]
+	set ACB(DLI) $dl
+
+	# trc "ACN START: $ACB(OPE) $ACB(CLO) $ACB(HSH) $ACB(HSC) $ACB(CNC) $ACB(POL) $ACB(DLI)"
 
 	# last device scan time
 	set ACB(LDS) 0
@@ -1403,7 +1455,34 @@ proc autocn_start { op cl hs hc cc { po "" } } {
 	set ACB(RRM) -1
 	set ACB(LRM) -1
 
-	ac_callback
+	if { $ACB(CBK) != "" } {
+		# a precaution
+		catch { after cancel $ACB(CBK) }
+	}
+	set ACB(CBK) [after 10 [lize ac_callback]]
+}
+
+proc autocn_stop { } {
+#
+# Stop the callback and disconnect
+#
+	variable ACB
+
+	if { $ACB(CBK) != "" } {
+		catch { after cancel $ACB(CBK) }
+		set ACB(CBK) ""
+	}
+
+	if { $ACB(CLO) != "" } {
+		$ACB(CLO)
+	}
+}
+
+proc ac_again { d } {
+
+	variable ACB
+
+	set ACB(CBK) [after $d [lize ac_callback]]
 }
 
 proc ac_callback { } {
@@ -1415,9 +1494,11 @@ proc ac_callback { } {
 
 	# trc "AC S=$ACB(STA)"
 	if { $ACB(STA) == "R" } {
+		# CONNECTED
 		if ![$ACB(CNC)] {
+			# just got disconnected
 			set ACB(STA) "L"
-			after 100 [lize ac_callback]
+			ac_again 100
 			return
 		}
 		# we are connected, check for heartbeat
@@ -1426,50 +1507,64 @@ proc ac_callback { } {
 			if { $ACB(POL) != "" } { $ACB(POL) }
 			set ACB(STA) "T"
 			set ACB(FAI) 0
-			after 1000 [lize ac_callback]
+			ac_again 1000
 			return
 		}
 		set ACB(RRM) $ACB(LRM)
-		# we are connected, no need to panic
-		after 2000 [lize ac_callback]
+		# we are still connected, no need to panic
+		ac_again 2000
 		return
 	}
 
 	if { $ACB(STA) == "T" } {
-		# counting heartbeat failures
+		# HEARTBEAT FAILURE
 		if ![$ACB(CNC)] {
+			# disconnected
 			set ACB(STA) "L"
-			after 100 [lize ac_callback]
+			ac_again 100
 			return
 		}
 		if { $ACB(RRM) == $ACB(LRM) } {
+			# count failures
 			if { $ACB(FAI) == 5 } {
 				set ACB(STA) "L"
 				$ACB(CLO)
-				after 100 [lize ac_callback]
+				ac_again 100
 				return
 			}
 			incr ACB(FAI)
 			if { $ACB(POL) != "" } { $ACB(POL) }
-			after 600 [lize ac_callback]
+			ac_again 600
 			return
 		}
 		set ACB(RRM) $ACB(LRM)
 		set ACB(STA) "R"
-		after 2000 [lize ac_callback]
+		ac_again 2000
 		return
 	}
 	
 	#######################################################################
 
 	if { $ACB(STA) == "L" } {
-		# Main loop
+		# CONNECTING
 		set tm [clock seconds]
 		if { $tm > [expr $ACB(LDS) + 5] } {
 			# last scan for new devices was done more than 5 sec
 			# ago, rescan
-			unames_scan
-			set ACB(DVS) [lindex [unames_choice] 0]
+			if { $ACB(DLI) != "" } {
+				set ACB(DVS) ""
+				foreach d $ACB(DLI) {
+					if [catch { expr $d } n] {
+						lappend ACB(DVS) $d
+					} else {
+						lappend ACB(DVS) \
+							[unames_ntodev $d]
+					}
+				}
+			} else {
+				unames_scan
+				set ACB(DVS) [lindex [unames_choice] 0]
+			}
 			set ACB(DVL) [llength $ACB(DVS)]
 			set ACB(LDS) $tm
 			# trc "AC RESCAN: $ACB(DVS), $ACB(DVL)"
@@ -1477,59 +1572,60 @@ proc ac_callback { } {
 		# index into the device table
 		set ACB(CUR) 0
 		set ACB(STA) "N"
-		after 250 [lize ac_callback]
+		ac_again 250
 		return
 	}
 
 	#######################################################################
 
 	if { $ACB(STA) == "N" } {
+		# TRYING NEXT DEVICE
 		# trc "AC N CUR=$ACB(CUR), DVL=$ACB(DVL)"
 		# try to open a new UART
 		if { $ACB(CUR) >= $ACB(DVL) } {
 			if { $ACB(DVL) == 0 } {
 				# no devices
 				set ACB(LDS) 0
-				after 1000 [lize ac_callback]
+				ac_again 1000
 				return
 			}
 			set ACB(STA) "L"
-			after 100 [lize ac_callback]
+			ac_again 100
 			return
 		}
 
 		set dev [lindex $ACB(DVS) $ACB(CUR)]
 		incr ACB(CUR)
 		if { [$ACB(OPE) $dev] == 0 } {
-			after 100 [lize ac_callback]
+			ac_again 100
 			return
 		}
 
 		$ACB(HSH)
 
 		set ACB(STA) "C"
-		after 2000 [lize ac_callback]
+		ac_again 2000
 		return
 	}
 
 	if { $ACB(STA) == "C" } {
-		# check if handshake established
+		# WAITING FOR HANDSHAKE
 		if [$ACB(HSC)] {
-			# yep, assume connection OK
+			# established, assume connection OK
 			set ACB(STA) "R"
-			after 2000 [lize ac_callback]
+			ac_again 2000
 			return
 		}
 		# sorry, try another one
 		# trc "AC C -> CLOSING"
 		$ACB(CLO)
 		set ACB(STA) "N"
-		after 100 [lize ac_callback]
+		ac_again 100
 		return
 	}
 
 	set ACB(STA) "L"
-	after 1000 [lize ac_callback]
+	ac_again 1000
 }
 
 namespace export autocn_*
@@ -1537,7 +1633,6 @@ namespace export autocn_*
 }
 
 namespace import ::AUTOCONNECT::*
-
 package require autoconnect
 
 ###############################################################################
