@@ -11,7 +11,7 @@ extern tagShortType monArray [];
 extern nbuComType   nbuArray [];
 
 extern word tag_eventGran;
-extern word app_flags;
+extern fl_t app_flags;
 
 extern profi_t profi_att, p_inc, p_exc;
 extern char desc_att [PEG_STR_LEN +1];
@@ -21,7 +21,7 @@ extern char d_alrm [PEG_STR_LEN +1];
 extern char nick_att [NI_LEN +1];
 extern ledStateType led_state;
 
-extern /* true*/ const char oss_out_f_str[], d_event[][12], d_nbu[][12],
+extern trueconst char oss_out_f_str[], d_event[][12], d_nbu[][12],
        welcome_str[], hs_str[], ill_str[], bad_str[], stats_str[],
        profi_ascii_def[], profi_ascii_raw[], alrm_ascii_def[],
        alrm_ascii_raw[], nvm_ascii_def[], nvm_local_ascii_def[],

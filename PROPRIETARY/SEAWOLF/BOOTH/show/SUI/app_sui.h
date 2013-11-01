@@ -11,11 +11,6 @@
 #include "app.h"
 #include "msg_tarp.h"
 
-#define DEF_APP_FLAGS 	0x0001
-#define is_autoack	(app_flags & 1)
-#define set_autoack	(app_flags |= 1)
-#define clr_autoack	(app_flags &= ~1)
-
 #define LI_MAX  10
 
 #define INFO_DESC	1
@@ -43,6 +38,14 @@ typedef enum {
 	fadingReportedTag, fadingConfirmedTag, fadingMatchedTag,
 	goneTag, sumTag
 } tagStateType;
+
+typedef struct flagsStruct {
+	word	autoack :1;
+	word	oss_out :2;
+	word	spare	:5;
+	word	freq_p	:4;
+	word	freq_a	:4;
+} fl_t;
 
 typedef struct nvmDataStruct {
 	word	id;

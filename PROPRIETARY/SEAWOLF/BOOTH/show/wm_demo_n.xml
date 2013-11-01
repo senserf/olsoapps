@@ -4,7 +4,7 @@
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
 
-    <xi:include href="CHANNELS/tabulated.xml"/>
+    <xi:include href="neutrino.xml"/>
 
     <nodes>
 	<defaults>

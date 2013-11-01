@@ -9,6 +9,7 @@
 
 #include "app_sui.h"
 
+void	oss_over_profi_out (char * buf, word rssi);
 void 	oss_profi_out (word ind, word list);
 void	oss_data_out (word ind);
 void 	oss_alrm_out (char * buf);

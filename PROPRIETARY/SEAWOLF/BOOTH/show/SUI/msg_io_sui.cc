@@ -46,7 +46,7 @@ void msg_data_in (char * buf) {
 	if (tagArray[tagIndex].state == confirmedTag)
 		set_tagState(tagIndex, matchedTag, YES);
 
-	if (is_autoack) {
+	if (app_flags.autoack) {
 		if (tagArray[tagIndex].state == reportedTag)
 			set_tagState (tagIndex, confirmedTag, NO);
 
@@ -135,6 +135,8 @@ void msg_profi_in (char * buf, word rssi) {
 			tagArray[tagIndex].rssi = rssi; // rssi not passed in
 			if (nbu == 1)
 				tagArray[tagIndex].info |= INFO_NBUZZ;
+		} else {
+			oss_over_profi_out (buf, rssi);
 		}
 
 		return;

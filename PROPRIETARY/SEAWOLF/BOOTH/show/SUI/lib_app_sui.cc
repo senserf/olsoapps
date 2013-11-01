@@ -134,7 +134,8 @@ int insert_tag (char * buf) {
 		}
 		i++;
 	}
-	app_diag_S ("Failed tag (%u) insert", in_header(buf, snd));
+	// caller will take care of it
+	// app_diag_S ("Failed tag (%u) insert", in_header(buf, snd));
 	return -1;
 }
 

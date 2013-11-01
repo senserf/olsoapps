@@ -40,8 +40,9 @@ static word hunt_ind = 0;
 #define WIN_RSSI	200
 #define HUNT_END	3
 
+word	pinda_id = PINDA_ID;
 word	host_pl	= 7;
-word    app_flags               = DEF_APP_FLAGS;
+fl_t    app_flags;
 word    tag_eventGran           = 4;  // in seconds
 
 tagDataType     tagArray [LI_MAX];
@@ -84,15 +85,15 @@ fsm mbeacon {
 
 fsm abeacon (word target) {
 
-    state START:
-	if (local_host == PINDA_ID) 
-		delay (60000 + (rnd() % 2048), SEND);
-    	else
-		delay (2048 + rnd() % 2048, SEND); // 2 - 4s
-	release;
+	state START:
+		if (app_flags.freq_a == 0)
+			finish;
+		
+		delay (app_flags.freq_a * 1024 + rnd() % 2048, SEND);
+		release;
 
     initial state SEND:
-		msg_alrm_out (target, local_host == PINDA_ID ? 9 : 0, NULL);
+		msg_alrm_out (target, local_host == pinda_id ? 9 : 0, NULL);
 		proceed (START);
 
 }
@@ -158,12 +159,14 @@ static void process_incoming (word state, char * buf, word size, word rssi) {
 			// same things go up to the phone (BT) and to PINDA
 			strcpy (in_alrm(buf, desc), d_alrm);
 
-			if (hunting >=2 ) {
-				if (!running (abeacon)) {
-					runfsm abeacon (PINDA_ID);
+			if (pinda_id) {
+				if (hunting >=2 ) {
+					if (!running (abeacon)) {
+						runfsm abeacon (pinda_id);
+					}
+				} else {
+					msg_alrm_out (pinda_id, 9, NULL);
 				}
-			} else {
-				msg_alrm_out (PINDA_ID, 9, NULL);
 			}
 		}
 			
@@ -304,7 +307,10 @@ fsm audit {
 			form (d_alrm, "!TH!&%u&%u&%u&%u&%u",
 					(word)(seconds() - hstart),
 					0, 0, HUNT_END - hunt_ind, 0);
-			msg_alrm_out (PINDA_ID, 0, NULL);
+					
+			if (pinda_id)
+				msg_alrm_out (pinda_id, 0, NULL);
+				
 			oss_alrm_out (NULL);
 		}
 		
@@ -402,8 +408,13 @@ fsm root {
 	strncpy (d_biz, _d_biz_ini, PEG_STR_LEN);
 	strncpy (d_priv, _d_priv_ini, PEG_STR_LEN);
 #endif
-		net_id = DEF_NID;
 
+		net_id = DEF_NID;
+		app_flags.autoack = 1;
+		app_flags.oss_out = 2; // full
+		app_flags.freq_p = 2;
+		app_flags.freq_a = 0;
+		
 		//tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
 		tarp_ctrl.param = 0xA2; // level 2, rec 2, slack 1, fwd off(!?)
 		//we're departing from all forwarders beacause of flooding
@@ -423,14 +434,6 @@ fsm root {
 			app_diag_F ("net_init failed");
 			reset();
 		}
-		net_opt (PHYSOPT_SETSID, &net_id);
-		net_opt (PHYSOPT_SETPOWER, &host_pl);
-		runfsm rcv;
-		runfsm cmd_in;
-		runfsm audit;
-		led_state.color = LED_G;
-		led_state.state = LED_ON;
-		leds (LED_G, LED_ON);
 
 		if (ee_read (NVM_OSET, (byte *)&nvm_dat, NVM_SLOT_SIZE)) {
 			app_diag_S ("Can't read nvm");
@@ -472,6 +475,15 @@ fsm root {
 #endif
 		  }
 		}
+
+		net_opt (PHYSOPT_SETSID, &net_id);
+		net_opt (PHYSOPT_SETPOWER, &host_pl);
+		runfsm rcv;
+		runfsm cmd_in;
+		runfsm audit;
+		led_state.color = LED_G;
+		led_state.state = LED_ON;
+		leds (LED_G, LED_ON);
 
 		if (local_host != 0xDEAD &&
 				(profi_att & PROF_KIOSK) == 0 &&
@@ -537,6 +549,9 @@ much sense
 			case 'a': proceed RS_ABEAC;
 			case 'H': proceed RS_HUNT;
 			case 'U': proceed RS_AUTO;
+			case 'F': proceed RS_FREQS;
+			case 'O': proceed RS_OSSI;
+			case 'K': proceed RS_PINDA;
 			default:
 				form (ui_obuf, ill_str, cmd_line);
 				proceed RS_UIOUT;
@@ -1173,16 +1188,40 @@ StoreAll:
 		proceed RS_UIOUT;
 		
 	state RS_AUTO:
-		if (scan (cmd_line +1, "%u", &w1) > 0) {
-			if (w1)
-				set_autoack;
-			else
-				clr_autoack;
-		}
+		if (scan (cmd_line +1, "%u", &w1) > 0)
+			app_flags.autoack = w1 ? 1 : 0;
+
 		form (ui_obuf, "Automatch is %s\r\n",
-				is_autoack ? "on" : "off");
+				app_flags.autoack ? "on" : "off");
 		proceed RS_UIOUT;
 
+	state RS_OSSI:
+		if (scan (cmd_line +1, "%u", &w1) > 0 && w1 < 3)
+			app_flags.oss_out = w1;
+
+		form (ui_obuf, "OSSI: %u\r\n", app_flags.oss_out);
+		proceed RS_UIOUT;
+
+	state RS_PINDA:
+		if (scan (cmd_line +1, "%u", &w1) > 0)
+			pinda_id = w1;
+
+		form (ui_obuf, "Kiosk: %u\r\n", pinda_id);
+		proceed RS_UIOUT;
+
+	state RS_FREQS:
+		if ((cmd_line[1] == 'p' || cmd_line[1] == 'a') &&
+				scan (cmd_line +2, "%u", &w1) > 0 && w1 < 61) {
+			if (cmd_line[1] == 'p')
+				app_flags.freq_p = w1;
+			else
+				app_flags.freq_a = w1;
+		}
+
+		form (ui_obuf, "Freqs p(%u) a(%u)\r\n",
+			app_flags.freq_p, app_flags.freq_a);
+		proceed RS_UIOUT;
+		
 	state RS_UIOUT:
 		ser_out (RS_UIOUT, ui_obuf);
 		proceed RS_FREE;

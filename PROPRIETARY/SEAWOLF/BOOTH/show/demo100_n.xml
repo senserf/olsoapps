@@ -1,10 +1,10 @@
-<!-- War Museum demo -->
+<!-- 100+ node demo -->
 
-<network nodes="18">
+<network nodes="120">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
 
-    <xi:include href="CHANNELS/tabulated.xml"/>
+    <xi:include href="neutrino.xml"/>
 
     <nodes>
 	<defaults>
@@ -26,9 +26,12 @@
 	    </leds>
 	    <eeprom size="524288"></eeprom>
 	    <iflash size="256,2"></iflash>
-	    <uart rate="9600" bsize="12">
-		<input source="socket"></input>
-		<output target="socket" type="held"></output>
+	    <uart rate="115200" bsize="64,2400">
+			<input source="socket"></input>
+			<!-- NOT held
+			<output target="socket" type="held"></output>
+			-->
+			<output target="socket"></output>
 	    </uart>
 		<sensors>
 			<input source="socket"></input>
@@ -40,7 +43,10 @@
 			<buttons>0 1 2 3 4</buttons>
 		</pins>
 		<emul>
+			<!-- NOT held
 			<output target="socket" type="held"></output>
+			-->
+			<output target="socket"></output>
 		</emul>
 	    <preinit tag="PROFI" type="word">0xFF00</preinit>
 	    <preinit tag="PINC" type="word">0xFFFF</preinit>
@@ -58,6 +64,24 @@
 		<color solid="tomato1"/>
 	    <preinit tag="NICK" type="string">Kiosk</preinit>
 	    <preinit tag="DESC" type="string">Combat RnD</preinit>
+	    <preinit tag="PROFI" type="word">0xFF04</preinit>
+	    <preinit tag="PEXC" type="word">0x0020</preinit>
+	</node>
+
+	<node number="18" type="sui" start="on" hid="0xBACA0062">
+	    <location>100.0 5.0</location>
+		<color solid="tomato1"/>
+	    <preinit tag="NICK" type="string">Kiosk2</preinit>
+	    <preinit tag="DESC" type="string">Avaya Kiosk</preinit>
+	    <preinit tag="PROFI" type="word">0xFF04</preinit>
+	    <preinit tag="PEXC" type="word">0x0020</preinit>
+	</node>
+	
+	<node number="19" type="sui" start="on" hid="0xBACA0061">
+	    <location>115.0 15.0</location>
+		<color solid="tomato1"/>
+	    <preinit tag="NICK" type="string">Kiosk3</preinit>
+	    <preinit tag="DESC" type="string">Another Kiosk</preinit>
 	    <preinit tag="PROFI" type="word">0xFF04</preinit>
 	    <preinit tag="PEXC" type="word">0x0020</preinit>
 	</node>
@@ -192,5 +216,8 @@
 	    <preinit tag="PROFI" type="word">0x0F01</preinit>
 	    <preinit tag="PEXC" type="word">0x0028</preinit>
 	</node>
+
+	<xi:include href="add100.xml"/>
+
     </nodes>
 </network>

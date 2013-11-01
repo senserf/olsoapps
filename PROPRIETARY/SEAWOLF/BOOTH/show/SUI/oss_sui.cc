@@ -18,17 +18,23 @@
 // OSS reporting
 // =============
 fsm oss_out (char*) {
-        state OO_RETRY:
+    state OO_RETRY:
+		if (app_flags.oss_out == 0) {
+			ufree (data);
+			finish;
+		}
+		
 		if (data == NULL)
 			app_diag_S (oss_out_f_str);
 		else
 			ser_outb (OO_RETRY, data);
-                finish;
+
+        finish;
 }
 
 
 
-static char * stateName (word state) {
+static const char * stateName (word state) {
 	switch ((tagStateType)state) {
 		case noTag:
 			return "noTag";
@@ -55,7 +61,7 @@ static char * stateName (word state) {
 	}
 }
 #if 0
-static char * locatName (word rssi, word pl) { // ignoring pl 
+static const char * locatName (word rssi, word pl) { // ignoring pl 
 	switch (rssi) {
 		case 3:
 			return "proxy";
@@ -69,7 +75,7 @@ static char * locatName (word rssi, word pl) { // ignoring pl
 	return "rssi?";
 }
 #endif
-static char * descName (word info) {
+static const char * descName (word info) {
 	if (info & INFO_PRIV) return "private";
 	if (info & INFO_BIZ) return "business";
 	if (info & INFO_DESC) return "intro";
@@ -77,7 +83,7 @@ static char * descName (word info) {
 	return "noDesc";
 }
 
-static char * descMark (word info, word list) {
+static const char * descMark (word info, word list) {
 
 	if (list)
 		return "LT";
@@ -87,6 +93,23 @@ static char * descMark (word info, word list) {
 	if (info & INFO_DESC) return "DESC";
 	// noombuzz is independent...
 	return "HELLO";
+}
+
+void oss_over_profi_out (char * buf, word rssi) {
+	char * lbuf;
+
+	if (app_flags.oss_out < 2)
+		return;
+	
+	lbuf = form (NULL, profi_ascii_def, "DESC",
+		in_profi(buf, pl), rssi, in_profi(buf, nick),
+		in_header(buf, snd), 0, "NEW",
+		in_profi(buf, profi), "intro", in_profi(buf, desc));
+	
+	if (runfsm oss_out (lbuf) == 0 ) {
+		app_diag_S (oss_out_f_str);
+		ufree (lbuf);
+    }
 }
 
 // arg. list indicates calls from 'lt'; kludgy wrap for 'LT' for Android stuff

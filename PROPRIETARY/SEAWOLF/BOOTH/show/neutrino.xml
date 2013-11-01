@@ -1,0 +1,15 @@
+<channel bn="-110.0dBm">
+	<propagation type="neutrino" range="500m"/>
+	<frame>
+		physical bits per byte      = 12
+		extra framing bits          = 0
+	</frame>
+	<rates boost="no">
+		0	  4800
+		1	 10000
+		2	 38400
+		3       200000
+	</rates>
+	<channels number="255">
+	</channels>
+</channel>
