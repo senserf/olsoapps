@@ -20,7 +20,7 @@ void nbuVec (char * s, byte b) {
 	} while (--i >= 0);
 }
 
-int find_tag (word tag) {
+sint find_tag (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (tagArray[i].id == tag) {
@@ -32,7 +32,7 @@ int find_tag (word tag) {
 }
 
 // do NOT combine: real should be quite different
-int find_ign (word tag) {
+sint find_ign (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (ignArray[i].id == tag) {
@@ -43,7 +43,7 @@ int find_ign (word tag) {
 	return -1;
 }
 
-int find_nbu (word tag) {
+sint find_nbu (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (nbuArray[i].id == tag) {
@@ -54,7 +54,7 @@ int find_nbu (word tag) {
 	return -1;
 }
 
-int find_mon (word tag) {
+sint find_mon (word tag) {
 	word i = 0;
 	while (i < LI_MAX) {
 		if (monArray[i].id == tag) {
@@ -114,32 +114,53 @@ void set_tagState (word i, tagStateType state, Boolean updEvTime) {
 	app_diag_D ("set_tagState in %u to %u", i, state);
 }
 
-int insert_tag (char * buf) {
-	int i = 0;
+static void fill_in (char * buf, word i) {
+	tagArray[i].id = in_header(buf, snd);
+	tagArray[i].profi = in_profi(buf, profi);
+	set_tagState (i, newTag, YES);
+	strncpy (tagArray[i].nick, in_profi(buf, nick), NI_LEN);
+	strncpy (tagArray[i].desc, in_profi(buf, desc), 
+			PEG_STR_LEN);
+	tagArray[i].info |= INFO_DESC;
+	tagArray[i].pl = in_profi(buf, pl);
+	tagArray[i].intim = in_header(buf, rcv) != 0 ? 1 : 0;
+}
+
+sint insert_tag (char * buf) {
+	sint i = 0;
+	sint virti = LI_MAX;
+	Boolean dongle = !(in_profi(buf, profi) & PROF_VIRT);
 
 	while (i < LI_MAX) {
 		if (tagArray[i].id == 0) {
-			tagArray[i].id = in_header(buf, snd);
-			tagArray[i].profi = in_profi(buf, profi);
-			set_tagState (i, newTag, YES);
-			strncpy (tagArray[i].nick, in_profi(buf, nick), NI_LEN);
-			strncpy (tagArray[i].desc, in_profi(buf, desc), 
-					PEG_STR_LEN);
-			tagArray[i].info |= INFO_DESC;
-			tagArray[i].pl = in_profi(buf, pl);
-			tagArray[i].intim = in_header(buf, rcv) != 0 ? 1 : 0;
+			fill_in (buf, i);
 			app_diag_D ("Inserted tag %u at %u",
 					in_header(buf, snd), i);
 			return i;
 		}
+		if (dongle && virti == LI_MAX &&
+				(tagArray[i].profi & PROF_VIRT))
+			virti = i;
+			
 		i++;
 	}
+	
+	if (virti != LI_MAX) { // we'll force out virtual for real dongle
+		set_tagState (virti, forcedOutTag, NO);
+		oss_profi_out (virti, 0);
+		init_tag (virti);
+		fill_in (buf, virti);
+		app_diag_D ("ForcedIn tag %u at %u",
+			in_header(buf, snd), virti);
+		return virti;
+	}
+	
 	// caller will take care of it
 	// app_diag_S ("Failed tag (%u) insert", in_header(buf, snd));
 	return -1;
 }
 
-int insert_nbu (word id, word w, word v, word h, char *s) {
+sint insert_nbu (word id, word w, word v, word h, char *s) {
 	int i = 0;
 
 	while (i < LI_MAX) {
@@ -159,7 +180,7 @@ int insert_nbu (word id, word w, word v, word h, char *s) {
 	return -1;
 }
 
-int insert_ign (word id, char * s) {
+sint insert_ign (word id, char * s) {
 	int i = 0;
 
 	while (i < LI_MAX) {
@@ -176,7 +197,7 @@ int insert_ign (word id, char * s) {
 	return -1;
 }
 
-int insert_mon (word id, char * s) {
+sint insert_mon (word id, char * s) {
 	int i = 0; 
 
 	while (i < LI_MAX) {
@@ -241,6 +262,7 @@ void check_tag (word i) {
 			break;
 
 		case goneTag:
+		case forcedOutTag:
 			app_diag_S ("Gone?? %u", tagArray[i].id);
 			init_tag (i);
 			//oss_profi_out (i, 0);
@@ -272,7 +294,7 @@ void check_tag (word i) {
 	}
 }
 
-int check_msg_size (char * buf, word size) {
+sint check_msg_size (char * buf, word size) {
 	word expSize;
 	
 	// for some msgTypes, it'll be less trivial

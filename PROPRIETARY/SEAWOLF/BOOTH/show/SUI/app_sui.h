@@ -36,7 +36,7 @@
 typedef enum {
 	noTag, newTag, reportedTag, confirmedTag, matchedTag,
 	fadingReportedTag, fadingConfirmedTag, fadingMatchedTag,
-	goneTag, sumTag
+	goneTag, sumTag, forcedOutTag
 } tagStateType;
 
 typedef struct flagsStruct {

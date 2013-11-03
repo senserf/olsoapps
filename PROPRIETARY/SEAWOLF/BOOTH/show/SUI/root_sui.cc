@@ -411,7 +411,7 @@ fsm root {
 
 		net_id = DEF_NID;
 		app_flags.autoack = 1;
-		app_flags.oss_out = 2; // full
+		app_flags.oss_out = 1; // no NEW (2 would be full out)
 		app_flags.freq_p = 2;
 		app_flags.freq_a = 0;
 		
@@ -497,7 +497,7 @@ fsm root {
 			tarp_ctrl.param |= 1; // fwd ON
 #if 0
 if we want to do that, abeacon should be taking a uniquw string (not d_alrm).
-However, since PINDA is not mute, this !KI! abeacon doesn't make
+However, since PINDA is not mute, this !KI! abeacon doesn''t make
 much sense
 
 		} else {

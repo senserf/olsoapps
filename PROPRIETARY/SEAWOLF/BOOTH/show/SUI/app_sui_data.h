@@ -31,22 +31,22 @@ extern trueconst char oss_out_f_str[], d_event[][12], d_nbu[][12],
 
 // Methods/functions: need no EXTERN
 
-int 	check_msg_size (char * buf, word size);
+sint 	check_msg_size (char * buf, word size);
 void 	check_tag (word i);
-int 	find_tag (word tag);
-int 	find_ign (word tag);
-int	find_mon (word tag);
-int	find_nbu (word tag);
+sint 	find_tag (word tag);
+sint 	find_ign (word tag);
+sint	find_mon (word tag);
+sint	find_nbu (word tag);
 // in app.h char * 	get_mem (word state, int len);
 void 	init_tag (word i);
 void	init_ign (word i);
 void	init_mon (word i);
 void	init_nbu (word i);
 void 	init_tags (void);
-int 	insert_tag (char * buf);
-int	insert_ign (word tag, char * nick);
-int	insert_mon (word tag, char * nick);
-int	insert_nbu (word id, word w, word v, word h, char * s);
+sint 	insert_tag (char * buf);
+sint	insert_ign (word tag, char * nick);
+sint	insert_mon (word tag, char * nick);
+sint	insert_nbu (word id, word w, word v, word h, char * s);
 void 	set_tagState (word i, tagStateType state, Boolean updEvTime);
 void	nbuVec (char *s, byte b);
 

@@ -56,6 +56,8 @@ static const char * stateName (word state) {
 			return "fadingMatched";
 		case matchedTag:
 			return "matched";
+		case forcedOutTag:
+			return "forcedOut";
 		default:
 			return "unknown?";
 	}

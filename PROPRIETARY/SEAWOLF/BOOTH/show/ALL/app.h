@@ -30,6 +30,7 @@ typedef word profi_t;
 #define PROF_RXOFF	16
 #define PROF_TAG	32
 #define PROF_HUNT	64
+#define PROF_VIRT	128
 
 //+++ "lib_app.c"
 // in lib_app.cc:
