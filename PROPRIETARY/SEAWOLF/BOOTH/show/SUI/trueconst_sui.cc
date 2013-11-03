@@ -4,7 +4,7 @@ trueconst char oss_out_f_str[] = "oss_out failed";
 
 trueconst char d_event[][12] = {
 	"_sui", "_lcd", "_kiosk", "_sens",
-	"+rxoff", "+tag", "+hunt", "+sp7",
+	"+rxoff", "+tag", "+hunt", "+virt",
 	"SPB", "IPV", "Combat", "Avaya",
 	"skiing", "golf", "triathlon", "fishing"};
 
@@ -34,7 +34,7 @@ trueconst char welcome_str[] = "***Booth 0.2***\r\n"
 	"\tinclude:\tpi[ |&||]<ABCD hex>\r\n\r\n"
 	"Help / bulk shows:\r\n"
 	"\tsHow\tsettings:\ths\r\n"
-	"\tsHow\tparams\t\thp\r\n"
+	"\tsHow\tparams\thp\r\n"
 	"\tsHow\tevent desc\the [ABCD hex [ABCD hex]]\r\n"
 	"\tsHow\tnbuZZ desc\thz [AB hex {AB hex]]\r\n"
 	"\tHelp\th\r\n\r\n"
@@ -44,7 +44,7 @@ trueconst char welcome_str[] = "***Booth 0.2***\r\n"
 	"\tAccept\t\tY <id>\r\n"
 	"\tReject\t\tN <id>\r\n"
 	"\tTargeted ping\tT <id>\r\n"
-	"\tBusiness\tB <id>\r\n"
+	"\tBusiness\t\tB <id>\r\n"
 	"\tPrivate\t\tP <id>\r\n"
 	"\tAlarm\t\tA <id> <level>\r\n"
 	"\tAlarm beac\ta [1|0] [<id>]\r\n"
@@ -54,10 +54,10 @@ trueconst char welcome_str[] = "***Booth 0.2***\r\n"
 	"\tErase\t\tE <id>\r\n\r\n"
 	"\tKiosk\t\tK <id>\r\n"
 	"\tFreqs\t\tF[p|a]<freq>\r\n"
-	"\tOSSI\t\tO <id>\r\n\r\n"
+	"\tOSSI\t\tO [0|1|2]\r\n\r\n"
 	"\tSave and reset\tq\r\n"
 	"\tClear and reset\tQ\r\n"
-	"\tList\r\n\t  nbuzz/tag/ign/mon\tL[z|t|i|m]\r\n"
+	"\tList nbuzz/tag/ign/mon\tL[z|t|i|m]\r\n"
 	"\tnbuZZ add\tZ+ <id> <what: 0|1> <why: AB hex> <dhook> <memo>\r\n"
 	"\tnbuZZ del\tZ- <id>\r\n"
 	"\tMonitor add\tM+ <id> <nick>\r\n"

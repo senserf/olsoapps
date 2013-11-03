@@ -3,6 +3,6 @@
 	<color solid="lightgreen"/>
 	<preinit tag="NICK" type="string">Noise</preinit>
 	<preinit tag="DESC" type="string">Background</preinit>
-	<preinit tag="PROFI" type="word">0x8601</preinit>
+	<preinit tag="PROFI" type="word">0x8681</preinit>
 	<preinit tag="PEXC" type="word">0x0028</preinit>
 </node>
