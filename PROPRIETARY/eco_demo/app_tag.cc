@@ -14,6 +14,10 @@
 #include "tarp.h"
 #include "storage.h"
 
+#if BVSHIFT_TH > 0
+#include "pinopts.h"
+#endif
+
 #ifdef __SMURPH__
 #define	SENSOR_LIST	present
 #else
@@ -716,6 +720,8 @@ fsm pong {
 
 fsm sens {
 
+	Boolean bvshift_done = NO;
+
 	entry SE_INIT:
 
 		powerup();
@@ -757,7 +763,7 @@ fsm sens {
 		lh_time = seconds();
 #ifdef SENSOR_LIST
 
-#ifdef BOARD_WARSAW_ILS
+#if defined (BOARD_WARSAW_ILS) || (BVSHIFT_TH > 0)
 #define SESL0	-2
 #define SESL1	-1
 #define SESL2	0
@@ -789,6 +795,15 @@ fsm sens {
 #undef SESL1
 #undef SESL2
 #undef SESL3
+
+#if BVSHIFT_TH > 0
+	if (!bvshift_done &&  sens_data.ee.sval[1] < BVSHIFT_TH) {
+		pin_write (9, 0);
+		bvshift_done = YES;
+		sens_data.ee.sval[3] = (word)(seconds() / 60);
+	}
+	sens_data.ee.sval[2] = bvshift_done;
+#endif
 
 #else
 		app_diag (D_WARNING, "FAKE SENSORS");
@@ -857,6 +872,11 @@ fsm root {
 
 	entry RS_INIT:
 		ui_obuf = get_mem (RS_INIT, UI_BUFLEN);
+
+#if BVSHIFT_TH > 0
+		pin_write (9, 1);
+#endif
+
 		if (ee_open ()) {
 			leds (LED_B, LED_ON);
 			leds (LED_R, LED_ON);

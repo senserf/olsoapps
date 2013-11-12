@@ -102,3 +102,6 @@
 // CHANNEL at comip.ca perpetual demo is 4
 #define RADIO_DEFAULT_CHANNEL   4
 
+#define BVSHIFT_TH	2300
+//#define BVSHIFT_TH	0
+

@@ -74,5 +74,10 @@
 		<module id="sensors">0.0 2.5</module>
 	    </ptracker>
 
+	    <pins  number="10">
+                <output target="socket"></output>
+                <input source="socket"></input>
+	    </pins>
+
 	    <highlight fg="red" bg="white">red green blue</highlight>
 	    <color solid="lightblue"/>
