@@ -1,0 +1,7 @@
+#define	NETWORK_ID	0xA1FA
+
+#define	PKTYPE_WAKE	1
+#define	PKTYPE_MOTION	2
+#define	PKTYPE_BUTTON	3
+
+#define	PKTYPE_ACK	1

@@ -1,0 +1,5 @@
+// #define	AP320_BROKEN
+#undef	UART_DRIVER
+#define	UART_DRIVER	0
+
+
