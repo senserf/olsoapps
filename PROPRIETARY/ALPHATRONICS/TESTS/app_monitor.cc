@@ -36,6 +36,17 @@ fsm root {
 		par = NETWORK_ID;
 		tcv_control (sfd, PHYSOPT_SETSID, &par);
 		tcv_control (sfd, PHYSOPT_ON, NULL);
+		leds (0, 2);
+		leds (1, 2);
+		leds (2, 2);
+		delay (3072, GO_AHEAD);
+		release;
+
+	state GO_AHEAD:
+
+		leds (0, 0);
+		leds (1, 0);
+		leds (2, 0);
 
 	state WPACKET:
 
