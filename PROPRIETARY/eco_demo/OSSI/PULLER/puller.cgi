@@ -11,9 +11,16 @@
 ###############################################################################
 
 package provide sdb 1.0
-#
-# Berkeley DB access functions
-#
+
+#############################################################################
+#                                                                           #
+# This is a trivial database of sensor samples whereby each dayload of data #
+# takes one file whose name looks like YYYYMMDD.                            #
+#                                                                           #
+# Copyright (C) 2009 Olsonet Communications Corporation                     #
+#                                                                           #
+#############################################################################
+
 namespace eval SDB {
 
 variable DB
