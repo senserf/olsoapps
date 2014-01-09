@@ -44,6 +44,8 @@ fsm root {
 
 	state GO_AHEAD:
 
+		ser_out (GO_AHEAD, "HELLO\r\n");
+
 		leds (0, 0);
 		leds (1, 0);
 		leds (2, 0);

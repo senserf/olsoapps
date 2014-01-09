@@ -1,0 +1,2 @@
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES	2

@@ -1,0 +1,5 @@
+#undef  UART_DRIVER
+#define	UART_DRIVER	1
+
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES	2
