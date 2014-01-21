@@ -15,6 +15,15 @@
 
 sint	sfd = -1, sfu = -1;
 
+fsm rreader {
+
+	state RD_LOOP:
+
+		address pkt = tcv_rnp (RD_LOOP, sfu);
+		tcv_endp (pkt);
+		proceed RD_LOOP;
+}
+
 fsm root {
 
 	word hst, tst;
@@ -39,7 +48,9 @@ fsm root {
 		leds (0, 2);
 		leds (1, 2);
 		leds (2, 2);
+		runfsm rreader;
 
+#if 0
 	state FIRST_MSG:
 
 		address pkt;
@@ -49,6 +60,15 @@ fsm root {
 		pkt [0] = 0x5555;
 		tcv_endp (pkt);
 
+	state FIRST_PKT:
+
+		address pkt;
+
+		pkt = tcv_wnp (FIRST_PKT, sfd, 8);
+		pkt [1] = 0x5555;
+		pkt [2] = 0xAAAA;
+		tcv_endp (pkt);
+#endif
 		delay (2048, GO_AHEAD);
 		release;
 
@@ -57,6 +77,7 @@ fsm root {
 		leds (0, 0);
 		leds (1, 0);
 		leds (2, 0);
+		proceed ACKNOWLEDGE;
 
 	state WPACKET:
 
@@ -67,12 +88,16 @@ fsm root {
 		len = tcv_left (pkt);
 
 		// These are only event packets of fixed length
+		// diag ("GOT PKT");
 
 		if (len < 14 || pkt [2] != PKTYPE_BUTTON) {
 			// Accept only these
+			// diag ("BAD PKT");
 			tcv_endp (pkt);
 			proceed WPACKET;
 		}
+
+		// diag ("OK");
 
 		rss = ((byte*)pkt) [len - 1];
 

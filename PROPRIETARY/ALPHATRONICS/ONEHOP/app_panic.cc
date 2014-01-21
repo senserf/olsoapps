@@ -48,7 +48,7 @@ fsm root {
 	state LOOP:
 
 		if (current) {
-			when (send_button (1, 0), DONE);
+			when (send_button (current, 0), DONE);
 		} else {
 			when (&current, LOOP);
 		}
