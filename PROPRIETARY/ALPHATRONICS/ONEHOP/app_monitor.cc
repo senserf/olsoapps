@@ -16,7 +16,9 @@
 sint	sfd = -1, sfu = -1;
 
 fsm rreader {
-
+//
+// Reads and absorbs stuff arriving on the UART without any interpretation
+//
 	state RD_LOOP:
 
 		address pkt = tcv_rnp (RD_LOOP, sfu);
@@ -27,7 +29,7 @@ fsm rreader {
 fsm root {
 
 	word hst, tst;
-	byte rss, but, add, vlt, glb;
+	byte rss, but, add, vlt, glb, xpw;
 
 	state RS_INIT:
 
@@ -90,7 +92,7 @@ fsm root {
 		// These are only event packets of fixed length
 		// diag ("GOT PKT");
 
-		if (len < 14 || pkt [2] != PKTYPE_BUTTON) {
+		if (len < 16 || pkt [2] != PKTYPE_BUTTON) {
 			// Accept only these
 			// diag ("BAD PKT");
 			tcv_endp (pkt);
@@ -119,6 +121,9 @@ fsm root {
 
 		vlt = (byte)((pkt [5] - 1000) >> 3);
 
+		// XMIT power
+		xpw = (byte)(pkt [6]);
+
 		// Local/global
 		glb = (but & 0x80) >> 7;
 		but &= 0x7F;
@@ -141,16 +146,19 @@ fsm root {
 
 		byte *pkt;
 
-		pkt = (byte*) tcv_wnp (SRENESAS, sfu, 9);
+		pkt = (byte*) tcv_wnp (SRENESAS, sfu, 13);
 
-		pkt [0] = 0x01;
-		pkt [1] = (byte) tst;
-		((address) pkt) [1] = hst;
-		pkt [4] = but;
-		pkt [5] = glb;
-		pkt [6] = vlt;
-		pkt [7] = add;
-		pkt [8] = rss;
+		pkt [ 0] = 0x01;
+		pkt [ 1] = 16;
+		((address) pkt) [1] = host_id;
+		((address) pkt) [2] = hst;
+		pkt [ 6] = but;
+		pkt [ 7] = glb;
+		pkt [ 8] = (byte) tst;
+		pkt [ 9] = vlt;
+		pkt [10] = rss;
+		pkt [11] = xpw;
+		pkt [12] = add;
 
 		tcv_endp ((address)pkt);
 

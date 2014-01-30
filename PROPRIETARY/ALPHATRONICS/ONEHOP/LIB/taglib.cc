@@ -129,7 +129,7 @@ fsm event_sender {
 		if (!WACK)
 			sameas DONE;
 
-		pkt = tcv_wnp (NEXT_TRY, SFD, 14);
+		pkt = tcv_wnp (NEXT_TRY, SFD, 16);
 
 		receiver_on ();
 
@@ -138,6 +138,9 @@ fsm event_sender {
 		pkt [3] = ECNT;
 		pkt [4] = (((word)BUTT) << 8) | MADD;
 		pkt [5] = voltage;
+
+#define	xmpower	7
+		pkt [6] = xmpower;
 
 		tcv_endp (pkt);
 
