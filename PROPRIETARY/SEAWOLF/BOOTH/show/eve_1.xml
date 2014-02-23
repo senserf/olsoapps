@@ -1,0 +1,236 @@
+<!-- 100+ node demo:
+ #0 (id 99) pivotal PINDA (Combat RnD) ON
+ #1 - #100 (id 0xBACADEAD) virtual nodes ON
+ 
+ from War Museum, all OFF, keep them for hybrid setups:
+ #101 (id 98) - Avaya Kiosk
+ #102 (id 99) - Another Kiosk
+ #103-106 (1000-1001) - Treasure Tags
+ #107-109 (2000-2002) - sensor nodes
+ #110,111 (10, 11) - vendors
+ #112-115 (100-103) - CHRONOS (VIP nodes)
+ #116-119 (200-203) - real dongles (with phones)
+ -->
+
+<network nodes="120">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+
+    <xi:include href="neutrino.xml"/>
+
+    <nodes>
+	<defaults>
+	    <memory>8666 bytes</memory>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			8msec
+			threshold		-109.0dBm
+	    	</lbt>
+	    	<backoff>
+			min			8msec
+			max			303msec
+	    	</backoff>
+	    </radio>
+	    <leds number="3">
+	    	<output target="socket"></output>
+	    </leds>
+	    <eeprom size="524288"></eeprom>
+	    <iflash size="256,2"></iflash>
+	    <uart rate="115200" bsize="64,2400">
+			<input source="socket"></input>
+			<!-- NOT held
+			<output target="socket" type="held"></output>
+			-->
+			<output target="socket"></output>
+	    </uart>
+		<sensors>
+			<input source="socket"></input>
+			<sensor number="-1" vsize="2" delay="0.01" init="2501"> 2600 </sensor>
+			<sensor number="0" vsize="2" delay="0.01" init="4000"> 4095 </sensor>
+		</sensors>
+		<pins number="5">
+			<input source="socket"></input>
+			<buttons>0 1 2 3 4</buttons>
+		</pins>
+		<emul>
+			<!-- NOT held
+			<output target="socket" type="held"></output>
+			-->
+			<output target="socket"></output>
+		</emul>
+	    <preinit tag="PROFI" type="word">0xFF00</preinit>
+	    <preinit tag="PINC" type="word">0xFFFF</preinit>
+	    <preinit tag="PEXC" type="word">0</preinit>
+	    <preinit tag="NICK" type="string">nick</preinit>
+	    <preinit tag="DESC" type="string">desc</preinit>
+	    <preinit tag="DBIZ" type="string">-</preinit>
+	    <preinit tag="DPRIV" type="string">-</preinit>
+		<highlight>magenta blue</highlight>
+	</defaults>
+	
+<!-- pivotal PINDA -->
+	<node number="0" type="sui" start="on" hid="0xBACA0063">
+	    <location>5.0 5.0</location>
+		<color solid="tomato1"/>
+	    <preinit tag="NICK" type="string">Kiosk</preinit>
+	    <preinit tag="DESC" type="string">Combat RnD</preinit>
+	    <preinit tag="PROFI" type="word">0xFF04</preinit>
+	    <preinit tag="PEXC" type="word">0x0020</preinit>
+	</node>
+
+<!-- other PINDAs -->
+	<node number="101" type="sui" start="off" hid="0xBACA0062">
+	    <location>150.0 5.0</location>
+		<color solid="tomato1"/>
+	    <preinit tag="NICK" type="string">Kiosk2</preinit>
+	    <preinit tag="DESC" type="string">Avaya Kiosk</preinit>
+	    <preinit tag="PROFI" type="word">0xFF04</preinit>
+	    <preinit tag="PEXC" type="word">0x0020</preinit>
+	</node>
+	
+	<node number="102" type="sui" start="off" hid="0xBACA0061">
+	    <location>150.0 10.0</location>
+		<color solid="tomato1"/>
+	    <preinit tag="NICK" type="string">Kiosk3</preinit>
+	    <preinit tag="DESC" type="string">Another Kiosk</preinit>
+	    <preinit tag="PROFI" type="word">0xFF04</preinit>
+	    <preinit tag="PEXC" type="word">0x0020</preinit>
+	</node>
+	
+<!-- Treasure Tags -->
+	<node number="103" type="sui" start="off" hid="0xBACA03E8">
+	    <location>150.0 100.0</location>
+	    <preinit tag="NICK" type="string">TT1000</preinit>
+	    <preinit tag="DESC" type="string">Treasure Tag 1000</preinit>
+	    <preinit tag="PROFI" type="word">0x0021</preinit>
+	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
+	</node>
+	<node number="104" type="sui" start="off" hid="0xBACA03E9">
+	    <location>150.0 95.0</location>
+	    <preinit tag="NICK" type="string">TT1001</preinit>
+	    <preinit tag="DESC" type="string">Treasure Tag 1001</preinit>
+	    <preinit tag="PROFI" type="word">0x0021</preinit>
+	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
+	</node>
+	<node number="105" type="sui" start="off" hid="0xBACA03EA">
+	    <location>150.0 90.0</location>
+	    <preinit tag="NICK" type="string">TT1002</preinit>
+	    <preinit tag="DESC" type="string">Treasure Tag 1002</preinit>
+	    <preinit tag="PROFI" type="word">0x0021</preinit>
+	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
+	</node>
+	<node number="106" type="sui" start="off" hid="0xBACA03EB">
+	    <location>150.0 90.0</location>
+	    <preinit tag="NICK" type="string">TT1003</preinit>
+	    <preinit tag="DESC" type="string">Treasure Tag 1003</preinit>
+	    <preinit tag="PROFI" type="word">0x0021</preinit>
+	    <preinit tag="PEXC" type="word">0xFFFF</preinit>
+	</node>
+
+<!-- Sensors (no preinits; just documenting data here) -->
+	<node number="107" type="sen" start="off" hid="0xBACA07D0">
+	    <location>150.0 140.0</location>
+	    <preinit tag="NICK" type="string">SENSOR</preinit>
+	    <preinit tag="DESC" type="string">-</preinit>
+	    <preinit tag="PROFI" type="word">0x0018</preinit>
+
+	</node>
+	<node number="108" type="sen" start="off" hid="0xBACA07D1">
+	    <location>150.0 145.0</location>
+	    <preinit tag="NICK" type="string">SENSOR</preinit>
+	    <preinit tag="DESC" type="string">-</preinit>
+	    <preinit tag="PROFI" type="word">0x0018</preinit>
+
+	</node>
+	<node number="109" type="sen" start="off" hid="0xBACA07D2">
+	    <location>150.0 150.0</location>
+	    <preinit tag="NICK" type="string">SENSOR</preinit>
+	    <preinit tag="DESC" type="string">-</preinit>
+	    <preinit tag="PROFI" type="word">0x0018</preinit>
+	</node>
+
+<!-- Vendors -->
+	<node number="110" type="sui" start="off" hid="0xBACA000A">
+	    <location>20.0 5.0</location>
+		<color solid="lightblue"/>
+	    <preinit tag="NICK" type="string">Combat</preinit>
+	    <preinit tag="DESC" type="string">Combat Booth</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	<node number="111" type="sui" start="off" hid="0xBACA000B">
+	    <location>35.0 5.0</location>
+		<color solid="lightblue"/>
+	    <preinit tag="NICK" type="string">Avaya</preinit>
+	    <preinit tag="DESC" type="string">Avaya Booth</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	
+<!-- LCDs -->
+    <node number="112" type="lcd" start="off" hid="0xBACA0064">
+            <location>5.0 35.0</location>
+	    <preinit tag="NICK" type="string">Rob F</preinit>
+	    <preinit tag="DESC" type="string">Rob Finucan, Combat Networks</preinit>
+	    <preinit tag="PROFI" type="word">0x8702</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+
+    <node number="113" type="lcd" start="off" hid="0xBACA0065">
+            <location>20.0 35.0</location>
+	    <preinit tag="NICK" type="string">Rejean</preinit>
+	    <preinit tag="DESC" type="string">Rejean Bourgault, Avaya</preinit>
+	    <preinit tag="PROFI" type="word">0x4B02</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	
+    <node number="114" type="lcd" start="off" hid="0xBACA0066">
+            <location>35.0 35.0</location>
+	    <preinit tag="NICK" type="string">Eric</preinit>
+	    <preinit tag="DESC" type="string">Eric Belliveau, Avaya</preinit>
+	    <preinit tag="PROFI" type="word">0x2B02</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	
+    <node number="115" type="lcd" start="off" hid="0xBACA0067">
+            <location>50.0 35.0</location>
+	    <preinit tag="NICK" type="string">Jean</preinit>
+	    <preinit tag="DESC" type="string">Jean Turgeon, Avaya</preinit>
+	    <preinit tag="PROFI" type="word">0xAB02</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	
+<!-- Phones -->
+	<node number="116" type="sui" start="off" hid="0xBACA00C8">
+	    <location>5.0 20.0</location>
+	    <preinit tag="NICK" type="string">Paul</preinit>
+	    <preinit tag="DESC" type="string">Paul Boone, Combat Networks</preinit>
+	    <preinit tag="PROFI" type="word">0x8601</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	<node number="117" type="sui" start="off" hid="0xBACA00C9">
+	    <location>20.0 20.0</location>
+	    <preinit tag="NICK" type="string">Rob D</preinit>
+	    <preinit tag="DESC" type="string">Rob Daleman, Avaya</preinit>
+	    <preinit tag="PROFI" type="word">0x4A01</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	<node number="118" type="sui" start="off" hid="0xBACA00CA">
+	    <location>35.0 20.0</location>
+	    <preinit tag="NICK" type="string">John</preinit>
+	    <preinit tag="DESC" type="string">John  McClelland, Rogers</preinit>
+	    <preinit tag="PROFI" type="word">0xA201</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+	<node number="119" type="sui" start="off" hid="0xBACA00CB">
+	    <location>50.0 20.0</location>
+	    <preinit tag="NICK" type="string">Karen</preinit>
+	    <preinit tag="DESC" type="string">Karen Moss, Avaya</preinit>
+	    <preinit tag="PROFI" type="word">0x0F01</preinit>
+	    <preinit tag="PEXC" type="word">0x0028</preinit>
+	</node>
+
+	<xi:include href="add100_1.xml"/>
+
+    </nodes>
+</network>

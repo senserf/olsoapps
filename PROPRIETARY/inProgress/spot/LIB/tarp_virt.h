@@ -1,20 +1,23 @@
 #ifndef __tarp_virt_h
 #define __tarp_virt_h
 /* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2011 			*/
+/* Copyright (C) Olsonet Communications, 2002 - 2014 			*/
 /* All rights reserved.							*/
 /* ==================================================================== */
 
-// Headers of TARP's virtual functions
+// TARP's virtual functions
 
 #include "tarp.h"
 
-idiosyncratic int tr_offset (headerType*);
-idiosyncratic Boolean msg_isBind (msg_t);
-idiosyncratic Boolean msg_isTrace (msg_t);
-idiosyncratic Boolean msg_isMaster (msg_t);
-idiosyncratic Boolean msg_isNew (msg_t);
-idiosyncratic Boolean msg_isClear (byte);
-idiosyncratic void set_master_chg ();
-idiosyncratic word  guide_rtr (headerType*);
+int tr_offset (headerType*);
+Boolean msg_isBind (msg_t);
+Boolean msg_isTrace (msg_t);
+Boolean msg_isMaster (msg_t);
+Boolean msg_isNew (msg_t);
+Boolean msg_isClear (byte);
+void set_master_chg ();
+word  guide_rtr (headerType*);
+
+//+++ tarp_virt.cc
+
 #endif

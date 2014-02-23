@@ -1,0 +1,222 @@
+<network nodes="54" radio="54">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer image="hq.gif" width="38.4" display="yes"></roamer>
+    </display>
+    <xi:include href="combReal_ch.xml"/>
+	
+    <nodes>
+	<defaults>
+		<xi:include href="tag.xml"/>
+		<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<node number="0" hid="0xBACA0064">
+		<location>1.0 6.1</location>
+	</node>
+	<node number="1" start="on" hid="0xBACA0065">
+		<location>12.2 5.8</location>
+	</node>
+	<node number="2" start="on" hid="0xBACA0066">
+		<location>25.5 5.6</location>
+	</node>
+	<node number="3" start="on" hid="0xBACA0067">
+		<location>34.7 5.3</location>
+	</node>
+	<node number="4" start="on" hid="0xBACA0069">
+		<location>2.4 14.1</location>
+	</node>
+        <node number="5" start="on" hid="0xBACA0068">
+            <location>9.8 14.5</location>
+        </node>
+        <node number="6" start="on" hid="0xBACA006A">
+            <location>22.8 15.3</location>
+        </node>
+       <node number="7" start="on" hid="0xBACA006B">
+            <location>32.9 14.3</location>
+        </node>
+	<node number="8" start="on" hid="0xBACA006C">
+		<location>26.0 23.2</location>
+	</node>
+        <node number="9" start="on" hid="0xBACA006D">
+            <location>33.6 23.0</location>
+        </node>
+
+        <node number="10" start="off" hid="0xBACA0001">
+            <location>10.4 14.5</location>
+			<color solid="tomato1"/>
+        </node>	
+        <node number="11" start="off" hid="0xBACA0002">
+            <location>1.1 4.7</location>
+			<color solid="tomato1"/>
+        </node>		
+        <node number="12" start="off" hid="0xBACA0003">
+            <location>11.1 1.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="13" start="off" hid="0xBACA0004">
+            <location>11.4 15.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="14" start="off" hid="0xBACA0005">
+            <location>11.6 8.8</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="15" start="off" hid="0xBACA0006">
+            <location>11.7 1.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="16" start="off" hid="0xBACA0007">
+            <location>11.9 11.8</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="17" start="off" hid="0xBACA0008">
+            <location>12.3 7.8</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="18" start="off" hid="0xBACA0009">
+            <location>13.6 10.1</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="19" start="off" hid="0xBACA000A">
+            <location>13.9 14.3</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="20" start="off" hid="0xBACA000B">
+            <location>15.3 5.4</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="21" start="off" hid="0xBACA000C">
+            <location>16.0 8.9</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="22" start="off" hid="0xBACA000D">
+            <location>16.1 11.7</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="23" start="off" hid="0xBACA000E">
+            <location>16.0 13.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="24" start="off" hid="0xBACA000F">
+            <location>16.3 1.5</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="25" start="off" hid="0xBACA0010">
+            <location>16.3 14.9</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="26" start="off" hid="0xBACA0011">
+            <location>16.9 7.7</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="27" start="off" hid="0xBACA0012">
+            <location>17.0 13.0</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="28" start="off" hid="0xBACA0013">
+            <location>18.2 4.1</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="29" start="off" hid="0xBACA0014">
+            <location>18.6 14.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="30" start="off" hid="0xBACA0015">
+            <location>19.6 1.5</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="31" start="off" hid="0xBACA0016">
+            <location>19.6 7.6</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="32" start="off" hid="0xBACA0017">
+            <location>19.8 12.9</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="33" start="off" hid="0xBACA0018">
+            <location>19.8 15.1</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="34" start="off" hid="0xBACA0019">
+            <location>20.7 5.4</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="35" start="off" hid="0xBACA001A">
+            <location>20.8 12.9</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="36" start="off" hid="0xBACA001B">
+            <location>20.9 15.0</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="37" start="off" hid="0xBACA001C">
+            <location>22.2 13.8</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="38" start="off" hid="0xBACA001D">
+            <location>22.2 11.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="39" start="off" hid="0xBACA001E">
+            <location>23.9 12.8</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="40" start="off" hid="0xBACA001F">
+            <location>24.1 15.3</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="41" start="off" hid="0xBACA0020">
+            <location>24.7 15.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="42" start="off" hid="0xBACA0021">
+            <location>25.6 5.3</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="43" start="off" hid="0xBACA0022">
+            <location>25.9 1.5</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="44" start="off" hid="0xBACA0023">
+            <location>26.0 18.5</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="45" start="off" hid="0xBACA0024">
+            <location>27.0 3.3</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="46" start="off" hid="0xBACA0025">
+            <location>27.0 1.2</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="47" start="off" hid="0xBACA0026">
+            <location>28.8 1.1</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="48" start="off" hid="0xBACA0027">
+            <location>31.0 16.5</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="49" start="off" hid="0xBACA0028">
+            <location>31.7 2.0</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="50" start="off" hid="0xBACA0029">
+            <location>33.1 12.7</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="51" start="off" hid="0xBACA002A">
+            <location>3.8 14.0</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="52" start="off" hid="0xBACA002B">
+            <location>8.4 1.5</location>
+                        <color solid="tomato1"/>
+        </node>
+        <node number="53" start="off" hid="0xBACA002C">
+            <location>9.3 2.5</location>
+                        <color solid="tomato1"/>
+        </node>
+    </nodes>
+</network>
