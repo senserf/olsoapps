@@ -22,8 +22,14 @@ void oss_ini ();
 //+++ oss_null.cc
 #endif
 
-#else // not pegs
+#else // tags
+
+#ifdef BOARD_WARSAW
+//+++ oss_tag_ser.cc
+#else
 //+++ oss_null.cc
+#endif
+
 #endif
 
 void init_inout () {

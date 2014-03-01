@@ -37,13 +37,19 @@ fsm mbeacon {
 	tmp = 0;
 	memset (&mf, 0, sizeof(msgMasterType));
 	mf.header.msg_type = msg_master;
+	highlight_set (0, 0.0, NULL);
 
     state SEND:
+	tmp = 0;
+	talk ((char *)&mf, sizeof(msgMasterType), TO_NET);
+
+    state DEL:
 	if ((++tmp % 10) == 0)
-		talk ((char *)&mf, sizeof(msgMasterType), TO_NET);
+		proceed SEND;
 	when (TRIG_MBEAC, SEND);
-    	delay ((58 + (rnd() % 5)) << 10, SEND); // 60 +/- 2s
+	delay ((58 + (rnd() % 5)) << 10, DEL); // 60 +/- 2s
 	release;
+
 }
 
 void process_incoming (char * buf, word size, word rssi) {
@@ -61,6 +67,14 @@ void process_incoming (char * buf, word size, word rssi) {
 
 	case msg_reportAck:
 		msg_reportAck_in (buf);
+		return;
+
+	case msg_fwd:
+		msg_fwd_in (buf, size);
+		return;
+
+	case msg_fwdAck:
+		talk (buf, size, TO_OSS);
 		return;
 
 	case msg_master:

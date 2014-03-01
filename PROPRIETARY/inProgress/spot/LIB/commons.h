@@ -36,7 +36,7 @@
 
 typedef enum {
         msg_null, msg_pong, msg_pongAck,
-        msg_master, msg_report, msg_reportAck
+        msg_master, msg_report, msg_reportAck, msg_fwd, msg_fwdAck
 } msgType;
 
 typedef struct pongParamsStruct {
@@ -124,6 +124,18 @@ typedef struct msgReportAckStruct {
         word            tagid;
 } msgReportAckType;
 #define in_reportAck(buf, field)   (((msgReportAckType *)(buf))->field)
+
+typedef struct msgFwdStruct {
+        headerType      header;
+        word            ref;
+} msgFwdType;
+#define in_fwd(buf, field)   (((msgFwdType *)(buf))->field)
+
+typedef struct msgFwdAckStruct {
+        headerType      header;
+        word            ref;
+} msgFwdAckType;
+#define in_fwdAck(buf, field)   (((msgFwdAckType *)(buf))->field)
 
 char * get_mem (word len, Boolean reset);
 

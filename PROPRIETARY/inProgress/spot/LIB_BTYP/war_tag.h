@@ -1,26 +1,21 @@
-#ifndef __chro_h__
-#define __chro_h__
+#ifndef __war_tag_h__
+#define __war_tag_h__
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications 2014                            */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "commons.h"
 
-typedef struct chroStruct {
-	lword	ev_ts;		// internal activity monitor
-	word	move_ts; 	// last movement's (short) timestamp
-	word	move_nr;	// movement counter (over uptime mod 2^16)
-
+typedef struct warStruct {
 	word	volt;
-	word	acc_mode :2;	// 0-off, 1-mot, 2-immob, 3-3D (not impl)
+	word	random_shit;
 	word	alrm_id  :3;	// which alarm raised
 	word	alrm_seq :4;	// alarm seq (so host can spot missing)
-	word    last_but :3;
-	word	spare	 :4;
-} chro_t;
-extern chro_t	chronos;
+	word	spare	 :9;
+} war_t;
+extern war_t	warsaw;
 
-void chro_init ();
+void war_init ();
 
-//+++ chro.cc
+//+++ war_tag.cc
 #endif

@@ -5,8 +5,6 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-//+++ variants.cc
-
 /* Board-specifics (tag? peg?) */
 
 #include "commons.h"
@@ -74,7 +72,8 @@ typedef pongPloadType5 pongPloadType;
 #endif
 
 #ifndef BTYPE
-#err unsupported board
+#error unsupported board
+error unsupported board FIXME
 #endif
 
 // not for pegs
@@ -84,6 +83,12 @@ extern char pong_frame [sizeof(msgPongType) + sizeof(pongPloadType)];
 void init_pframe ();
 void load_pframe ();
 void upd_pframe (word pl, word tnr); // signature may end up board-specific
+
+void set_alrm (word a);
+void clr_alrm ();
+
+//+++ variants.cc
+
 #endif
 
 #endif

@@ -17,7 +17,7 @@
 	    	<output target="socket"></output>
 	    </leds>
 	    <iflash size="256,2"></iflash>
-	    <uart rate="9600" bsize="12">
+	    <uart rate="115200" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>
 	    </uart>
@@ -40,6 +40,6 @@
 		  <module id="storage">0.030 0.030 10.0 15.0 17.0 16.0</module>
 		  <module id="sensors">0.0 2.5</module>
 		</ptracker>
-		<highlight>magenta blue</highlight>
+		<highlight>magenta goldenrod</highlight>
 	</defaults>
 

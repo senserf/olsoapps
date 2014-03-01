@@ -2,7 +2,7 @@
 /* Copyright (C) Olsonet Communications, 2011-2014                      */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
-#include "chro.h"
+#include "chro_tag.h"
 #include "form.h"
 #include "looper.h"
 #include "pong.h"
@@ -10,14 +10,9 @@
 #include "inout.h"
 #include "net.h"
 
-//////// I'm not sure what should be put on the i/f in chro.h //////////
-void chro_hi (const char *txt);
-void chro_lo (const char *txt);
-void chro_nn (word hi, word a);
-void chro_xx (word hi, word a);
+// I think circ. dependencies creeped in:
+#include "variants.h"
 
-fsm buzz;
-fsm beep;
 fsm acc;
 fsm lcd_mon;
 
@@ -176,16 +171,10 @@ fsm acc {
                 cma3000_off ();
                 chronos.move_ts = (word)seconds();
                 chronos.move_nr++;
-                if (chronos.acc_mode == 1) {
-                        chronos.alrm_id = 2;
-			chronos.alrm_seq++;
-                        trigger (TRIG_ALRM);
-		        chro_hi ("ALAR");
-        		chro_lo ("ON");
-        		if (!running (beep))
-                		runfsm beep(1);
 
-                }
+                if (chronos.acc_mode == 1)
+			set_alrm (2);
+
                 delay (10240, INI);
                 release;
 }
@@ -343,13 +332,7 @@ static void do_butt (word b) {
         }
 
         // only B0 triggers (forcing-in 'pending' changes, e.g. heartbeat)
-        trigger (TRIG_ALRM);
-        chronos.alrm_id = 1;
-	chronos.alrm_seq++;
-        chro_hi ("ALAR");
-        chro_lo ("ON");
-	if (!running (beep))
-		runfsm beep(1);
+	set_alrm (1);
 }
 
 void chro_init () {

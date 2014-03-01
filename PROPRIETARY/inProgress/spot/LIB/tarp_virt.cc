@@ -36,17 +36,23 @@ Boolean msg_isClear (byte o) {
 }
 
 #ifdef PGMLABEL_peg
+#include "tag_mgr.h"
 
 Boolean msg_isMaster (msg_t m) {
         return (m == msg_master);
 }
 
 fsm mbeacon;
+fsm looper;
 void set_master_chg () {
         if (running (mbeacon)) { // I was the Master
                 killall (mbeacon);
                 tarp_ctrl.param |= 0x01; // routing ON
                 app_diag_W ("Abdicating for %u", master_host);
+		highlight_clear();
+		tagList.block = NO;
+		tarp_ctrl.param = 0xB1;
+		runfsm looper;
         } else {
                 app_diag_W ("Set master to %u", master_host);
         }

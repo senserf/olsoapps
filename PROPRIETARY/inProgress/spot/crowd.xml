@@ -11,7 +11,6 @@
 	
 	<node number="0" type="peg" start="on" hid="0xBACA0001">
 	    <location>5.0 5.0</location>
-		<color solid="tomato1"/>
 	</node>
 	
 	<node number="1" type="peg" start="on" hid="0xBACA0002">
@@ -20,25 +19,25 @@
 	<node number="2" type="peg" start="on" hid="0xBACA0003">
 	    <location>5.0 100.0</location>
 	</node>
-	<node number="3" type="chr" start="on" hid="0xBACA0064">
+	<node number="3" type="chrt" start="on" hid="0xBACA0064">
 	    <location>50.0 100.0</location>
 	</node>
-	<node number="4" type="chr" start="on" hid="0xBACA0065">
+	<node number="4" type="chrt" start="on" hid="0xBACA0065">
 	    <location>50.0 50.0</location>
 	</node>
-        <node number="5" type="chr" start="on" hid="0xBACA0066">
+        <node number="5" type="chrt" start="on" hid="0xBACA0066">
             <location>50.0 60.0</location>
         </node>
-        <node number="6" type="chr" start="on" hid="0xBACA0067">
+        <node number="6" type="chrt" start="on" hid="0xBACA0067">
             <location>50.0 70.0</location>
         </node>
-        <node number="7" type="chr" start="on" hid="0xBACA0068">
+        <node number="7" type="chrt" start="on" hid="0xBACA0068">
             <location>50.0 80.0</location>
         </node>
-        <node number="8" type="chr" start="on" hid="0xBACA0069">
+        <node number="8" type="chrt" start="on" hid="0xBACA0069">
             <location>50.0 90.0</location>
         </node>
-        <node number="9" type="chr" start="on" hid="0xBACA006A">
+        <node number="9" type="chrt" start="on" hid="0xBACA006A">
             <location>70.0 90.0</location>
         </node>
         <node number="10" type="peg" start="on" hid="0xBACA0004">

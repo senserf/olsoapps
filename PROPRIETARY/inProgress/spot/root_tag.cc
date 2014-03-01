@@ -3,14 +3,9 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#ifndef BOARD_CHRONOS
-#error CHRONOS only
-#endif
-
 #include "inout.h"
 #include "looper.h"
 #include "pong.h"
-#include "chro.h"
 #include "diag.h"
 #include "variants.h"
 #include "net.h"
@@ -19,7 +14,7 @@ static void init () {
         master_host = local_host; // I'm not sure what this is for...
         tarp_ctrl.param &= 0xFE; // routing off
 
-	chro_init ();
+	btyp_init ();
 	init_inout ();
 	net_opt (PHYSOPT_RXOFF, NULL); // default is ON
 	init_pframe();
@@ -39,6 +34,11 @@ void process_incoming (char * buf, word size, word rssi) {
 			trigger (TRIG_ACK);
 		else
 			app_diag_W ("Alien ack %u", in_pongAck(buf, dupeq));
+
+		// this is truly superfluous, here just for illustration,
+		// if anything is truly needed, it should be inited from
+		// pong when (TRIG_ACK, ...)
+		talk (buf, size, TO_OSS);
 		break;
 
 	default:

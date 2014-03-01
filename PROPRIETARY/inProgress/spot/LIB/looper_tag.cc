@@ -19,19 +19,28 @@ word	heartbeat = 60; // seconds
 
 fsm pong; // external
 
-#define _LOO_DBG	1
+#define _LOO_DBG	0
 
 /* VOLTAGE is consistent across the boards, but I'd like to see how this
-   works for common functionality on board-specific resources.
+   works for common functionality on board-specific resources...
+   I don't think VOLTAGE should be defined here, but it should be #defined
+   somewhere... and likely not in variants.h. Let's see if we need some
+   sensor-related blocks.
 */
 
 #ifdef BOARD_CHRONOS
-#include "chro.h"
+#include "chro_tag.h"
 #define VOLTAGE &chronos.volt
 #endif
 
+#if defined BOARD_WARSAW || defined BOARD_WARSAW_BLUE
+#include "war_tag.h"
+#define VOLTAGE &warsaw.volt
+#endif
+
 #ifndef VOLTAGE
-#err where is VOLTAGE
+#error where is VOLTAGE
+error where is VOLTAGE FIXME
 #endif
 
 fsm looper {

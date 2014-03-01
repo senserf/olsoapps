@@ -6,23 +6,22 @@
     <xi:include href="CHANNELS/tabulated.xml"/>
 
     <nodes>
-	<xi:include href="nodefs.xml"
+	<xi:include href="nodefs.xml"/>
 	
 	<node number="0" type="peg" start="on" hid="0xBACA0001">
 	    <location>5.0 5.0</location>
-		<color solid="tomato1"/>
 	</node>
 	
 	<node number="1" type="peg" start="on" hid="0xBACA0002">
 	    <location>5.0 50.0</location>
 	</node>
-	<node number="2" type="peg" start="off" hid="0xBACA0003">
+	<node number="2" type="peg" start="on" hid="0xBACA0003">
 	    <location>5.0 100.0</location>
 	</node>
-	<node number="3" type="chr" start="on" hid="0xBACA0064">
+	<node number="3" type="chrt" start="on" hid="0xBACA0064">
 	    <location>50.0 100.0</location>
 	</node>
-	<node number="4" type="chr" start="off" hid="0xBACA0065">
+	<node number="4" type="wart" start="on" hid="0xBACA0065">
 	    <location>50.0 50.0</location>
 	</node>
     </nodes>

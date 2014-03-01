@@ -8,57 +8,13 @@
 #include "diag.h"
 #include "tag_mgr.h"
 #include "tarp.h"
+#include "inout.h"
 
-fsm mbeacon;
-
-///////////////// oss out ////////////////
-// this is better than multiple fsm oss_out I used before
-//
-// 15 is max with the sizes in FIFEK
-#define FIFEK_SIZ 15
-static struct { // yes, not all field are truly needed but same size it is
-	char	*buf [FIFEK_SIZ];
-	word	h :4;
-	word	t :4;
-	word	n :4;
-	word	o :4;
-} fifek;
-
-static word _oss_out (char * b) {
-
-	if (b == NULL)
-		return 2;
-
-	if (fifek.n < FIFEK_SIZ) {
-		fifek.buf[fifek.h] = b;
-		++fifek.n; ++fifek.h; fifek.h %= FIFEK_SIZ;
-		trigger (TRIG_OSSO);
-		return 0;
-	}
-	app_diag_S ("OSS oflow (%u) %u", seconds(), ++fifek.o);
-	ufree (b);
-	return 1;
-}
- 
-fsm perp_oss_out () {
-
-        state CHECK:
-		if (fifek.n == 0) {
-			when (TRIG_OSSO, CHECK);
-			release;
-		}
-
-        state RETRY:
-                ser_outb (RETRY, fifek.buf[fifek.t]);
-                --fifek.n; ++fifek.t; fifek.t %= FIFEK_SIZ;
-                proceed (CHECK);
-}
-#undef FIFEK_SIZ
-
-///////////////// ? where should it be? ////////////////
+#include "ser_insert.cc"
 
 static trueconst char welcome_str[] = "SPOT(1.0) Peg:\r\n"
   "\t? - status quo\r\n\tm - become master / force mbeacon\r\n"
+  "\tf id text - forward text to id\r\n"
   "\th - help\r\nq - quit\r\n";
 
 static trueconst char stats_str[] = "Node %u uptime %u.%u:%u:%u "
@@ -81,6 +37,8 @@ static char * stats () {
    call process_incoming() as fsm hear does for RF in.
 */
 
+fsm mbeacon;
+fsm looper;
 fsm cmd_in {
         char * obuf;
         char   ibuf [UART_INPUT_BUFFER_LENGTH];
@@ -93,6 +51,9 @@ fsm cmd_in {
                 ibuf[0] = '\0';
 
         state LISN: // LISTEN keyword??
+		char * b;
+		word w, l;
+
                 ser_in (LISN, ibuf, UART_INPUT_BUFFER_LENGTH);
                 if (strlen(ibuf) == 0 // CR on empty line would do it
                         || ibuf[0] == ' ') // ignore lines starting blank
@@ -116,10 +77,34 @@ fsm cmd_in {
 					}
 				} else {
 					master_host = local_host;
+					tarp_ctrl.param = 0xB0;
+					tagList.block = YES;
+					reset_tags();
+					killall (looper);
 					runfsm mbeacon;
 					obuf = (char *)"I am M\r\n";
 				}
 				proceed UIOUT;
+
+			case 'f':
+				w = local_host;
+				scan (ibuf +1, "%u", &w);
+				if (w != local_host) {
+				    l = strlen(ibuf) + sizeof(msgFwdType);
+
+				    if ((b = get_mem (l, NO)) != NULL) {
+					memset (b, 0, l);
+					in_header(b, msg_type) = msg_fwd;
+					in_header(b, rcv) = w;
+					in_fwd(b, ref) = (word)seconds();
+					// terminating NULL should fit in:
+					strcpy (b+sizeof(msgFwdType), ibuf+1);
+					talk (b, l, TO_ALL);
+					ufree (b);
+					proceed INI;
+				    }
+				}
+				// fall through
 
 			default: // ?
 				obuf = stats();
@@ -131,19 +116,7 @@ fsm cmd_in {
                 ser_out (UIOUT, obuf);
 		proceed INI;
 }
-
-void oss_ini () {
-
-#ifdef BOARD_WARSAW_BLUE
-	// Use UART 2 via Bluetooth
-	ser_select (1);
-#endif
-	if (!running (perp_oss_out))
-		runfsm perp_oss_out;
-
-	if (!running (cmd_in))
-		runfsm cmd_in;
-}
+///////////////////////////////
 
 #define _ppp	(p + sizeof(pongDataType))
 static char * board_out (char * p) {
@@ -176,6 +149,7 @@ static char * board_out (char * p) {
                                 ((pongPloadType5 *)_ppp)->volt,
                                 ((pongPloadType5 *)_ppp)->random_shit,
                                 ((pongPloadType5 *)_ppp)->steady_shit);
+			break;
 		default:
 			app_diag_W ("btyp %u", ((pongDataType *)p)->btyp);
 			b = NULL;
@@ -189,6 +163,7 @@ static char * board_out (char * p) {
 // NO parameter sanitization
 void oss_tx (char * b, word siz) {
 	char *bu, *bt;
+	Boolean incoming;
 
 	// allocated, freed after output
 	if (siz == MAX_WORD) {
@@ -205,14 +180,13 @@ void oss_tx (char * b, word siz) {
 	// b[0] doesn't have to be msg_type; if not, must be off the enum
 	switch (b[0]) {
 	    case msg_report:
+		incoming = in_header(b, rcv) == local_host ? YES : NO;
 		bt = board_out (b + sizeof(msgReportType)); 
 		bu = form (NULL, "%s Report #%u tag %u->%u rss %u ago %u "
 		    "btyp %u plev %u alrm %u.%u fl %u try %u: %s\r\n",
-			in_header(b, rcv) == local_host ? 
-				"IN" : "OUT",
+			incoming ?  "IN" : "OUT",
 			in_report(b, ref), in_report(b, tagid),
-			in_header(b, rcv) == local_host ?
-				in_header(b, snd) : 0,
+			in_header(b, snd),
 			in_report(b, rssi), in_report(b, ago),
 			((pongDataType *)(b + sizeof(msgReportType)))->btyp,
 			((pongDataType *)(b + sizeof(msgReportType)))->plev,
@@ -224,12 +198,30 @@ void oss_tx (char * b, word siz) {
 		ufree (bt);
 		_oss_out (bu);
 		break;
+
 	    case msg_reportAck:
 		bu = form (NULL, "RepAck #%u tag %u (%u+%u)\r\n",
 			in_reportAck(b, ref), in_reportAck(b, tagid),
 			tagList.alrms, tagList.evnts);
 		_oss_out (bu);
 		break;
+
+	    case msg_fwd:
+		incoming = in_header(b, snd) != 0 &&
+			in_header(b, snd) != local_host;
+		bu = form (NULL, "%s FWD #%u %u [%s]\r\n",
+		incoming ? "IN" : "OUT", in_fwd(b, ref),
+		incoming ?  in_header(b, snd) : in_header(b, rcv),
+		incoming ?  b + sizeof(msgFwdType) : ".");
+		_oss_out (bu);
+		break;
+
+	    case msg_fwdAck:
+		bu = form (NULL, "FwdAck #%u fr %u\r\n",
+			in_fwd(b, ref), in_header(b, snd));
+		_oss_out (bu);
+		break;
+
 	    default:
 		app_diag_U ("dupa unfinished?");
 	}

@@ -21,14 +21,21 @@ void msg_pong_in (char * buf, word rssi) {
 	ins_tag (buf, rssi);
 }
 
+void msg_fwd_in (char * buf, word siz) {
+	msgFwdAckType ack = {{msg_fwdAck,0,0,0,0,0,0,0}};
+        ack.header.rcv = in_header(buf, snd);
+        ack.ref = in_fwd(buf, ref);
+        talk ((char *)&ack, sizeof(msgFwdAckType), TO_NET);
+        talk (buf, siz, TO_OSS);
+}
+
 void msg_report_in (char * buf, word siz) {
 
-	msgReportAckType rep_ack = {{msg_reportAck,0,0,0,0,0,0,0}};
-
-	rep_ack.header.rcv = in_header(buf, snd);
-	rep_ack.ref = in_report(buf, ref);
-	rep_ack.tagid = in_report(buf, tagid);
-	talk ((char *)&rep_ack, sizeof(msgReportAckType), TO_NET);
+	msgReportAckType ack = {{msg_reportAck,0,0,0,0,0,0,0}};
+	ack.header.rcv = in_header(buf, snd);
+	ack.ref = in_report(buf, ref);
+	ack.tagid = in_report(buf, tagid);
+	talk ((char *)&ack, sizeof(msgReportAckType), TO_NET);
 	talk (buf, siz, TO_OSS);
 }
 

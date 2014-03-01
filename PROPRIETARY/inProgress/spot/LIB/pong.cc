@@ -12,7 +12,7 @@
 // retry delay, try  nr, rx span, spare bits, power levels
 pongParamsType  pong_params = { 5, 3, 2, 0, 0x7531};
 
-#define PONG_DBG 0
+#define _PONG_DBG 0
 
 fsm pong {
 
@@ -21,7 +21,7 @@ fsm pong {
 	state LOAD:
 		tr = 0;
 		load_pframe ();
-#if PONG_DBG
+#if _PONG_DBG
 	app_diag_U ("PONG BEG (%u) retry %u.%u rx %u pl %x", (word)seconds(),
 		pong_params.retry_del, pong_params.retry_nr,
 		pong_params.rx_span, pong_params.pow_levels);
@@ -40,8 +40,9 @@ fsm pong {
 			net_opt (PHYSOPT_RXON, NULL);
 
 			talk (pong_frame, sizeof(msgPongType) +
-				sizeof(pongPloadType), TO_NET);
-#if PONG_DBG
+				sizeof(pongPloadType),
+				TO_ALL /* just to illustrate TO_NET*/);
+#if _PONG_DBG
                         app_diag_U ("PONG out (%u) l %u tr %u", (word)seconds(),
 				level, tr);
 #endif
@@ -49,7 +50,7 @@ fsm pong {
 			delay (pong_params.rx_span << 10, ROFF);
 
                 } else {
-#if PONG_DBG
+#if _PONG_DBG
                         app_diag_U ("PONG skip level (%u) %u", 
 				(word)seconds(), tr);
 #endif
@@ -60,7 +61,7 @@ fsm pong {
 
 	state ROFF:
 		net_opt (PHYSOPT_RXOFF, NULL);
-#if PONG_DBG
+#if _PONG_DBG
 		 app_diag_U ("PONG rxoff (%u)", (word)seconds());
 #endif
 		delay ((pong_params.retry_del - pong_params.rx_span) <<  10,
@@ -78,11 +79,12 @@ fsm pong {
 		trigger (TRIG_DORO);
 
 	state FIN:
-		net_opt (PHYSOPT_RXOFF, NULL); // superfluous doesn't hurt
-#if PONG_DBG
+		net_opt (PHYSOPT_RXOFF, NULL);
+		clr_alrm();
+#if _PONG_DBG
 		app_diag_U ("PONG ends (%u)", seconds());
 #endif
                 finish;
 }
-#undef PONG_DBG
+#undef _PONG_DBG
 

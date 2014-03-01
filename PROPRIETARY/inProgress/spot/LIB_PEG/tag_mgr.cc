@@ -14,7 +14,7 @@ overwrite alarms. Acks from Master remove (del) corresponding entries.
 ***************************************************************************/
 tagListType tagList;
 
-#define TMGR_DBG	0
+#define _TMGR_DBG	0
 void reset_tags () {
 
 	char * mel = tagList.nel;
@@ -112,13 +112,13 @@ void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 	char * ptr;
 
 	if (ret == 4) {
-#if TMGR_DBG
+#if _TMGR_DBG
 		app_diag_U ("TMGR Ins set alrm %u", in_header(buf, snd));
 #endif
 		return;
 	}
 	if (ret == 5) {
-#if TMGR_DBG
+#if _TMGR_DBG
 		app_diag_U ("TMGR dupeq %u", in_header(buf, snd));
 #endif
 		return;
@@ -145,11 +145,11 @@ void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 			tagList.alrms++;
 		else
 			tagList.evnts++;
-#if TMGR_DBG
+#if _TMGR_DBG
 	app_diag_U ("TMGR rep %u %u", tagList.alrms, tagList.evnts);
 #endif
 	} else 				// ... and free the element
 		ufree (ptr);
 }
-#undef TMGR_DBG
+#undef _TMGR_DBG
 
