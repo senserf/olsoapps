@@ -16,7 +16,7 @@ fsm randal () {
 	state ALRM:
 	    word w = (word)rnd();
 	    if (w & 1) // further .5 chance
-		set_alrm ( w & 7);
+		set_alrm (7);
 
 	    proceed INI;
 }

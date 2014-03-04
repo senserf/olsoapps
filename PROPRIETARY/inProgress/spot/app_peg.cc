@@ -44,7 +44,7 @@ fsm mbeacon {
 	talk ((char *)&mf, sizeof(msgMasterType), TO_NET);
 
     state DEL:
-	if ((++tmp % 10) == 0)
+	if ((++tmp % 11) == 0) // % N <=> N-1 delays (N==1 is quick but painful)
 		proceed SEND;
 	when (TRIG_MBEAC, SEND);
 	delay ((58 + (rnd() % 5)) << 10, DEL); // 60 +/- 2s

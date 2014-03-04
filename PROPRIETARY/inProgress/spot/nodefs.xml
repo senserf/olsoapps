@@ -17,6 +17,7 @@
 	    	<output target="socket"></output>
 	    </leds>
 	    <iflash size="256,2"></iflash>
+<!-- dupa 115200 -->
 	    <uart rate="115200" bsize="12">
 		<input source="socket"></input>
 		<output target="socket" type="held"></output>

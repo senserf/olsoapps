@@ -79,9 +79,11 @@ error unsupported board FIXME
 // not for pegs
 #ifndef PGMLABEL_peg
 extern char pong_frame [sizeof(msgPongType) + sizeof(pongPloadType)];
+extern fifek_t pframe_stash;
 
 void init_pframe ();
 void load_pframe ();
+void stash_pframe ();
 void upd_pframe (word pl, word tnr); // signature may end up board-specific
 
 void set_alrm (word a);

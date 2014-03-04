@@ -10,13 +10,13 @@
 #include "net.h"
 
 // retry delay, try  nr, rx span, spare bits, power levels
-pongParamsType  pong_params = { 5, 3, 2, 0, 0x7531};
+pongParamsType  pong_params = { 5, 4, 2, 0, 0x7531};
 
 #define _PONG_DBG 0
 
 fsm pong {
 
-        word tr;  // many times forgot that tr is NOT on stack = 0;
+        word tr;  // = 0; many times forgot that tr is NOT on stack
 
 	state LOAD:
 		tr = 0;
@@ -84,6 +84,12 @@ fsm pong {
 #if _PONG_DBG
 		app_diag_U ("PONG ends (%u)", seconds());
 #endif
+		if (!fifek_empty (&pframe_stash)) {
+// dupa check with HW: n VUEE proceed ALWAYS end up with failed 1st pong
+			// proceed LOAD;
+			delay (50, LOAD);
+			release;
+		}
                 finish;
 }
 #undef _PONG_DBG

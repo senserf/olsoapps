@@ -34,10 +34,7 @@
 #define TRIG_OSSO	5
 #define TRIG_MBEAC	6
 
-typedef enum {
-        msg_null, msg_pong, msg_pongAck,
-        msg_master, msg_report, msg_reportAck, msg_fwd, msg_fwdAck
-} msgType;
+/////////// tag-related structs ////////////////
 
 typedef struct pongParamsStruct {
         word retry_del 	:6; // times in seconds
@@ -88,6 +85,14 @@ typedef struct tagListStruct {
 	char  * nel;
 } tagListType;
 
+///////////// messages ////////////////////
+
+typedef enum {
+        msg_null, msg_pong, msg_pongAck,
+        msg_master, msg_report, msg_reportAck, msg_fwd, msg_fwdAck
+} msgType;
+
+
 typedef struct msgPongStruct {
         headerType      header;
 	pongDataType	pd;
@@ -136,6 +141,26 @@ typedef struct msgFwdAckStruct {
         word            ref;
 } msgFwdAckType;
 #define in_fwdAck(buf, field)   (((msgFwdAckType *)(buf))->field)
+
+/////////////////// fifek ////////////////////
+// small (up to 15) circ buffer of (alloc'ed) buffers
+//
+typedef struct fifekStruct {
+        char  **b;
+        word    h :4;
+        word    t :4;
+        word    n :4;
+        word    s :4;
+} fifek_t; // illegal? , *fifek_pt;
+
+void fifek_ini (fifek_t *fif, word siz);
+void fifek_reset (fifek_t *fif, word siz);
+Boolean fifek_empty (fifek_t *fif);
+Boolean fifek_full (fifek_t *fif);
+void fifek_push (fifek_t *fif, char * el);
+char * fifek_pull (fifek_t *fif);
+
+///////////////////////////////////////////
 
 char * get_mem (word len, Boolean reset);
 

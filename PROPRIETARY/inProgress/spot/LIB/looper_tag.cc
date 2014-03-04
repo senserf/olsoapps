@@ -11,7 +11,7 @@
 
 #include "sysio.h"
 #include "diag.h"
-#include "commons.h"
+#include "variants.h"
 #include "hold.h"
 #include "sensors.h"
 
@@ -58,7 +58,7 @@ fsm looper {
                 if (!running (pong))
                         runfsm pong;
                 else
-                        app_diag_W ("lazy pong");
+			stash_pframe ();
 
 		if (heartbeat == 0) {
 			app_diag_W ("looper exits");

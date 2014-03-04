@@ -18,7 +18,7 @@ static trueconst char welcome_str[] = "SPOT(1.0) Peg:\r\n"
   "\th - help\r\nq - quit\r\n";
 
 static trueconst char stats_str[] = "Node %u uptime %u.%u:%u:%u "
-	"master %u mem %u %u oflow %u\r\n";
+	"master %u mem %u %u\r\n";
 
 static char * stats () {
         char * b = NULL;
@@ -28,7 +28,7 @@ static char * stats () {
 		(word)((seconds() % 86400) / 3600), 
 		(word)((seconds() % 3600) / 60),
 		(word)(seconds() % 60), master_host,
-                mem, mmin, fifek.o);
+                mem, mmin);
 	return b;
 }
 ///////////////// oss in ////////////////
