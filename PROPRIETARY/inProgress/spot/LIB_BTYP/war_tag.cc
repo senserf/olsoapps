@@ -3,9 +3,7 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "war_tag.h"
-
-// because of set_alrm():
-#include "variants.h"
+#include "alrms.h"
 
 war_t	warsaw; // my state
 

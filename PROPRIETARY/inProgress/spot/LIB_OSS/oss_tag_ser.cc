@@ -2,12 +2,14 @@
 /* Copyright (C) Olsonet Communications, 2002 - 2014                    */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
-#include "variants.h"
+#include "commons.h"
+#include "vartypes.h"
 #include "form.h"
 #include "ser.h"
 #include "diag.h"
 #include "tag_mgr.h"
 #include "tarp.h"
+#include "alrms.h"
 
 #include "ser_insert.cc"
 

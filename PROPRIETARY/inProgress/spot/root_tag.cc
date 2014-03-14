@@ -7,21 +7,35 @@
 #include "looper.h"
 #include "pong.h"
 #include "diag.h"
-#include "variants.h"
 #include "net.h"
+#include "lit.h"
 
-static void init () {
+fsm ronin {
+	state ST:
+		when (TRIG_RONIN, ACT);
+		release;
+
+	state ACT:
+		clr_lit (YES);
+		set_lit (30, LED_ALRM, LED_BLINK, 0);
+		proceed ST;
+}
+
+static void init0 () {
+	powerdown();
         master_host = local_host; // I'm not sure what this is for...
         tarp_ctrl.param &= 0xFE; // routing off
 
 	btyp_init ();
 	init_inout ();
 	net_opt (PHYSOPT_RXOFF, NULL); // default is ON
+}
+
+static void init () {
 	init_pframe();
         runfsm hear;
         runfsm looper;
-	powerdown();
-
+	runfsm ronin;
 }
 
 void process_incoming (char * buf, word size, word rssi) {
@@ -51,11 +65,11 @@ void process_incoming (char * buf, word size, word rssi) {
 fsm root {
 
 	entry RS_INIT:
-
-#ifdef __SMURPH__
-		delay (rnd() % 5000, RS_INIT1);
+		init0();
+		word d = 1 + (word)(rnd() % 3);
+		set_lit (d, LED_ALRM, LED_BLINK, 0);
+		delay (d << 10, RS_INIT1);
 		release;
-#endif
 
 	entry RS_INIT1:
 		init();

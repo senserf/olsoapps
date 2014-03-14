@@ -11,13 +11,12 @@
 
 #include "sysio.h"
 #include "diag.h"
-#include "variants.h"
+#include "vartypes.h"
 #include "hold.h"
 #include "sensors.h"
+#include "pong.h"
 
 word	heartbeat = 60; // seconds
-
-fsm pong; // external
 
 #define _LOO_DBG	0
 
@@ -28,12 +27,12 @@ fsm pong; // external
    sensor-related blocks.
 */
 
-#ifdef BOARD_CHRONOS
+#if BTYPE == BTYPE_CHRONOS
 #include "chro_tag.h"
 #define VOLTAGE &chronos.volt
 #endif
 
-#if defined BOARD_WARSAW || defined BOARD_WARSAW_BLUE
+#if BTYPE == BTYPE_WARSAW
 #include "war_tag.h"
 #define VOLTAGE &warsaw.volt
 #endif

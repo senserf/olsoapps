@@ -5,6 +5,7 @@
 #include "commons.h"
 #include "diag.h"
 #include "tarp.h"
+#include "vartypes.h"
 
 /*
  * "Virtual" stuff needed by NET & TARP =======================================
@@ -35,7 +36,7 @@ Boolean msg_isClear (byte o) {
         return YES;
 }
 
-#ifdef PGMLABEL_peg
+#if PTYPE == PTYPE_PEG
 #include "tag_mgr.h"
 
 Boolean msg_isMaster (msg_t m) {

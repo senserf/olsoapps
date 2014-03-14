@@ -7,6 +7,7 @@
 #include "diag.h"
 #include "net.h"
 #include "tarp.h"
+#include "vartypes.h"
 
 void process_incoming (char * buf, word siz, word rssi);
 
@@ -14,9 +15,9 @@ void process_incoming (char * buf, word siz, word rssi);
 void oss_tx (char * buf, word siz);
 void oss_ini ();
 // are in:
-#ifdef PGMLABEL_peg
+#if PTYPE == PTYPE_PEG
 
-#ifdef BOARD_WARSAW
+#if BTYPE == BTYPE_WARSAW
 //+++ oss_peg_ser.cc
 #else
 //+++ oss_null.cc
@@ -24,7 +25,7 @@ void oss_ini ();
 
 #else // tags
 
-#ifdef BOARD_WARSAW
+#if BTYPE == BTYPE_WARSAW
 //+++ oss_tag_ser.cc
 #else
 //+++ oss_null.cc

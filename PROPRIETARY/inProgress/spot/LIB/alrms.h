@@ -1,21 +1,13 @@
-#ifndef __looper_h__
-#define __looper_h__
+#ifndef __alrms_h__
+#define __alrms_h__
 /* ==================================================================== */
 /* Copyright (C) Olsonet Communications, 2014                           */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 
-#include "sysio.h"
-#include "vartypes.h"
+void set_alrm (word a);
+void clr_alrm ();
 
-extern word heartbeat;
-
-fsm looper;
-
-#if PTYPE == PTYPE_PEG
-//+++ looper_peg.cc
-#else
-//+++ looper_tag.cc
-#endif
+//+++ alrms.cc
 
 #endif

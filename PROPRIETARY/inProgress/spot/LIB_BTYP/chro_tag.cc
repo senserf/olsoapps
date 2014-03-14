@@ -9,9 +9,7 @@
 #include "tarp.h"
 #include "inout.h"
 #include "net.h"
-
-// I think circ. dependencies creeped in:
-#include "variants.h"
+#include "alrms.h"
 
 fsm acc;
 fsm lcd_mon;

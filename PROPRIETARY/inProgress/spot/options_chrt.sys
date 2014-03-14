@@ -1,7 +1,7 @@
 #ifdef  __SMURPH__
-#ifdef DIAG_MESSAGES
 #undef DIAG_MESSAGES
-#endif
 #define DIAG_MESSAGES 2
 #endif
+#undef RADIO_USE_LEDS
+#define RADIO_USE_LEDS 0
 
