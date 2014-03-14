@@ -1,0 +1,73 @@
+<network nodes="17">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+	<roamer image="floor.gif" width="32.962" nodesize="20" display="yes"/>
+    </display>
+    <xi:include href="channel.xml"/>
+    <nodes>
+	<node type="ap321" hid="0xBACA000A" default="board">
+	    <location>18.0 15.154</location>
+	    <uart_window display="yes"/>
+	</node>
+
+	<node type="ap319" hid="0xBACA0081" default="board">
+	    <preinit tag="switches" type="word">0x3012</preinit>
+	    <location>5.077 11.962</location>
+	</node>
+	<node type="ap319" hid="0xBACA0082" default="board">
+	    <preinit tag="switches" type="word">0x3313</preinit>
+	    <location>5.077 14.115</location>
+	</node>
+	<node type="ap319" hid="0xBACA0083" default="board">
+	    <preinit tag="switches" type="word">0x3A14</preinit>
+	    <location>7.692 22.077</location>
+	</node>
+	<node type="ap319" hid="0xBACA0084" default="board">
+	    <preinit tag="switches" type="word">0x3B15</preinit>
+	    <location>15.115 13.269</location>
+	</node>
+	<node type="ap319" hid="0xBACA0085" default="board">
+	    <preinit tag="switches" type="word">0x3C16</preinit>
+	    <location>18.654 9.692</location>
+	</node>
+	<node type="ap319" hid="0xBACA0086" default="board">
+	    <preinit tag="switches" type="word">0x3D17</preinit>
+	    <location>25.808 9.769</location>
+	</node>
+	<node type="ap319" hid="0xBACA0087" default="board">
+	    <preinit tag="switches" type="word">0x3E18</preinit>
+	    <location>31.269 17.346</location>
+	</node>
+	<node type="ap319" hid="0xBACA0088" default="board">
+	    <preinit tag="switches" type="word">0x3F19</preinit>
+	    <location>25.654 22.154</location>
+	</node>
+
+	<node type="ap320" hid="0xBACA0101" default="board">
+	    <location>4.231 10.269</location>
+	</node>
+	<node type="ap320" hid="0xBACA0102" default="board">
+	    <location>4.654 16.538</location>
+	</node>
+	<node type="ap320" hid="0xBACA0103" default="board">
+	    <location>4.615 20.577</location>
+	</node>
+	<node type="ap320" hid="0xBACA0104" default="board">
+	    <location>14.769 20.385</location>
+	</node>
+	<node type="ap320" hid="0xBACA0105" default="board">
+	    <location>11.615 10.385</location>
+	</node>
+	<node type="ap320" hid="0xBACA0106" default="board">
+	    <location>30.769 9.000</location>
+	</node>
+	<node type="ap320" hid="0xBACA0107" default="board">
+	    <location>27.808 15.000</location>
+	</node>
+	<node type="ap320" hid="0xBACA0108" default="board">
+	    <location>28.423 20.731</location>
+	</node>
+
+    </nodes>
+</network>

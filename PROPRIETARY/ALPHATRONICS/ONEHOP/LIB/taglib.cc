@@ -2,8 +2,11 @@
 #include "tcvphys.h"
 #include "phys_cc1100.h"
 #include "plug_null.h"
+
+#ifndef	__SMURPH__
 #include "cc1100.h"
 #include "buttons.h"
+#endif
 
 #include "taglib.h"
 #include "netid.h"

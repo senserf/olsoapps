@@ -7,7 +7,7 @@
 
 #define	THE_LED			3
 
-#define	FAILURE_BLINK_TIME	4	// seconds (target = 30)
+#define	FAILURE_BLINK_TIME	10	// seconds (target = 30)
 #define	FAILURE_BLINK_ON	205
 #define	FAILURE_BLINK_OFF	FAILURE_BLINK_ON
 #define	WACK_ON_TIME		2048

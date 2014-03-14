@@ -8,8 +8,11 @@
 #include "tcvphys.h"
 #include "phys_cc1100.h"
 #include "phys_uart.h"
-#include "cc1100.h"
 #include "plug_null.h"
+
+#ifndef	__SMURPH__
+#include "cc1100.h"
+#endif
 
 // ============================================================================
 

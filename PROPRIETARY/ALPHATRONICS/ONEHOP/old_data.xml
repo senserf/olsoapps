@@ -1,0 +1,276 @@
+<network nodes="17">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+	<roamer image="floor.gif" width="32.962" nodesize="20" display="yes">
+	</roamer>
+    </display>
+    <xi:include href="channel.xml"/>
+    <nodes>
+
+	<defaults>
+	    <memory>3666 bytes</memory>
+	    <radio>
+	    	<power>7</power>
+	    	<preamble>32 bits</preamble>
+	    	<lbt>
+			delay			4msec
+			threshold		-109.0dBm
+			tries			5
+	    	</lbt>
+	    	<backoff>
+			min			2msec
+			span			63msec
+	    	</backoff>
+	    </radio>
+	    <iflash size="512,4"></iflash>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+	    </sensors>
+	    <emul>
+		<output target="socket" type="held"></output>
+	    </emul>
+	    <ptracker>
+		<output target="socket"/>
+		<module id="cpu">0.25 0.005</module>
+		<module id="radio">0.0004 16.0 30.7 30.7</module>
+		<module id="sensors">0.0 0.15</module>
+	    </ptracker>
+	</defaults>
+
+	<node type="ap321" hid="0xBACA000A">
+	    <uart rate="115200" bsize="256,256" mode="escape">
+		<input source="socket"/>
+		<output target="socket" type="held"/>
+	    </uart>
+	    <leds number="3"><output target="socket"></output></leds>
+	    <location>18.0 15.154</location>
+	</node>
+
+	<node type="ap319" hid="0xBACA0081">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>5.077 11.962</location>
+	</node>
+	<node type="ap319" hid="0xBACA0082">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>5.077 14.115</location>
+	</node>
+	<node type="ap319" hid="0xBACA0083">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>7.692 22.077</location>
+	</node>
+	<node type="ap319" hid="0xBACA0084">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>15.115 13.269</location>
+	</node>
+	<node type="ap319" hid="0xBACA0085">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>18.654 9.692</location>
+	</node>
+	<node type="ap319" hid="0xBACA0086">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>25.808 9.769</location>
+	</node>
+	<node type="ap319" hid="0xBACA0087">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>31.269 17.346</location>
+	</node>
+	<node type="ap319" hid="0xBACA0088">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <pins number="6">
+		<input source="socket"></input>
+		<buttons>0 1 2 3 4 5</buttons>
+	    </pins>
+	    <location>25.654 22.154</location>
+	</node>
+
+	<node type="ap320" hid="0xBACA0101">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>4.231 10.269</location>
+	</node>
+	<node type="ap320" hid="0xBACA0102">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>4.654 16.538</location>
+	</node>
+	<node type="ap320" hid="0xBACA0103">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>4.615 20.577</location>
+	</node>
+	<node type="ap320" hid="0xBACA0104">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>14.769 20.385</location>
+	</node>
+	<node type="ap320" hid="0xBACA0105">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>11.615 10.385</location>
+	</node>
+	<node type="ap320" hid="0xBACA0106">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>30.769 9.000</location>
+	</node>
+	<node type="ap320" hid="0xBACA0107">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>27.808 15.000</location>
+	</node>
+	<node type="ap320" hid="0xBACA0108">
+	    <leds number="4"><output target="socket"></output></leds>
+	    <sensors>
+	    	<input source="socket"></input>
+		<output target="socket"></output>
+		<sensor number="-2" vsize="2" delay="0.01" init="2300">
+			2000
+		</sensor>
+		<sensor number="-1" vsize="2" delay="0.01" init="2300">
+			2047
+		</sensor>
+		<sensor number="0" vsize="4" delay="0.01" init="0"></sensor>
+	    </sensors>
+	    <pins number="1">
+		<input source="socket"></input>
+		<buttons>0</buttons>
+	    </pins>
+	    <location>28.423 20.731</location>
+	</node>
+
+    </nodes>
+</network>
