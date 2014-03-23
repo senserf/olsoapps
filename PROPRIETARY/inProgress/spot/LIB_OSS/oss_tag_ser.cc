@@ -21,14 +21,14 @@ static trueconst char stats_str[] = "Node %u uptime %u.%u:%u:%u "
 	"mem %u %u\r\n";
 
 static char * stats () {
-        char * b = NULL;
-        word mmin, mem;
+	char * b = NULL;
+	word mmin, mem;
 	mem = memfree(0, &mmin);
-        b = form (NULL, stats_str, local_host, (word)(seconds() / 86400),
+	b = form (NULL, stats_str, local_host, (word)(seconds() / 86400),
 		(word)((seconds() % 86400) / 3600), 
 		(word)((seconds() % 3600) / 60),
 		(word)(seconds() % 60),
-                mem, mmin);
+		mem, mmin);
 	return b;
 }
 ///////////////// oss in ////////////////
@@ -106,20 +106,20 @@ void oss_tx (char * b, word siz) {
 	// b[0] doesn't have to be msg_type; if not, must be off the enum
 	switch (b[0]) {
 	    case msg_pong:
-		bu = form (NULL, "Pong(%u) at %u try %u.%u alrm %u.%u #%u\r\n",
-			in_pong(b, pd).btyp, (word)seconds(),
-			in_pong(b, pd).trynr, in_pong(b, pd).plev,
-			in_pong(b, pd).alrm_id, in_pong(b, pd).alrm_seq,
-			in_pong(b, pd).dupeq);
-		_oss_out (bu);
-		break;
+			bu = form (NULL, "Pong(%u) at %u try %u.%u alrm %u.%u #%u\r\n",
+				in_pong(b, pd).btyp, (word)seconds(),
+				in_pong(b, pd).trynr, in_pong(b, pd).plev,
+				in_pong(b, pd).alrm_id, in_pong(b, pd).alrm_seq,
+				in_pong(b, pd).dupeq);
+			_oss_out (bu);
+			break;
 	    case msg_pongAck:
-		bu = form (NULL, "Ack #%u from %u\r\n",
-			in_pongAck(b, dupeq), in_header(b, snd));
-		_oss_out (bu);
-		break;
+			bu = form (NULL, "Ack #%u from %u\r\n",
+				in_pongAck(b, dupeq), in_header(b, snd));
+			_oss_out (bu);
+			break;
 	    default:
-		app_diag_U ("dupa unfinished?");
+			app_diag_U ("dupa unfinished?");
 	}
 }
 

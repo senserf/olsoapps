@@ -19,11 +19,11 @@ static void init () {
 	net_opt (PHYSOPT_SETPOWER, &pl);
 	reset_tags();
 	if (local_host == master_host) {
-                tarp_ctrl.param = 0xB0; // level 2, rec 3, slack 0, fwd off
+        tarp_ctrl.param = 0xB0; // level 2, rec 3, slack 0, fwd off
 		runfsm mbeacon;
 		tagList.block = YES;
 	} else {
-                tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
+        tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
 		runfsm looper;
 	}
 	runfsm hear;
@@ -44,7 +44,7 @@ fsm mbeacon {
 	talk ((char *)&mf, sizeof(msgMasterType), TO_NET);
 
     state DEL:
-	if ((++tmp % 11) == 0) // % N <=> N-1 delays (N==1 is quick but painful)
+	if ((++tmp % 11) == 0) // % N <=> N-1 delays (N==1 is a quick but painful death)
 		proceed SEND;
 	when (TRIG_MBEAC, SEND);
 	delay ((58 + (rnd() % 5)) << 10, DEL); // 60 +/- 2s

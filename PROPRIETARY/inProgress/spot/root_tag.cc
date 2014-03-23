@@ -23,8 +23,8 @@ fsm ronin {
 
 static void init0 () {
 	powerdown();
-        master_host = local_host; // I'm not sure what this is for...
-        tarp_ctrl.param &= 0xFE; // routing off
+    master_host = local_host; // I'm not sure what this is for...
+    tarp_ctrl.param &= 0xFE; // routing off
 
 	btyp_init ();
 	init_inout ();
@@ -33,8 +33,8 @@ static void init0 () {
 
 static void init () {
 	init_pframe();
-        runfsm hear;
-        runfsm looper;
+    runfsm hear;
+    runfsm looper;
 	runfsm ronin;
 }
 

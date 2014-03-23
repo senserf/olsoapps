@@ -29,7 +29,7 @@
 // limit LEDs to tags (for modularity illustration?)
 #if PTYPE == PTYPE_TAG
 
-#if BTYPE == BTYPE_ALPHATRONICS_BUTTON || BTYPE == BTYPE_ALPHATRONICS_PANIC
+#if BTYPE == BTYPE_AT_BUT6 || BTYPE == BTYPE_AT_BUT1
 #define LED_ALRM LED_4
 #else
 #define LED_ALRM LED_R

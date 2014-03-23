@@ -226,3 +226,95 @@ void stash_pframe () {
 
 #endif
 
+#if BTYPE == BTYPE_AT_BUT6
+#include "ap319_tag.h"
+
+void load_pframe () {
+	char * pf;
+	
+    in_pong(pong_frame, pd.dupeq) += 1;
+    in_pong(pong_frame, pd.fl2)++; // vy not?
+
+    if (fifek_empty (&pframe_stash)) {
+		ap319_rsw ();
+        in_pong(pong_frame, pd.alrm_id) = ap319.alrm_id;
+        in_pong(pong_frame, pd.alrm_seq) = ap319.alrm_seq;
+        in_pongPload(pong_frame, volt) = ap319.volt;
+        in_pongPload(pong_frame, dial) = ap319.dial;
+		in_pongPload(pong_frame, glob) = 
+			ap319.alrm_id && (ap319.gmap & (1 << (ap319.alrm_id -1))) ? 1 : 0;
+    } else {
+		pf = fifek_pull (&pframe_stash);
+		in_pong(pong_frame, pd.alrm_id) = in_pong(pf, pd.alrm_id);
+		in_pong(pong_frame, pd.alrm_seq) = in_pong(pf, pd.alrm_seq);
+		in_pongPload(pong_frame, volt) = in_pongPload(pf, volt);
+		in_pongPload(pong_frame, dial) = in_pongPload(pf, dial);
+		in_pongPload(pong_frame, glob) = in_pongPload(pf, glob);
+		ufree (pf);
+    }
+}
+
+// we're overwriting alrms older than the last and this - it is trivial to
+// increase the stash - 2nd param in call to fifek_ini().
+void stash_pframe () {
+	char * pf;
+
+	if (ap319.alrm_id == 0)
+		return; // only alrms count
+
+	if ((pf = get_mem (sizeof(msgPongType) + sizeof(pongPloadType),
+			NO)) == NULL)
+		return;
+
+	in_pong(pf, pd.alrm_id) = ap319.alrm_id;
+	in_pong(pf, pd.alrm_seq) = ap319.alrm_seq;
+	in_pongPload(pf, volt) = ap319.volt;
+	in_pongPload(pf, dial) = ap319.dial;
+	in_pongPload(pf, glob) = (ap319.gmap >> (ap319.alrm_id -1)) & 1;
+	fifek_push(&pframe_stash, pf);
+}
+
+#endif
+
+#if BTYPE == BTYPE_AT_BUT1
+#include "ap320_tag.h"
+
+void load_pframe () {
+	char * pf;
+	
+    in_pong(pong_frame, pd.dupeq) += 1;
+    in_pong(pong_frame, pd.fl2)++; // vy not?
+
+    if (fifek_empty (&pframe_stash)) {
+        in_pong(pong_frame, pd.alrm_id) = ap320.alrm_id;
+        in_pong(pong_frame, pd.alrm_seq) = ap320.alrm_seq;
+        in_pongPload(pong_frame, volt) = ap320.volt;
+    } else {
+		pf = fifek_pull (&pframe_stash);
+		in_pong(pong_frame, pd.alrm_id) = in_pong(pf, pd.alrm_id);
+		in_pong(pong_frame, pd.alrm_seq) = in_pong(pf, pd.alrm_seq);
+		in_pongPload(pong_frame, volt) = in_pongPload(pf, volt);
+		ufree (pf);
+    }
+}
+
+// we're overwriting alrms older than the last and this - it is trivial to
+// increase the stash - 2nd param in call to fifek_ini().
+void stash_pframe () {
+	char * pf;
+
+	if (ap320.alrm_id == 0)
+		return; // only alrms count
+
+	if ((pf = get_mem (sizeof(msgPongType) + sizeof(pongPloadType),
+			NO)) == NULL)
+		return;
+
+	in_pong(pf, pd.alrm_id) = ap320.alrm_id;
+	in_pong(pf, pd.alrm_seq) = ap320.alrm_seq;
+	in_pongPload(pf, volt) = ap320.volt;
+	fifek_push(&pframe_stash, pf);
+}
+
+#endif
+

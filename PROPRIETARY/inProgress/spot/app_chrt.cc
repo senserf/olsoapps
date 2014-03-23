@@ -2,8 +2,8 @@
 /* Copyright (C) Olsonet Communications, 2014                           */
 /* All rights reserved.                                                 */
 /* ==================================================================== */
-
-#ifndef BOARD_CHRONOS
+#include "vartypes.h"
+#if BTYPE != BTYPE_CHRONOS
 #error CHRONOS only
 #endif
 

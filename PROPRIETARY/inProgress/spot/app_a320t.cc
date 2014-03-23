@@ -3,14 +3,14 @@
 /* All rights reserved.                                                 */
 /* ==================================================================== */
 #include "vartypes.h"
-#if BTYPE_WARSAW != BTYPE_WARSAW
-#error WARSAW only
+#if BTYPE != BTYPE_AT_BUT1
+#error AT_BUT1 only
 #endif
 
-#include "war_tag.h"
+#include "ap320_tag.h"
 
 static void btyp_init () {
-	war_init ();
+	ap320_init ();
 }
 
 #include "root_tag.cc"

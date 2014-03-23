@@ -48,3 +48,35 @@ void clr_alrm () {
 	warsaw.random_shit = 0;
 }
 #endif
+
+#if BTYPE == BTYPE_AT_BUT6
+#include "ap319_tag.h"
+
+void set_alrm (word a) {
+	ap319.alrm_id = a;
+	ap319.alrm_seq++;
+	trigger (TRIG_ALRM);
+	clr_lit (YES);
+	set_lit (2, LED_ALRM, LED_ON, 0);
+}
+
+void clr_alrm () {
+	ap319.alrm_id = 0;
+}
+#endif
+
+#if BTYPE == BTYPE_AT_BUT1
+#include "ap320_tag.h"
+
+void set_alrm (word a) {
+	ap320.alrm_id = a;
+	ap320.alrm_seq++;
+	trigger (TRIG_ALRM);
+	clr_lit (YES);
+	set_lit (2, LED_ALRM, LED_ON, 0);
+}
+
+void clr_alrm () {
+	ap320.alrm_id = 0;
+}
+#endif

@@ -4,10 +4,14 @@
 /* ==================================================================== */
 
 ///////////////// oss out ////////////////
-// this is better than multiple fsm oss_out I used before
-//
+// this is consistent with ser oss but I think it would be only needed for
+// 'immediate acks' and retries. Acks that require context (and have longer
+// and non-blocking retries) would need additional buffer for inventory and
+// audit. In here we don't retry, ignore acks, but keep fifek.
+/////////////////////////////////////////////////////////////////
 
 static fifek_t oss_cb;
+static sint oss_fd;
 
 // if we compile with the 2 #ifs switched off, we'll be overwriting circ. buf;
 // i.e. old lines will be lost (instead of new ones).
@@ -32,6 +36,7 @@ static word _oss_out (char * b) {
  
 fsm perp_oss_out () {
 	char * ptr;
+	address pkt;
 
 	state CHECK:
 		if (fifek_empty (&oss_cb)) {
@@ -39,9 +44,17 @@ fsm perp_oss_out () {
 			release;
 		}
 		ptr = fifek_pull (&oss_cb);
-
-	state RETRY:
-		ser_outb (RETRY, ptr);
+		if (ptr[1] < 5) { // wrong len
+			app_diag_S ("OSSO len %d", (sint)ptr[1]);
+			ufree (ptr);
+			proceed CHECK;
+		}
+		
+	state WNP:
+		pkt = tcv_wnp (WNP, oss_fd, (sint)ptr[1] -3);
+		memcpy ((char *)pkt, ptr,  (sint)ptr[1] -3);
+		tcv_endp (pkt);
+		ufree (ptr);
 		proceed (CHECK);
 }
 #undef FIFEK_SIZ
@@ -51,10 +64,14 @@ fsm perp_oss_out () {
 fsm cmd_in;
 void oss_ini () {
 
-#ifdef BOARD_WARSAW_BLUE
-	// Use UART 2 via Bluetooth
-	ser_select (1);
-#endif
+	phys_uart (1, 80, 0); // 80B, not used anywhere else(?)
+
+	// we should be returning, the caller blinking, whatever
+	if ((oss_fd = tcv_open (WNONE, 1, 0)) < 0) {
+		app_diag_F ("TCVE error");
+		reset();
+	}
+	
 	fifek_ini (&oss_cb, 15);
 	if (!running (perp_oss_out))
 		runfsm perp_oss_out;

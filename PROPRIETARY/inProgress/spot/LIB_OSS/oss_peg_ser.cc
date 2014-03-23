@@ -22,14 +22,14 @@ static trueconst char stats_str[] = "Node %u uptime %u.%u:%u:%u "
 	"master %u mem %u %u\r\n";
 
 static char * stats () {
-        char * b = NULL;
-        word mmin, mem;
+	char * b = NULL;
+	word mmin, mem;
 	mem = memfree(0, &mmin);
-        b = form (NULL, stats_str, local_host, (word)(seconds() / 86400),
+	b = form (NULL, stats_str, local_host, (word)(seconds() / 86400),
 		(word)((seconds() % 86400) / 3600), 
 		(word)((seconds() % 3600) / 60),
 		(word)(seconds() % 60), master_host,
-                mem, mmin);
+		mem, mmin);
 	return b;
 }
 ///////////////// oss in ////////////////
@@ -41,24 +41,24 @@ static char * stats () {
 fsm mbeacon;
 fsm looper;
 fsm cmd_in {
-        char * obuf;
-        char   ibuf [UART_INPUT_BUFFER_LENGTH];
+	char * obuf;
+	char   ibuf [UART_INPUT_BUFFER_LENGTH];
 
 	state START:
 		obuf = (char *)welcome_str;
 		proceed UIOUT;
 
-        state INI:
-                ibuf[0] = '\0';
+	state INI:
+		ibuf[0] = '\0';
 
-        state LISN: // LISTEN keyword??
+	state LISN: // LISTEN keyword??
 		char * b;
 		word w, l;
 
-                ser_in (LISN, ibuf, UART_INPUT_BUFFER_LENGTH);
-                if (strlen(ibuf) == 0 // CR on empty line would do it
-                        || ibuf[0] == ' ') // ignore lines starting blank
-                                proceed LISN;
+		ser_in (LISN, ibuf, UART_INPUT_BUFFER_LENGTH);
+		if (strlen(ibuf) == 0 // CR on empty line would do it
+				|| ibuf[0] == ' ') // ignore lines starting blank
+			proceed LISN;
 
 		switch (ibuf[0]) {
 			case 'h':
@@ -94,15 +94,15 @@ fsm cmd_in {
 				    l = strlen(ibuf) + sizeof(msgFwdType);
 
 				    if ((b = get_mem (l, NO)) != NULL) {
-					memset (b, 0, l);
-					in_header(b, msg_type) = msg_fwd;
-					in_header(b, rcv) = w;
-					in_fwd(b, ref) = (word)seconds();
-					// terminating NULL should fit in:
-					strcpy (b+sizeof(msgFwdType), ibuf+1);
-					talk (b, l, TO_ALL);
-					ufree (b);
-					proceed INI;
+						memset (b, 0, l);
+						in_header(b, msg_type) = msg_fwd;
+						in_header(b, rcv) = w;
+						in_fwd(b, ref) = (word)seconds();
+						// terminating NULL should fit in:
+						strcpy (b+sizeof(msgFwdType), ibuf+1);
+						talk (b, l, TO_ALL);
+						ufree (b);
+						proceed INI;
 				    }
 				}
 				// fall through
@@ -114,7 +114,7 @@ fsm cmd_in {
 		}
 
 	state UIOUT:
-                ser_out (UIOUT, obuf);
+		ser_out (UIOUT, obuf);
 		proceed INI;
 }
 ///////////////////////////////
@@ -138,18 +138,18 @@ static char * board_out (char * p) {
 		case 3:
 			b = form (NULL, "V %u dial %u.%u",
 				((pongPloadType3 *)_ppp)->volt,
-				((pongPloadType3 *)_ppp)->dial >> 8,
-				((pongPloadType3 *)_ppp)->dial & 0xFF);
+				((pongPloadType3 *)_ppp)->dial,
+				((pongPloadType3 *)_ppp)->glob);
 			break;
-                case 4:
-                         b = form (NULL, "V %u",
-                                ((pongPloadType4 *)_ppp)->volt);
+		case 4:
+			b = form (NULL, "V %u",
+				((pongPloadType4 *)_ppp)->volt);
 			break;
-                case 5:
-                        b = form (NULL, "V %u s %u.%u",
-                                ((pongPloadType5 *)_ppp)->volt,
-                                ((pongPloadType5 *)_ppp)->random_shit,
-                                ((pongPloadType5 *)_ppp)->steady_shit);
+		case 5:
+			b = form (NULL, "V %u s %u.%u",
+				((pongPloadType5 *)_ppp)->volt,
+				((pongPloadType5 *)_ppp)->random_shit,
+				((pongPloadType5 *)_ppp)->steady_shit);
 			break;
 		default:
 			app_diag_W ("btyp %u", ((pongDataType *)p)->btyp);

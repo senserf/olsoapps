@@ -45,24 +45,24 @@ typedef struct pongParamsStruct {
 } pongParamsType;
 
 typedef struct pongDataStruct {
-        word            btyp     :4;
-        word            plev     :3;
-        word            alrm_id  :3;
-        word            alrm_seq :4;
-        word            fl2      :2;    // board-spec flag... filler
+    word    btyp     :4;
+    word    plev     :3;
+    word    alrm_id  :3;
+    word    alrm_seq :4;
+    word    fl2      :2;    // board-specific flag... filler
 
-        word            len      :6;
-        word            trynr    :3;
-	word		dupeq	 :4;
-        word            spare    :3;
+    word    len      :6;
+    word 	trynr    :3;
+	word	dupeq	 :4;
+    word	spare    :3;
 } pongDataType; // 4B (+len bytes of pload serialized after this)
 
 typedef struct tagDataStruct {
 	char  * nel;
 	word	audTime;
 	word	refTime;
-        word    tagid;
-        word    rssi  :8;
+    word    tagid;
+    word    rssi  :8;
 	word	marka :1;
 	word	spare :7;
 } tagDataType;
@@ -94,7 +94,7 @@ typedef enum {
 
 
 typedef struct msgPongStruct {
-        headerType      header;
+    headerType      header;
 	pongDataType	pd;
 } msgPongType;
 #define in_pong(buf, field)     (((msgPongType *)(buf))->field)
@@ -103,21 +103,21 @@ typedef struct msgPongStruct {
                                 sizeof(msgPongType)))->field)
 
 typedef struct msgPongAckStruct {
-        headerType      header;
+    headerType      header;
 	word		dupeq 	 :4;
 	word		spare    :12;
 } msgPongAckType;
 #define in_pongAck(buf, field)     (((msgPongAckType *)(buf))->field)
 
 typedef struct msgMasterStruct {
-        headerType      header;
+    headerType      header;
 } msgMasterType;
 #define in_master(buf, field)     (((msgPongType *)(buf))->field)
 
 typedef struct msgReportStruct {
-        headerType      header;
-        word            ref;
-        word            tagid;
+    headerType  header;
+    word        ref;
+    word        tagid;
 	word		rssi :8;
 	word		ago  :8;
 } msgReportType; // follows serialized pdt & ppt structured as above

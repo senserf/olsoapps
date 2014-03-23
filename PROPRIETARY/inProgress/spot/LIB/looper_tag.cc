@@ -37,26 +37,36 @@ word	heartbeat = 60; // seconds
 #define VOLTAGE &warsaw.volt
 #endif
 
+#if BTYPE == BTYPE_AT_BUT6
+#include "ap319_tag.h"
+#define VOLTAGE &ap319.volt
+#endif
+
+#if BTYPE == BTYPE_AT_BUT1
+#include "ap320_tag.h"
+#define VOLTAGE &ap320.volt
+#endif
+
 #ifndef VOLTAGE
 #error where is VOLTAGE
-error where is VOLTAGE FIXME
 #endif
 
 fsm looper {
-        lword htime;
+	lword htime;
 
-        state BEG:
+	state BEG:
+	
 #if _LOO_DBG
 		app_diag_U ("LOO: BEG (%u)", (word)seconds());
 #endif
-                htime = seconds() + heartbeat;
+		htime = seconds() + heartbeat;
 
-        state VOLT:
-                read_sensor (VOLT, -1, VOLTAGE);
+	state VOLT:
+		read_sensor (VOLT, -1, VOLTAGE);
 
-                if (!running (pong))
-                        runfsm pong;
-                else
+		if (!running (pong))
+			runfsm pong;
+		else
 			stash_pframe ();
 
 		if (heartbeat == 0) {
@@ -66,9 +76,10 @@ fsm looper {
 #if _LOO_DBG
 		app_diag_U ("LOO: hold %u", (word)(htime - seconds()));
 #endif
-        state HOLD:
-                when (TRIG_ALRM, BEG); // it'll reset htime (doesn't have to)
-                hold (HOLD, htime);
-                proceed BEG;
+
+	state HOLD:
+		when (TRIG_ALRM, BEG); // it'll reset htime (doesn't have to)
+		hold (HOLD, htime);
+		proceed BEG;
 }
 

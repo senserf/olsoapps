@@ -19,6 +19,8 @@ void oss_ini ();
 
 #if BTYPE == BTYPE_WARSAW
 //+++ oss_peg_ser.cc
+#elif BTYPE == BTYPE_AT_BASE
+//+++ oss_peg_tcve.cc
 #else
 //+++ oss_null.cc
 #endif
