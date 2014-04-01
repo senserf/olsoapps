@@ -3,9 +3,16 @@
 
 #undef	UART_DRIVER
 #undef	UART_RATE
+#undef	RADIO_USE_LEDS
+#define	RADIO_USE_LEDS	0
+#undef	UART_USE_LEDS
+#define	UART_USE_LEDS	7
 
 #define	UART_DRIVER	0
 #define	UART_FROM_SMCLK	1
 #define	UART_TCV	1
 #define	UART_TCV_MODE	UART_TCV_MODE_E
 #define	UART_RATE	115200
+
+// #undef	RADIO_DEFAULT_BITRATE
+// #define	RADIO_DEFAULT_BITRATE 1

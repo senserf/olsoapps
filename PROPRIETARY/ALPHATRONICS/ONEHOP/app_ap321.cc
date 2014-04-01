@@ -14,9 +14,32 @@
 #include "cc1100.h"
 #endif
 
+#define	SHOW_RENESAS_OUTPUT	1
+
 // ============================================================================
 
 sint	sfd = -1, sfu = -1;
+word	rtries;
+word	nodeid, master = MASTER_NODE_ID;
+
+// ============================================================================
+
+void sack (byte req, word add) {
+//
+// Send an ACK to RENESAS
+//
+	address pkt;
+
+	if ((pkt = tcv_wnp (NULL, sfu, 5)) == NULL)
+		return;
+
+	((byte*)pkt) [0] = (0x80 | req);
+	((byte*)pkt) [1] = 5 + 3;
+	pkt [1] = add;
+	((byte*)pkt) [4] = 0x06;
+
+	tcv_endp (pkt);
+}
 
 fsm rreader {
 //
@@ -24,7 +47,73 @@ fsm rreader {
 //
 	state RD_LOOP:
 
-		address pkt = tcv_rnp (RD_LOOP, sfu);
+		address pkt;
+
+#ifdef SHOW_RENESAS_OUTPUT
+		address pkr;
+		word len;
+#endif
+		pkt = tcv_rnp (RD_LOOP, sfu);
+
+#ifdef SHOW_RENESAS_OUTPUT
+
+		len = tcv_left (pkt);
+#if 0
+		pkr = tcv_wnp (WNONE, sfd, len + 8);
+		if (pkr != NULL) {
+			pkr [1] = host_id;
+			pkr [2] = PKTYPE_RENESAS;
+			memcpy (pkr + 3, pkt, len);
+			tcv_endp (pkr);
+		}
+#endif
+		if (len < 4)
+			goto Ignore;
+
+		if (pkt [1] != 0 && pkt [1] != nodeid)
+			goto Ignore;
+
+		switch (((byte*)pkt) [0]) {
+
+		    case 0x81:
+
+			// Assume ACK, can there be anything else
+			if (((byte*)pkt) [4] == 0x06) {
+				rtries = 0;
+				trigger (&rtries);
+			}
+			break;
+
+		    case 0x11:
+
+			if (len < 6 || (pkr = tcv_wnp (NULL, sfu, 8)) == NULL)
+				goto Ignore;
+
+			((byte*)pkr) [0] = 0x91;
+			((byte*)pkr) [1] = 11;
+
+			pkr [1] = pkt [1];
+			pkr [2] = pkt [2];
+			pkr [3] = (pkt [2] == 0x0002) ? (nodeid == master) :
+				nodeid;
+
+			tcv_endp (pkr);
+			break;
+
+		    case 0x12:
+
+			if (len < 8)
+				goto Ignore;
+
+			if (pkt [2] == 0x0001)
+				nodeid = pkt [3];
+			else
+				master = pkt [3];
+
+			sack (0x12, pkt [1]);
+		}
+Ignore:
+#endif
 		tcv_endp (pkt);
 		proceed RD_LOOP;
 }
@@ -37,6 +126,8 @@ fsm root {
 	state RS_INIT:
 
 		word par;
+
+		nodeid = HOSTID;
 
 		phys_cc1100 (0, CC1100_MAXPLEN);
 		phys_uart (1, MAX_RENESAS_MESSAGE_LENGTH, 0);
@@ -145,25 +236,45 @@ fsm root {
 
 		tcv_endp (pkt);
 
+		rtries = RNTRIES;
+
 	state SRENESAS:
 
 		byte *pkt;
 
-		pkt = (byte*) tcv_wnp (SRENESAS, sfu, 13);
+		pkt = (byte*) tcv_wnp (SRENESAS, sfu, 16);
 
 		pkt [ 0] = 0x01;
-		pkt [ 1] = 16;
+		pkt [ 1] = 19;
 		((address) pkt) [1] = host_id;
-		((address) pkt) [2] = hst;
-		pkt [ 6] = but;
-		pkt [ 7] = glb;
-		pkt [ 8] = (byte) tst;
-		pkt [ 9] = vlt;
-		pkt [10] = rss;
-		pkt [11] = xpw;
-		pkt [12] = add;
+		((address) pkt) [2] = host_id;
+		((address) pkt) [3] = hst;
+		pkt [ 8] = but;
+		pkt [ 9] = glb;
+		pkt [10] = (byte) tst;
+		pkt [11] = vlt;
+		pkt [12] = rss;
+		pkt [13] = xpw;
+		pkt [14] = add;
+		pkt [15] = 1;		// Dummy age
 
 		tcv_endp ((address)pkt);
 
+	state WRACK:
+
+		if (rtries) {
+			when (&rtries, WRACK);
+			delay (32, RRETRY);
+			release;
+		}
+
 		proceed WPACKET;
+
+	state RRETRY:
+
+		if (!rtries)
+			proceed WPACKET;
+
+		rtries--;
+		sameas SRENESAS;
 }

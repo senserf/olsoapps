@@ -5,6 +5,13 @@
 #define	PKTYPE_BUTTON	3
 
 #define	PKTYPE_ACK	1
+#define	PKTYPE_RENESAS	127
 
 // This is pure payload, excluding STX, ETX, parity, and any DLE's
 #define	MAX_RENESAS_MESSAGE_LENGTH	64
+
+#define	MASTER_NODE_ID	1
+
+#define	RNTRIES		4
+
+#define	HOSTID		((word)host_id)
