@@ -77,9 +77,27 @@ fsm looper {
 		app_diag_U ("LOO: hold %u", (word)(htime - seconds()));
 #endif
 
+	// this is temporary, I think: heartbeat should be global, settable from pong
 	state HOLD:
 		when (TRIG_ALRM, BEG); // it'll reset htime (doesn't have to)
+		when (TRIG_RONIN, RONIN);
+		when (TRIG_DORO, DORO);
 		hold (HOLD, htime);
 		proceed BEG;
+		
+	state RONIN:
+		if (heartbeat < 3600) {
+			heartbeat += 60;
+			htime += 60;
+		}
+		proceed HOLD; // sameas is better?
+		
+	state DORO:
+		if (heartbeat != 60) {
+			heartbeat = 60;
+			htime = seconds() + 60;
+		}
+		proceed HOLD;
+		
 }
 

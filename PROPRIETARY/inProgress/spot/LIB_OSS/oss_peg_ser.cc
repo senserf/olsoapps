@@ -124,28 +124,28 @@ static char * board_out (char * p) {
 	char * b;
 
 	switch (((pongDataType *)p)->btyp) {
-		case 0: // chronoses
-		case 1:
+		case BTYPE_CHRONOS:
+		case BTYPE_CHRONOS_WHITE:
 			b = form (NULL, "V %u move %u.%u",
 				((pongPloadType0 *)_ppp)->volt,
 				((pongPloadType0 *)_ppp)->move_ago,
 				((pongPloadType0 *)_ppp)->move_nr);
 			break;
-		case 2:
+		case BTYPE_AT_BASE:
 			 b = form (NULL, "V %u",
 				((pongPloadType2 *)_ppp)->volt);
 			break;
-		case 3:
+		case BTYPE_AT_BUT6:
 			b = form (NULL, "V %u dial %u.%u",
 				((pongPloadType3 *)_ppp)->volt,
 				((pongPloadType3 *)_ppp)->dial,
 				((pongPloadType3 *)_ppp)->glob);
 			break;
-		case 4:
+		case BTYPE_AT_BUT1:
 			b = form (NULL, "V %u",
 				((pongPloadType4 *)_ppp)->volt);
 			break;
-		case 5:
+		case BTYPE_WARSAW:
 			b = form (NULL, "V %u s %u.%u",
 				((pongPloadType5 *)_ppp)->volt,
 				((pongPloadType5 *)_ppp)->random_shit,

@@ -33,6 +33,7 @@
 #define TRIG_DORO	4
 #define TRIG_OSSO	5
 #define TRIG_MBEAC	6
+#define TRIG_OSSIN	7
 
 /////////// tag-related structs ////////////////
 

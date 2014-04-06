@@ -12,7 +12,7 @@
 #include "alrms.h"
 
 // retry delay, try  nr, rx span, spare bits, power levels
-pongParamsType  pong_params = { 5, 4, 2, 0, 0x7531};
+pongParamsType  pong_params = { 5, 3, 2, 0, 0x7753};
 
 char pong_frame [sizeof(msgPongType) + sizeof(pongPloadType)];
 
@@ -242,7 +242,7 @@ void load_pframe () {
         in_pongPload(pong_frame, volt) = ap319.volt;
         in_pongPload(pong_frame, dial) = ap319.dial;
 		in_pongPload(pong_frame, glob) = 
-			ap319.alrm_id && (ap319.gmap & (1 << (ap319.alrm_id -1))) ? 1 : 0;
+			!ap319.alrm_id || (ap319.gmap & (1 << (ap319.alrm_id -1))) ? 1 : 0;
     } else {
 		pf = fifek_pull (&pframe_stash);
 		in_pong(pong_frame, pd.alrm_id) = in_pong(pf, pd.alrm_id);

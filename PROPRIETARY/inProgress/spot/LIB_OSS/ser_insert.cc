@@ -44,7 +44,6 @@ fsm perp_oss_out () {
 		ser_outb (RETRY, ptr);
 		proceed (CHECK);
 }
-#undef FIFEK_SIZ
 
 /////////////////
 

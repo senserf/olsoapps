@@ -6,6 +6,7 @@
 #include "commons.h"
 #include "diag.h"
 #include "inout.h"
+#include "vartypes.h"
 
 /**************************************************************************
 tagList is a simple list of structs with Master-unconfirmed tags. New alarms
@@ -76,6 +77,14 @@ word del_tag (word id, word ref, word dupeq, Boolean force) {
 	return 3;
 }
 
+static Boolean is_global ( char * b) {
+
+	if (((pongDataType *)(b+sizeof(msgReportType)))->btyp != BTYPE_AT_BUT6)
+		return YES;
+		
+	return ((pongPloadType3 *)(b+sizeof(msgReportType)+sizeof(pongDataType)))->glob;
+}
+
 void report_tag (char * td) {
 	char  * mp;
 	word	siz = sizeof(msgReportType) + sizeof(pongDataType) +
@@ -99,7 +108,7 @@ void report_tag (char * td) {
 
 	memcpy (mp + sizeof(msgReportType), td + sizeof(tagDataType),
 		siz - sizeof(msgReportType));
-	talk (mp, siz, TO_ALL); // will NOT go TO_NET on Master. see talk()
+	talk (mp, siz, is_global (mp) ? TO_ALL : TO_OSS); // will NOT go TO_NET on Master. see talk()
 	ufree (mp);
 }
 

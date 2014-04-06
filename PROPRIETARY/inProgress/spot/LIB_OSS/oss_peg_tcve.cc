@@ -11,19 +11,17 @@
 #include "tcvphys.h"
 #include "phys_uart.h"
 
+
+
 #include "tcve_insert.cc"
 
-// note that field ids (fid_*) requested by AT don't make sense here
 typedef struct statsStruct {
 	word	type :8;
 	word	len	 :8;
-	word	nid;	// Node Address?
-//	word	fid_mid;
+	word	nid;
 	word	mid;
-//	word	fid_up
-	word	up_h;
 	word	up_l;
-//	word	fid_mem;
+	word	up_h;
 	word	mem;
 	word	min;
 } stats_t; // 14B
@@ -35,7 +33,7 @@ static void stats () {
 		return;
 
 	mem = memfree(0, &mmin);
-	b->type = 0x91;
+	b->type = 0xD1;
 	b->len = 14 + 3;
 	b->nid = local_host;
 	b->mid = master_host;
@@ -43,20 +41,48 @@ static void stats () {
 	b->up_l = (word)seconds();
 	b->mem = mem;
 	b->min = mmin;
-	_oss_out ((char *)b);
+
+	_oss_out ((char *)b, NO);
 }
 
-static void byteout (byte typ, byte val) {
-	char * cb = get_mem (5+3, NO);
-	if (cb == NULL)
+static void sack (byte req, word add, Boolean ok) {
+	char *b;
+
+	if ((b = get_mem (5, NO)) == NULL)
 		return;
-	cb[0] = typ;
-	cb[1] = 8;
-	((address)cb)[1] = local_host;
-	cb[4] = val;
-	_oss_out (cb);
-}
+
+	b [0] = (req | 0x80);
+	b [1] = 5+3;
 	
+	((address)b) [1] = add;
+	
+	b [4] = ok ? 0x06 : 0x15;
+	
+	_oss_out (b, YES);
+}
+
+static void reply11 (char *pkt) {
+
+	char *b;
+	word len;
+
+	len = tcv_left ((address)pkt);
+
+	if (len < 6 || (b = get_mem (8, NO)) == NULL) {
+		app_diag_S ("rep11 %u", len);
+		return;
+	}
+
+	b [0] = 0x91;
+	b [1] = 8+3;
+
+	((address)b) [1] = ((address)pkt) [1];
+	((address)b) [2] = ((address)pkt) [2];
+	((address)b) [3] = (((address)pkt) [2] == 0x0002) ?
+		(local_host == master_host) : local_host;
+	_oss_out (b, YES);
+}
+
 ///////////////// oss in ////////////////
 
 /* no need for that here, but we could build appropriate structs here and
@@ -75,36 +101,85 @@ fsm cmd_in {
 		char * b;
 		char * ib = (char *) tcv_rnp (LISN, oss_fd);
 
+		if ((l = tcv_left ((address)ib)) < 5) { // what do we do? ack?
+			app_diag_S ("cmdlen %u", l);
+			tcv_endp ((address)ib);
+			proceed LISN;
+		}
+		
+		if (osync.type) { // only (n)acks allowed
+			if ((osync.type | 0x80) == (byte)ib[0]) {
+				trigger (TRIG_OSSIN);
+			} else {
+				app_diag_S ("badack %x", ((word)osync.type << 8) | *ib);
+			}
+			tcv_endp ((address)ib);
+			proceed LISN;
+		}
+		
+		// NOTE that with (n)ack pending, we won't get here
 		switch ((byte)(*ib)) {
-			case 0x11:	// mutated 'get node'
-				stats();
+			case 0x11:
+				reply11 (ib);
 				break;
 
-			case 0xFF: reset();
+			case 0x12:
+				if (ib[1] != 11) {
+					sack (0x12, 0, NO);
+					break;
+				}
+				switch (((address)ib)[2]) {
+					case 0x0001:
+						if (((address)ib)[3]) {
+							local_host = ((address)ib)[3];
+							sack (0x12, ((address)ib)[1], YES);
+						} else {
+							sack (0x12, ((address)ib)[1], NO);
+						}
+						break;
+						
+					case 0x0002:
+						// ack on bad, as requested
+						if (local_host != ((address)ib)[3]) {
+							sack (0x12, ((address)ib)[1], YES);
+							break;
+						}
+						
+						if (local_host != master_host) {
+							master_host = local_host;
+							tarp_ctrl.param = 0xB0;
+							tagList.block = YES;
+							reset_tags();
+							killall (looper);
+							runfsm mbeacon;
+						}
+						// apparently, it comes to the master for a twisted fun
+						sack (0x12, ((address)ib)[1], YES);
+						break;
 
-			case 0x12:	// I shortcut 'set node' to 'm' command
-				if (local_host == master_host) {
-					if (running (mbeacon)) {
-					    trigger (TRIG_MBEAC);
-					} else {
-					    runfsm mbeacon;
-					}
-					byteout (0x12+0x80, 0x15);	// lets send nack here
-				} else {
-					master_host = local_host;
-					tarp_ctrl.param = 0xB0;
-					tagList.block = YES;
-					reset_tags();
-					killall (looper);
-					runfsm mbeacon;
-					byteout (0x12+0x80, 0x06); // and ack here
+					case 0x0003:
+						// in case sb does need to send mbeacon (out of spec)
+						if (local_host == master_host) {
+							if (running (mbeacon)) {
+								trigger (TRIG_MBEAC);
+							} else {
+								runfsm mbeacon;
+							}
+							sack (0x12, ((address)ib)[1], YES);
+						} else {
+							sack (0x12, ((address)ib)[1], NO);
+						}
+
+					default:
+						sack (0x12, ((address)ib)[1], NO);
 				}
 				break;
 
 			case 0x41:
 			case 0x42:
 			case 0x43:
-				if (*((word *)(ib +2)) != local_host) {
+				sack (ib[0], ((address)ib)[1], YES);
+				if (((address)ib)[1] != local_host) {
 				    l = ib[1] -3 + sizeof(msgFwdType);
 
 				    if ((b = get_mem (l, NO)) != NULL) {
@@ -113,35 +188,79 @@ fsm cmd_in {
 						in_header(b, rcv) = *((word *)(ib +2));
 						in_fwd(b, ref) = (word)seconds();
 						memcpy (b+sizeof(msgFwdType), ib, l - sizeof(msgFwdType));
-						talk (b, l, TO_ALL);
+						talk (b, l, TO_NET); // not to stubborn renensas i/f
+						// send data to emul for tests in vuee
+						app_diag_U ("fwd %x to %u #%u", ((address)ib)[0],
+							in_header(b, rcv), in_fwd(b, ref));
 						ufree (b);
 				    } else {
-						byteout (0x12+0x80, 0x15);
+						sack (ib[0], ((address)ib)[1], NO);
 					}
 				} else {
-					byteout (0x12+0x80, 0x15);
+					sack (ib[0], ((address)ib)[1], NO); // will error code be invented?
 				}
 				break;
 
 			default: // ?
-				// ignore acks, nacks, etc.
-				app_diag_W ("ign cmd %x fr %u dat %x", ib[0], ((address)ib)[1], ib[4]); 
+				// ignore? ack? nack?
+				app_diag_W ("ign cmd %x", ((address)ib)[0]);
+				// if we ever get there, we'll have a 0xD. dispatch here
 		}
 		tcv_endp ((address)ib);
 		proceed LISN;
 }
 ///////////////////////////////
 
+#define _ppp	(p + sizeof(pongDataType))
+static void board_out (char * p, char * b) {
+
+	// for boards other tham ap319, 320: just for fun
+	switch (((pongDataType *)p)->btyp) {
+		case BTYPE_CHRONOS:
+		case BTYPE_CHRONOS_WHITE:
+			b[11] = (byte)((((pongPloadType0 *)_ppp)->volt - 1000) >> 3);
+			b[9] = (byte)((pongPloadType0 *)_ppp)->move_ago; // vy not
+			b[14] = (byte)((pongPloadType0 *)_ppp)->move_nr;
+			break;
+
+		case BTYPE_AT_BASE:
+			b[11] = (byte)((((pongPloadType2 *)_ppp)->volt - 1000) >> 3);
+			b[9] = 9;
+			b[14] = 14;
+			break;
+			
+		case BTYPE_AT_BUT6:
+			b[9] = ((pongPloadType3 *)_ppp)->glob;
+			b[11] = (byte)((((pongPloadType3 *)_ppp)->volt - 1000) >> 3);
+			b[14] = ((pongPloadType3 *)_ppp)->dial;
+			break;
+
+		case BTYPE_AT_BUT1:
+			b[9] = 1;
+			b[11] = (byte)((((pongPloadType4 *)_ppp)->volt - 1000) >> 3);
+			b[14] = 0;
+			break;
+			
+		case BTYPE_WARSAW:
+			b[9] = (byte)((pongPloadType5 *)_ppp)->random_shit;
+			b[11] = (byte)((((pongPloadType5 *)_ppp)->volt - 1000) >> 3);
+			b[14] = (byte)((pongPloadType5 *)_ppp)->steady_shit;
+			break;
+
+		default:
+			app_diag_W ("btyp %u", ((pongDataType *)p)->btyp);
+	}
+}
+#undef _ppp
 
 // this is the main out on the oss i/f, I don't know at all if this makes
 // more sense than no generic i/f at all
 // NO parameter sanitization
 void oss_tx (char * b, word siz) {
 	char *bu;
-	Boolean incoming;
 
-	// I'm not sure (now) what to do with these 2 spec. cases FIXME dupa
-	// likely, we'll need a dbg i/f
+	// I'm not sure (now) what to do with these 2 spec. cases
+	// likely, we'll need a dbg i/f; for now dump to emul
 
 	// allocated, freed after output
 	if (siz == MAX_WORD) {
@@ -151,71 +270,69 @@ void oss_tx (char * b, word siz) {
 	}
 	if (siz == 0) { // copied for direct output
 		app_diag_U (b);
-		if (bu)
-			app_diag_U (b);
 		return;
 	}
 
 	// b[0] doesn't have to be msg_type; if not, must be off the enum
 	switch (b[0]) {
+	
 		case msg_report:
-			incoming = in_header(b, rcv) == local_host ? YES : NO;
-			bu = get_mem (siz + 4 - sizeof(headerType), NO);
-			if (bu == NULL)
+			
+			if ((bu = get_mem (16, NO)) == NULL)
 				return;
-				
-			memcpy (bu +4, b +sizeof(headerType), siz - sizeof(headerType));
+			
 			bu[0] = 0x01;
-			bu[1] = siz + 4 - sizeof(headerType) +3;
-			((address)bu)[1] = in_header(b, snd);
-			_oss_out (bu);
+			bu[1] = 16+3;
+			((address)bu)[1] = local_host;
+			((address)bu)[2] = in_header(b, snd) == 0 ? local_host : in_header(b, snd);
+			((address)bu)[3] = in_report(b, tagid);
+			bu[8] = ((pongDataType *)(b + sizeof(msgReportType)))->alrm_id;
+			// board specific bu[9] = global flag
+			bu[10] = ((pongDataType *)(b + sizeof(msgReportType)))->alrm_seq;
+			// board-specific bu[11] = voltage
+			bu[12] = in_report(b, rssi);
+			bu[13] = ((pongDataType *)(b + sizeof(msgReportType)))->plev;
+			// board-specific bu[14] = dial
+			board_out (b + sizeof(msgReportType), bu); // sets board-specifics
+			bu[15] = in_report(b, ago);
+
+			_oss_out (bu, NO);
 			break;
 
 	    case msg_reportAck:
-			bu = get_mem (4+2+2+1+1, NO);
-			if (bu == NULL)
-				return;
-			bu[0] = 0x81;
-			bu[1] = 11;
-			((address)bu)[1] = in_reportAck(b, tagid);
-			((address)bu)[2] = in_fwd(b, ref);
-			bu[6] = tagList.alrms;
-			bu[7] = tagList.evnts;
-			_oss_out (bu);
+		// renesas doesn't want to see it
+		
+			app_diag_U ("repAck #%u t%u l%u.%u", in_reportAck(b, ref),
+				in_reportAck(b, tagid), tagList.alrms, tagList.evnts);
 			break;
 
 	    case msg_fwd:
-			incoming = in_header(b, snd) != 0 &&
-				in_header(b, snd) != local_host;
-			
-			bu = get_mem (*(b+sizeof(msgFwdType) +1) -3, NO);
-			if (bu == NULL)
-				return;
-				
-			memcpy (bu, b+sizeof(msgFwdType), *(b +sizeof(msgFwdType) +1) -3);
-			
-			if (incoming)
-				((address)bu)[1] = in_header(b, snd);
-			else { // ok, I replace node addr with ref#
-				bu[0] += 0x80;
-				((address)bu)[1] = in_fwd(b, ref);
+			if (in_header(b, snd) == 0 || in_header(b, snd) == local_host) {
+				app_diag_S ("fwd??");
+				break;
 			}
-			_oss_out (bu);
+			
+			if ((bu = get_mem (*(b+sizeof(msgFwdType)+1) -3, NO)) == NULL) {
+				app_diag_S ("fwdlen %u", (word)*(b+sizeof(msgFwdType)+1-3));
+				return;
+			}
+			
+			memcpy (bu, b+sizeof(msgFwdType), *(b +sizeof(msgFwdType) +1) -3);
+			bu[0] |= 0x80;
+			((address)bu)[1] = in_header(b, snd);
+			
+			_oss_out (bu, YES);
 			break;
 
 	    case msg_fwdAck:
-			bu = get_mem (6, NO);
-			if (bu == NULL)
-				return;
-			bu[0] = 0x44; // I've made it up
-			bu[1] = 9;
-			((address)bu)[1] = in_header(b, snd);
-			((address)bu)[2] = in_fwd(b, ref);
-			_oss_out (bu);
+		// renesas doesn't want to see it
+		
+			app_diag_U ("fwdAck #%u fr%u", in_fwdAck(b, ref),
+				in_header(b, snd));
 			break;
 
 	    default:
-			app_diag_S ("dupa unfinished?");
+			app_diag_S ("unfinished? %x %u", *(address)b, siz);
 	}
 }
 
