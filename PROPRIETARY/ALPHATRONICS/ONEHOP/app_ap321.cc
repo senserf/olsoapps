@@ -14,7 +14,7 @@
 #include "cc1100.h"
 #endif
 
-#define	SHOW_RENESAS_OUTPUT	1
+//#define	SHOW_RENESAS_OUTPUT
 
 // ============================================================================
 
@@ -47,19 +47,14 @@ fsm rreader {
 //
 	state RD_LOOP:
 
-		address pkt;
-
-#ifdef SHOW_RENESAS_OUTPUT
-		address pkr;
+		address pkt, pkr;
 		word len;
-#endif
+
 		pkt = tcv_rnp (RD_LOOP, sfu);
+		len = tcv_left (pkt);
 
 #ifdef SHOW_RENESAS_OUTPUT
-
-		len = tcv_left (pkt);
-#if 0
-		pkr = tcv_wnp (WNONE, sfd, len + 8);
+		pkr = tcv_wnp (WNONE, sfd, len + (len & 1) ? 9 : 8);
 		if (pkr != NULL) {
 			pkr [1] = host_id;
 			pkr [2] = PKTYPE_RENESAS;
@@ -113,7 +108,6 @@ fsm rreader {
 			sack (0x12, pkt [1]);
 		}
 Ignore:
-#endif
 		tcv_endp (pkt);
 		proceed RD_LOOP;
 }
@@ -264,7 +258,7 @@ fsm root {
 
 		if (rtries) {
 			when (&rtries, WRACK);
-			delay (32, RRETRY);
+			delay (512, RRETRY);
 			release;
 		}
 

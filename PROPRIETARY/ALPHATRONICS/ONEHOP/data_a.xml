@@ -8,7 +8,7 @@
     <nodes>
 	<node type="ap321" hid="0xBACA000A" default="board">
 	    <location>18.0 15.154</location>
-	    <uart_window display="yes"/>
+	    <uart_window display="no"/>
 	</node>
 
 	<node type="ap319" hid="0xBACA0081" default="board">

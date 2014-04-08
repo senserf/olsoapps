@@ -7,38 +7,55 @@ proc plug_init { ags } {
 	global PLUG
 
 	set PLUG(DUMP) 0
-	if { [string first "D" $ags] >= 0 } {
-		set PLUG(DUMP) 1
-	}
-	if { [string first "DD" $ags] >= 0 } {
-		set PLUG(DUMP) 2
-	}
 
 	if [regexp {[[:<:]]-m[[:blank:]]([[:digit:]]+)[[:>:]]} $ags jnk mn] {
-		set PLUG(MA) [expr $mn]
+		set PLUG(MASTER) [expr $mn]
 	} else {
 		# the default master node
-		set PLUG(MA) 1
+		set PLUG(MASTER) 1
 	}
 
-	# unacknowledged count for poll messages
-	set PLUG(UC) 0
+	while { $ags != "" } {
+		if { [string index $ags 0] == "D" } {
+			incr PLUG(DUMP)
+		}
+		set ags [string range $ags 1 end]
+	}
 
 	# node Id (unknown yet)
-	set PLUG(NI) ""
+	set PLUG(NODEID) ""
 
-	# time to failure report
-	set PLUG(TF,R) 10000
-	set PLUG(TF) $PLUG(TF,R)
+	# pending command
+	set PLUG(PENDING) ""
 
-	plug_periodic_query
+	# number of failures
+	set PLUG(FAILURES) 0
+
+	# the renesas thread
+	set PLUG(RSTATE) 0
+	set PLUG(CB,RENESAS) [after 1 plug_renesas]
+	set PLUG(CB,TIMEOUT) ""
+
+	# Retransmission interval
+	set PLUG(RTIME)	100
+	# Longer interval for persistent polling for Node Id
+	set PLUG(LTIME) 500
+	# Poll time
+	set PLUG(PTIME) 2000
+
+	# Number of retries
+	set PLUG(RETRIES) 3
+
 }
 
 proc plug_close { } {
 
 	global PLUG
 
-	catch { after cancel $PLUG(PQ) }
+	# kill all callbacks
+	foreach c [array names PLUG "CB,*"] {
+		catch { after cancel $PLUG($c) }
+	}
 	array unset PLUG
 }
 
@@ -54,7 +71,7 @@ proc plug_inppp_b { in } {
 		set inp [string trimleft \
 			[string range $inp [string length $mat] end]]
 		if [catch { expr $inp } no] {
-			set no $PLUG(NI)
+			set no $PLUG(NODEID)
 			if { $no == "" } {
 				pt_tout "Node Id still unknown,\
 					command ignored!"
@@ -67,8 +84,20 @@ proc plug_inppp_b { in } {
 			return 0
 		}
 
-		set PLUG(MA) $no
+		set PLUG(MASTER) $no
 		pt_tout "Master node Id = [format %04X $no] ($no)"
+		return 0
+	}
+
+	if [regexp {^d[[:alpha:]]*} $inp mat] {
+		# dump
+		set inp [string trimleft \
+			[string range $inp [string length $mat] end]]
+		if [catch { expr $inp } df] {
+			pt_tout "Number expected!"
+			return 0
+		}
+		set PLUG(DUMP) $df
 		return 0
 	}
 
@@ -94,18 +123,22 @@ proc plug_inppp_b { in } {
 		lappend lv $n
 	}
 
-	if { $lv == "" } {
-		pt_tout "Empty sequence ignored!"
+	if { [llength $lv ] < 2 } {
+		pt_tout "Need at least two bytes!"
 		return 0
 	}
 
-	set res "[lindex $lv 0] [expr [llength $lv] + 4]\
-		[join [lrange $lv 1 end]]"
+	set lf [expr [llength $lv] + 3]
+	set ls [lindex $lv 1]
 
-	if $PLUG(DUMP) {
-		pt_tout "-->: \[$res\]"
+	if { $ls != $lf } {
+		pt_tout "Fixing length $ls to $lf"
 	}
-	pt_outln $res
+
+	set lv [lreplace $lv 1 1 $lf]
+
+	plug_dmp $lv "-->"
+	pt_outln $lv
 
 	return 0
 }
@@ -115,44 +148,45 @@ proc plug_outpp_b { in } {
 	upvar $in inp
 	global PLUG
 
-	set ln [llength $inp]
+	set org ""
+	set ln 0
+	foreach v $inp {
+		lappend org "0x$v"
+		incr ln
+	}
 
 	if { $ln < 5 } {
 		# garbage
-		if $PLUG(DUMP) {
-			pt_tout "<-U: \[$inp\]"
-		}
+		plug_dmp $org "<-U"
 		return
 	}
 
-	set org $inp
-
-	set tp [expr 0x[lindex $inp 0]]
-	set tl [expr 0x[lindex $inp 1]]
-	set nl [expr 0x[lindex $inp 2]]
-	set nh [expr 0x[lindex $inp 3]]
-	set no [expr $nl | ($nh << 8)]
-	set inp [lrange $inp 4 end]
+	lassign $org tp tl nl nh no
+	set inp [lrange $org 4 end]
 
 	if { $tp == 0x91 && $ln >= 8 } {
 		# response to "get node info"
-		if { $PLUG(DUMP) > 1 } {
-			pt_tout "<-P: \[$org\]"
+		if { $PLUG(PENDING) == $tp } {
+			# awaited
+			set PLUG(PENDING) ""
+			plug_dmp $org "<-W" 2
+		} else {
+			# spurious
+			plug_dmp $org "<-S" 1
 		}
-		set ii [expr 0x[lindex $inp 0] | (0x[lindex $inp 1] << 8)]
+		set ii [expr [lindex $inp 0] | ([lindex $inp 1] << 8)]
 		if { $ii == 1 } {
-			set ni [expr 0x[lindex $inp 2] | \
-				(0x[lindex $inp 3] << 8)]
-			if { $PLUG(NI) == "" } {
-				set PLUG(TF) $PLUG(TF,R)
-				set PLUG(UC) 0
+			set ni [expr [lindex $inp 2] | \
+				([lindex $inp 3] << 8)]
+			if { $PLUG(NODEID) == "" } {
 				pt_tout "Node Id = [format %04X $ni] ($ni)"
-				set PLUG(NI) $ni
-			} elseif { $PLUG(NI) != $ni } {
+				set PLUG(NODEID) $ni
+			} elseif { $PLUG(NODEID) != $ni } {
 				pt_tout "Node Id change:\
-					[format %04X $PLUG(NI)] ($PLUG(NI)) -->\
+					[format %04X $PLUG(NODEID)]\
+					($PLUG(NODEID)) -->\
 					[format %04X $ni] ($ni)"
-				set PLUG(NI) $ni
+				set PLUG(NODEID) $ni
 			}
 		}
 		# more?
@@ -161,46 +195,41 @@ proc plug_outpp_b { in } {
 
 	if { $tp == 0x92 } {
 		# ACK for "set node info"
-		if { $PLUG(DUMP) > 1 } {
-			pt_tout "<-A: \[$org\]"
-		}
-		set ac [expr 0x[lindex $inp 0]]
-		if { $ac == 0x06 } {
-			if { $PLUG(UC) > 0 } {
-				incr PLUG(UC) -1
-			}
+		if { $PLUG(PENDING) == $tp } {
+			# awaited
+			set PLUG(PENDING) ""
+			plug_dmp $org "<-W" 2
+		} else {
+			# spurious
+			plug_dmp $org "<-S" 1
 		}
 		return 0
 	}
 
 	if { $tp == 0x01 && $ln >= 16 } {
-		if $PLUG(DUMP) {
-			pt_tout "<-E: \[$org\]"
-		}
-		set pi [expr 0x[lindex $inp  0] | (0x[lindex $inp 1] << 8)]
-		set ti [expr 0x[lindex $inp  2] | (0x[lindex $inp 3] << 8)]
-		set ts [expr 0x[lindex $inp  6]]
-		if { $pi == $PLUG(NI) } {
+		plug_dmp $org "<-E"
+		set pi [expr [lindex $inp  0] | ([lindex $inp 1] << 8)]
+		set ti [expr [lindex $inp  2] | ([lindex $inp 3] << 8)]
+		set ts [expr [lindex $inp  6]]
+		if { $pi == $PLUG(NODEID) } {
 			# this peg
 			if { [info exists PLUG(EV,$ti)] && $PLUG(EV,$ti) ==
 			     $ts } {
 				# duplicate
 				set out "0x81 0x08 $nl $nh 0x06"
-				if { $PLUG(DUMP) > 1 } {
-					pt_tout "D->: \[$out\]"
-				}
+				plug_dmp $out "D->" 2
 				pt_outln $out
 				return 0
 			}
 			set PLUG(EV,$ti) $ts
 		}
-		set bu [expr 0x[lindex $inp  4]]
-		set it [expr 0x[lindex $inp  5]]
-		set vo [expr 0x[lindex $inp  7]]
-		set rs [expr 0x[lindex $inp  8]]
-		set tx [expr 0x[lindex $inp  9]]
-		set ad [expr 0x[lindex $inp 10]]
-		set ag [expr 0x[lindex $inp 11]]
+		set bu [expr [lindex $inp  4]]
+		set it [expr [lindex $inp  5]]
+		set vo [expr [lindex $inp  7]]
+		set rs [expr [lindex $inp  8]]
+		set tx [expr [lindex $inp  9]]
+		set ad [expr [lindex $inp 10]]
+		set ag [expr [lindex $inp 11]]
 		pt_tout "Event, peg = [format %04X $pi] ($pi),\
 			tag = [format %04X $ti] ($ti), ad = $ad, sn = $ts:"
 		if $it {
@@ -215,65 +244,125 @@ proc plug_outpp_b { in } {
 		pt_tout "    age:      $ag"
 		# send ACK
 		set out "0x81 0x08 $nl $nh 0x06"
-		if $PLUG(DUMP) {
-			pt_tout "A->: \[$out\]"
-		}
+		plug_dmp $out "A->"
 		pt_outln $out
 		return 0
 	}
 
-	if $PLUG(DUMP) {
-		pt_tout "<-U: \[$org\]"
-	}
+	plug_dmp $org "<-U"
 	return 0
 }
 		
 ###############################################################################
 ###############################################################################
 
-proc plug_periodic_query { } {
+proc plug_timeout_start { del } {
 
 	global PLUG
 
-	# low and high bytes of master node Id
-	set ml [expr $PLUG(MA) % 256]
-	set mh [expr $PLUG(MA) / 256]
-
-	set out "0x11 0x09 0x00 0x00 $ml $mh"
-	if { $PLUG(DUMP) > 1 } {
-		pt_tout "P->: \[$out\]"
-	}
-	pt_outln $out
-
-	if { $PLUG(NI) == "" } {
-		if { $PLUG(TF) <= 0 } {
-			pt_tout "Node Id still unknown!"
-			set PLUG(TF) $PLUG(TF,R)
-		} else {
-			incr PLUG(TF) -500
-		}
-		set PLUG(PQ) [after 500 plug_periodic_query]
-		return
+	if { $PLUG(CB,TIMEOUT) != "" } {
+		catch { after cancel $PLUG(CB,TIMEOUT) }
 	}
 
-	if { $PLUG(UC) >= 10 } {
-		if { $PLUG(TF) <= 0 } {
-			pt_tout "$PLUG(UC) unacked queries"
-			set PLUG(TF) $PLUG(TF,R)
-		}
-	}
-	set out "0x12 0x0B 0x00 0x00 0x02 0x00 $ml $mh"
-	if { $PLUG(DUMP) > 1 } {
-		pt_tout "P->: \[$out\]"
-	}
-	pt_outln $out
-	set PLUG(PQ) [after 2000 plug_periodic_query]
+	set PLUG(CB,TIMEOUT) [after $del plug_timeout_gooff]
+}
 
-	if { $PLUG(TF) >= 0 } {
-		incr PLUG(TF) -2000
+proc plug_timeout_gooff { } {
+
+	global PLUG
+
+	set PLUG(PENDING) $PLUG(PENDING)
+	set PLUG(CB,TO) ""
+}
+
+proc plug_timeout_clear { } {
+
+	global PLUG
+
+	if { $PLUG(CB,TIMEOUT) != "" } {
+		catch { after cancel $PLUG(CB,TIMEOUT) }
+		set PLUG(CB,TIMEOUT) ""
 	}
 }
 
+###############################################################################
+
+proc plug_renesas { } {
+
+	global PLUG
+
+	while 1 {
+
+###	#######################################################################
+###	#######################################################################
+
+	if ![info exists PLUG(MASTER)] {
+		return
+	}
+
+	set ml [expr {  $PLUG(MASTER)       & 0xFF }]
+	set mh [expr { ($PLUG(MASTER) << 8) & 0xFF }]
+
+	switch $PLUG(RSTATE) {
+
+	0 {
+		# start for get node info
+		set PLUG(TR) 1
+		set out "0x11 0x09 0x00 0x00 $ml $mh"
+		plug_dmp $out "P->" 2
+		pt_outln $out
+		set PLUG(PENDING) 0x91
+		set PLUG(RSTATE) 1
+		plug_timeout_start $PLUG(RTIME)
+		vwait PLUG(PENDING)
+	}
+
+	1 {
+		plug_timeout_clear
+		if { $PLUG(PENDING) != "" && $PLUG(TR) < $PLUG(RETRIES) } {
+			set out "0x11 0x09 0x00 0x00 $ml $mh"
+			plug_dmp $out "P->" 3
+			pt_outln $out
+			incr PLUG(RETRIES)
+			plug_timeout_start $PLUG(RTIME)
+		} elseif { $PLUG(NODEID) == "" } {
+			# still don't know the node Id, keep polling
+			set PLUG(RSTATE) 0
+			plug_timeout_start $PLUG(LTIME)
+		} else {
+			set PLUG(TR) 1
+			set out "0x12 0x0B 0x00 0x00 0x02 0x00 $ml $mh"
+			plug_dmp $out "P->" 2
+			pt_outln $out
+			set PLUG(PENDING) 0x92
+			set PLUG(RSTATE) 2
+			plug_timeout_start $PLUG(RTIME)
+		}
+		vwait PLUG(PENDING)
+	}
+
+	2 {
+		plug_timeout_clear
+		if { $PLUG(PENDING) != "" && $PLUG(TR) < $PLUG(RETRIES) } {
+			set out "0x12 0x0B 0x00 0x00 0x02 0x00 $ml $mh"
+			plug_dmp $out "P->" 3
+			pt_outln $out
+			incr PLUG(RETRIES)
+			plug_timeout_start $PLUG(RTIME)
+		} else {
+			# close the loop
+			set PLUG(RSTATE) 0
+			plug_timeout_start $PLUG(PTIME)
+		}
+		vwait PLUG(PENDING)
+	}
+	}
+
+###	#######################################################################
+###	#######################################################################
+	}
+}
+			
 proc plug_validate_int { n { min "" } { max "" } } {
 #
 # Validate an integer value
@@ -323,7 +412,7 @@ proc plug_parse_number { l } {
 		incr ix -1
 		if { $ix < 0 } {
 			# failure
-			return 1
+			error "illegal number"
 		}
 
 		if ![catch { expr [string range $line 0 $ix] } res] {
@@ -331,6 +420,29 @@ proc plug_parse_number { l } {
 			set line [string range $line [expr $ix + 1] end]
 			return $res
 		}
+	}
+}
+
+proc plug_toh { lv } {
+
+	set res ""
+
+	foreach v $lv {
+		lappend res [format "%02x" $v]
+	}
+
+	return [join $res]
+}
+
+proc plug_dmp { lv t { lev 1 } } {
+
+	global PLUG
+
+	if { $PLUG(DUMP) >= $lev } {
+		if { $t == "" } {
+			set t "-"
+		}
+		pt_tout "${t}: \[[plug_toh $lv]\]"
 	}
 }
 
