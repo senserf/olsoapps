@@ -66,7 +66,7 @@ proc plug_inppp_b { in } {
 
 	set inp [string trim $inp]
 
-	if [regexp {^m[[:alpha:]]*} $inp mat] {
+	if [regexp -nocase {^m[[:alpha:]]*} $inp mat] {
 		# master [n]
 		set inp [string trimleft \
 			[string range $inp [string length $mat] end]]
@@ -89,7 +89,7 @@ proc plug_inppp_b { in } {
 		return 0
 	}
 
-	if [regexp {^d[[:alpha:]]*} $inp mat] {
+	if [regexp -nocase {^d[[:alpha:]]*} $inp mat] {
 		# dump
 		set inp [string trimleft \
 			[string range $inp [string length $mat] end]]
@@ -105,22 +105,47 @@ proc plug_inppp_b { in } {
 
 	set lv ""
 
-	while 1 {
-		set inp [string trimleft $inp]
-		if { $inp == "" } {
-			break
-		}
+	if [regexp -nocase {^x} $inp] {
+		# line in hex
+		set inp [string range $inp 1 end]
 
-		if [catch { plug_parse_number inp } val] {
-			pt_tout "Illegal expression: $inp, input ignored!"
-			return 0
-		}
+		while 1 {
 
-		if [catch { plug_validate_int $val 0 255 } n] {
-			pt_tout "Illegal byte value: $val, input ignored!"
-			return 0
+			set inp [string trimleft $inp]
+			if { $inp == "" } {
+				break
+			}
+
+			set dd [string range $inp 0 1]
+			set inp [string range $inp 2 end]
+
+			if [catch { expr 0x$dd } val] {
+				pt_tout "Bad input: $dd is not a pair of hex\
+					digits, ignored!"
+				return 0
+			}
+			lappend lv $val
 		}
-		lappend lv $n
+	} else {
+		# free style numbers/expressions
+		while 1 {
+			set inp [string trimleft $inp]
+			if { $inp == "" } {
+				break
+			}
+		
+			if [catch { plug_parse_number inp } val] {
+				pt_tout "Bad input: $inp ($val), ignored!"
+				return 0
+			}
+
+			if [catch { plug_validate_int $val 0 255 } n] {
+				pt_tout "Illegal byte value: $val,\
+					input ignored!"
+				return 0
+			}
+			lappend lv $n
+		}
 	}
 
 	if { [llength $lv ] < 2 } {
@@ -212,15 +237,6 @@ proc plug_outpp_b { in } {
 		set ti [expr [lindex $inp  2] | ([lindex $inp 3] << 8)]
 		set ts [expr [lindex $inp  6]]
 		if { $pi == $PLUG(NODEID) } {
-			# this peg
-			if { [info exists PLUG(EV,$ti)] && $PLUG(EV,$ti) ==
-			     $ts } {
-				# duplicate
-				set out "0x81 0x08 $nl $nh 0x06"
-				plug_dmp $out "D->" 2
-				pt_outln $out
-				return 0
-			}
 			set PLUG(EV,$ti) $ts
 		}
 		set bu [expr [lindex $inp  4]]
@@ -401,7 +417,7 @@ proc plug_parse_number { l } {
 		# a special check for a string which fares fine as an
 		# expression, but we don't want it; if it doesn't open the
 		# expression, but occurs inside, that's fine
-		error "illegal expression"
+		error "illegal \" at the beginning of expression"
 	}
 
 	set ll [string length $line]
@@ -419,6 +435,11 @@ proc plug_parse_number { l } {
 			# found, remove the match
 			set line [string range $line [expr $ix + 1] end]
 			return $res
+		}
+		# check for the special case of illegal octal number
+		set so [string range $line $ix [expr $ix + 1]]
+		if [regexp {[0-7][8-9]} $so] {
+			error "illegal octal digit in '$so'"
 		}
 	}
 }
