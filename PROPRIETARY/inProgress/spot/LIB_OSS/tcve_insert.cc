@@ -99,7 +99,11 @@ OutCrap:
 			sameas DONE;
 			
 		when (TRIG_OSSIN, DONE);
-		delay (50, --rtr > 0 ? RTRY : NOACK);
+#ifdef __SMURPH__
+		delay (500, --rtr > 0 ? RTRY : NOACK);
+#else
+		delay (500, --rtr > 0 ? RTRY : NOACK);
+#endif
 		release;
 		
 	state RTRY:

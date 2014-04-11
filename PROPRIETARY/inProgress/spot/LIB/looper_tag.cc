@@ -16,9 +16,11 @@
 #include "sensors.h"
 #include "pong.h"
 
-word	heartbeat = 60; // seconds
-
 #define _LOO_DBG	0
+#define _HBEAT	900
+#define _HBEAT_MAX	3600
+
+word	heartbeat = _HBEAT; // seconds
 
 /* VOLTAGE is consistent across the boards, but I'd like to see how this
    works for common functionality on board-specific resources...
@@ -86,18 +88,20 @@ fsm looper {
 		proceed BEG;
 		
 	state RONIN:
-		if (heartbeat < 3600) {
-			heartbeat += 60;
-			htime += 60;
+		if (heartbeat < _HBEAT_MAX) {
+			heartbeat += _HBEAT;
+			htime += _HBEAT;
 		}
-		proceed HOLD; // sameas is better?
+		proceed HOLD;
 		
 	state DORO:
-		if (heartbeat != 60) {
-			heartbeat = 60;
-			htime = seconds() + 60;
+		if (heartbeat != _HBEAT) {
+			heartbeat = _HBEAT;
+			htime = seconds() + _HBEAT;
 		}
 		proceed HOLD;
 		
 }
-
+#undef _LOO_DBG
+#undef _HBEAT
+#undef _HBEAT_MAX

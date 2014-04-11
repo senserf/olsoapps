@@ -13,7 +13,7 @@
 #include "tag_mgr.h"
 #include "hold.h"
 
-word	heartbeat = 25; // seconds
+word	heartbeat = 60; // seconds
 
 #define _LOO_DBG	0
 
@@ -56,7 +56,7 @@ fsm looper {
 				in_tdt(tp, refTime));
 #endif
 			in_tdt(tp, marka) = tagList.marka;
-			report_tag (tp);
+			(void) report_tag (tp);
 			delay (1024, TAG);
 			release;
 		}
@@ -73,3 +73,4 @@ fsm looper {
                 proceed BEG;
 }
 
+#undef _LOO_DBG

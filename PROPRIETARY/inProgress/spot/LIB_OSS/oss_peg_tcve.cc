@@ -152,6 +152,7 @@ fsm cmd_in {
 							reset_tags();
 							killall (looper);
 							runfsm mbeacon;
+							app_diag_W ("I am M");
 						}
 						// apparently, it comes to the master for a twisted fun
 						sack (0x12, ((address)ib)[1], YES);

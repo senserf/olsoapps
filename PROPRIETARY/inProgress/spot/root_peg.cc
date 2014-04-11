@@ -19,11 +19,11 @@ static void init () {
 	net_opt (PHYSOPT_SETPOWER, &pl);
 	reset_tags();
 	if (local_host == master_host) {
-        tarp_ctrl.param = 0xB0; // level 2, rec 3, slack 0, fwd off
+        tarp_ctrl.param = 0xB2; // level 2, rec 3, slack 1, fwd off
 		runfsm mbeacon;
 		tagList.block = YES;
 	} else {
-        tarp_ctrl.param = 0xB1; // level 2, rec 3, slack 0, fwd on
+        tarp_ctrl.param = 0xB3; // level 2, rec 3, slack 1, fwd on
 		runfsm looper;
 	}
 	runfsm hear;

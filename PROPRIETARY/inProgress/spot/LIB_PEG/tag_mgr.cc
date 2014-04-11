@@ -85,8 +85,12 @@ static Boolean is_global ( char * b) {
 	return ((pongPloadType3 *)(b+sizeof(msgReportType)+sizeof(pongDataType)))->glob;
 }
 
-void report_tag (char * td) {
+/*************
+returns 1 if report goes global, 0 otherwise
+*************/
+Boolean report_tag (char * td) {
 	char  * mp;
+	Boolean globa;
 	word	siz = sizeof(msgReportType) + sizeof(pongDataType) +
 			in_pdt(td, len);
 
@@ -94,7 +98,7 @@ void report_tag (char * td) {
 
 	if (mp == NULL) {
 		app_diag_S ("Rep failed");
-		return;
+		return 0;
 	}
 
 	memset (mp, 0, siz);
@@ -108,14 +112,18 @@ void report_tag (char * td) {
 
 	memcpy (mp + sizeof(msgReportType), td + sizeof(tagDataType),
 		siz - sizeof(msgReportType));
-	talk (mp, siz, is_global (mp) ? TO_ALL : TO_OSS); // will NOT go TO_NET on Master. see talk()
+		
+	globa = is_global (mp);
+	talk (mp, siz, globa ? TO_ALL : TO_OSS); // will NOT go TO_NET on Master. see talk()
 	ufree (mp);
+	return globa;
 }
 
 // I let it do empty quick things if local_host == master_host
 void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 
 	Boolean force = in_pong(buf, pd).alrm_id == 0 ? NO : YES;
+	Boolean globa;
 	word ret = del_tag (in_header(buf, snd), 0, in_pong(buf, pd).dupeq, 
 			force);
 	char * ptr;
@@ -145,9 +153,9 @@ void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 	in_tdt(ptr, marka) = tagList.marka;
 	in_tdt(ptr, nel) = tagList.nel;
 
-	report_tag (ptr);
+	globa = report_tag (ptr);
 
-	if (local_host != master_host) { // on Master, just skip insertion...
+	if (globa && local_host != master_host) { // on Master, just skip insertion...
 		tagList.nel = ptr;
 
 		if (force)
