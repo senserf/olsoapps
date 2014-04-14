@@ -15,6 +15,7 @@ overwrite alarms. Acks from Master remove (del) corresponding entries.
 ***************************************************************************/
 tagListType tagList;
 
+#define	_TMGR_MAX_RELIABLE	12
 #define _TMGR_DBG	0
 void reset_tags () {
 
@@ -65,8 +66,17 @@ word del_tag (word id, word ref, word dupeq, Boolean force) {
 				else
 					tagList.nel = in_tdt(pl, nel);
 
+#if _TMGR_DBG
+				app_diag_U ("TMGR(%u): del %u %u %u %u", (word)seconds(),
+					in_tdt(pl, tagid), in_tdt(pl, refTime), tagList.alrms, tagList.evnts);
+#endif
+
 				ufree (pl);
 			} else {
+#if _TMGR_DBG
+				app_diag_U ("TMGR(%u): del badref %u %u %u %u", (word)seconds(),
+					ref, in_tdt(pl, refTime), tagList.alrms, tagList.evnts);
+#endif
 				return 2;
 			}
 			return ret;
@@ -115,6 +125,18 @@ Boolean report_tag (char * td) {
 		
 	globa = is_global (mp);
 	talk (mp, siz, globa ? TO_ALL : TO_OSS); // will NOT go TO_NET on Master. see talk()
+
+#if _TMGR_DBG
+	app_diag_U ("TMGR(%u): rep %u %u %u", (word)seconds(),
+		in_report(mp, tagid), in_report(mp, ago), globa);
+#endif
+
+	// remove old tags
+	if (in_report(mp, ago) == 255) {
+		siz = del_tag (in_report(mp, tagid), in_report(mp, ref), 0, YES);
+		app_diag_W ("Del(%u) aged tag %u", siz, in_report(mp, tagid));
+	}
+	
 	ufree (mp);
 	return globa;
 }
@@ -155,7 +177,26 @@ void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 
 	globa = report_tag (ptr);
 
-	if (globa && local_host != master_host) { // on Master, just skip insertion...
+	if (local_host == master_host) { // no insertions on Master
+		globa = NO;
+	} else {
+	
+		if (!globa || in_pdt(ptr, alrm_id) == 0 ||
+				tagList.alrms + tagList.evnts >= _TMGR_MAX_RELIABLE) {
+			
+#if _TMGR_DBG
+			app_diag_U ("TMGR(%u): ins skip %u %u %u %u", (word)seconds(),
+				in_tdt(ptr, tagid), globa, in_pdt(ptr, alrm_id),
+				tagList.alrms + tagList.evnts);
+#endif
+
+			globa = NO;
+		} else {
+			globa = YES;
+		}
+	} // by now globa means also 'insert'
+	
+	if (globa) {
 		tagList.nel = ptr;
 
 		if (force)
@@ -163,10 +204,12 @@ void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 		else
 			tagList.evnts++;
 #if _TMGR_DBG
-	app_diag_U ("TMGR rep %u %u", tagList.alrms, tagList.evnts);
+		app_diag_U ("TMGR(%u): ins %u %u %u", (word)seconds(),
+			in_tdt(ptr, tagid), tagList.alrms, tagList.evnts);
 #endif
 	} else 				// ... and free the element
 		ufree (ptr);
 }
 #undef _TMGR_DBG
+#undef _TMGR_MAX_RELIABLE
 

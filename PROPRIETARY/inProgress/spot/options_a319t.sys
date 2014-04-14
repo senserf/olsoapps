@@ -6,5 +6,7 @@
 #ifdef     __SMURPH__
 #undef DIAG_MESSAGES
 #define DIAG_MESSAGES	2
+//#include "options_retries.inc"
+
 #endif
 

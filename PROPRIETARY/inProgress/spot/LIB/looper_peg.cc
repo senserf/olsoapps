@@ -37,18 +37,41 @@ static char * nextel () {
 	return ptr;
 }
 
-fsm looper {
-        lword htime;
+#ifdef __SMURPH__
+#include "form.h"
+static trueconst char stats_str[] = "Node %u uptime %u.%u:%u:%u "
+	"master %u mem %u %u\r\n";
+static void stats_ () {
+	char * b = NULL;
+	word mmin, mem;
+	mem = memfree(0, &mmin);
+	b = form (NULL, stats_str, local_host, (word)(seconds() / 86400),
+		(word)((seconds() % 86400) / 3600), 
+		(word)((seconds() % 3600) / 60),
+		(word)(seconds() % 60), master_host,
+		mem, mmin);
+	app_diag_U (b);
+	ufree (b);
+}
+#endif
 
-        state BEG:
+fsm looper {
+    lword htime;
+
+    state BEG:
+
+#ifdef __SMURPH__
+		stats_();
+#endif
+
 #if _LOO_DBG
 		app_diag_U ("LOO: BEG (%u) %u+%u", (word)seconds(),
 			tagList.alrms, tagList.evnts);
 #endif
-                htime = seconds() + heartbeat;
+		htime = seconds() + heartbeat;
 		tagList.marka++;	// flip
 
-        state TAG:
+	state TAG:
 		char * tp = nextel();
 		if (tp) {
 #if _LOO_DBG
@@ -68,9 +91,9 @@ fsm looper {
 #if _LOO_DBG
 		app_diag_U ("LOO: hold %u", (word)(htime - seconds()));
 #endif
-        state HOLD:
-                hold (HOLD, htime);
-                proceed BEG;
+    state HOLD:
+		hold (HOLD, htime);
+		proceed BEG;
 }
 
 #undef _LOO_DBG
