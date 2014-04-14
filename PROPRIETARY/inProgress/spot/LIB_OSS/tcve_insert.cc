@@ -102,7 +102,7 @@ OutCrap:
 #ifdef __SMURPH__
 		delay (500, --rtr > 0 ? RTRY : NOACK);
 #else
-		delay (500, --rtr > 0 ? RTRY : NOACK);
+		delay (50, --rtr > 0 ? RTRY : NOACK);
 #endif
 		release;
 		
