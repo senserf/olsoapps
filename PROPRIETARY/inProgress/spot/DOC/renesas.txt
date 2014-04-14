@@ -1,0 +1,51 @@
+Packet format (escaped), all values HEX:
+
+02 TP LN NA NA ... DATA ... CC 03
+
+TP - content type (1 byte)
+LN - length (complete packet excepting escapes)
+NA - two byte NodeAddress
+CC - one byte XOR of everything from STX (02) to ETX (03) must be zero
+
+02, 03, 10 are escaped with 10
+
+====
+
+The PHY frames the packet and provides the escaped, we only deal with the cleartext stuff between TP and the last byte of DATA.
+
+====
+
+Protocol as of April 13, 2004
+=============================
+
+Renesas   -> 11 09 00 00 01 00		- query for node address
+                         02 00		- query for master status
+		       
+		       
+Replies:  -> 91 0b 00 00 01 00 NA NA	- node address
+                         02 00 x0 00    - x == 1, if master, 0 otherwise
+			 
+
+Renesas   -> 12 0b 00 00 01 00 NA NA    - set node address
+                         02 00 NA NA    - become master (NA must equal local_host)
+			 
+Replies   -> 92 08 00 00 06             - ACK
+                         15             - NAK (NA == 0 for 01)
+			 
+
+			 
+TI        -> 01 13 NA NA PE PE TA TA IT IR TS VO RS TX AD AG	- event
+
+		PE - peg address
+		TA - tag address
+		IT - input type (button number)
+		IR - input range 1 - global, 0 - local
+		TS - time stamp modulo 16
+		RS - RSSI
+		TX - TX power
+		AD - rotary address
+		AG - ago
+		
+Replies   -> 91 08 NA NA 06
+                         15
+
