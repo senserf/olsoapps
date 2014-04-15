@@ -17,7 +17,7 @@
 #include "pong.h"
 
 #define _LOO_DBG	0
-#define _HBEAT	900
+#define _HBEAT		3600
 #define _HBEAT_MAX	3600
 
 word	heartbeat = _HBEAT; // seconds

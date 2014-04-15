@@ -12,7 +12,7 @@
 #include "alrms.h"
 
 // retry delay, try  nr, rx span, spare bits, power levels
-pongParamsType  pong_params = { 5, 3, 2, 0, 0x7777};
+pongParamsType  pong_params = { 3, 4, 2, 0, 0x7777};
 
 char pong_frame [sizeof(msgPongType) + sizeof(pongPloadType)];
 

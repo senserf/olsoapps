@@ -78,8 +78,17 @@ static void reply11 (char *pkt) {
 
 	((address)b) [1] = ((address)pkt) [1];
 	((address)b) [2] = ((address)pkt) [2];
-	((address)b) [3] = (((address)pkt) [2] == 0x0002) ?
-		(local_host == master_host) : local_host;
+	switch (((address)b) [2]) { // will be more
+		case 0x0002:
+			((address)b) [3] = (local_host == master_host);
+			break;
+		case 0x0003:
+			((address)b) [3] = (tarp_ctrl.param & 1);
+			break;
+		default:
+			((address)b) [3] = local_host;
+	}
+	
 	_oss_out (b, YES);
 }
 
@@ -159,6 +168,15 @@ fsm cmd_in {
 						break;
 
 					case 0x0003:
+						if (((address)ib)[3])
+							tarp_ctrl.param |= 1;
+						else
+							tarp_ctrl.param &= 0xFE;
+							
+						sack (0x12, ((address)ib)[1], YES);
+						break;
+						
+					case 0x0004:
 						// in case sb does need to send mbeacon (out of spec)
 						if (local_host == master_host) {
 							if (running (mbeacon)) {
@@ -319,7 +337,7 @@ void oss_tx (char * b, word siz) {
 			}
 			
 			memcpy (bu, b+sizeof(msgFwdType), *(b +sizeof(msgFwdType) +1) -3);
-			bu[0] |= 0x80;
+			// bu[0] |= 0x80; not wanted
 			((address)bu)[1] = in_header(b, snd);
 			
 			_oss_out (bu, YES);

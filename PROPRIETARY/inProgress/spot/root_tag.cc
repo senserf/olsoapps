@@ -65,10 +65,14 @@ void process_incoming (char * buf, word size, word rssi) {
 fsm root {
 
 	entry RS_INIT:
+#ifdef __SMURPH__
+		word d = 1024 + (rnd() % 5121);
+#else
+		word d = 3072;
+#endif
 		init0();
-		word d = 1 + (word)(rnd() % 3);
-		set_lit (d, LED_ALRM, LED_BLINK, 0);
-		delay (d << 10, RS_INIT1);
+		set_lit (d >> 10, LED_ALRM, LED_BLINK, 0);
+		delay (d, RS_INIT1);
 		release;
 
 	entry RS_INIT1:
