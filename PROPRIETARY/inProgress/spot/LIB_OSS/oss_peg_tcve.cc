@@ -197,7 +197,6 @@ fsm cmd_in {
 			case 0x41:
 			case 0x42:
 			case 0x43:
-				sack (ib[0], ((address)ib)[1], YES);
 				if (((address)ib)[1] != local_host) {
 				    l = ib[1] -3 + sizeof(msgFwdType);
 
@@ -212,6 +211,7 @@ fsm cmd_in {
 						app_diag_U ("fwd %x to %u #%u", ((address)ib)[0],
 							in_header(b, rcv), in_fwd(b, ref));
 						ufree (b);
+						sack (ib[0], ((address)ib)[1], YES);
 				    } else {
 						sack (ib[0], ((address)ib)[1], NO);
 					}
