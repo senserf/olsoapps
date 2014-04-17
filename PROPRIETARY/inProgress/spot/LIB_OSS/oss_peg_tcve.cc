@@ -212,12 +212,10 @@ fsm cmd_in {
 							in_header(b, rcv), in_fwd(b, ref));
 						ufree (b);
 						sack (ib[0], ((address)ib)[1], YES);
-				    } else {
-						sack (ib[0], ((address)ib)[1], NO);
-					}
-				} else {
-					sack (ib[0], ((address)ib)[1], NO); // will error code be invented?
+						break;
+				    }
 				}
+				sack (ib[0], ((address)ib)[1], NO); // will error code be invented?
 				break;
 
 			default: // ?

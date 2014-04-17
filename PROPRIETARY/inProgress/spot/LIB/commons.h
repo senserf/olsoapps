@@ -64,8 +64,8 @@ typedef struct tagDataStruct {
 	word	refTime;
     word    tagid;
     word    rssi  :8;
-	word	marka :1;
-	word	spare :7;
+	word	marka :3;
+	word	spare :5;
 } tagDataType;
 #define in_tdt(b, f) (((tagDataType *)(b))->f)
 #define in_pdt(b, f) (((pongDataType *)(b + sizeof(tagDataType)))->f)
@@ -80,9 +80,9 @@ typedef struct tagDataStruct {
 typedef struct tagListStruct {
 	word	alrms :8;
 	word	evnts :8;
-	word	marka :1;
+	word	marka :3;
 	word	block :1;
-	word	spare :14; // we can have app flags here...
+	word	spare :12; // we can have app flags here...
 	char  * nel;
 } tagListType;
 

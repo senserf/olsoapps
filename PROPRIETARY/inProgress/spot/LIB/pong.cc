@@ -95,10 +95,12 @@ fsm pong {
 #endif
 
 		if (!fifek_empty (&pframe_stash)) {
-// dupa check with HW: n VUEE proceed ALWAYS end up with failed 1st pong
-			// proceed LOAD;
-			delay (50, LOAD);
-			release;
+			// for the record: once proceed ALWAYS ended up with failed 1st pong,
+			// so I blamed back-to-back TXs. Can't see it now. Keeping this in case
+			// symptoms reappear (i.e. cause is still active, elsewhere).
+			// delay (50, LOAD);
+			// release;
+			proceed LOAD;
 		}
 		finish;
 }

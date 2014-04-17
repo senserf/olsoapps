@@ -13,14 +13,13 @@
 #include "tag_mgr.h"
 #include "hold.h"
 
-word	heartbeat = 60; // seconds
+word	heartbeat = 15; // seconds
 
 #define _LOO_DBG	0
 
 /* we want to spread re-reporting of multiple tags, but we can't hang on
    a given list element, as it can be deallocated any moment. So, we have
-   a binary audit marker (marka) and quickly pick the next element from'
-   the head
+   an audit marker (marka) and quickly pick the next element from the head
 */
 static char * nextel () {
 	char * ptr = tagList.nel;
@@ -69,7 +68,7 @@ fsm looper {
 			tagList.alrms, tagList.evnts);
 #endif
 		htime = seconds() + heartbeat;
-		tagList.marka++;	// flip
+		tagList.marka++;
 
 	state TAG:
 		char * tp = nextel();
