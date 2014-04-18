@@ -492,14 +492,12 @@ proc plug_receive { bytes tag hexflag } {
 
 	global PLUG
 
-	set msg "RCV:"
 	set chunk ""
 	while { $bytes != "" } {
 		set c [string index $bytes 0]
 		set bytes [string range $bytes 1 end]
 		scan $c %c v
 		lappend chunk $v
-		append msg " [format %02x $v]"
 	}
 
 	while 1 {
@@ -544,8 +542,8 @@ proc plug_receive { bytes tag hexflag } {
 						set chunk [lrange $chunk \
 							[expr { $i + 1 }] end]
 						if $PLUG($tag,P) {
-							term_output "Parity\
-							    error!" $tag
+							pt_tout "Parity error!"\
+								$tag
 							break
 						}
 						# remove the parity byte
