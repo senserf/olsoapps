@@ -54,6 +54,8 @@ void set_master_chg (void);
 
 #endif
 
+typedef word hop_t;
+
 int msg_reply (word);
 int msg_send (msg_t, nid_t, hop_t, word, word, word, char *);
 

@@ -83,7 +83,7 @@ proc msource { f } {
 		return
 	}
 
-	set dir "Scripts"
+	set dir "Scripts/Packages"
 	set lst ""
 
 	for { set i 0 } { $i < 10 } { incr i } {
