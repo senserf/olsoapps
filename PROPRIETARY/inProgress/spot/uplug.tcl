@@ -470,7 +470,8 @@ proc plug_open { nodenum hostnum nodetype tag } {
 
 	# the renesas thread
 	set PLUG($tag,RSTATE) 0
-	set PLUG($tag,CB,RENESAS) [after 1 plug_renesas $tag]
+	# this is broken; you cannot vwait in a plugin
+	# set PLUG($tag,CB,RENESAS) [after 1 plug_renesas $tag]
 	set PLUG($tag,CB,TIMEOUT) ""
 
 	# Retransmission interval
