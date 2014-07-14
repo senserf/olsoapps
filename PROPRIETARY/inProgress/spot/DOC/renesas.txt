@@ -15,7 +15,7 @@ The PHY frames the packet and provides the escaped, we only deal with the cleart
 
 ====
 
-Protocol as of April 13, 2004
+Protocol as of April 13, 2014
 =============================
 
 Renesas   -> 11 09 00 00 01 00		- query for node address

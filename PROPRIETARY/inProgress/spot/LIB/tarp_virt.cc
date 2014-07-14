@@ -54,6 +54,9 @@ void set_master_chg () {
 		tagList.block = NO;
 		tarp_ctrl.param = 0xB1;
 		runfsm looper;
+#ifdef MASTER_STATUS_LED
+		leds (MASTER_STATUS_LED, 0);
+#endif
         } else {
                 app_diag_W ("Set master to %u", master_host);
         }

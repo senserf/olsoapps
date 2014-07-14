@@ -19,6 +19,9 @@
 #define LED_B   2
 #define LED_4	3
 
+// Need to remove the third led from RADIO_USE_LEDS
+#define	MASTER_STATUS_LED LED_B
+
 #define LED_OFF 0
 #define LED_ON  1
 #define LED_BLINK 2
