@@ -14,9 +14,13 @@ void msg_pong_in (char * buf, word rssi) {
 	// 1s for hco and prox
 	msgPongAckType  pong_ack = {{msg_pongAck,0,0,0,0,1,1,0}};
 
-	pong_ack.header.rcv = in_header(buf, snd);
-	pong_ack.dupeq = in_pong(buf, pd).dupeq;
-	talk ((char *)&pong_ack, sizeof(msgPongAckType), TO_NET);
+	if (needs_ack (in_header(buf, snd), buf + sizeof(headerType))) {
+		pong_ack.header.rcv = in_header(buf, snd);
+		pong_ack.dupeq = in_pong(buf, pd).dupeq;
+		talk ((char *)&pong_ack, sizeof(msgPongAckType), TO_NET);
+	} else 
+		in_pong(buf, pd).noack = 1;
+
 	app_diag_D ("Pong %u", in_header(buf, snd));
 	ins_tag (buf, rssi);
 }

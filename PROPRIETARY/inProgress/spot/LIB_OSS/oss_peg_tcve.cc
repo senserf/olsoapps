@@ -92,6 +92,30 @@ static void reply11 (char *pkt) {
 	_oss_out (b, YES);
 }
 
+static void reply14 (char * pkt) {
+
+	char *b;
+	word n;
+
+	if (tcv_left ((address)pkt) < 5) { // we should nack, but it sould be inconsistent with all this crap
+		app_diag_S ("rep14 len %u", n);
+		return;
+	}
+
+	n = 1+1+2+1+ 3* slice_treg ((word)pkt[4]); // index to size
+	if ((b = get_mem (n, NO)) == NULL) {
+		app_diag_S ("rep14 mem %u", n);
+		return;
+	}
+
+	b [0] = 0x94;
+	b [1] = 3 + n;
+	((address)b) [1] = local_host;
+	b[4] = pkt[4];
+	treg2b ((byte *)(b+4));
+	_oss_out (b, YES);
+}
+	
 ///////////////// oss in ////////////////
 
 /* no need for that here, but we could build appropriate structs here and
@@ -110,7 +134,7 @@ fsm cmd_in {
 		char * b;
 		char * ib = (char *) tcv_rnp (LISN, oss_fd);
 
-		if ((l = tcv_left ((address)ib)) < 5) { // what do we do? ack?
+		if ((l = tcv_left ((address)ib)) < 4) { // what do we do? ack?
 			app_diag_S ("cmdlen %u", l);
 			tcv_endp ((address)ib);
 			proceed LISN;
@@ -197,6 +221,33 @@ fsm cmd_in {
 				}
 				break;
 
+			case 0x13:
+				// assuming these moronic nacks would cause retries,
+				// so nack goes out only for a bad length
+				if (((address)ib)[1] != local_host) {
+					sack (0x13, ((address)ib)[1], YES);
+					break;
+				}
+				if ((l = ib[1] -8) % 3) {
+					sack (0x13, ((address)ib)[1], NO);
+					break;
+				}
+				sack (0x13, ((address)ib)[1], YES);
+				
+				l /= 3; // this is # of entries in the set cmd
+				b2treg (l, (byte *)(ib+4));
+				break;
+
+			case 0x14:
+				reply14 (ib);
+				break;
+
+			case 0x15:
+				sack (0x15, ((address)ib)[1], YES); // always?
+				if (((address)ib)[1] == local_host) // no bcast
+					reset_treg ();
+				break;
+
 			case 0x41:
 			case 0x42:
 			case 0x43:
@@ -250,13 +301,13 @@ static void board_out (char * p, char * b) {
 			break;
 			
 		case BTYPE_AT_BUT6:
-			b[9] = ((pongPloadType3 *)_ppp)->glob;
+			b[9] |= ((pongPloadType3 *)_ppp)->glob;
 			b[11] = (byte)((((pongPloadType3 *)_ppp)->volt - 1000) >> 3);
 			b[14] = ((pongPloadType3 *)_ppp)->dial;
 			break;
 
 		case BTYPE_AT_BUT1:
-			b[9] = 1;
+			b[9] |= 1;
 			b[11] = (byte)((((pongPloadType4 *)_ppp)->volt - 1000) >> 3);
 			b[14] = 0;
 			break;
@@ -307,7 +358,14 @@ void oss_tx (char * b, word siz) {
 			((address)bu)[2] = in_header(b, snd) == 0 ? local_host : in_header(b, snd);
 			((address)bu)[3] = in_report(b, tagid);
 			bu[8] = ((pongDataType *)(b + sizeof(msgReportType)))->alrm_id;
-			// board specific bu[9] = global flag
+			
+			// trynr on high tuple
+			bu[9] = ((pongDataType *)(b + sizeof(msgReportType)))->trynr << 4;
+			//... and | 0x80 for not registered events (noack)
+			if (((pongDataType *)(b + sizeof(msgReportType)))->noack)
+				bu[9] |= 0x80;
+			// board specific will bu[9] |= global flag
+			
 			bu[10] = ((pongDataType *)(b + sizeof(msgReportType)))->alrm_seq;
 			// board-specific bu[11] = voltage
 			bu[12] = in_report(b, rssi);

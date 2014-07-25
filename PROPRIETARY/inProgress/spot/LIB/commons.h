@@ -58,7 +58,8 @@ typedef struct pongDataStruct {
     word    len      :6;
     word 	trynr    :3;
 	word	dupeq	 :4;
-    word	spare    :3;
+	word	noack	 :1;	// doesn't really belong here, but this place is handy
+    word	spare    :2;
 } pongDataType; // 4B (+len bytes of pload serialized after this)
 
 typedef struct tagDataStruct {

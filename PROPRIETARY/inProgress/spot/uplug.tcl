@@ -187,10 +187,19 @@ proc show_message { inp tag } {
 		set ag [expr [lindex $inp 11]]
 		pt_tout "Event, peg = [format %04X $pi] ($pi),\
 			tag = [format %04X $ti] ($ti), ad = $ad, sn = $ts:" $tag
-		if $it {
-			set it "G"
+			
+		# WLO: initial hack
+		set retr [expr (($it >> 4) & 7)]
+		if { $it & 0x80 } {
+			set noack " ?"
 		} else {
-			set it "L"
+			set noack ""
+		}
+		
+		if { $it & 0x0f } {
+			set it "G $retr$noack"
+		} else {
+			set it "L $retr$noack"
 		}
 		pt_tout "    button:   $bu ($it)" $tag
 		set vo [expr ((($vo << 3) + 1000.0) / 4095.0) * 5.0]

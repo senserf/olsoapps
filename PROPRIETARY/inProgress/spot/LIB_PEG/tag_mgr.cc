@@ -7,6 +7,7 @@
 #include "diag.h"
 #include "inout.h"
 #include "vartypes.h"
+#include "tag_mgr.h"
 
 /**************************************************************************
 tagList is a simple list of structs with Master-unconfirmed tags. New alarms
@@ -87,12 +88,21 @@ word del_tag (word id, word ref, word dupeq, Boolean force) {
 	return 3;
 }
 
-static Boolean is_global ( char * b) {
+Boolean is_global ( char * b) { // b point at pdt (and optional board-specific ppt)
 
-	if (((pongDataType *)(b+sizeof(msgReportType)))->btyp != BTYPE_AT_BUT6)
+	if (((pongDataType *)b)->btyp != BTYPE_AT_BUT6)
 		return YES;
 		
-	return ((pongPloadType3 *)(b+sizeof(msgReportType)+sizeof(pongDataType)))->glob;
+	return ((pongPloadType3 *)(b+sizeof(pongDataType)))->glob;
+}
+
+Boolean needs_ack ( word id, char * b) { // b point at pdt (and optional board-specific ppt)
+
+	if (is_global (b))
+		return YES;
+
+	return (in_treg (id, (byte)((pongDataType *)b)->alrm_id));
+//	return (~(in_treg (id, (byte)((pongDataType *)b)->alrm_id))); // dupa back to negative default
 }
 
 /*************
@@ -123,7 +133,7 @@ Boolean report_tag (char * td) {
 	memcpy (mp + sizeof(msgReportType), td + sizeof(tagDataType),
 		siz - sizeof(msgReportType));
 		
-	globa = is_global (mp);
+	globa = is_global (mp + sizeof(msgReportType));
 	talk (mp, siz, globa ? TO_ALL : TO_OSS); // will NOT go TO_NET on Master. see talk()
 
 #if _TMGR_DBG
@@ -210,6 +220,133 @@ void ins_tag (char * buf, word rssi) { // it is msg_pong in buf
 	} else 				// ... and free the element
 		ufree (ptr);
 }
+
+/******************TREG******************
+  This part is about tag registration or rather discrimination between events that should be acked
+  (global and registered local events) or unacked. The logic is rather twisted; I believe more appropriate
+  would be to make tags address alarms to specific pegs. In any case, let's do it for Alphanet 1.0 without
+  worrying too much about optimization; this alarm addressing will likely be implemented instead, as it
+  has nice side effects, e.g. only genuinely interested pegs give a shit.
+  
+  Keeping it private here anyway, for the unlikely case we will be optimizing it.
+****************************************/
+#define TREG_NUM	20
+typedef struct tregStruct {
+	word tid[TREG_NUM];
+	byte bmask[TREG_NUM];
+} treg_t;
+
+treg_t my_tags;
+void reset_treg () {
+	memset (&my_tags, 0, sizeof (treg_t));
+}
+
+#if 0
+// this was in a bit more decent version
+word count_treg () {
+	word i, c = 0;
+	for (i = 0; i < TREG_NUM; i++) {
+		if (my_tags.tid[i] != 0) c++;
+	}
+	return c;
+}
+#endif
+
+#if 0
+// let's wait for a better moment 
+/***************************
+returns likely unused stuff:
+0 - full / overflow
+1 - updated
+2 - added
+3 - deleted
+4 - void request
+***************************/
+word upd_treg (word id, byte mask) {
+	word i, j = TREG_NUM;
+	if (id == 0) {
+		i = count_treg();
+		reset_treg();
+		return (i > 0 ? 3 : 4);
+	}
+	
+	for (i = 0; i < TREG_NUM; i++) {
+		if (my_tags.tid[i] == id) {
+			if (mask == 0) {
+				my_tags.tid[i] = 0;
+				return 3;
+			}
+			if (my_tags.bmask[i] == mask)
+				return 4;
+			my_tags.bmask[i] = mask;
+			return 1;
+		}
+		if (j == TREG_NUM && my_tags.tid[i] == 0)
+			j = i; // first empty
+	}
+	
+	if (mask == 0)
+		return 4;
+		
+	if (j == TREG_NUM)
+		return 0;
+	
+	my_tags.tid[j] = id;
+	my_tags.bmask[j] = mask;
+	return 2;
+}
+#endif
+
+void b2treg (word l, byte * b) {
+	byte * ptr;
+	word i, n;
+
+	if ((n = slice_treg ((word)*b)) > l)
+		n = l;
+	ptr = b +1;
+	i = *b;
+	while (n--) {
+		memcpy (&my_tags.tid[i], ptr, 2);
+		my_tags.bmask[i++] = *(ptr +2);
+		ptr += 3;
+	}
+#if _TMGR_DBG
+	app_diag_U ("TMGR(%u): b2treg (%u,%u)", (word)seconds(), l, (word)*b);
+#endif
+}
+
+// we don't want to mess with oss allocation here, caller must do it and put the index in *b
+void treg2b (byte *b) {
+	word i = *b;
+	byte * ptr = b +1;
+	
+	while (i < TREG_NUM) {
+		memcpy (ptr, &my_tags.tid[i], 2);
+		*(ptr +2) = my_tags.bmask[i++];
+		ptr += 3;
+	}
+#if _TMGR_DBG
+	app_diag_U ("TMGR(%u): treg2b %u", (word)seconds(), (word)*b);
+#endif
+}
+
+Boolean in_treg (word id, byte but) {
+	word i;
+	
+	if (id == 0 || but == 0)
+		return NO;
+
+	for (i = 0; i < TREG_NUM; i++) {
+		if (my_tags.tid[i] == id && (my_tags.bmask[i] & (1 << (but-1))))
+			return YES;
+	}
+	return NO;
+}
+
+word slice_treg (word ind) {
+	return (ind < TREG_NUM ? TREG_NUM - ind : 0);
+}
+
 #undef _TMGR_DBG
 #undef _TMGR_MAX_RELIABLE
 
