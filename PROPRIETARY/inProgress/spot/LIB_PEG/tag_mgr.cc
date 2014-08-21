@@ -15,6 +15,7 @@ from an already present tag overwrite (del, ins) the entry. Events don't
 overwrite alarms. Acks from Master remove (del) corresponding entries.
 ***************************************************************************/
 tagListType tagList;
+Boolean learn_mod = 0;
 
 #define	_TMGR_MAX_RELIABLE	12
 #define _TMGR_DBG	0
@@ -96,14 +97,16 @@ Boolean is_global ( char * b) { // b point at pdt (and optional board-specific p
 	return ((pongPloadType3 *)(b+sizeof(pongDataType)))->glob;
 }
 
-Boolean needs_ack ( word id, char * b) { // b point at pdt (and optional board-specific ppt)
+#define LEARN_THOLD	150
+Boolean needs_ack ( word id, char * b, word rss) { // b point at pdt (and optional board-specific ppt)
 
-	if (is_global (b))
+	if (is_global (b) || learn_mod && rss >= LEARN_THOLD)
 		return YES;
 
 	return (in_treg (id, (byte)((pongDataType *)b)->alrm_id));
 //	return (~(in_treg (id, (byte)((pongDataType *)b)->alrm_id))); // dupa back to negative default
 }
+#undef LEARN_THOLD
 
 /*************
 returns 1 if report goes global, 0 otherwise
@@ -303,6 +306,23 @@ void b2treg (word l, byte * b) {
 
 	if ((n = slice_treg ((word)*b)) > l)
 		n = l;
+		
+	// special case: illegal index deals with 'learning mode'
+	if (n == 0) {
+		i = learn_mod;
+		if (*(b+3) == 0) { // learning on
+			learn_mod = YES;
+		} else {
+			if (*(b+3) == 0xff) { // learning off
+				learn_mod = NO;
+			} // else do nothing - no error codes, shitty acks
+		}
+#if _TMGR_DBG
+		app_diag_U ("TMGR(%u): b2treg.learning (%u->%u)", (word)seconds(), i, learn_mod);
+#endif
+		return;
+	}
+
 	ptr = b +1;
 	i = *b;
 	while (n--) {

@@ -95,14 +95,19 @@ static void reply11 (char *pkt) {
 static void reply14 (char * pkt) {
 
 	char *b;
-	word n;
+	word n, m;
 
 	if (tcv_left ((address)pkt) < 5) { // we should nack, but it sould be inconsistent with all this crap
 		app_diag_S ("rep14 len %u", n);
 		return;
 	}
 
-	n = 1+1+2+1+ 3* slice_treg ((word)pkt[4]); // index to size
+	m = slice_treg ((word)pkt[4]); // index to how many
+	if (m)
+		n = 1+1+2+1+ 3* m; // how many to size
+	else
+		n = 1+1+2+1+1; // special case for learning mode
+		
 	if ((b = get_mem (n, NO)) == NULL) {
 		app_diag_S ("rep14 mem %u", n);
 		return;
@@ -112,7 +117,12 @@ static void reply14 (char * pkt) {
 	b [1] = 3 + n;
 	((address)b) [1] = local_host;
 	b[4] = pkt[4];
-	treg2b ((byte *)(b+4));
+	
+	if (m)
+		treg2b ((byte *)(b+4));
+	else
+		b[5] = learn_mod;
+		
 	_oss_out (b, YES);
 }
 	

@@ -41,11 +41,11 @@
 /////////// tag-related structs ////////////////
 
 typedef struct pongParamsStruct {
-        word retry_del 	:6; // times in seconds
-        word retry_nr 	:3;
+    word retry_del 	:6; // times in seconds
+    word retry_nr 	:3;
 	word rx_span 	:3;
 	word spare	:4;
-        word pow_levels;
+    word pow_levels;
 } pongParamsType;
 
 typedef struct pongDataStruct {

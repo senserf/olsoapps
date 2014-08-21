@@ -1,14 +1,15 @@
 #ifndef __tag_mgr_h
 #define __tag_mgr_h
 
-extern tagListType tagList;
+extern tagListType	tagList;
+extern Boolean		learn_mod;
 
 void reset_tags ();
 word del_tag (word id, word ref, word dupeq, Boolean force);
 void ins_tag (char * buf, word rssi);
 Boolean report_tag (char * td);
 Boolean is_global ( char * b);
-Boolean needs_ack ( word id, char * b);
+Boolean needs_ack ( word id, char * b, word rss);
 
 // word count_treg ();
 void reset_treg ();

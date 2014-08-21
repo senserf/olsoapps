@@ -204,6 +204,7 @@ proc show_message { inp tag } {
 		pt_tout "    button:   $bu ($it)" $tag
 		set vo [expr ((($vo << 3) + 1000.0) / 4095.0) * 5.0]
 		pt_tout "    voltage:  [format %4.2f $vo]" $tag
+		pt_tout "    rssi:     $rs" $tag
 		pt_tout "    txpower:  $tx" $tag
 		pt_tout "    age:      $ag" $tag
 		# send ACK
