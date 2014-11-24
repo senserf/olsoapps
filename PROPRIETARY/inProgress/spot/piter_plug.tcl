@@ -248,12 +248,19 @@ proc plug_outpp_b { in } {
 		set ag [expr [lindex $inp 11]]
 		pt_tout "Event, peg = [format %04X $pi] ($pi),\
 			tag = [format %04X $ti] ($ti), ad = $ad, sn = $ts:"
-		if $it {
+		# A copy of Wlodek's hack from uplug
+		set retr [expr ($it >> 4) & 7]
+		if { $it & 0x80 } {
+			set noack " ?"
+		} else {
+			set noack ""
+		}
+		if { $it & 0x0f } {
 			set it "G"
 		} else {
 			set it "L"
 		}
-		pt_tout "    button:   $bu ($it)"
+		pt_tout "    button:   $bu ($it $retr$noack)"
 		set vo [expr ((($vo << 3) + 1000.0) / 4095.0) * 5.0]
 		pt_tout "    voltage:  [format %4.2f $vo]"
 		pt_tout "    txpower:  $tx"

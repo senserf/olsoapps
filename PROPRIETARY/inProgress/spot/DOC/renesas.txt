@@ -49,3 +49,33 @@ TI        -> 01 13 NA NA PE PE TA TA IT IR TS VO RS TX AD AG	- event
 Replies   -> 91 08 NA NA 06
                          15
 
+
+July 25, 2014
+=============
+
+Set tag association list:
+
+Renesas   -> 13 nn 00 00 IX TI TI BM TI TI BM ... TI TI BM
+		nn == 8 + 3 * list_length
+
+	- max number of triplets: 20
+	- at TI, the triplets are stored in an array (or a pair of arrays)
+	- IX is the index of first array entry to be filled (starting from 0)
+	- no matter how many entries are specified we stop at 19
+
+TI	  -> ACK or NAK, i.e., 94 08 00 00 06
+                                           15
+
+Get association list:
+
+Renesas   -> 14 nn 00 00 IX ... the rest ignored ...
+
+TI	  -> 94 nn 00 00 TI TI BM ... TI TI BM
+
+	- returns the list of associations starting from IX
+	- return none if out of range
+
+Reset association list:
+
+Renesas   -> 15 07 00 00
+TI        -> 95 08 00 00 06
