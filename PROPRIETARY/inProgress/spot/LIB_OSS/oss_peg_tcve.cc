@@ -225,7 +225,8 @@ fsm cmd_in {
 						} else {
 							sack (0x12, ((address)ib)[1], NO);
 						}
-
+						break;
+						
 					default:
 						sack (0x12, ((address)ib)[1], NO);
 				}
