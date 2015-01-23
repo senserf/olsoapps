@@ -15,10 +15,6 @@ if [catch { exec uname } ST(SYS)] {
 	set ST(SYS) "W"
 }
 if { $ST(SYS) != "L" } {
-	# sanitize arguments; here you a sample of the magnitude of stupidity
-	# I have to fight when glueing together Windows and Cygwin stuff;
-	# the last argument (sometimes!) has a CR character appended at the
-	# end, and you wouldn't believe how much havoc that can cause
 	set u [string trimright [lindex $argv end]]
 	if { $u == "" } {
 		set argv [lreplace $argv end end]
@@ -41,7 +37,7 @@ if [file isdirectory "/dev"] {
 
 ###############################################################################
 
-set ST(VER) 0.02
+set ST(VER) 0.04
 
 ## double exit avoidance flag
 set DEAF 0
@@ -1682,6 +1678,17 @@ proc confirm { msg } {
 	return $w
 }
 
+proc fparent { } {
+
+	set w [focus]
+
+	if { $w == "" } {
+		return ""
+	}
+
+	return "-parent $w"
+}
+
 proc terminate { } {
 
 	global DEAF ST PM
@@ -1702,6 +1709,23 @@ proc terminate { } {
 	}
 
 	exit 0
+}
+
+proc strtail { str n } {
+#
+# Return no more than n trailing characters of the string
+#
+	if { $n < 4 } {
+		set n 4
+	}
+
+	set ll [string length $str]
+
+	if { $ll <= $n } {
+		return $str
+	}
+
+	return "...[string range $str end-[expr {$n - 4}] end]"
 }
 
 proc isinteger { u } {
@@ -1980,7 +2004,7 @@ proc getsparams { } {
 #
 # Retrieve parameters from the RC file
 #
-	global RC PM Params RGroups PLayouts
+	global RC PM Params RGroups PLayouts PREINIT
 
 	if { $PM(RCF) == "" } {
 		# switched off
@@ -1989,14 +2013,16 @@ proc getsparams { } {
 
 	if [catch { open $PM(RCF) "r" } fd] {
 		# no such file
-		return
-	}
-
-	if [catch { read $fd } pars] {
+		if ![info exists PREINIT] {
+			return
+		}
+		set pars $PREINIT
+	} elseif [catch { read $fd } pars] {
 		catch { close $fd }
 		return
+	} else {
+		catch { close $fd }
 	}
-	catch { close $fd }
 
 	# parameters
 	foreach p $Params {
@@ -2008,11 +2034,16 @@ proc getsparams { } {
 			continue
 		}
 		set valcode $RC(+,$p)
-		regsub "%I" $valcode "\$v" valcode
-		regsub "%O" $valcode "v" valcode
-		if [eval $valcode] {
-			# OK
-			set RC($p) $v
+		if { $valcode == "" } {
+			# no verification needed
+			set RC($p) [string trim $v]
+		} else {
+			regsub "%I" $valcode "\$v" valcode
+			regsub "%O" $valcode "v" valcode
+			if [eval $valcode] {
+				# OK
+				set RC($p) $v
+			}
 		}
 	}
 
@@ -2139,13 +2170,33 @@ proc log { line } {
 
 	$t configure -state disabled
 	$t yview -pickplace end
+
+	if { $ST(LFD) != "" && [string index $line 0] != "*" } {
+		# to file
+		set sec [clock seconds]
+		set day [clock format $sec -format %d]
+		set hdr [clock format $sec -format "%H:%M:%S"]
+		if { $day != $ST(LCD) } {
+			# day change
+			set today "Today is "
+			append today [clock format $sec -format "%h $day, %Y"]
+			if { $ST(LCD) == 0 } {
+				# startup
+				log_w "$hdr #### $today ####"
+			} else {
+				log_w "00:00:00 #### BIM! BOM! $today ####"
+			}
+			set ST(LCD) $day
+		}
+		log_w "$hdr $line"
+	}
 }
 
 proc log_open { } {
 #
 # Opens the log window
 #
-	global ST WN FO
+	global ST WN FO RC
 
 	if { $WN(LOG) != "" } {
 		# already open
@@ -2183,6 +2234,33 @@ proc log_open { } {
 	button $f.k -text "Clear" -command "log_clear"
 	pack $f.k -side left
 
+	#######################################################################
+
+	set WN(LOF) [button $f.m -text "To file" -command "log_file_toggle"]
+	pack $f.m -side left
+
+	label $f.n -textvariable ST(LOF)
+	pack $f.n -side left
+
+	#######################################################################
+
+	menubutton $f.as -text [lindex $WN(ASM) $RC(LON)] -direction right \
+		-menu $f.as.m -relief raised
+	menu $f.as.m -tearoff 0
+	pack $f.as -side right -expand no -fill y
+
+	set n 0
+	foreach it $WN(ASM) {
+		$f.as.m add command -label $it \
+			-command "log_menu_click $f.as $n"
+		incr n
+	}
+
+	label $f.p -text "Autostart: "
+	pack $f.p -side right
+
+	#######################################################################
+
 	bind $w <Destroy> log_close
 	bind $w <ButtonRelease-1> "tk_textCopy $w"
 	bind $w <ButtonRelease-2> "tk_textPaste $w"
@@ -2199,6 +2277,39 @@ proc log_open { } {
 	$c configure -state disabled
 
 	$WN(LOB) configure -text "Packet Log Off"
+
+	#######################################################################
+
+	set ST(LOF) ""
+	set ST(LFD) ""
+
+	if { $RC(LON) == 2 } {
+		# try to open the file
+		if { $RC(LOF) == "" } {
+			alert "No known log file, request ignored"
+			set RC(LON) 1
+		} else {
+			if ![log_open_file $RC(LOF)] {
+				# failure
+				log_menu_click $f.as 1
+			}
+		}
+	}
+}
+
+proc log_menu_click { wid n } {
+#
+# Invoked after a click in the autostart menu
+#
+	global RC WN ST
+
+	set RC(LON) $n
+
+	$wid configure -text [lindex $WN(ASM) $n]
+
+	if { $n == 2 && $ST(LFD) == "" } {
+		log_file_toggle
+	}
 }
 
 proc log_clear { } {
@@ -2218,9 +2329,46 @@ proc log_close { } {
 
 	global WN
 
+	log_close_file
 	catch { destroy .logw }
 	set WN(LOG) ""
 	$WN(LOB) configure -text "Packet Log On"
+}
+
+proc log_close_file { } {
+
+	global ST WN
+
+	if { $ST(LFD) != "" } {
+		# close the log file
+		catch { close $ST(FD) }
+		set ST(LFD) ""
+		set ST(LOF) ""
+		catch { $WN(LOF) configure -text "To file" }
+	}
+}
+
+proc log_open_file { fn } {
+
+	global ST RC WN
+
+	if [catch { open $fn "a" } fd] {
+		alert "Cannot open log file $fn, $fd"
+		return 0
+	}
+
+	# last day log written
+	set ST(LCD) 0
+
+	# assume everything's OK
+	set ST(LOF) [strtail $fn 32]
+	set ST(LFD) $fd
+	$WN(LOF) configure -text "Stop file"
+	set RC(LOF) $fn
+
+	log "@@ file started"
+
+	return 1
 }
 
 proc log_toggle { } {
@@ -2236,6 +2384,59 @@ proc log_toggle { } {
 	}
 }
 
+proc log_file_toggle { } {
+#
+# Closes/opens the log file
+#
+	global ST RC
+
+	if { $ST(LFD) != "" } {
+		log_close_file
+		return
+	}
+
+	set ou $RC(LOF)
+
+	while 1 {
+		set fn [tk_getSaveFile \
+			-defaultextension ".log" \
+			{*}[fparent] \
+			-title "Log file name" \
+			-initialfile [file tail $ou] \
+			-initialdir [file dirname $ou]]
+
+		if { $fn == "" } {
+			# cancelled
+			return
+		}
+
+		if [log_open_file $fn] {
+			return
+		}
+	}
+}
+
+proc log_w { msg } {
+
+	global ST
+
+	catch {
+		puts $ST(LFD) $msg
+		flush $ST(LFD)
+	}
+}
+
+proc log_auto { } {
+#
+# Called to check if the log window should be auto-called at this moment
+#
+	global RC WN 
+
+	if { $RC(LON) && [mode_reception] && $WN(LOG) == "" } {
+		log_open
+	}
+}
+	
 ###############################################################################
 
 proc send_reset { { urg 0 } } {
@@ -2374,6 +2575,8 @@ proc uart_first_read { msg } {
 	update_widgets
 
 	trigger
+
+	after 0 try_start
 }
 
 proc ack_timeout { } {
@@ -2471,8 +2674,8 @@ proc log_packet { smp len } {
 	if { $l0 > [expr $ln + 2] } {
 		set smp [string range $smp 0 [expr $ln + 1]]
 	}
-	log "Received packet \[[tstamp]\] (length=$ln):"
-	log [string trimleft [hencode $smp]]
+	log "** received packet \[[tstamp]\] (length=$ln):"
+	log "<= [string trimleft [hencode $smp]]"
 }
 
 proc process_band_sample { smp } {
@@ -2606,6 +2809,17 @@ proc clear_sip { } {
 	}
 
 	boss_timeouts $PM(LTM,I)
+}
+
+proc try_start { args } {
+#
+# Try to start up when the autostart checkbutton becomes checked
+#
+	global ST RC
+
+	if { $RC(AST) && $ST(SFD) != 0 && !$ST(SIP) } {
+		do_start_stop
+	}
 }
 
 proc do_start_stop { } {
@@ -3215,6 +3429,7 @@ proc band_menu_click { w n } {
 	set_averaging_button
 	fix_min_isd
 	redraw
+	log_auto
 }
 
 proc set_averaging { } {
@@ -3486,7 +3701,10 @@ proc mk_rootwin { win } {
 	frame $x -relief sunken
 	pack $x -side top -expand y -fill x -anchor n
 
-	# this is probably temporary ##########################################
+	grid columnconfigure $x 0 -weight 0
+	grid columnconfigure $x 1 -weight 1
+
+	#######################################################################
 	button $x.lo -text "Packet Log On" -command "log_toggle" -width 12
 	grid $x.lo -column 0 -row 0 -sticky news
 	set WN(LOB) $x.lo
@@ -3496,6 +3714,17 @@ proc mk_rootwin { win } {
 	button $x.rg -text "Show Regs" -command "regs_toggle" -width 8
 	grid $x.rg -column 0 -row 1 -sticky news
 	set WN(REB) $x.rg
+	#######################################################################
+
+	frame $x.af -padx 4 -pady 4
+	grid $x.af -column 1 -row 0 -sticky ne
+
+	label $x.af.h -text "Autostart: " -anchor e
+	pack $x.af.h -side left -expand n
+	checkbutton $x.af.c -variable RC(AST)
+	pack $x.af.c -side right -expand n
+	trace add variable RC(AST) write try_start
+
 	#######################################################################
 
 	set x $mf.bu
@@ -3520,6 +3749,9 @@ proc mk_rootwin { win } {
 	#######################################################################
 
 	bind . <Destroy> "terminate"
+
+	# check if should summon the log window
+	log_auto
 }
 
 ###############################################################################
@@ -5536,8 +5768,8 @@ proc inject_execute { this } {
 		return
 	} 
 
-	log "Injecting packet \[[tstamp]\] (length=[string length $pkt]):"
-	log [string trimleft [hencode $pkt]]
+	log "** injecting packet \[[tstamp]\] (length=[string length $pkt]):"
+	log "=> [string trimleft [hencode $pkt]]"
 	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
 	set ret [wack { 0xFD 0xFC } 4000]
 	if { $ret < 0 } {
@@ -5607,16 +5839,16 @@ proc inject_repeat_callback { this } {
 
 	set rc [expr $WN(INJ,$this,RK) + 1]
 
-	log "Injecting packet \[[tstamp]\] ($rc of $WN(INJ,$this,RL),\
+	log "** injecting packet \[[tstamp]\] ($rc of $WN(INJ,$this,RL),\
 		length=[string length $pkt]):"
-	log [string trimleft [hencode $pkt]]
+	log "=> [string trimleft [hencode $pkt]]"
 
 	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
 	set ret [wack { 0xFD 0xFC } 4000]
 	if { $ret < 0 } {
-		log "repeat injection failed (node response timeout)"
+		log "** repeat injection failed (node response timeout)"
 	} elseif { $ret != 0xFD } {
-		log "repeat injection failed (node busy)"
+		log "** repeat injection failed (node busy)"
 	}
 
 	if { $rc >= $WN(INJ,$this,RL) } {
@@ -5840,6 +6072,10 @@ set PM(MXL) 1024
 set ST(LOG) ""
 set ST(LOL) 0
 
+# current log file + descriptor
+set ST(LOF) ""
+set ST(LFD) ""
+
 # displayable connection status + received (raw) message counter
 set ST(CST) ""
 set ST(RRM) 0
@@ -5854,6 +6090,9 @@ set WN(REG) ""
 set WN(CRP) plus
 set WN(CCD) hand2
 
+# log autostart menu
+set WN(ASM) { "off" "on" "on+file" }
+
 # rc file
 set PM(RCF) ".sapicrc"
 if { [info exists env(HOME)] && $env(HOME) != "" } {
@@ -5863,6 +6102,15 @@ if { [info exists env(HOME)] && $env(HOME) != "" } {
 }
 
 set PM(RCF) [file join $e $PM(RCF)]
+
+# default autostart; values 0 1
+set PM(AST_def) 0
+
+# default autolog; values 0 1 2 (2 = also to the file)
+set PM(LON_def) 0
+
+# default log file
+set PM(LOF_def) ""
 
 # frequency prereqs: minimum, maximum (from), maximum (to) default, min step
 # max step, crystal freq
@@ -5889,16 +6137,31 @@ for { set e 1 } { $e <= $PM(MPS) } { incr e } {
 # list of value types
 set PM(VTY) { hex int oct str }
 
-# font for axis ticks #########################################################
-foreach e [font names] {
-	if [regexp -nocase "small" $e] {
-		set FO(SMA) $e
-		break
+proc setsmfont { t } {
+
+	foreach e [font names] {
+		if [regexp -nocase $t $e] {
+			return $e
+		}
 	}
+
+	return ""
 }
-if ![info exists FO(SMA)] {
+
+# font for axis ticks #########################################################
+
+set FO(SMA) [setsmfont icon]
+if { $FO(SMA) == "" } {
+	set FO(SMA) [setsmfont menu]
+}
+if { $FO(SMA) == "" } {
+	set FO(SMA) [setsmfont small]
+}
+
+if { $FO(SMA) == "" } {
 	set FO(SMA) {-family courier -size 9}
 }
+
 ###############################################################################
 
 # font for the log
@@ -5927,6 +6190,9 @@ proc pardef { name vcmd def } {
 # list of RC parameters together with validation functions and default
 # (fallback) values
 
+pardef AST "valid_int_number %I 0 1 %O" $PM(AST_def)
+pardef LON "valid_int_number %I 0 2 %O" $PM(LON_def)
+pardef LOF "" $PM(LOF_def)
 pardef FCE "valid_fp_number %I $PM(FRE_min) $PM(FRE_max) 2 %O" $PM(FRE_def)
 pardef BAN "valid_ban %I %O" [lindex $PM(BAN) 7]
 pardef STA "valid_int_number %I 1 $PM(STA_max) %O" 1
@@ -6787,8 +7053,16 @@ regtip	RCCTRL0S	"Contains the RCCTRL0 value from the last run of the\
 
 ###############################################################################
 ###############################################################################
+###############################################################################
+
+set PREINIT {PARAMS {AST 1 LON 2 FCE 868.00 BAN Single/rcv STA 4 ISD 1 GRS 64 MRS 255 EMA 1 MOA 1 TMX 1} REGISTERS {Default {{IOCFG2 47} {IOCFG1 47} {IOCFG0 1} {FIFOTHR 15} {SYNC1 171} {SYNC0 53} {PKTLEN 63} {PKTCTRL1 4} {PKTCTRL0 69} {ADDR 0} {CHANNR 0} {FSCTRL1 12} {FSCTRL0 0} {FREQ2 34} {FREQ1 196} {FREQ0 236} {MDMCFG4 202} {MDMCFG3 131} {MDMCFG2 3} {MDMCFG1 66} {MDMCFG0 248} {DEVIATN 52} {MCSM2 7} {MCSM1 3} {MCSM0 24} {FOCCFG 21} {BSCFG 108} {AGCCTRL2 3} {AGCCTRL1 64} {AGCCTRL0 145} {WOREVT1 135} {WOREVT0 107} {WORCTRL 1} {FREND1 86} {FREND0 16} {FSCAL3 169} {FSCAL2 42} {FSCAL1 0} {FSCAL0 13} {RCCTRL1 0} {RCCTRL0 0} {FSTEST 89} {PTEST 127} {AGCTEST 63} {TEST2 136} {TEST1 49} {TEST0 2} {PATABLE {3 28 87 142 133 204 198 195}}}} PLAYOUTS {dupa {{0 10 2000} {2 hex BAC0 -1} {4 hex {ba ca de ad} 0} {} {3 int 123465 0} {1 int 267 1} {} {8 str olsonet 0} {} {} {} {} {}} pipa {{0 10 2000} {2 hex BAC0 -1} {4 hex {ba ca de ad} 0} {} {3 int 123465 0} {1 int 267 1} {} {8 str olsonet 0} {} {} {} {} {}}}}
+
+###############################################################################
+###############################################################################
+###############################################################################
 
 autocn_start uart_open boss_close send_handshake handshake_ok uart_connected \
 	send_poll [initialize]
+
 
 while 1 { event_loop }
