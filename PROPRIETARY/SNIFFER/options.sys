@@ -1,0 +1,14 @@
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES	2
+
+#undef	INFO_FLASH
+#define	INFO_FLASH	0
+
+#undef	UART_TCV
+#undef	UART_RATE
+#undef	UART_DRIVER
+#undef	UART_TCV_MODE
+
+#define	UART_TCV	1
+#define	UART_TCV_MODE	UART_TCV_MODE_N
+#define	UART_RATE	115200

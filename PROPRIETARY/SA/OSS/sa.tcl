@@ -7055,7 +7055,11 @@ regtip	RCCTRL0S	"Contains the RCCTRL0 value from the last run of the\
 ###############################################################################
 ###############################################################################
 
-set PREINIT {PARAMS {AST 1 LON 2 FCE 868.00 BAN Single/rcv STA 4 ISD 1 GRS 64 MRS 255 EMA 1 MOA 1 TMX 1} REGISTERS {Default {{IOCFG2 47} {IOCFG1 47} {IOCFG0 1} {FIFOTHR 15} {SYNC1 171} {SYNC0 53} {PKTLEN 63} {PKTCTRL1 4} {PKTCTRL0 69} {ADDR 0} {CHANNR 0} {FSCTRL1 12} {FSCTRL0 0} {FREQ2 34} {FREQ1 196} {FREQ0 236} {MDMCFG4 202} {MDMCFG3 131} {MDMCFG2 3} {MDMCFG1 66} {MDMCFG0 248} {DEVIATN 52} {MCSM2 7} {MCSM1 3} {MCSM0 24} {FOCCFG 21} {BSCFG 108} {AGCCTRL2 3} {AGCCTRL1 64} {AGCCTRL0 145} {WOREVT1 135} {WOREVT0 107} {WORCTRL 1} {FREND1 86} {FREND0 16} {FSCAL3 169} {FSCAL2 42} {FSCAL1 0} {FSCAL0 13} {RCCTRL1 0} {RCCTRL0 0} {FSTEST 89} {PTEST 127} {AGCTEST 63} {TEST2 136} {TEST1 49} {TEST0 2} {PATABLE {3 28 87 142 133 204 198 195}}}} PLAYOUTS {dupa {{0 10 2000} {2 hex BAC0 -1} {4 hex {ba ca de ad} 0} {} {3 int 123465 0} {1 int 267 1} {} {8 str olsonet 0} {} {} {} {} {}} pipa {{0 10 2000} {2 hex BAC0 -1} {4 hex {ba ca de ad} 0} {} {3 int 123465 0} {1 int 267 1} {} {8 str olsonet 0} {} {} {} {} {}}}}
+if 0 {
+
+set PREINIT { PARAMS {AST 1 LON 1 LOF {} FCE 868.03 BAN Single/rcv STA 4 ISD 1 GRS 64 MRS 255 EMA 1 MOA 1 TMX 1} REGISTERS {Default {{IOCFG2 47} {IOCFG1 47} {IOCFG0 1} {FIFOTHR 15} {SYNC1 171} {SYNC0 53} {PKTLEN 63} {PKTCTRL1 4} {PKTCTRL0 69} {ADDR 0} {CHANNR 0} {FSCTRL1 12} {FSCTRL0 0} {FREQ2 34} {FREQ1 196} {FREQ0 236} {MDMCFG4 202} {MDMCFG3 131} {MDMCFG2 3} {MDMCFG1 66} {MDMCFG0 248} {DEVIATN 52} {MCSM2 7} {MCSM1 3} {MCSM0 24} {FOCCFG 21} {BSCFG 108} {AGCCTRL2 3} {AGCCTRL1 64} {AGCCTRL0 145} {WOREVT1 135} {WOREVT0 107} {WORCTRL 1} {FREND1 86} {FREND0 16} {FSCAL3 169} {FSCAL2 42} {FSCAL1 0} {FSCAL0 13} {RCCTRL1 0} {RCCTRL0 0} {FSTEST 89} {PTEST 127} {AGCTEST 63} {TEST2 136} {TEST1 49} {TEST0 2} {PATABLE {3 28 87 142 133 204 198 195}}}} }
+
+}
 
 ###############################################################################
 ###############################################################################
