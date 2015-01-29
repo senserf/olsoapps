@@ -90,6 +90,13 @@ typedef struct tagListStruct {
 	char  * nel;
 } tagListType;
 
+typedef struct roguemStruct {
+	lword 	ts;
+	word	nid;
+	word	cnt :8;
+	word	hops :8;
+} roguemType;
+
 ///////////// messages ////////////////////
 
 typedef enum {

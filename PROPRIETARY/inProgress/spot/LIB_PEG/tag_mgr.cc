@@ -16,6 +16,7 @@ overwrite alarms. Acks from Master remove (del) corresponding entries.
 ***************************************************************************/
 tagListType tagList;
 Boolean learn_mod = 0;
+roguemType	roma;
 
 #define	_TMGR_MAX_RELIABLE	12
 #define _TMGR_DBG	0

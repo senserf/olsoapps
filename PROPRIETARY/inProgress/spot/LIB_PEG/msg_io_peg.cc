@@ -9,6 +9,19 @@
 #include "tag_mgr.h"
 #include "form.h"
 
+void msg_master_in (char * buf) {
+
+	if (master_host != local_host)
+		return;
+
+	roma.nid = in_header(buf, snd);
+	roma.cnt++;
+	roma.hops = in_header(buf, hoc);
+	roma.ts = seconds();
+	trigger (TRIG_MBEAC);
+	app_diag_S ("master contra %u %u (%u)", roma.nid, roma.cnt, (word)roma.ts);
+}
+
 void msg_pong_in (char * buf, word rssi) {
 
 	// 1s for hco and prox

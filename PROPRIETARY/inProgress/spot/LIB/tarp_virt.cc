@@ -40,7 +40,7 @@ Boolean msg_isClear (byte o) {
 #include "tag_mgr.h"
 
 Boolean msg_isMaster (msg_t m) {
-        return (m == msg_master);
+        return (m == msg_master && local_host != DEF_MHOST);
 }
 
 fsm mbeacon;

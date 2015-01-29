@@ -14,7 +14,10 @@
 fsm mbeacon;
 static void init () {
 	word pl = 7;
+
 	master_host = DEF_MHOST;
+	memset (&roma, 0, sizeof(roguemType));
+
 	init_inout ();
 	net_opt (PHYSOPT_SETPOWER, &pl);
 	reset_tags();
@@ -22,7 +25,7 @@ static void init () {
 #ifdef MASTER_STATUS_LED
 		leds (MASTER_STATUS_LED, 2);
 #endif
-        	tarp_ctrl.param = 0xB2; // level 2, rec 3, slack 1, fwd off
+        tarp_ctrl.param = 0xB2; // level 2, rec 3, slack 1, fwd off
 		runfsm mbeacon;
 		tagList.block = YES;
 	} else {
@@ -84,7 +87,8 @@ void process_incoming (char * buf, word size, word rssi) {
 		return;
 
 	case msg_master:
-		// handled in TARP, nothing more to do
+		// handled in TARP, nothing more to do - not any more, a (temporary) kludge in msg_master_in
+		msg_master_in (buf);
 		return;
 
 	default:

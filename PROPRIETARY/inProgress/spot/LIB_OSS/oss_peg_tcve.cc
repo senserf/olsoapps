@@ -68,22 +68,40 @@ static void reply11 (char *pkt) {
 
 	len = tcv_left ((address)pkt);
 
-	if (len < 6 || (b = get_mem (8, NO)) == NULL) {
+	if (len < 6) {
 		app_diag_S ("rep11 %u", len);
 		return;
 	}
 
+	if (((address)pkt) [2] == 4) { // rogue master crap
+		len = 12;
+	} else {
+		len = 8;
+	}
+	
+	if ((b = get_mem (len, NO)) == NULL) {
+		app_diag_S ("rep11 no mem");
+		return;
+	}
+
 	b [0] = 0x91;
-	b [1] = 8+3;
+	b [1] = len +3;
 
 	((address)b) [1] = ((address)pkt) [1];
 	((address)b) [2] = ((address)pkt) [2];
 	switch (((address)b) [2]) { // will be more
 		case 0x0002:
-			((address)b) [3] = (local_host == master_host);
+			((address)b) [3] = master_host;
 			break;
 		case 0x0003:
 			((address)b) [3] = (tarp_ctrl.param & 1);
+			break;
+		case 0x0004:
+			((address)b) [3] = roma.nid;
+			((address)b) [4] = roma.ts ? (word)(seconds() - roma.ts) : 0;
+			b[10] = roma.cnt;
+			b[11] = roma.hops;
+			memset (&roma, 0, sizeof(roguemType));
 			break;
 		default:
 			((address)b) [3] = local_host;
@@ -97,7 +115,7 @@ static void reply14 (char * pkt) {
 	char *b;
 	word n, m;
 
-	if (tcv_left ((address)pkt) < 5) { // we should nack, but it sould be inconsistent with all this crap
+	if ((n = tcv_left ((address)pkt)) < 5) { // we should nack, but it would be inconsistent with all this crap
 		app_diag_S ("rep14 len %u", n);
 		return;
 	}
@@ -173,7 +191,9 @@ fsm cmd_in {
 				}
 				switch (((address)ib)[2]) {
 					case 0x0001:
-						if (((address)ib)[3]) {
+						// shitty shit, see below in 0x0002
+						if (((address)ib)[3] && local_host != DEF_MHOST && ((address)ib)[3] != DEF_MHOST) {
+						// if (((address)ib)[3]) {
 							local_host = ((address)ib)[3];
 							sack (0x12, ((address)ib)[1], YES);
 						} else {
@@ -182,6 +202,13 @@ fsm cmd_in {
 						break;
 						
 					case 0x0002:
+						// what a shitty shit...
+if (1) {
+						// disallow (temporarily?)
+						sack (0x12, ((address)ib)[1], NO);
+						break;
+}
+if (0) {
 						// ack on bad, as requested
 						if (local_host != ((address)ib)[3]) {
 							sack (0x12, ((address)ib)[1], YES);
@@ -203,6 +230,7 @@ fsm cmd_in {
 						// apparently, it comes to the master for a twisted fun
 						sack (0x12, ((address)ib)[1], YES);
 						break;
+}
 
 					case 0x0003:
 						if (((address)ib)[3])

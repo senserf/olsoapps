@@ -3,6 +3,7 @@
 
 extern tagListType	tagList;
 extern Boolean		learn_mod;
+extern roguemType	roma;
 
 void reset_tags ();
 word del_tag (word id, word ref, word dupeq, Boolean force);
