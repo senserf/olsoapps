@@ -7,7 +7,9 @@ format_function: file with a function to format packets shown on output (see
 
 expressions:     a file with regular expressions applicable to the formatted
                  output, one expression per line, the expressions are AND-ed
-                 (see file sample_expressions)
+                 (see file sample_expressions); if the first character of an
+                 expression is !, then the matching is reversed, i.e., the
+                 packet must NOT much the expression to qualify
 
 from, to:        starting and ending time, e.g., "Jan 30, 2015 23:55:00"
 

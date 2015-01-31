@@ -86,6 +86,23 @@ proc date_daystart { sec } {
 	return [clock format $sec -format %D]
 }
 
+proc parse_regexp { re } {
+
+	set re [string trimleft $re]
+
+	if { [string index $re 0] == "!" } {
+		set ap 0
+		set re [string range $re 1 end]
+	} else {
+		set ap 1
+	}
+	set re [string trim $re]
+	if { $re == "" } {
+		return ""
+	}
+	return [list $ap $re]
+}
+
 ###############################################################################
 
 proc fmt { bytes } {
@@ -172,11 +189,19 @@ proc scan_file { fn tf tt re } {
 
 		foreach e $re {
 
-			if ![regexp -nocase $re $line] {
-				set line ""
-				break
-			}
+			lassign $e a r
 
+			if $a {
+				if ![regexp -nocase $r $line] {
+					set line ""
+					break
+				}
+			} else {
+				if [regexp -nocase $r $line] {
+					set line ""
+					break
+				}
+			}
 		}
 
 		if { $line != "" } {
@@ -266,14 +291,8 @@ proc main { } {
 				}
 				set re [split $re "\n"]
 				foreach r $re {
-					set r [string trim $r]
-					if { $r != "" &&
-					    [string index $r 0] != "#" } {
-						if [catch { regexp $r "du" } \
-						    err] {
-							abt "-ee, $arg, illegal\
-							    regexp: $r, $err"
-						}
+					set r [parse_regexp $r]
+					if { $r != "" } {
 						lappend regexp_list $r
 					}
 				}
@@ -281,8 +300,8 @@ proc main { } {
 			}
 
 			"e" {
-				set arg [string trim $arg]
-				if [catch { regexp $arg "du" } err] {
+				set arg [parse_regexp $arg]
+				if [catch { regexp [lindex $arg 1] "du" } err] {
 					abt "-e, $arg, illegal expression, $err"
 				}
 				lappend regexp_list $arg
