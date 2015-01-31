@@ -1,0 +1,85 @@
+#
+# This is a simple line format function for the log scanner
+#
+
+set MSGTYPES { "NULL" "PONG" "PACK" "MAST" "REPO" "RACK" "FRWD" "FACK" }
+
+proc fmt { bytes } {
+
+	global MSGTYPES
+##
+## Tarp header:
+##
+##	msg_type	1 byte
+##	seq_no		1 byte
+##	snd		1 word
+##	rcv		1 word
+##	hoc		7 bits
+##	prox		1 bit
+##	hco		7 bits
+##	weak		1 bit
+##
+	set output ""
+
+	set length [llength $bytes]
+
+	if { $length < 10 } {
+		return "packet too short"
+	}
+
+	set nid [expr { [lindex $bytes 0] | ([lindex $bytes 1] << 8) }]
+	set mty [lindex $bytes 2]
+	if { $mty < [llength $MSGTYPES] } {
+		set mty [lindex $MSGTYPES $mty]
+	} else {
+		set mty [format "*%02x*" $mty]
+	}
+	set seq [lindex $bytes 3]
+	set snd [expr { [lindex $bytes 4] | ([lindex $bytes 5] << 8) }]
+	set rcv [expr { [lindex $bytes 6] | ([lindex $bytes 7] << 8) }]
+	set hoc [expr { [lindex $bytes 8] & 0x7f }]
+	set pro [expr { [lindex $bytes 8] & 0x80 }]
+	set hco [expr { [lindex $bytes 9] & 0x7f }]
+	set wea [expr { [lindex $bytes 9] & 0x80 }]
+	set rss [expr { ([lindex $bytes end-1] + 128) & 0xff }]
+	set lqa [expr { [lindex $bytes end] & 0x7f }]
+	set chs [expr { [lindex $bytes end] & 0x80 }]
+
+	set bytes [lrange $bytes 10 end-2]
+
+	set output "NID=[format %04x $nid], TYP=$mty, RSS=[format %03d $rss],\
+		LQA=[format %03d $lqa], CHS="
+
+	if $chs {
+		append output "OK "
+	} else {
+		append output "BAD"
+	}
+
+	append output ", SND=[format %05d $snd], RCV=[format %05d $rcv]\n"
+
+	append output "         HOC=[format %02d $hoc], HCO=[format %02d $hco],\
+		PRO="
+
+	if $pro {
+		append output "YES"
+	} else {
+		append output "NO "
+	}
+
+	append output ", WEA="
+
+	if $wea {
+		append output "YES"
+	} else {
+		append output "NO "
+	}
+
+	append output "\n        "
+
+	foreach b $bytes {
+		append output [format " %02x" $b]
+	}
+
+	return $output
+}
