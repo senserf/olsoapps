@@ -4,9 +4,9 @@
 
 set MSGTYPES { "NULL" "PONG" "PACK" "MAST" "REPO" "RACK" "FRWD" "FACK" }
 
-proc fmt { bytes } {
+proc fmt { ts bytes } {
 
-	global MSGTYPES
+	global MSGTYPES lastts maxsil
 ##
 ## Tarp header:
 ##
@@ -32,7 +32,7 @@ proc fmt { bytes } {
 	if { $mty < [llength $MSGTYPES] } {
 		set mty [lindex $MSGTYPES $mty]
 	} else {
-		set mty [format "*%02x*" $mty]
+		set mty [format "  %1x" $mty]
 	}
 	set seq [lindex $bytes 3]
 	set snd [expr { [lindex $bytes 4] | ([lindex $bytes 5] << 8) }]
@@ -47,24 +47,24 @@ proc fmt { bytes } {
 
 	set bytes [lrange $bytes 10 end-2]
 
-	set output "NID=[format %04x $nid], TYP=$mty, RSS=[format %03d $rss],\
-		LQA=[format %03d $lqa], CHS="
+	set output "NID=[format %1x $nid], TYP=$mty, RSS=[format %1d $rss],\
+		LQA=[format %1d $lqa], CHS="
 
 	if $chs {
-		append output "OK "
+		append output "OK"
 	} else {
 		append output "BAD"
 	}
 
-	append output ", SND=[format %05d $snd], RCV=[format %05d $rcv]\n"
+	append output ", SND=[format %1d $snd], RCV=[format %1d $rcv]\n"
 
-	append output "         HOC=[format %02d $hoc], HCO=[format %02d $hco],\
+	append output "         HOC=[format %1d $hoc], HCO=[format %1d $hco],\
 		PRO="
 
 	if $pro {
 		append output "YES"
 	} else {
-		append output "NO "
+		append output "NO"
 	}
 
 	append output ", WEA="
@@ -72,13 +72,27 @@ proc fmt { bytes } {
 	if $wea {
 		append output "YES"
 	} else {
-		append output "NO "
+		append output "NO"
 	}
+
+	if [info exists lastts] {
+		set sil [format %1d [expr { $ts - $lastts }]]
+		if { $sil > $maxsil } {
+			set maxsil $sil
+		}
+	} else {
+		set sil "-"
+		set maxsil 0
+	}
+
+	set lastts $ts
+
+	append output ", SIL=$sil/$maxsil"
 
 	append output "\n        "
 
 	foreach b $bytes {
-		append output [format " %02x" $b]
+		append output [format " %1x" $b]
 	}
 
 	return $output

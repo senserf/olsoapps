@@ -24,7 +24,7 @@ proc usage { } {
 	global argv0
 
 	abt "usage: $argv0 -d fmtproc -f date -t date -e regexp \
-		-ee regfile ... file ... file "
+		-ee regfile -q quaproc ... file ... file "
 }
 
 ##
@@ -105,7 +105,7 @@ proc parse_regexp { re } {
 
 ###############################################################################
 
-proc fmt { bytes } {
+proc fmt { ts bytes } {
 #
 # The default format procedure
 #
@@ -116,6 +116,13 @@ proc fmt { bytes } {
 	}
 
 	return [string trimleft $output]
+}
+
+proc qua { ts line } {
+#
+# The default qualifier
+#
+	return 1
 }
 
 proc scan_files { fl tf tt re } {
@@ -185,7 +192,11 @@ proc scan_file { fn tf tt re } {
 			lappend bytes [expr 0x$b]
 		}
 
-		set line [fmt $bytes]
+		set line [fmt $ts $bytes]
+
+		if { $line == "" } {
+			continue
+		}
 
 		foreach e $re {
 
@@ -205,7 +216,10 @@ proc scan_file { fn tf tt re } {
 		}
 
 		if { $line != "" } {
-			out "$tst $line"
+			# applier the qualifier
+			if [qua $ts $line] {
+				out "$tst $line"
+			}
 		}
 	}
 
@@ -221,6 +235,7 @@ proc main { } {
 	set file_list ""
 	set regexp_list ""
 	set format_code ""
+	set qualifier_code ""
 	set time_from ""
 	set time_to ""
 
@@ -299,6 +314,23 @@ proc main { } {
 				continue
 			}
 
+			"q" {
+				# formatting
+				if { $qualifier_code != "" } {
+					usage
+				}
+
+				if [catch { get_file_contents $arg } \
+				    qualifier_code] {
+					abt "-q $arg, $qualifier_code"
+				}
+
+				if [catch { uplevel #0 $qualifier_code } err] {
+					abt "-q, cannot evaluate, $err"
+				}
+				continue
+			}
+
 			"e" {
 				set arg [parse_regexp $arg]
 				if [catch { regexp [lindex $arg 1] "du" } err] {
@@ -325,7 +357,7 @@ proc main { } {
 		lappend file_list [list $da $opt]
 	}
 
-	unset format_code
+	unset format_code qualifier_code
 
 	#######################################################################
 
