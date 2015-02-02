@@ -52,7 +52,6 @@ fsm radio_receiver {
 
 	address pkt;
 
-
 	state RCV_WAIT:
 
 		word len;
@@ -140,4 +139,3 @@ void handle_command () {
 			return;
 	}
 }
-

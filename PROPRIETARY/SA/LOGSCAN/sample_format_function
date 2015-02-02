@@ -4,9 +4,9 @@
 
 set MSGTYPES { "NULL" "PONG" "PACK" "MAST" "REPO" "RACK" "FRWD" "FACK" }
 
-proc fmt { ts bytes } {
+proc fmt { bytes } {
 
-	global MSGTYPES lastts maxsil
+	global MSGTYPES
 ##
 ## Tarp header:
 ##
@@ -56,10 +56,8 @@ proc fmt { ts bytes } {
 		append output "BAD"
 	}
 
-	append output ", SND=[format %1d $snd], RCV=[format %1d $rcv]\n"
-
-	append output "         HOC=[format %1d $hoc], HCO=[format %1d $hco],\
-		PRO="
+	append output ", SND=[format %1d $snd], RCV=[format %1d $rcv]"
+	append output ", HOC=[format %1d $hoc], HCO=[format %1d $hco], PRO="
 
 	if $pro {
 		append output "YES"
@@ -75,21 +73,7 @@ proc fmt { ts bytes } {
 		append output "NO"
 	}
 
-	if [info exists lastts] {
-		set sil [format %1d [expr { $ts - $lastts }]]
-		if { $sil > $maxsil } {
-			set maxsil $sil
-		}
-	} else {
-		set sil "-"
-		set maxsil 0
-	}
-
-	set lastts $ts
-
-	append output ", SIL=$sil/$maxsil"
-
-	append output "\n        "
+	append output ":"
 
 	foreach b $bytes {
 		append output [format " %1x" $b]

@@ -20,6 +20,7 @@ oss_message packet 0x01 {
 ###############################################################################
 
 set CMDS(status)	"parse_cmd_status"
+set last_day		""
 
 proc parse_cmd { line } {
 
@@ -82,21 +83,32 @@ proc show_msg { code ref msg } {
 
 proc show_msg_packet { msg } {
 
-	lassign [oss_getvalues $msg "packet"] payload
+	variable last_day
 
-	set len [llength $payload]
+	lassign [oss_getvalues $msg "packet"] pkt
 
-	set rss [lindex $payload end-1]
-	set lpq [lindex $payload end]
+	set sec [clock seconds]
+	set day [clock format $sec -format %d]
+	set hdr [clock format $sec -format "%H:%M:%S"]
 
-	set payload [lrange $payload 0 end-2]
-
-	if { $rss == "" } {
-		# too short
-		return
+	if { $day != $last_day } {
+		if { $last_day != "" } {
+			set res "00:00:00 #### BIM! BOM! "
+		} else {
+			set res "$hdr #### "
+		}
+		append res "Today is "
+		append res [clock format $sec -format "%h $day, %Y"]
+		set last_day $day
+		oss_ttyout $res
 	}
 
-	set res "PKT: <[format %03d $rss]/$lpq> = "
-	append res "[join $payload " " ]"
+	set res "$hdr <="
+
+	foreach b $pkt {
+		# strip 0x
+		append res " [string range $b 2 3]"
+	}
+
 	oss_ttyout $res
 }

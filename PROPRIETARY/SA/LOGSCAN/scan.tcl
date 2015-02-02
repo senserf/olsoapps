@@ -2,12 +2,6 @@
 #####################\
 exec tclsh "$0" "$@"
 
-proc out { m } {
-
-	puts $m
-
-}
-
 proc msg { m } {
 
 	puts stderr $m
@@ -23,15 +17,9 @@ proc usage { } {
 
 	global argv0
 
-	abt "usage: $argv0 -d fmtproc -f date -t date -e regexp \
-		-ee regfile -q quaproc ... file ... file "
+	abt "usage: $argv0 -d fmtproc -f date -t date -q quaproc\
+		... file ... file "
 }
-
-##
-## fmtfile:
-##
-##	align,nbits
-##
 
 proc get_file_contents { fn } {
 
@@ -86,26 +74,9 @@ proc date_daystart { sec } {
 	return [clock format $sec -format %D]
 }
 
-proc parse_regexp { re } {
-
-	set re [string trimleft $re]
-
-	if { [string index $re 0] == "!" } {
-		set ap 0
-		set re [string range $re 1 end]
-	} else {
-		set ap 1
-	}
-	set re [string trim $re]
-	if { $re == "" } {
-		return ""
-	}
-	return [list $ap $re]
-}
-
 ###############################################################################
 
-proc fmt { ts bytes } {
+proc fmt { bytes } {
 #
 # The default format procedure
 #
@@ -118,14 +89,23 @@ proc fmt { ts bytes } {
 	return [string trimleft $output]
 }
 
-proc qua { ts line } {
+proc qua { ts fpkt } {
 #
 # The default qualifier
 #
-	return 1
+	show $fpkt
 }
 
-proc scan_files { fl tf tt re } {
+###############################################################################
+
+proc show { line } {
+
+	global time_hdr
+
+	puts "$time_hdr $line"
+}
+
+proc scan_files { fl tf tt } {
 
 	if { $tf == "" } {
 		set tf 0
@@ -137,13 +117,15 @@ proc scan_files { fl tf tt re } {
 
 	foreach f $fl {
 
-		if [scan_file [lindex $f 1] $tf $tt $re] {
+		if [scan_file [lindex $f 1] $tf $tt] {
 			return
 		}
 	}
 }
 
-proc scan_file { fn tf tt re } {
+proc scan_file { fn tf tt } {
+
+	global time_hdr
 
 	set fd [open $fn "r"]
 
@@ -162,13 +144,13 @@ proc scan_file { fn tf tt re } {
 			continue
 		}
 
-		if ![regexp "^(..:..:..) <= (.*)" $line jnk tst byt] {
+		if ![regexp "^(..:..:..) <= (.*)" $line jnk time_hdr byt] {
 			# ignore
 			continue
 		}
 
-		if [catch { clock scan "$day $tst" } ts] {
-			abt "illegal time stamp: $tst"
+		if [catch { clock scan "$day $time_hdr" } ts] {
+			abt "illegal time stamp: $time_hdr"
 		}
 
 		if { $ts < $tf } {
@@ -192,35 +174,13 @@ proc scan_file { fn tf tt re } {
 			lappend bytes [expr 0x$b]
 		}
 
-		set line [fmt $ts $bytes]
+		set line [fmt $bytes]
 
 		if { $line == "" } {
 			continue
 		}
 
-		foreach e $re {
-
-			lassign $e a r
-
-			if $a {
-				if ![regexp -nocase $r $line] {
-					set line ""
-					break
-				}
-			} else {
-				if [regexp -nocase $r $line] {
-					set line ""
-					break
-				}
-			}
-		}
-
-		if { $line != "" } {
-			# applier the qualifier
-			if [qua $ts $line] {
-				out "$tst $line"
-			}
-		}
+		qua $ts $line
 	}
 
 	return 0
@@ -233,7 +193,6 @@ proc main { } {
 	global argv
 
 	set file_list ""
-	set regexp_list ""
 	set format_code ""
 	set qualifier_code ""
 	set time_from ""
@@ -300,20 +259,6 @@ proc main { } {
 				continue
 			}
 
-			"ee" {
-				if [catch { get_file_contents $arg } re] {
-					abt "-ee $arg, $re"
-				}
-				set re [split $re "\n"]
-				foreach r $re {
-					set r [parse_regexp $r]
-					if { $r != "" } {
-						lappend regexp_list $r
-					}
-				}
-				continue
-			}
-
 			"q" {
 				# formatting
 				if { $qualifier_code != "" } {
@@ -328,15 +273,6 @@ proc main { } {
 				if [catch { uplevel #0 $qualifier_code } err] {
 					abt "-q, cannot evaluate, $err"
 				}
-				continue
-			}
-
-			"e" {
-				set arg [parse_regexp $arg]
-				if [catch { regexp [lindex $arg 1] "du" } err] {
-					abt "-e, $arg, illegal expression, $err"
-				}
-				lappend regexp_list $arg
 				continue
 			}
 			}
@@ -368,7 +304,7 @@ proc main { } {
 		usage
 	}
 
-	scan_files $file_list $time_from $time_to $regexp_list
+	scan_files $file_list $time_from $time_to
 }
 
 main
