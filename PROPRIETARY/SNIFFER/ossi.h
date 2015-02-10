@@ -21,10 +21,10 @@ typedef	struct {
 // Command structures
 // ==================
 
-#define	command_status_code	1
+#define	command_packet_code	1
 typedef struct {
-	byte	what;
-} command_status_t;
+	blob	payload;
+} command_packet_t;
 
 // ==================
 // Message structures

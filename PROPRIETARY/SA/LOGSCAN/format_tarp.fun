@@ -1,12 +1,5 @@
-#
-# This is a simple line format function for the log scanner
-#
+{ bytes } {
 
-set MSGTYPES { "NULL" "PONG" "PACK" "MAST" "REPO" "RACK" "FRWD" "FACK" }
-
-proc fmt { bytes } {
-
-	global MSGTYPES
 ##
 ## Tarp header:
 ##
@@ -29,11 +22,15 @@ proc fmt { bytes } {
 
 	set nid [expr { [lindex $bytes 0] | ([lindex $bytes 1] << 8) }]
 	set mty [lindex $bytes 2]
-	if { $mty < [llength $MSGTYPES] } {
-		set mty [lindex $MSGTYPES $mty]
-	} else {
+
+	set typ [lindex { "NULL" "PONG" "PACK" "MAST"
+			  "REPO" "RACK" "FRWD" "FACK" } $mty]
+	if { $typ == "" } {
 		set mty [format "  %1x" $mty]
+	} else {
+		set mty $typ
 	}
+
 	set seq [lindex $bytes 3]
 	set snd [expr { [lindex $bytes 4] | ([lindex $bytes 5] << 8) }]
 	set rcv [expr { [lindex $bytes 6] | ([lindex $bytes 7] << 8) }]

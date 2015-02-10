@@ -60,7 +60,7 @@ void oss_ack (word st, byte cmd) {
 
 	byte *buf;
 
-	if ((buf = oss_outr (st, 1)) == NULL)
+	if ((buf = oss_outu (st, 1)) == NULL)
 		return;
 
 	buf [0] = cmd;

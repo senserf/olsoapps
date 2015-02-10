@@ -69,7 +69,7 @@ typedef pongPloadType0 pongPloadType;
 typedef pongPloadType1 pongPloadType;
 #endif
 
-#ifdef BOARD_ALPHATRONICS_BASE
+#if defined(BOARD_ALPHATRONICS_BASE) || defined (BOARD_ALPHATRONICS_BASE_XCC430)
 #define BTYPE   BTYPE_AT_BASE
 typedef pongPloadType2 pongPloadType;
 #endif

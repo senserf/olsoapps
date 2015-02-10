@@ -188,6 +188,11 @@ proc scan_file { fn tf tt } {
 
 ###############################################################################
 
+proc fundec { name func } {
+
+	uplevel #0 [concat proc $name $func]
+}
+
 proc main { } {
 
 	global argv
@@ -231,7 +236,8 @@ proc main { } {
 					abt "-d $arg, $format_code"
 				}
 
-				if [catch { uplevel #0 $format_code } err] {
+
+				if [catch { fundec fmt $format_code } err] {
 					abt "-d, cannot evaluate, $err"
 				}
 				continue
@@ -270,7 +276,7 @@ proc main { } {
 					abt "-q $arg, $qualifier_code"
 				}
 
-				if [catch { uplevel #0 $qualifier_code } err] {
+				if [catch { fundec qua $qualifier_code } err] {
 					abt "-q, cannot evaluate, $err"
 				}
 				continue

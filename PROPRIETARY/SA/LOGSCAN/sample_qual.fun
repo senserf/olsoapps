@@ -1,32 +1,24 @@
-#
-# Illustrates how to:
-#
-#	- qualify packets
-#	- calculate maximum silence (global and between the qualified events)
-#	- output extra information, not related to packets
-#
-
-set maxgsil 0
-set maxqsil 0
-set lastgts 0
-set lastqts 0
-
-proc qua { ts line } {
+{ ts line } {
 
 	global maxgsil maxqsil lastgts lastqts
 
-	if $lastgts {
+	if [info exists lastgts] {
 		# update global silence
 		set dt [expr { $ts - $lastgts }]
 		if { $dt > $maxgsil } {
 			set maxgsil $dt
 			show "NEW GLOBAL MAX SILENCE: $maxgsil"
 		}
+	} else {
+		set maxgsil 0
+		set maxqsil 0
+		set lastqts 0
 	}
+
 	set lastgts $ts
 
 	# a sample qualifier: our network and sent by master
-	if ![regexp -nocase "NID=4d,.*SND=1,.*HOC=0," $line] {
+	if ![regexp -nocase "NID=4d,.*HOC=0," $line] {
 		return
 	}
 

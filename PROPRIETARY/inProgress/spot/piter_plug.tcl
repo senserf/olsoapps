@@ -1,6 +1,487 @@
 {
 
 ###############################################################################
+#
+# A single list element is a list of these items:
+#
+#	- command keyword
+#	- list
+#		- subcommand keyword
+#		- list
+#			- opcode
+#			- argument tage
+#			- ...
+#
+#	w - word, b - byte (default is byte)
+#	% - provided by user
+#      *n - repeat the tail up to n times, possibly zero, depending on user
+#	    data availability
+#
+###############################################################################
+
+set PLUG(CMDS) {
+
+	{ "get"   { "address" { 0x11 w0 w1 } }
+		  { "master"  { 0x11 w0 w2 } }
+		  { "fwd"     { 0x11 w0 w3 } }
+		  { "det"     { 0x11 w0 w4 } }
+		  { "tal"     { 0x14 w0 b% } }
+	}
+
+	{ "set"   { "address" { 0x12 w0 w1 w% } }
+		  { "master"  { 0x12 w0 w2 w% } }
+		  { "tal"     { 0x13 w0 b% *20 w% b% } }
+	}
+
+	{ "reset" { "tal"     { 0x15 w0 } }
+	}
+}
+
+###############################################################################
+#
+#	- list
+#		- opcode
+#		- argument tag
+#		- ...
+#	- symbolic name of the reponse
+#	- function body to format the output
+#	- optional ACK or NAK, if the message is to be acked
+#
+#	argument tag w or b means word or byte to skip
+#	followed by a value -> expected value
+#	followed by a variable name (e.g., wx) -> to be passed to the function
+#
+###############################################################################
+
+set PLUG(RESP) {
+
+	{ { 0x91 w w1 wx } nodeaddress { return [format "Node Id = %1d" $x] } }
+
+	{ { 0x91 w w2 wx } masterid { return [format "Master Id = %1d" $x] } }
+
+	{ { 0x91 w w3 wx } fwdoffstatus
+		{
+			if $x {
+				set x "OFF"
+			} else {
+				set x "ON"
+			}
+			return "Forwarding = $x"
+		}
+	}
+
+	{ { 0x91 w w4 wx ws wa wh } dethrone
+		{
+			if { $x == 0 } {
+				return "No dethroning attempts"
+			} else {
+				return "$a attempts, $s sec ago, $h hops away"
+			}
+		}
+	}
+
+	{ { 0x92 w bx  } setreply
+		{
+			if { $x == 6 } {
+				return "SET OK"
+			} else {
+				return "SET FAILED"
+			}
+		}
+	}
+
+	{ { 0x01 wn wp wt bi bg bs bv br bp bj be } tagevent
+		{
+			set res "Event, peg = $p, tag = $t, adr = $j, tst = $s:"
+			set retr [expr { ($g >> 4) & 7 }]
+			if { $g & 0x80 } {
+				set noack " ?"
+			} else {
+				set noack ""
+			}
+			if { $g & 0x0f } {
+				set g "G"
+			} else {
+				set g "L"
+			}
+			append res "\n    button:   $i ($g $retr$noack)"
+			set v [expr { ((($v << 3) + 1000.0) / 4095.0) * 5.0 }]
+			append res "\n    voltage:  [format %4.2f $v]"
+			append res "\n    txpower:  $p"
+			append res "\n    age:      $e"
+			return $res
+		}
+		{ 0x91 w1 b6 }
+	}
+
+	{ { 0x94 w * wt bb } taldata
+		{
+			if { $args == "" } {
+				return "Empty TAL"
+			}
+			set res "TAL ="
+			foreach { t b } $args {
+				append res " <$t-$b>"
+			}
+			return $res
+		}
+	}
+
+	{ { 0x93 w bx  } settalreply
+		{
+			if { $x == 6 } {
+				return "SET TAL OK"
+			} else {
+				return "SET TAL FAILED"
+			}
+		}
+	}			
+
+	{ { 0x95 w bx  } resettalreply
+		{
+			if { $x == 6 } {
+				return "RESET TAL OK"
+			} else {
+				return "RESET TAL FAILED"
+			}
+		}
+	}			
+}
+
+###############################################################################
+
+proc issue_command { code vals } {
+
+	set out ""
+	foreach a $vals {
+
+		if ![regexp -nocase {^([wb])(.+)} $a j d a] {
+			set d b
+		}
+
+		if [catch { expr { int($a) } } val] {
+			error "illegal numerical value $a"
+		}
+
+		lappend out [expr { $val & 0xff }]
+
+		if { $d == "w" } {
+			lappend out [expr { ($val >> 8) & 0xff }]
+		}
+	}
+
+	set lf [expr { [llength $out] + 5 }]
+
+	set out [concat [list $code] [list $lf] $out]
+
+	plug_dmp $out "-->"
+
+	pt_outln $out
+}
+
+proc run_command { inp } {
+
+	global PLUG
+
+	set vls ""
+
+	if [regexp {^([[:alpha:]]+)[[:blank:]]+([[:alpha:]]+)(.*)} \
+		$inp jnk com sub arg] {
+
+		set com [string tolower $com]
+		set sub [string tolower $sub]
+
+		set bad 1
+		foreach c $PLUG(CMDS) {
+			if { [string first $com [lindex $c 0]] == 0 } {
+				set bad 0
+				set com [lindex $c 0]
+				break
+			}
+		}
+
+		if $bad {
+			return "Illegal command: $com"
+		}
+
+		set bad 1
+		foreach a [lrange $c 1 end] {
+			if { [string first $sub [lindex $a 0]] == 0 } {
+				set bad 0
+				set sub [lindex $a 0]
+				break
+			}
+		}
+
+		if $bad {
+			return "Illegal subcommand for $com: $sub"
+		}
+
+		set arp [lindex $a 1]
+		set cod [lindex $arp 0]
+		set arp [lrange $arp 1 end]
+		set rep 0
+		set inx 0
+
+		foreach a $arp {
+
+			incr inx
+
+			if [regexp {^\*([[:digit:]]*)} $a jnk rep] {
+				# repeat count
+				set arp [lrange $arp $inx end]
+				if { $rep == 0 } {
+					set rep 999
+				}
+				break
+			}
+
+			set d [string index $a 0]
+			set r [string range $a 1 end]
+
+			if { $r != "%" } {
+				# must be a number
+				lappend vls $a
+				continue
+			}
+
+			# argument
+
+			set arg [string trimleft $arg]
+			if [catch { plug_parse_number arg } num] {
+				return "Illegal argument, $num
+			}
+
+			lappend vls "$d$num"
+		}
+
+		while { $rep } {
+
+			set arg [string trimleft $arg]
+
+			if { $arg == "" } {
+				break
+			}
+
+			foreach a $arp {
+
+				set d [string index $a 0]
+				set r [string range $a 1 end]
+
+				if { $r != "%" } {
+					# must be a number
+					lappend vls $a
+					continue
+				}
+
+				# argument
+
+				if [catch { plug_parse_number arg } num] {
+					return "Illegal argument, $num
+				}
+
+				lappend vls "$d$num"
+			}
+
+			incr rep -1
+		}
+
+	} else {
+
+		if [regexp -nocase {^x} $inp] {
+
+			# line in hex
+
+			set inp [string range $inp 1 end]
+
+			while 1 {
+
+				set inp [string trimleft $inp]
+				if { $inp == "" } {
+					break
+				}
+
+				set dd [string range $inp 0 1]
+				set inp [string range $inp 2 end]
+
+				if [catch { expr 0x$dd } val] {
+					return "Bad input: $dd is not a pair\
+						of hex digits"
+				}
+				lappend vls $val
+			}
+
+		} else {
+
+			# free style numbers/expressions
+			while 1 {
+				set inp [string trimleft $inp]
+				if { $inp == "" } {
+					break
+				}
+			
+				if [catch { plug_parse_number inp } val] {
+					return "Bad input: $inp ($val)"
+				}
+
+				if [catch { plug_validate_int $val 0 255 } n] {
+					return "Illegal byte value: $val"
+				}
+				lappend vls $n
+			}
+		}
+
+		if { [llength $vls] < 2 } {
+			return "Need at least two bytes"
+		}
+
+		set cod [lindex $vls 0]
+		set vls [lrange $vls 1 end]
+	}
+
+	if [catch { issue_command $cod $vls } err] {
+		return $err
+	}
+
+	return ""
+}
+
+proc response_match { r op bs } {
+#
+# Checks if the response pattern matches the received node response
+#
+	set cp [lindex $r 0]
+
+	if { [lindex $cp 0] != $op } {
+		# opcode mismatch
+		return ""
+	}
+
+	set vls ""
+	set fal ""
+
+	set inx 0
+	set rep 0
+	set cp [lrange $cp 1 end]
+
+	foreach arg $cp {
+
+		incr inx
+
+		set d [string index $arg 0]
+		set arg [string range $arg 1 end]
+
+		if { $d == "*" } {
+			# repeat
+			set cp [lrange $cp $inx end]
+			set rep 1
+			break
+		}
+
+		if { $bs == "" } {
+			# no match
+			return ""
+		}
+
+		set v [lindex $bs 0]
+		set bs [lrange $bs 1 end]
+
+		if { $d == "w" } {
+			if { $bs == "" } {
+				return ""
+			}
+			set v [expr { $v | ([lindex $bs 0] << 8) }]
+			set bs [lrange $bs 1 end]
+		}
+
+		if { $arg == "" } {
+			# just skip
+			continue
+		}
+
+		if [catch { expr { int($arg) } } var] {
+			# not an expression, assume variable name; add the name
+			# to the function's list
+			lappend fal $arg
+			lappend vls $v
+			continue
+		}
+
+		# an expression, the values must much
+		if { $v != $var } {
+			return ""
+		}
+	}
+
+	# first round done, check if there's a repeat
+	if $rep {
+		# the subsequent values will form a list
+		lappend fal "args"
+
+		while { $bs != "" } {
+
+			foreach arg $cp {
+
+				set d [string index $arg 0]
+				set arg [string range $arg 1 end]
+
+				if { $bs == "" } {
+					# no match
+					return ""
+				}
+
+				set v [lindex $bs 0]
+				set bs [lrange $bs 1 end]
+
+				if { $d == "w" } {
+					if { $bs == "" } {
+						return ""
+					}
+					set v \
+					  [expr { $v | ([lindex $bs 0] << 8) }]
+					set bs [lrange $bs 1 end]
+				}
+
+				if { $arg == "" } {
+					# just skip
+					continue
+				}
+
+				if [catch { expr { int($arg) } } var] {
+					lappend vls $v
+					continue
+				}
+
+				# an expression, the values must much
+				if { $v != $var } {
+					return ""
+				}
+			}
+		}
+	}
+
+	# match, return a list:
+	#	- id
+	#	- list of values
+	#	- function (for apply) which is a list: arglist procbody
+	#
+
+	return [list [lindex $r 1] $vls [list $fal [lindex $r 2]]]
+}
+
+proc show_response { m } {
+#
+# Shows a formatted response
+#
+	set arg [lindex $m 1]
+	set fun [lindex $m 2]
+
+	set res [apply $fun {*}$arg]
+
+	pt_tout $res
+}
+
+###############################################################################
 
 proc plug_init { ags } {
 
@@ -28,6 +509,9 @@ proc plug_init { ags } {
 	# pending command
 	set PLUG(PENDING) ""
 
+	# last set reply status
+	set PLUG(LASTSRP) ""
+
 	# number of failures
 	set PLUG(FAILURES) 0
 
@@ -42,10 +526,8 @@ proc plug_init { ags } {
 	set PLUG(LTIME) 500
 	# Poll time
 	set PLUG(PTIME) 2000
-
 	# Number of retries
 	set PLUG(RETRIES) 3
-
 }
 
 proc plug_close { } {
@@ -70,7 +552,7 @@ proc plug_inppp_b { in } {
 		# master [n]
 		set inp [string trimleft \
 			[string range $inp [string length $mat] end]]
-		if [catch { expr $inp } no] {
+		if [catch { expr { int($inp) } } no] {
 			set no $PLUG(NODEID)
 			if { $no == "" } {
 				pt_tout "Node Id still unknown,\
@@ -93,7 +575,7 @@ proc plug_inppp_b { in } {
 		# dump
 		set inp [string trimleft \
 			[string range $inp [string length $mat] end]]
-		if [catch { expr $inp } df] {
+		if [catch { expr { int($inp) } } df] {
 			pt_tout "Number expected!"
 			return 0
 		}
@@ -101,69 +583,11 @@ proc plug_inppp_b { in } {
 		return 0
 	}
 
-	# direct
+	set err [run_command $inp]
 
-	set lv ""
-
-	if [regexp -nocase {^x} $inp] {
-		# line in hex
-		set inp [string range $inp 1 end]
-
-		while 1 {
-
-			set inp [string trimleft $inp]
-			if { $inp == "" } {
-				break
-			}
-
-			set dd [string range $inp 0 1]
-			set inp [string range $inp 2 end]
-
-			if [catch { expr 0x$dd } val] {
-				pt_tout "Bad input: $dd is not a pair of hex\
-					digits, ignored!"
-				return 0
-			}
-			lappend lv $val
-		}
-	} else {
-		# free style numbers/expressions
-		while 1 {
-			set inp [string trimleft $inp]
-			if { $inp == "" } {
-				break
-			}
-		
-			if [catch { plug_parse_number inp } val] {
-				pt_tout "Bad input: $inp ($val), ignored!"
-				return 0
-			}
-
-			if [catch { plug_validate_int $val 0 255 } n] {
-				pt_tout "Illegal byte value: $val,\
-					input ignored!"
-				return 0
-			}
-			lappend lv $n
-		}
+	if { $err != "" } {
+		pt_tout "$err!"
 	}
-
-	if { [llength $lv ] < 2 } {
-		pt_tout "Need at least two bytes!"
-		return 0
-	}
-
-	set lf [expr [llength $lv] + 3]
-	set ls [lindex $lv 1]
-
-	if { $ls != $lf } {
-		pt_tout "Fixing length $ls to $lf"
-	}
-
-	set lv [lreplace $lv 1 1 $lf]
-
-	plug_dmp $lv "-->"
-	pt_outln $lv
 
 	return 0
 }
@@ -173,106 +597,76 @@ proc plug_outpp_b { in } {
 	upvar $in inp
 	global PLUG
 
-	set org ""
+	set bts ""
 	set ln 0
 	foreach v $inp {
-		lappend org "0x$v"
+		lappend bts "0x$v"
 		incr ln
 	}
 
 	if { $ln < 5 } {
 		# garbage
-		plug_dmp $org "<-U"
-		return
-	}
-
-	lassign $org tp tl nl nh no
-	set inp [lrange $org 4 end]
-
-	if { $tp == 0x91 && $ln >= 8 } {
-		# response to "get node info"
-		if { $PLUG(PENDING) == $tp } {
-			# awaited
-			set PLUG(PENDING) ""
-			plug_dmp $org "<-W" 2
-		} else {
-			# spurious
-			plug_dmp $org "<-S" 1
-		}
-		set ii [expr [lindex $inp 0] | ([lindex $inp 1] << 8)]
-		if { $ii == 1 } {
-			set ni [expr [lindex $inp 2] | \
-				([lindex $inp 3] << 8)]
-			if { $PLUG(NODEID) == "" } {
-				pt_tout "Node Id = [format %04X $ni] ($ni)"
-				set PLUG(NODEID) $ni
-			} elseif { $PLUG(NODEID) != $ni } {
-				pt_tout "Node Id change:\
-					[format %04X $PLUG(NODEID)]\
-					($PLUG(NODEID)) -->\
-					[format %04X $ni] ($ni)"
-				set PLUG(NODEID) $ni
-			}
-		}
-		# more?
+		plug_dmp $bts "<-U"
 		return 0
 	}
 
-	if { $tp == 0x92 } {
-		# ACK for "set node info"
-		if { $PLUG(PENDING) == $tp } {
-			# awaited
-			set PLUG(PENDING) ""
-			plug_dmp $org "<-W" 2
-		} else {
-			# spurious
-			plug_dmp $org "<-S" 1
+	set opc [lindex $bts 0]
+	set tln [lindex $bts 1]
+	set ags [lrange $bts 2 end]
+
+	if { $ln != [expr { $tln - 3 }] } {
+		# bad length
+		plug_dmp $bts "<-U"
+		return 0
+	}
+
+	# decode the command
+	set m ""
+	foreach r $PLUG(RESP) {
+		set m [response_match $r $opc $ags]
+		if { $m != "" } {
+			break
+		}
+	}
+
+	if { $m == "" } {
+		# unrecognized
+		plug_dmp $bts "<-U"
+		return 0
+	}
+
+	set tp [lindex $m 0]
+
+	if { $PLUG(PENDING) == $tp } {
+		set PLUG(PENDING) ""
+		plug_dmp $bts "<-W"
+	}
+
+	if { $tp == "nodeaddress" } {
+		# the node address
+		set ni [lindex [lindex $m 1] 0]
+		if { $PLUG(NODEID) != $ni } {
+			set PLUG(NODEID) $ni
+			show_response $m
+		}
+		return 0
+	} elseif { $tp == "setreply" } {
+		# report only if change
+		set ni [lindex [lindex $m 1] 0]
+		if { $ni != $PLUG(LASTSRP) } {
+			set PLUG(LASTSRP) $ni
+			show_response $m
 		}
 		return 0
 	}
 
-	if { $tp == 0x01 && $ln >= 16 } {
-		plug_dmp $org "<-E"
-		set pi [expr [lindex $inp  0] | ([lindex $inp 1] << 8)]
-		set ti [expr [lindex $inp  2] | ([lindex $inp 3] << 8)]
-		set ts [expr [lindex $inp  6]]
-		if { $pi == $PLUG(NODEID) } {
-			set PLUG(EV,$ti) $ts
-		}
-		set bu [expr [lindex $inp  4]]
-		set it [expr [lindex $inp  5]]
-		set vo [expr [lindex $inp  7]]
-		set rs [expr [lindex $inp  8]]
-		set tx [expr [lindex $inp  9]]
-		set ad [expr [lindex $inp 10]]
-		set ag [expr [lindex $inp 11]]
-		pt_tout "Event, peg = [format %04X $pi] ($pi),\
-			tag = [format %04X $ti] ($ti), ad = $ad, sn = $ts:"
-		# A copy of Wlodek's hack from uplug
-		set retr [expr ($it >> 4) & 7]
-		if { $it & 0x80 } {
-			set noack " ?"
-		} else {
-			set noack ""
-		}
-		if { $it & 0x0f } {
-			set it "G"
-		} else {
-			set it "L"
-		}
-		pt_tout "    button:   $bu ($it $retr$noack)"
-		set vo [expr ((($vo << 3) + 1000.0) / 4095.0) * 5.0]
-		pt_tout "    voltage:  [format %4.2f $vo]"
-		pt_tout "    txpower:  $tx"
-		pt_tout "    age:      $ag"
-		# send ACK
-		set out "0x81 0x08 $nl $nh 0x06"
-		plug_dmp $out "A->"
-		pt_outln $out
-		return 0
+	set a [lindex $r 3]
+	if { $a != "" } {
+		# reply
+		issue_command [lindex $a 0] [lrange $a 1 end]
 	}
-
-	plug_dmp $org "<-U"
+		
+	show_response $m
 	return 0
 }
 		
@@ -311,7 +705,10 @@ proc plug_timeout_clear { } {
 ###############################################################################
 
 proc plug_renesas { } {
-
+#
+# This is a callback acting as a background process periodically polling the
+# node for status
+#
 	global PLUG
 
 	while 1 {
@@ -320,21 +717,22 @@ proc plug_renesas { } {
 ###	#######################################################################
 
 	if ![info exists PLUG(MASTER)] {
+		# nothing to do, PLUG(MASTER) tells the identity of the master
+		# node
 		return
 	}
-
-	set ml [expr {  $PLUG(MASTER)       & 0xFF }]
-	set mh [expr { ($PLUG(MASTER) << 8) & 0xFF }]
 
 	switch $PLUG(RSTATE) {
 
 	0 {
-		# start for get node info
+		# start poll for get node info; TR <- number of tries
 		set PLUG(TR) 1
-		set out "0x11 0x09 0x00 0x00 $ml $mh"
-		plug_dmp $out "P->" 2
-		pt_outln $out
-		set PLUG(PENDING) 0x91
+		set err [run_command "get address"]
+		if { $err != "" } {
+			pt_tout "ERROR: $err, Renesas callback terminates"
+			return
+		}
+		set PLUG(PENDING) "nodeaddress"
 		set PLUG(RSTATE) 1
 		plug_timeout_start $PLUG(RTIME)
 		vwait PLUG(PENDING)
@@ -343,9 +741,11 @@ proc plug_renesas { } {
 	1 {
 		plug_timeout_clear
 		if { $PLUG(PENDING) != "" && $PLUG(TR) < $PLUG(RETRIES) } {
-			set out "0x11 0x09 0x00 0x00 $ml $mh"
-			plug_dmp $out "P->" 3
-			pt_outln $out
+			set err [run_command "get address"]
+			if { $err != "" } {
+				pt_tout "ERROR: $err, Renesas callback\
+					terminates"
+			}
 			incr PLUG(RETRIES)
 			plug_timeout_start $PLUG(RTIME)
 		} elseif { $PLUG(NODEID) == "" } {
@@ -354,10 +754,12 @@ proc plug_renesas { } {
 			plug_timeout_start $PLUG(LTIME)
 		} else {
 			set PLUG(TR) 1
-			set out "0x12 0x0B 0x00 0x00 0x02 0x00 $ml $mh"
-			plug_dmp $out "P->" 2
-			pt_outln $out
-			set PLUG(PENDING) 0x92
+			set err [run_command "set master $PLUG(MASTER)"]
+			if { $err != "" } {
+				pt_tout "ERROR: $err, Renesas callback\
+					terminates"
+			}
+			set PLUG(PENDING) "setreply"
 			set PLUG(RSTATE) 2
 			plug_timeout_start $PLUG(RTIME)
 		}
@@ -367,9 +769,11 @@ proc plug_renesas { } {
 	2 {
 		plug_timeout_clear
 		if { $PLUG(PENDING) != "" && $PLUG(TR) < $PLUG(RETRIES) } {
-			set out "0x12 0x0B 0x00 0x00 0x02 0x00 $ml $mh"
-			plug_dmp $out "P->" 3
-			pt_outln $out
+			set err [run_command "set master $PLUG(MASTER)"]
+			if { $err != "" } {
+				pt_tout "ERROR: $err, Renesas callback\
+					terminates"
+			}
 			incr PLUG(RETRIES)
 			plug_timeout_start $PLUG(RTIME)
 		} else {
@@ -399,7 +803,7 @@ proc plug_validate_int { n { min "" } { max "" } } {
 		error "not an integer number"
 	}
 
-	if [catch { expr $n } n] {
+	if [catch { expr { int($n) } } n] {
 		error "not a number"
 	}
 
@@ -438,7 +842,7 @@ proc plug_parse_number { l } {
 			error "illegal number"
 		}
 
-		if ![catch { expr [string range $line 0 $ix] } res] {
+		if ![catch { expr { int([string range $line 0 $ix]) } } res] {
 			# found, remove the match
 			set line [string range $line [expr $ix + 1] end]
 			return $res

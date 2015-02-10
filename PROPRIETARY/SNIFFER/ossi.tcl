@@ -4,11 +4,11 @@ oss_interface -id 0x00010007 -speed 115200 -length 82 \
 ###############################################################################
 ###############################################################################
 
-oss_command status 0x01 {
+oss_command packet 0x01 {
 #
 # This is a dummy at present
 #
-	byte what;
+	blob payload;
 }
 
 oss_message packet 0x01 {
@@ -22,7 +22,7 @@ oss_message packet 0x01 {
 set CMDS(status)	"parse_cmd_status"
 set last_day		""
 
-proc parse_cmd { line } {
+proc parse_cmd { line { rec 0 } } {
 
 	variable CMDS
 
@@ -38,6 +38,31 @@ proc parse_cmd { line } {
 			[oss_parse -match "." -match ".*" -return 1]]
 		set res [oss_evalscript $cc]
 		oss_ttyout $res
+		return
+	}
+
+	if { $rec == 0 && $cc == "@" } {
+		# a file
+		set cc [oss_parse -skip -match {^[^[:blank:]]+} -return 1]
+		if { $cc == "" } {
+			error "file name expected"
+		}
+		# try to open the file
+		if [catch { open $cc "r" } fd] {
+			error "cannot open file $cc, $fd"
+		}
+		if [catch { read $fd } cmds] {
+			catch { close $fd }
+			error "cannot read file $cc, $cmds"
+		}
+		catch { close $fd }
+		set cmds [split $cmds "\n"]
+		foreach ln $cmds {
+			if [catch { parse_cmd $ln 1 } err] {
+				error "file processing aborted, $err"
+			}
+		}
+		oss_ttyout "file processing complete"
 		return
 	}
 

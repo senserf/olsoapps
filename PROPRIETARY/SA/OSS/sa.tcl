@@ -2618,8 +2618,6 @@ proc uart_read { msg } {
 	set len [expr [string length $msg] - 1]
 	binary scan $msg cu code
 
-	# dmp "REA<$len,$code>" $msg
-
 	foreach c $ST(ECM) {
 		if { $code == $c } {
 			# this command has been expected
@@ -5770,7 +5768,7 @@ proc inject_execute { this } {
 
 	log "** injecting packet \[[tstamp]\] (length=[string length $pkt]):"
 	log "=> [string trimleft [hencode $pkt]]"
-	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
+	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt" 1
 	set ret [wack { 0xFD 0xFC } 4000]
 	if { $ret < 0 } {
 		alert "Node response timeout"
@@ -5818,11 +5816,22 @@ proc inject_repeat { this } {
 	inject_button_status
 }
 
+proc inject_repeat_active { this } {
+#
+	global WN
+
+	if { [info exists WN(INJ,$this,WN)] && $WN(INJ,$this,CB) != "" } {
+		return 1
+	}
+
+	return 0
+}
+
 proc inject_repeat_callback { this } {
 #
 	global WN
 
-	if { ![info exists WN(INJ,$this,WN)] || $WN(INJ,$this,CB) == "" } {
+	if ![inject_repeat_active $this] {
 		# we are gone
 		return
 	}
@@ -5839,17 +5848,24 @@ proc inject_repeat_callback { this } {
 
 	set rc [expr $WN(INJ,$this,RK) + 1]
 
-	log "** injecting packet \[[tstamp]\] ($rc of $WN(INJ,$this,RL),\
-		length=[string length $pkt]):"
-	log "=> [string trimleft [hencode $pkt]]"
-
 	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
 	set ret [wack { 0xFD 0xFC } 4000]
-	if { $ret < 0 } {
-		log "** repeat injection failed (node response timeout)"
-	} elseif { $ret != 0xFD } {
-		log "** repeat injection failed (node busy)"
+
+	if ![inject_repeat_active $this] {
+		# don't bother
+		return
 	}
+
+	if { $ret < 0 || $ret != 0xFD } {
+		# try later
+		set WN(INJ,$this,CB) \
+			[after 64 "inject_repeat_callback $this"]
+		return
+	}
+
+	log "** injected packet \[[tstamp]\] ($rc of $WN(INJ,$this,RL),\
+		length=[string length $pkt]):"
+	log "=> [string trimleft [hencode $pkt]]"
 
 	if { $rc >= $WN(INJ,$this,RL) } {
 		# done

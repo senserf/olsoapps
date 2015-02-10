@@ -342,7 +342,7 @@ static void rq_handler (word st, byte *cmd, word cmdlen) {
 			// Kill the sampler process
 			reset_all ();
 			oss_erase ();
-			oss_ack (st, OSS_CMD_RSC);
+			oss_ack (WNONE, OSS_CMD_RSC);
 #endif
 			return;
 		}
@@ -510,11 +510,15 @@ SErr:
 			if (cmd [1] > MAX_TOTAL_PL + 1)
 				goto SErr;
 
-			if (!running (freq_sampler) || PTI)
-				goto SErr;
+			if (!running (freq_sampler) || PTI) {
+NErr:
+				oss_ack (WNONE, OSS_CMD_NAK);
+				led (LED_YELLOW, 3);
+				return;
+			}
 
 			if ((PTI = (byte*) umalloc (cmd [1])) == NULL)
-				goto SErr;
+				goto NErr;
 
 			PTIL = cmd [1];
 			memcpy (PTI, cmd + 2, PTIL);

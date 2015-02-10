@@ -137,5 +137,30 @@ void handle_command () {
 				tcv_endp (msg);
 			}
 			return;
+
+		case command_packet_code:
+
+#define	opt ((command_packet_t*)PMT)
+
+			if (opt->payload.size > MAX_PACKET_LENGTH - 2 ||
+			    (opt->payload.size & 1) != 0) {
+				oss_ack (1);
+				return;
+			}
+
+			if ((msg =
+			  tcv_wnp (WNONE, sd_rf, opt->payload.size + 2))
+			    == NULL) {
+				oss_ack (2);
+				return;
+			}
+
+			memcpy (opt->payload.content, msg, opt->payload.size);
+
+			tcv_endp (msg);
+
+			oss_ack (0);
+			return;
+#undef opt
 	}
 }
