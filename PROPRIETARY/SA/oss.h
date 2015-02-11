@@ -4,17 +4,17 @@
 //+++ "oss.cc"
 
 #include "sysio.h"
-#include "plug_boss.h"
+#include "plug_null.h"
 
 #define	OSS_PHY		0
 #define	OSS_PLUG	0
 #define	OSS_UART	UART_A
 
 #define	OSS_SAMPLES	129
-#define	OSS_MAXPLEN	(OSS_SAMPLES + 3)
+#define	OSS_MAXPLEN	(OSS_SAMPLES + 5)
 
-#define	OSS_CMD_NOP	0xFF	// NOP (always ignored, needed for resync)
-#define	OSS_CMD_RSC	0xFE	// RESYNC
+#define	OSS_CMD_NOP	0xFF	// NOP (always ignored)
+#define	OSS_CMD_RSC	0xFE	// Reset
 #define	OSS_CMD_ACK	0xFD
 #define	OSS_CMD_NAK	0xFC
 #define	OSS_CMD_U_PKT	0x01	// Packet (direction UP)
@@ -37,11 +37,11 @@
 
 typedef	void (*cmdfun_t) (word, byte*, word);
 
-void oss_init (cmdfun_t);
-void oss_ack (word, byte);
-byte *oss_outu (word, sint);
-byte *oss_outr (word, sint);
-void oss_send (byte*);
-void oss_erase ();
+void oss_ini (cmdfun_t);
+void oss_ack (word, byte, byte);
+byte *oss_out (word, sint);
+void oss_snd (byte*);
+void oss_ers ();
+void oss_sig ();
 
 #endif

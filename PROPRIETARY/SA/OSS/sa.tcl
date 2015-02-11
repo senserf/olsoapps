@@ -37,7 +37,7 @@ if [file isdirectory "/dev"] {
 
 ###############################################################################
 
-set ST(VER) 0.04
+set ST(VER) 0.84
 
 ## double exit avoidance flag
 set DEAF 0
@@ -515,13 +515,18 @@ namespace import ::TOOLTIPS::*
 
 package require tooltips
 
-package provide boss 1.0
-
-###############################################################################
-# BOSS ########################################################################
 ###############################################################################
 
-namespace eval BOSS {
+package provide noss 1.0
+
+###############################################################################
+# NOSS ########################################################################
+###############################################################################
+
+# This is N-mode packet interface with the Network ID field used as part
+# of payload (akin to the boss package)
+
+namespace eval NOSS {
 
 ###############################################################################
 # ISO 3309 CRC + supplementary stuff needed by the protocol module ############
@@ -573,27 +578,11 @@ set B(DGO) ""
 # character zero (aka NULL)
 set B(ZER) [format %c [expr 0x00]]
 
-# the ACK flag
-set B(ACK) [expr 0x04]
-
-# direct packet type
-set B(MAD) [expr 0xAC]
-
-# acked packet type
-set B(MAP) [expr 0xAD]
-
 # preamble byte
 set B(IPR) [format %c [expr 0x55]]
 
 # diag preamble (for packet modes) = ASCII DLE
 set B(DPR) [format %c [expr 0x10]]
-
-# output busy flag (current message pending) + output event variable; also
-# used as main event trigger for all vital events
-set B(OBS) 0
-
-# output queue
-set B(OQU) ""
 
 # reception automaton state
 set B(STA) 0
@@ -601,17 +590,8 @@ set B(STA) 0
 # reception automaton remaining byte count
 set B(CNT) 0
 
-# send callback
-set B(SCB) ""
-
-# long retransmit interval
-set B(RTL) 2048
-
-# short retransmit interval
-set B(RTS) 250
-
 # function to call on packet reception
-set B(DFN) "bo_nop"
+set B(DFN) ""
 
 # function to call on UART close (which can happen asynchronously)
 set B(UCF) ""
@@ -620,13 +600,11 @@ set B(UCF) ""
 set B(TIM)  ""
 
 # packet timeout (msec), once reception has started
-set B(PKT) 80
+set B(PKT) 8000
 
 ###############################################################################
 
-proc bo_nop { args } { }
-
-proc boss_chks { wa } {
+proc noss_chks { wa } {
 
 	variable CRCTAB
 
@@ -653,7 +631,7 @@ proc boss_chks { wa } {
 	return $chs
 }
 
-proc bo_abort { msg } {
+proc no_abort { msg } {
 
 	variable B
 
@@ -666,7 +644,7 @@ proc bo_abort { msg } {
 	exit 1
 }
 
-proc bo_diag { } {
+proc no_diag { } {
 
 	variable B
 
@@ -699,10 +677,10 @@ proc gize { fun } {
 
 proc lize { fun } {
 
-	return "::BOSS::$fun"
+	return "::NOSS::$fun"
 }
 
-proc bo_emu_readable { fun } {
+proc no_emu_readable { fun } {
 #
 # Emulates auto read on readable UART
 #
@@ -717,10 +695,10 @@ proc bo_emu_readable { fun } {
 		set B(ROT) 0
 	}
 
-	set B(ONR) [after $B(ROT) "[lize bo_emu_readable] $fun"]
+	set B(ONR) [after $B(ROT) "[lize no_emu_readable] $fun"]
 }
 
-proc bo_fnwrite { msg } {
+proc no_write { msg } {
 #
 # Writes a packet to the UART
 #
@@ -728,11 +706,9 @@ proc bo_fnwrite { msg } {
 
 	set ln [string length $msg]
 	if { $ln > $B(MPL) } {
-		bo_abort "assert fnwrite: $ln > max ($B(MPL))"
-	}
-
-	if { $ln < 2 } {
-		bo_abort "assert fnwrite: length ($ln) < 2"
+		# truncate the message to size, probably a bad idea
+		set ln $B(MPL)
+		set msg [string range $msg 0 [expr $ln - 1]]
 	}
 
 	if [expr $ln & 1] {
@@ -746,88 +722,27 @@ proc bo_fnwrite { msg } {
 	if [catch {
 		puts -nonewline $B(SFD) \
 			"$B(IPR)[binary format c $ln]$msg[binary format s\
-				[boss_chks $msg]]"
+				[noss_chks $msg]]"
 		flush $B(SFD)
-	}] {
-		boss_close "BOSS write error"
+	} err] {
+		noss_close "NOSS write error, $err"
 	}
 }
 
-proc bo_send { } {
-#
-# Callback for sending packets out
-#
-	variable B
-	
-	# cancel the callback, in case called explicitly
-	if { $B(SCB) != "" } {
-		catch { after cancel $B(SCB) }
-		set B(SCB) ""
-	}
-
-	if !$B(OBS) {
-		# just in case, this is a consistency invariant
-		set B(OUT) ""
-	}
-
-	set len [string length $B(OUT)]
-	# if len is nonzero, an outgoing message is pending; its length
-	# has been checked already (and is <= MAXPL)
-
-	set flg [expr $B(CUR) | ( $B(EXP) << 1 )]
-
-	if { $len == 0 } {
-		# ACK only
-		set flg [expr $flg | $B(ACK)]
-	}
-
-	bo_fnwrite "[binary format cc $B(MAP) $flg]$B(OUT)"
-
-	set B(SCB) [after $B(RTL) [lize bo_send]]
-}
-
-proc bo_write { msg { byp 0 } } {
-#
-# Write out a message
-#
-	variable B
-
-	set lm [expr $B(MPL) - 2]
-
-	if { [string length $msg] > $lm } {
-		# truncate the message to size, probably a bad idea
-		set msg [string range $msg 0 [expr $lm - 1]]
-	}
-
-	if $byp {
-		# immediate output, direct protocol
-		bo_fnwrite "[binary format cc $B(MAD) 0]$msg"
-		return
-	}
-
-	if $B(OBS) {
-		bo_abort "assert write: output busy"
-	}
-
-	set B(OUT) $msg
-	set B(OBS) 1
-
-	bo_send
-}
-
-proc bo_timeout { } {
+proc no_timeout { } {
 
 	variable B
 
 	if { $B(TIM) != "" } {
-		bo_rawread 1
+		no_rawread 1
 		set B(TIM) ""
 	}
 }
 
-proc bo_rawread { { tm 0 } } {
+proc no_rawread { { tm 0 } } {
 #
-# Called whenever data is available on the UART (mode S)
+# Called whenever data is available on the UART; returns 1 (if void), 0 (if
+# progress, i.e., some data was available)
 #
 	variable B
 #
@@ -856,12 +771,12 @@ proc bo_rawread { { tm 0 } } {
 					# reset
 					set B(STA) 0
 				} elseif { $B(STA) != 0 } {
-					# something has started, set up timer
+					# something has started, set up timer,
 					# if not running already
 					if { $B(TIM) == "" } {
 						set B(TIM) \
 				            	    [after $B(PKT) \
-							[lize bo_timeout]]
+							[lize no_timeout]]
 					}
 				}
 				return $void
@@ -936,14 +851,14 @@ proc bo_rawread { { tm 0 } } {
 				append B(BUF) $chunk
 				set chunk ""
 				# we have a complete buffer
-				bo_receive
+				no_receive
 				continue
 			}
 
 			# merged packets
 			append B(BUF) [string range $chunk 0 [expr $B(CNT) - 1]]
 			set chunk [string range $chunk $B(CNT) end]
-			bo_receive
+			no_receive
 		}
 
 		3 {
@@ -976,7 +891,7 @@ proc bo_rawread { { tm 0 } } {
 			set chunk [string range $chunk [expr $c + 1] end]
 			# reset
 			set B(STA) 0
-			bo_diag
+			no_diag
 		}
 
 		5 {
@@ -991,7 +906,7 @@ proc bo_rawread { { tm 0 } } {
 			set B(STA) 0
 			append B(BUF) [string range $chunk 0 [expr $B(CNT) - 1]]
 			set chunk [string range $chunk $B(CNT) end]
-			bo_diag
+			no_diag
 		}
 
 		default {
@@ -1001,7 +916,7 @@ proc bo_rawread { { tm 0 } } {
 	}
 }
 
-proc bo_receive { } {
+proc no_receive { } {
 #
 # Handle a received packet
 #
@@ -1010,7 +925,7 @@ proc bo_receive { } {
 	# dmp "RCV" $B(BUF)
 
 	# validate CRC
-	if [boss_chks $B(BUF)] {
+	if [noss_chks $B(BUF)] {
 		return
 	}
 
@@ -1023,104 +938,23 @@ proc bo_receive { } {
 		return
 	}
 
-	# extract the header
-	binary scan $msg cucu pr fg
-
-	# trim the message
-	set msg [string range $msg 2 end]
-
-	if { $pr == $B(MAD) } {
-		# direct, receive right away, nothing else to do
+	if { $B(DFN) != "" } {
 		$B(DFN) $msg
-		# count received messages as a form of heartbeat
-		return
-	}
-
-	if { $pr != $B(MAP) } {
-		# wrong magic
-		return
-	}
-
-	set cu [expr $fg & 1]
-	set ex [expr ($fg & 2) >> 1]
-	set ac [expr $fg & 4]
-
-	if $B(OBS) {
-		# we have an outgoing message
-		if { $ex != $B(CUR) } {
-			# expected != our current, we are done with this
-			# packet
-			set B(OUT) ""
-			set B(CUR) $ex
-			set B(OBS) 0
-		}
-	} else {
-		# no outgoing message, set current to expected
-		set B(CUR) $ex
-	}
-
-	if $ac {
-		# treat as pure ACK and ignore
-		return
-	}
-
-	if { $cu != $B(EXP) } {
-		# not what we expect, speed up the NAK
-		catch { after cancel $B(SCB) }
-		set B(SCB) [after $B(RTS) [lize bo_send]]
-		return
-	}
-
-	# receive it
-	$B(DFN) $msg
-
-	# update expected
-	set B(EXP) [expr 1 - $B(EXP)]
-
-	# force an ACK
-	bo_send
-}
-
-proc boss_reset { } {
-#
-# Protocol reset
-#
-	variable B
-
-	# queue of outgoing messages
-	set B(OQU) ""
-
-	# current outgoing message
-	set B(OUT) ""
-
-	# output busy flag
-	set B(OBS) 0
-
-	# expected
-	set B(EXP) 0
-
-	# current
-	set B(CUR) 0
-
-	if { $B(SCB) != "" } {
-		# abort the callback
-		catch { after cancel $B(SCB) }
-		set B(SCB) ""
 	}
 }
 
-proc boss_init { ufd mpl { clo "" } { emu 0 } } {
+proc noss_init { ufd mpl { inp "" } { dia "" } { clo "" } { emu 0 } } {
 #
 # Initialize: 
 #
 #	ufd - UART descriptor
 #	mpl - max packet length
+#	inp - function to be called on user input
+#	dia - function to be called to present a diag message
 #	clo - function to call on UART close (can happen asynchronously)
 #	emu - emulate 'readable'
 #
 	variable B
-
-	boss_reset
 
 	set B(STA) 0
 	set B(CNT) 0
@@ -1131,94 +965,60 @@ proc boss_init { ufd mpl { clo "" } { emu 0 } } {
 
 	set B(UCF) $clo
 
-	# User packet length: in the S mode, the Network ID field is used by
-	# the protocol
-	set B(UPL) [expr $B(MPL) - 2]
+	set B(DFN) $inp
+	set B(DGO) $dia
 
 	fconfigure $B(SFD) -buffering full -translation binary
 
-	# start the write callback for the persistent stream
-	bo_send
-
-	# insert the auto-input handler
 	if $emu {
 		# the readable flag doesn't work for UART on some Cygwin
 		# setups
 		set B(ROT) 1
 		set B(RMX) $emu
-		bo_emu_readable "[lize bo_rawread]"
+		no_emu_readable [lize no_rawread]
 	} else {
 		# do it the easy way
-		fileevent $B(SFD) readable "[lize bo_rawread]"
+		fileevent $B(SFD) readable [lize no_rawread]
 	}
 }
 
-proc boss_oninput { { fun "" } } {
+proc noss_oninput { { fun "" } } {
 #
 # Declares a function to be called when a packet is received
 #
 	variable B
 
-	if { $fun == "" } {
-		set fun "bo_nop"
-	} else {
+	if { $fun != "" } {
 		set fun [gize $fun]
 	}
 
 	set B(DFN) $fun
 }
 
-proc boss_trigger { } {
-	set ::BOSS::B(OBS) $::BOSS::B(OBS)
-}
-
-proc boss_wait { } {
-
-	variable B
-
-	if !$B(OBS) {
-		# not busy
-		if { $B(OQU) != "" } {
-			# something in queue
-			if { $B(SFD) != "" } {
-				bo_write [lindex $B(OQU) 0]
-				set B(OQU) [lrange $B(OQU) 1 end]
-			} else {
-				# drop everything, this is just a precaution
-				set B(OQU) ""
-			}
-		}
-	}
-
-	vwait ::BOSS::B(OBS)
-}
-
-proc boss_stop { } {
+proc noss_stop { } {
 #
 # Stop the protocol
 #
 	variable B
 
-	foreach cb { "SCB" "TIM" } {
-		# kill callbacks
-		if { $B($cb) != "" } {
-			catch { after cancel $B($cb) }
-			set B($cb) ""
-		}
+	if { $B(TIM) != "" } {
+		# kill the callback
+		catch { after cancel $B(TIM) }
+		set B(TIM) ""
 	}
-
-	boss_reset
 
 	set B(STA) 0
 	set B(CNT) 0
 	set B(BUF) ""
 }
 
-proc boss_close { { err "" } } {
+proc noss_close { { err "" } } {
 #
 # Close the UART (externally or internally, which can happen asynchronously)
 #
 	variable B
+
+	# trc "NOSS CLOSE"
 
 	if { [info exist B(ONR)] && $B(ONR) != "" } {
 		# we have been emulating 'readable', kill the callback
@@ -1239,14 +1039,13 @@ proc boss_close { { err "" } } {
 	set B(SFD) ""
 
 	# stop the protocol
-	boss_stop
+	noss_stop
 
-	boss_oninput
-
-	boss_trigger
+	set B(DFN) ""
+	set B(DGO) ""
 }
 
-proc boss_send { buf { urg 0 } } {
+proc noss_send { buf } {
 #
 # This is the user-level output function
 #
@@ -1257,55 +1056,36 @@ proc boss_send { buf { urg 0 } } {
 		return
 	}
 
-	# dmp "SND<$urg>" $buf
+	# dmp "SND" $buf
 
-	if $urg {
-		bo_write $buf 1
-		return
-	}
-
-	lappend B(OQU) $buf
-
-	boss_trigger
+	no_write $buf
 }
 
-proc boss_timeouts { slow { fast 0 } } {
-#
-# Sets the timeouts:
-#
-#	slow	periodic ACKS
-#	fast	nack after unexpected packet
-#
-	variable B
-
-	if { $slow == 0 } {
-		set slow 1000000000
-	}
-	set B(RTL) $slow
-	if $fast {
-		set B(RTS) $fast
-	}
-
-	if { $B(SCB) != "" } {
-		bo_send
-	}
-}
-
-namespace export boss_*
+namespace export noss_*
 
 }
 
-namespace import ::BOSS::*
+namespace import ::NOSS::*
+
+package require noss
 
 ###############################################################################
-# End of BOSS #################################################################
 ###############################################################################
 
-package require boss
+proc trigger { } {
 
-proc trigger { } { boss_trigger }
+	global __evnt
 
-proc event_loop { } { boss_wait }
+	set __evnt 1
+}
+
+proc event_loop { } {
+
+	global __evnt
+
+	set __evnt 0
+	vwait __evnt
+}
 
 ###############################################################################
 
@@ -1703,9 +1483,8 @@ proc terminate { } {
 
 	if $ST(SIP) {
 		# send a reset request to the node
-		boss_timeouts $PM(LTM,H)
-		send_reset 1
-		wack 0xFE $PM(SDL)
+		send_reset 16
+		wack 0xFE 0 $PM(SDL)
 	}
 
 	exit 0
@@ -1730,7 +1509,7 @@ proc strtail { str n } {
 
 proc isinteger { u } {
 
-	if [catch { expr $u } v] {
+	if [catch { expr { int($u) } } v] {
 		return 0
 	}
 
@@ -2439,31 +2218,39 @@ proc log_auto { } {
 	
 ###############################################################################
 
-proc send_reset { { urg 0 } } {
+proc rqc { } {
+#
+# New request sequence number
+#
+	global ST
 
-	set t [binary format c 0xFE]
+	incr ST(RQC)
 
-	if $urg {
-		boss_send $t 1
-		boss_send $t 1
-		boss_send $t 1
+	if { $ST(RQC) > 255 } {
+		set ST(RQC) 0
 	}
 
-	boss_send [binary format c 0xFF]
-	boss_send [binary format c 0xFE]
+	return $ST(RQC)
+}
+
+proc send_reset { { n 2 } } {
+
+	set t [binary format cc 0xFE 0]
+
+	while { $n } {
+		noss_send $t
+		incr n -1
+	}
 }
 
 proc send_handshake { } {
 
-	send_reset
-	set msg [binary format c 0x05]
-	boss_send $msg
-	boss_send $msg
+	send_reset 32
 }
 
 proc send_poll { } {
 
-	boss_send [binary format c 0x05]
+	noss_send [binary format cc 0x05 0]
 }
 
 proc handshake_ok { } {
@@ -2509,13 +2296,7 @@ proc uart_open { udev } {
 	set ST(HSK) 0
 
 	# configure the protocol
-	boss_init $ST(SFD) $PM(MPL) uart_close $emu
-
-	# input function
-	boss_oninput uart_first_read
-
-	# timeouts
-	boss_timeouts $PM(LTM,H) $PM(STM)
+	noss_init $ST(SFD) $PM(MPL) uart_first_read "" uart_close $emu
 
 	return 1
 }
@@ -2527,7 +2308,7 @@ proc uart_close { { err "" } } {
 	# trc "close UART: $err"
 
 	if $ST(SIP) {
-		send_reset 1
+		send_reset 8
 	}
 
 	catch { close $ST(SFD) }
@@ -2569,7 +2350,7 @@ proc uart_first_read { msg } {
 	# handshake condition met
 	set ST(HSK) 1
 	set_status "connected $ST(UDV)"
-	boss_oninput uart_read
+	noss_oninput uart_read
 
 	clear_sip
 	update_widgets
@@ -2589,13 +2370,15 @@ proc ack_timeout { } {
 	trigger
 }
 
-proc wack { cmd { tim 8000 } } {
+proc wack { cmd seq { tim 8000 } } {
 #
 # Wait for a response
 #
 	global ST PM
 
 	set ST(ECM) $cmd
+	set ST(ECM,S) $seq
+
 	set ST(ECM,C) 0
 	set ST(ECM,M) ""
 	set ST(ECM,T) [after $tim ack_timeout]
@@ -2615,14 +2398,14 @@ proc uart_read { msg } {
 
 	autocn_heartbeat
 
-	set len [expr [string length $msg] - 1]
-	binary scan $msg cu code
+	set len [expr [string length $msg] - 2]
+	binary scan $msg cucu code seq
 
 	foreach c $ST(ECM) {
-		if { $code == $c } {
+		if { $code == $c && $ST(ECM,S) == $seq } {
 			# this command has been expected
 			set ST(ECM,C) $c
-			set ST(ECM,M) [string range $msg 1 end]
+			set ST(ECM,M) [string range $msg 2 end]
 			trigger
 			return
 		}
@@ -2639,7 +2422,7 @@ proc uart_read { msg } {
 			# trc "Bad sample, $len bytes instead of $PM(NSA)"
 			return
 		}
-		set msg [string range $msg 1 end]
+		set msg [string range $msg 2 end]
 		if { $ST(SIP) == 1 } {
 			process_band_sample $msg
 		} elseif { $ST(SIP) != 0 } {
@@ -2650,7 +2433,7 @@ proc uart_read { msg } {
 
 	if { $code == 1 } {
 		# packet
-		log_packet [string range $msg 1 end] $len
+		log_packet [string range $msg 2 end] $len
 		return
 	}
 }
@@ -2805,8 +2588,6 @@ proc clear_sip { } {
 		update_widgets
 		inject_button_status
 	}
-
-	boss_timeouts $PM(LTM,I)
 }
 
 proc try_start { args } {
@@ -2831,10 +2612,10 @@ proc do_start_stop { } {
 
 	if $ST(SIP) {
 		# stop scan
-		boss_timeouts $PM(LTM,H)
-		send_reset 1
-		if { [wack 0xFE] < 0 } {
+		send_reset 96
+		if { [wack 0xFE 0] < 0 } {
 			alert "Node reset timeout"
+			return
 		}
 		clear_sip
 		return
@@ -2865,9 +2646,8 @@ proc do_start_stop { } {
 	# trc "SEP: $mo, $RC(FCE)<$fc>, $RC(BAN)<$fs>, $RC(STA), $RC(ISD)"
 
 	# reset the node
-	send_reset
-
-	if { [wack 0xFE] < 0 } {
+	send_reset 8
+	if { [wack 0xFE 0] < 0 } {
 		alert "Node reset timeout"
 		return
 	}
@@ -2880,8 +2660,8 @@ proc do_start_stop { } {
 	}
 
 	# issue the request
-
-	set cmd [binary format c 0x02]
+	set seq [rqc]
+	set cmd [binary format cc 0x02 $seq]
 
 	append cmd [pack1 $mo]
 	append cmd [pack3 $fc]
@@ -2889,11 +2669,12 @@ proc do_start_stop { } {
 	append cmd [pack1 $RC(STA)]
 	append cmd [pack1 $RC(ISD)]
 
-	boss_send $cmd
+	noss_send $cmd
+	noss_send $cmd
+	noss_send $cmd
 
 	set ST(SIP) [expr $mo + 1]
 	$WN(SSB) configure -text "Stop"
-	boss_timeouts $PM(LTM,S)
 
 	for { set i 0 } { $i < $PM(NSA) } { incr i } {
 		set SM($i) $RC(GRS)
@@ -3092,14 +2873,7 @@ proc draw_y_ticks { xc } {
 				[format " %1d" $y] -anchor $tan \
 				-font $FO(SMA) -fill $WN(AXC) -tags axis
 		}
-
-
-
-		
-
 	}
-
-	
 }
 
 proc draw_axes { } {
@@ -4050,7 +3824,7 @@ proc reguse { grp } {
 			continue
 		}
 		if [catch { regset $rg $rv } err] {
-			trc "regset error <$p $rv>: $err"
+			# trc "regset error <$p $rv>: $err"
 		}
 	}
 
@@ -4135,7 +3909,7 @@ proc reg_toggle_bit { name i } {
 
 proc reg_write { name } {
 
-	global ST RG
+	global ST RG PM
 
 	if { $ST(SFD) == "" } {
 		# disconnected, this probably will never happen
@@ -4152,26 +3926,29 @@ proc reg_write { name } {
 	}
 
 	set val [regval $name]
+	set seq [rqc]
 
 	if $RG($name,L) {
 		# burst
 		# trc "RWB: $name, $RG($name,A), $RG($name,L) == $val"
-		set cmd [binary format ccc 0x06 $RG($name,A) $RG($name,L)]
+		set cmd [binary format cccc 0x06 $seq $RG($name,A) $RG($name,L)]
 		foreach v $val {
 			append cmd [pack1 $v]
 		}
 	} else {
 		# single
 		# trc "RWS: $name, $RG($name,A) == $val"
-		set cmd [binary format cccc 0x03 1 $RG($name,A) $val]
+		set cmd [binary format ccccc 0x03 $seq 1 $RG($name,A) $val]
 	}
 
-	boss_send $cmd
-	if { [wack 0xFD 2000] < 0 } {
-		return "Failed to write register $name, node response timeout"
+	for { set i 0 } { $i < $PM(RET) } { incr i } {
+		noss_send $cmd
+		if { [wack 0xFD $seq 2000] >= 0 } {
+			return ""
+		}
 	}
 
-	return ""
+	return "Failed to write register $name, node response timeout"
 }
 
 proc reg_write_click { name } {
@@ -4187,7 +3964,7 @@ proc regs_write { } {
 #
 # Writes all R/W registers to the device
 #
-	global ST RG RGroups
+	global ST RG PM RGroups
 
 	if { $ST(SFD) == "" } {
 		# disconnected
@@ -4209,15 +3986,22 @@ proc regs_write { } {
 		}
 	}
 
-	set cmd [binary format cc 0x03 [llength $gs]]
+	set seq [rqc]
+	set cmd [binary format ccc 0x03 $seq [llength $gs]]
 	foreach r $gs {
 		append cmd [pack1 [lindex $r 0]]
 		append cmd [pack1 [lindex $r 1]]
 	}
 
 	# write single-valued registers
-	boss_send $cmd
-	if { [wack 0xFD 3000] < 0 } {
+	for { set i 0 } { $i < $PM(RET) } { incr i } {
+		noss_send $cmd
+		if { [wack 0xFD $seq 3000] >= 0 } {
+			break
+		}
+	}
+
+	if { $i == $PM(RET) } {
 		return "Failed to write single-valued registers, node response\
 			timeout"
 	}
@@ -4247,7 +4031,7 @@ proc reg_read { name } {
 #
 # Read register from device
 #
-	global ST RG
+	global ST RG PM
 
 	if { $ST(SFD) == "" } {
 		return "Cannot read register $name, not connected to device"
@@ -4257,19 +4041,26 @@ proc reg_read { name } {
 		return "Cannot read register $name, no such register"
 	}
 
+	set seq [rqc]
+
 	if $RG($name,L) {
 		# burst
 		set wai 0x07
-		set cmd [binary format ccc $wai $RG($name,A) $RG($name,L)]
+		set cmd [binary format cccc $wai $seq $RG($name,A) $RG($name,L)]
 	} else {
 		# single
 		set wai 0x04
-		set cmd [binary format ccc $wai 1 $RG($name,A)]
+		set cmd [binary format cccc $wai $seq 1 $RG($name,A)]
 	}
 
-	boss_send $cmd
+	for { set i 0 } { $i < $PM(RET) } { incr i } {
+		noss_send $cmd
+		if { [wack $wai $seq 2000] >= 0 } {
+			break
+		}
+	}
 
-	if { [wack $wai 2000] < 0 } {
+	if { $i == $PM(RET) } {
 		return "Failed to read register $name, node response timeout"
 	}
 
@@ -4323,7 +4114,7 @@ proc regs_read { } {
 #
 # Read all registers
 #
-	global ST RG RGroups
+	global ST RG PM RGroups
 
 	if { $ST(SFD) == "" } {
 		# disconnected
@@ -4364,16 +4155,22 @@ proc regs_read { } {
 	# now for the single-valued ones
 
 	set el [llength $gs]
-	set cmd [binary format cc 0x04 $el]
+	set seq [rqc]
+	set cmd [binary format ccc 0x04 $seq $el]
 
 	foreach r $gs {
 		append cmd [pack1 $RG($r,A)]
 	}
 
 	# read all single-valued registers
-	boss_send $cmd
+	for { set i 0 } { $i < $PM(RET) } { incr i } {
+		noss_send $cmd
+		if { [wack 0x04 $seq 2000] >= 0 } {
+			break
+		}
+	}
 
-	if { [wack 0x04 2000] < 0 } {
+	if { $i == $PM(RET) } {
 		return "Failed to read registers, node response timeout"
 	}
 
@@ -5736,7 +5533,7 @@ proc inject_build_packet { this } {
 		if [expr [string length $pkt] & 1] {
 			append pkt $CH(ZER)
 		}
-		set pkt "$pkt[boss_chks $pkt]"
+		set pkt "$pkt[noss_chks $pkt]"
 	}
 
 	return $pkt
@@ -5744,7 +5541,7 @@ proc inject_build_packet { this } {
 				
 proc inject_execute { this } {
 
-	global WN
+	global WN PM
 
 	if ![info exists WN(INJ,$this,WN)] {
 		return
@@ -5768,8 +5565,18 @@ proc inject_execute { this } {
 
 	log "** injecting packet \[[tstamp]\] (length=[string length $pkt]):"
 	log "=> [string trimleft [hencode $pkt]]"
-	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt" 1
-	set ret [wack { 0xFD 0xFC } 4000]
+
+	set seq [rqc]
+	set msg "[binary format ccc 0x08 $seq [string length $pkt]]$pkt"
+
+	for { set i 0 } { $i < $PM(RET) } { incr i } {
+		noss_send $msg
+		set ret [wack { 0xFD 0xFC } $seq 2000]
+		if { $ret == 0xFD } {
+			break
+		}
+	}
+
 	if { $ret < 0 } {
 		alert "Node response timeout"
 	} elseif { $ret != 0xFD } {
@@ -5829,7 +5636,7 @@ proc inject_repeat_active { this } {
 
 proc inject_repeat_callback { this } {
 #
-	global WN
+	global WN PM
 
 	if ![inject_repeat_active $this] {
 		# we are gone
@@ -5848,20 +5655,9 @@ proc inject_repeat_callback { this } {
 
 	set rc [expr $WN(INJ,$this,RK) + 1]
 
-	boss_send "[binary format cc 0x08 [string length $pkt]]$pkt"
-	set ret [wack { 0xFD 0xFC } 4000]
-
-	if ![inject_repeat_active $this] {
-		# don't bother
-		return
-	}
-
-	if { $ret < 0 || $ret != 0xFD } {
-		# try later
-		set WN(INJ,$this,CB) \
-			[after 64 "inject_repeat_callback $this"]
-		return
-	}
+	# this is best effort (should we change?)
+	set seq [rqc]
+	noss_send "[binary format ccc 0x08 $seq [string length $pkt]]$pkt"
 
 	log "** injected packet \[[tstamp]\] ($rc of $WN(INJ,$this,RL),\
 		length=[string length $pkt]):"
@@ -5973,16 +5769,11 @@ set PM(DSP) 	115200
 # tip text wrap length (pixels)
 set PM(TWR)	320
 
-# timeouts: handshake, idle, sampling
-set PM(LTM,H)	64
-set PM(LTM,I)	512
-set PM(LTM,S)	0
-
 # soft delay before closing the UART to give the node a chance to stop
 set PM(SDL)	8000
 
-# short timeout
-set PM(STM)	32
+# number of retries for commands
+set PM(RET)	3
 
 # Handshake timeout: short, long
 set PM(HST)	{ 2000 8000 }
@@ -5992,6 +5783,9 @@ set ST(SIP)	0
 
 # signal scale mode 0-RSSI, 1-dB
 set ST(SSM)	0
+
+# request counter
+set ST(RQC)	0
 
 # expected command list, actual command code, or -1 for timeout, the message,
 # timer
@@ -7081,7 +6875,9 @@ set PREINIT { PARAMS {AST 1 LON 1 LOF {} FCE 868.03 BAN Single/rcv STA 4 ISD 1 G
 ###############################################################################
 ###############################################################################
 
-autocn_start uart_open boss_close send_handshake handshake_ok uart_connected \
+trigger
+
+autocn_start uart_open noss_close send_handshake handshake_ok uart_connected \
 	send_poll [initialize]
 
 

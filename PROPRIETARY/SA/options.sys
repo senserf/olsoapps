@@ -1,5 +1,4 @@
 #define	TCV_LIMIT_XMT		16
-#define	TCV_LIMIT_URGENT_BUMP	4
 
 #undef	DIAG_MESSAGES
 #define	DIAG_MESSAGES		0

@@ -23,7 +23,11 @@ static word	Mode;		// 0-band, 1-single freq, 2-single+receiving
 static byte Samples [OSS_SAMPLES];
 
 // Packet to inject and its length
-static byte *PTI = NULL, PTIL;
+static byte *PTI = NULL, PTIL, SEQN, SSTA = 0;
+// Last request/sequence number
+static byte LREQ = 0, LRSQ;
+// Note: SSTA is passed as the sequence in output streaming data, so far it is
+// zero, but can be used for something creative, if needed
 
 #define	MAX_CTS_TRIES	1024
 
@@ -78,27 +82,27 @@ static void out_fifo (word st) {
 	if ((len = rrf_rx_status ()) <= 0)
 		return;
 
-	if ((buf = oss_outu (st, len + 2)) == NULL)
+	if ((buf = oss_out (st, len + 3)) == NULL)
 		return;
 
 	buf [0] = OSS_CMD_U_PKT;
-
-	rrf_get_reg_burst (CCxxx0_RXFIFO, buf + 2, buf [1] = (byte) len);
-
-	oss_send (buf);
+	buf [1] = SSTA;
+	rrf_get_reg_burst (CCxxx0_RXFIFO, buf + 3, buf [2] = (byte) len);
+	oss_snd (buf);
 }
 
 static void flush_samples (word st) {
 
 	byte *buf;
 
-	if ((buf = oss_outu (st, OSS_SAMPLES+1)) == NULL)
+	if ((buf = oss_out (st, OSS_SAMPLES+2)) == NULL)
 		// This can only happen if st id WNONE
 		return;
 
 	buf [0] = OSS_CMD_U_SMP;
-	memcpy (buf+1, Samples, OSS_SAMPLES);
-	oss_send (buf);
+	buf [1] = SSTA;
+	memcpy (buf+2, Samples, OSS_SAMPLES);
+	oss_snd (buf);
 }
 
 // ============================================================================
@@ -267,7 +271,8 @@ fsm freq_sampler {
 				ufree (PTI);
 				PTI = NULL;
 				rrf_enter_rx ();
-				proceed INJECT_FAIL;
+				// Failed, ignore
+				proceed WAIT_SAMPLE;
 			}
 			sacc++;
 			delay (1, CCLEAR);
@@ -289,15 +294,6 @@ WaitTX:
 		ufree (PTI);
 		PTI = NULL;
 		rrf_enter_rx ();
-
-	state INJECT_OK:
-
-		oss_ack (INJECT_OK, OSS_CMD_ACK);
-		proceed WAIT_SAMPLE;
-
-	state INJECT_FAIL:
-
-		oss_ack (INJECT_FAIL, OSS_CMD_NAK);
 		proceed WAIT_SAMPLE;
 }			
 
@@ -333,21 +329,31 @@ static void start_all () {
 
 static void rq_handler (word st, byte *cmd, word cmdlen) {
 
+	SEQN = cmd [1];
+
 	switch (*cmd) {
 
 		case OSS_CMD_RSC: {
+
 #if 1
 			reset ();
 #else
 			// Kill the sampler process
 			reset_all ();
-			oss_erase ();
-			oss_ack (WNONE, OSS_CMD_RSC);
-#endif
+			oss_ers ();
+			oss_ack (WNONE, CMD_ACK, SEQN);
+			LREQ = 0;
 			return;
+#endif
 		}
 
 		case OSS_CMD_D_SMP: {
+
+			// Prevent replication as much as possible
+			if ((running (band_sampler) || running (freq_sampler))
+			    && LREQ == OSS_CMD_D_SMP && LRSQ == SEQN)
+				// Assume this is a duplicate request
+				goto RAck;
 
 			// A new sampling request
 			reset_all ();
@@ -359,27 +365,29 @@ static void rq_handler (word st, byte *cmd, word cmdlen) {
 			//	Samples to average (1)
 			//	Sample delay (1)
 
-			if (cmdlen < 10) {
+			if (cmdlen < 11) {
 SErr:
-				oss_ack (st, OSS_CMD_NAK);
+				oss_ack (st, OSS_CMD_NAK, SEQN);
 				led (LED_RED, 3);
 				return;
 			}
 
-			Mode = cmd [1];
+			Mode = cmd [2];
 			if (Mode > 2)
 				goto SErr;
 
-			FreqStart 	= unpack3 (cmd +  2);
-			FreqStep 	= unpack3 (cmd +  5);
+			LREQ = OSS_CMD_D_SMP;
+			LRSQ = SEQN;
+
+			FreqStart 	= unpack3 (cmd +  3);
+			FreqStep 	= unpack3 (cmd +  6);
 			FreqMax		= FreqStart + FreqStep * OSS_SAMPLES;
 
-			SamplesToAverage	= cmd [8];
-			SampleDelay 		= cmd [9];
-
-			oss_ack (st, OSS_CMD_ACK);
-
+			SamplesToAverage	= cmd [ 9];
+			SampleDelay 		= cmd [10];
 			start_all ();
+RAck:
+			oss_ack (st, OSS_CMD_ACK, SEQN);
 			return;
 		}
 
@@ -392,21 +400,25 @@ SErr:
 			word i;
 			sint len;
 
-			// The minimum is cmd npairs + 2 bytes
-			if (cmdlen < 4)
+			if (LRSQ == SEQN && LREQ == OSS_CMD_D_SRG)
+				goto RAck;
+
+			// The minimum is npairs + 2 bytes
+			if (cmdlen < 5)
 				goto SErr;
 
-			len = 2 + 2 * ((sint) cmd [1]);
+			len = 3 + 2 * ((sint) cmd [2]);
 
-			if (len < 4 || len > cmdlen)
+			if (len < 5 || len > cmdlen)
 				goto SErr;
 
-			oss_ack (st, OSS_CMD_ACK);
-
-			for (i = 2; i < len; i += 2)
+			for (i = 3; i < len; i += 2)
 				rrf_mod_reg (cmd [i], cmd+1+i, 0);
 
-			return;
+			LRSQ = SEQN;
+			LREQ = OSS_CMD_D_SRG;
+
+			goto RAck;
 		}
 
 		case OSS_CMD_D_GRG: {
@@ -418,24 +430,29 @@ SErr:
 			word i;
 			byte *buf;
 
-			if (cmdlen < 3)
+			if (cmdlen < 4)
 				goto SErr;
 
-			len = 2 + ((sint) cmd [1]);
+			len = 3 + ((sint) cmd [2]);
 
-			if (len < 3 || len > cmdlen)
+			if (len < 4 || len > cmdlen)
 				goto SErr;
 
-			if ((buf = oss_outr (st, len)) == NULL)
+			if ((buf = oss_out (st, len)) == NULL)
 				// Cannot happen
 				goto SErr;
 
 			buf [0] = OSS_CMD_U_GRG;
-			buf [1] = (byte) (len - 2);
+			buf [1] = SEQN;
+			buf [2] = (byte) (len - 3);
 
-			for (i = 2; i < len; i++)
+			for (i = 3; i < len; i++)
 				buf [i] = rrf_get_reg (cmd [i]);
-			oss_send (buf);
+			oss_snd (buf);
+
+			LRSQ = SEQN;
+			LREQ = OSS_CMD_D_GRG;
+
 			return;
 		}
 
@@ -446,16 +463,17 @@ SErr:
 			//	len
 			//	bytes
 
-			if (cmdlen < 4)
+			if (LRSQ == SEQN && LREQ == OSS_CMD_D_SRGB)
+				goto RAck;
+
+			if (cmdlen < 5)
 				goto SErr;
 
-			if (cmd [2] == 0 || cmd [2] > cmdlen - 3)
+			if (cmd [3] == 0 || cmd [3] > cmdlen - 4)
 				goto SErr;
 
-			oss_ack (st, OSS_CMD_ACK);
-
-			rrf_mod_reg (cmd [1], cmd + 3, cmd [2]);
-			return;
+			rrf_mod_reg (cmd [2], cmd + 4, cmd [3]);
+			goto RAck;
 
 		case OSS_CMD_D_GRGB: {
 
@@ -464,64 +482,63 @@ SErr:
 			//	len
 			byte *buf;
 
-			if (cmdlen < 3 || cmd [2] > OSS_SAMPLES)
+			if (cmdlen < 4 || cmd [3] > OSS_SAMPLES)
 				goto SErr;
 
-			if ((buf = oss_outr (st, cmd [2] + 2)) == NULL)
+			if ((buf = oss_out (st, cmd [3] + 3)) == NULL)
 				goto SErr;
 
 			buf [0] = OSS_CMD_U_GRGB;
-			buf [1] = cmd [2];
+			buf [1] = SEQN;
+			buf [2] = cmd [3];
 
-			rrf_get_reg_burst (cmd [1], buf + 2, cmd [2]);
-			oss_send (buf);
+			rrf_get_reg_burst (cmd [2], buf + 3, cmd [3]);
+			oss_snd (buf);
+
+			LRSQ = SEQN;
+			LREQ = OSS_CMD_D_GRGB;
+
 			return;
 		}
 
-		case OSS_CMD_D_POL: {
+		case OSS_CMD_D_POL:
 
-			byte *buf;
-
-			if ((buf = oss_outr (st, 4)) == NULL)
-				// Cannot happen
-				goto SErr;
-
-			buf [0] = OSS_CMD_U_POL;
-			buf [1] = OSS_MAG0;
-			buf [2] = OSS_MAG1;
-			buf [3] = OSS_MAG2;
-
-			oss_send (buf);
+			oss_sig (st);
 			led (LED_YELLOW, 2);
 			return;
-		}
 
 		case OSS_CMD_D_INJT:
 
 			// Len
 			// Bytes to be written to TX FIFO
+			if (LRSQ == SEQN && LREQ == OSS_CMD_D_INJT)
+				goto IAck;
 
-			if (cmdlen < 3)
+			if (cmdlen < 4)
 				goto SErr;
 
-			if (cmd [1] == 0 || cmd [1] > cmdlen - 2)
+			if (cmd [2] == 0 || cmd [2] > cmdlen - 3)
 				goto SErr;
 
-			if (cmd [1] > MAX_TOTAL_PL + 1)
+			if (cmd [2] > MAX_TOTAL_PL + 1)
 				goto SErr;
 
 			if (!running (freq_sampler) || PTI) {
 NErr:
-				oss_ack (WNONE, OSS_CMD_NAK);
+				oss_ack (WNONE, OSS_CMD_NAK, SEQN);
 				led (LED_YELLOW, 3);
 				return;
 			}
 
-			if ((PTI = (byte*) umalloc (cmd [1])) == NULL)
+			if ((PTI = (byte*) umalloc (cmd [2])) == NULL)
 				goto NErr;
 
-			PTIL = cmd [1];
-			memcpy (PTI, cmd + 2, PTIL);
+			PTIL = cmd [2];
+			memcpy (PTI, cmd + 3, PTIL);
+			LRSQ = SEQN;
+			LREQ = OSS_CMD_D_INJT;
+IAck:
+			oss_ack (WNONE, OSS_CMD_ACK, SEQN);
 			return;
 
 		default:
@@ -535,7 +552,7 @@ fsm root {
 	state INIT:
 
 		led (0, 0);
-		oss_init (rq_handler);
+		oss_ini (rq_handler);
 		// Init RF, power down, default registers
 		rrf_init ();
 
