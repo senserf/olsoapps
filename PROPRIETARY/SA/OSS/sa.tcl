@@ -2120,7 +2120,7 @@ proc log_close_file { } {
 
 	if { $ST(LFD) != "" } {
 		# close the log file
-		catch { close $ST(FD) }
+		catch { close $ST(LFD) }
 		set ST(LFD) ""
 		set ST(LOF) ""
 		catch { $WN(LOF) configure -text "To file" }

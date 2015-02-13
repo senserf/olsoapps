@@ -30,10 +30,10 @@ set PLUG(CMDS) {
 
 	{ "set"   { "address" { 0x12 w0 w1 w% } }
 		  { "master"  { 0x12 w0 w2 w% } }
-		  { "tal"     { 0x13 w0 b% *20 w% b% } }
+		  { "tal"     { 0x13 wn b% *20 w% b% } }
 	}
 
-	{ "reset" { "tal"     { 0x15 w0 } }
+	{ "reset" { "tal"     { 0x15 wn } }
 	}
 }
 
@@ -70,7 +70,7 @@ set PLUG(RESP) {
 		}
 	}
 
-	{ { 0x91 w w4 wx ws wa wh } dethrone
+	{ { 0x91 w w4 wx ws ba bh } dethrone
 		{
 			if { $x == 0 } {
 				return "No dethroning attempts"
@@ -111,15 +111,15 @@ set PLUG(RESP) {
 			append res "\n    age:      $e"
 			return $res
 		}
-		{ 0x91 w1 b6 }
+		{ 0x81 w1 b6 }
 	}
 
-	{ { 0x94 w * wt bb } taldata
+	{ { 0x94 w bx * wt bb } taldata
 		{
 			if { $args == "" } {
 				return "Empty TAL"
 			}
-			set res "TAL ="
+			set res "TAL = <$x>"
 			foreach { t b } $args {
 				append res " <$t-$b>"
 			}
@@ -241,6 +241,15 @@ proc run_command { inp } {
 
 			if { $r != "%" } {
 				# must be a number
+				if { $r == "n" } {
+					# node Id
+					if { $PLUG(NODEID) == "" } {
+						set a 0
+					} else {
+						set a $PLUG(NODEID)
+					}
+					set a "$d$a"
+				}
 				lappend vls $a
 				continue
 			}
@@ -249,7 +258,7 @@ proc run_command { inp } {
 
 			set arg [string trimleft $arg]
 			if [catch { plug_parse_number arg } num] {
-				return "Illegal argument, $num
+				return "Illegal argument, $arg, $num"
 			}
 
 			lappend vls "$d$num"
@@ -277,7 +286,7 @@ proc run_command { inp } {
 				# argument
 
 				if [catch { plug_parse_number arg } num] {
-					return "Illegal argument, $num
+					return "Illegal argument, $arg, $num
 				}
 
 				lappend vls "$d$num"
@@ -489,13 +498,6 @@ proc plug_init { ags } {
 
 	set PLUG(DUMP) 0
 
-	if [regexp {[[:<:]]-m[[:blank:]]([[:digit:]]+)[[:>:]]} $ags jnk mn] {
-		set PLUG(MASTER) [expr $mn]
-	} else {
-		# the default master node
-		set PLUG(MASTER) 1
-	}
-
 	while { $ags != "" } {
 		if { [string index $ags 0] == "D" } {
 			incr PLUG(DUMP)
@@ -505,6 +507,9 @@ proc plug_init { ags } {
 
 	# node Id (unknown yet)
 	set PLUG(NODEID) ""
+
+	# tag association list to send
+	set PLUG(TAL) ""
 
 	# pending command
 	set PLUG(PENDING) ""
@@ -524,8 +529,8 @@ proc plug_init { ags } {
 	set PLUG(RTIME)	100
 	# Longer interval for persistent polling for Node Id
 	set PLUG(LTIME) 500
-	# Poll time
-	set PLUG(PTIME) 2000
+	# Poll time (60 seconds)
+	set PLUG(PTIME) 60000
 	# Number of retries
 	set PLUG(RETRIES) 3
 }
@@ -544,30 +549,47 @@ proc plug_close { } {
 proc plug_inppp_b { in } {
 
 	upvar $in inp
-	global PLUG
 
 	set inp [string trim $inp]
 
-	if [regexp -nocase {^m[[:alpha:]]*} $inp mat] {
-		# master [n]
-		set inp [string trimleft \
-			[string range $inp [string length $mat] end]]
-		if [catch { expr { int($inp) } } no] {
-			set no $PLUG(NODEID)
-			if { $no == "" } {
-				pt_tout "Node Id still unknown,\
-					command ignored!"
-				return 0
+	process_input $inp 0
+	return 0
+}
+
+proc process_input { inp f } {
+#
+# f - file flag, i.e., running commands from file
+#
+	global PLUG
+
+	if { $f == 0 } {
+		# echo
+		pt_tout $inp
+	}
+
+	if { $f == 0 &&
+	    [regexp -nocase {^f[[:alpha:]]*[[:blank:]]+(.+)} $inp mat fn] } {
+		# commands from file
+		if [catch { open $fn } fd] {
+			pt_tout "Cannot open file $fn, $fd"
+			return 1
+		}
+		if [catch { read $fd } cmds] {
+			catch { close $fd }
+			pt_tout "Cannot read file $fn, $cmds"
+			return 1
+		}
+		foreach cmd [split cmds "\n"] {
+			set cmd [string trim $cmd]
+			if { $cmd == "" || [string index $cmd 0] == "#" } {
+				continue
+			}
+			if [process_input $cmd 1] {
+				# error
+				pt_tout "File processing aborted!"
+				break
 			}
 		}
-
-		if { $no > 0xFFFE || $no < 0 } {
-			pt_tout "Illegal master node id $no, command ignored!"
-			return 0
-		}
-
-		set PLUG(MASTER) $no
-		pt_tout "Master node Id = [format %04X $no] ($no)"
 		return 0
 	}
 
@@ -577,9 +599,69 @@ proc plug_inppp_b { in } {
 			[string range $inp [string length $mat] end]]
 		if [catch { expr { int($inp) } } df] {
 			pt_tout "Number expected!"
-			return 0
+			return 1
 		}
 		set PLUG(DUMP) $df
+		return 0
+	}
+
+	if [regexp -nocase {^t[[:alpha:]]*} $inp mat] {
+		# set association list for periodic transmission to the node
+		set inp [string trimleft \
+			[string range $inp [string length $mat] end]]
+
+		if { $inp == "" } {
+			# reset
+			set PLUG(TAL) ""
+			return 0
+		}
+
+		if { $inp == "?" } {
+			pt_tout "TAL = [join $PLUG(TAL)]"
+			return 0
+		}
+			
+		if [catch { plug_parse_number inp } val] {
+			pt_tout "Bad index, number expected!"
+			return 1
+		}
+		if [catch { plug_validate_int $val 0 31 } inx] {
+			pt_tout "Index out of range, $val, must be between 0\
+				and 31!"
+			return 1
+		}
+		set tl [list $inx]
+		while 1 {
+			if [catch { plug_parse_number inp } val] {
+				break
+			}
+			if [catch { plug_validate_int $val 2 65534 } tag] {
+				pt_tout "Illegal tag Id, $val, must be between\
+					2 and 65534!"
+				return 1
+			}
+			if [catch { plug_parse_number inp } val] {
+				pt_tout "Button mask expected!"
+				return 1
+			}
+			if [catch { plug_validate_int $val 0 255 } bma] {
+				pt_tout "Illegal button mask, $val, must be\
+					between 0 and 255!"
+				return 1
+			}
+			lappend tl $tag
+			lappend tl $bma
+		}
+
+		if { [llength $tl] == 1 } {
+			pt_tout "Empty tag list!"
+			return 1
+		}
+
+		set PLUG(TAL) $tl
+		plug_timeout_clear
+		plug_timeout_gooff
+
 		return 0
 	}
 
@@ -587,6 +669,7 @@ proc plug_inppp_b { in } {
 
 	if { $err != "" } {
 		pt_tout "$err!"
+		return 1
 	}
 
 	return 0
@@ -640,6 +723,8 @@ proc plug_outpp_b { in } {
 	if { $PLUG(PENDING) == $tp } {
 		set PLUG(PENDING) ""
 		plug_dmp $bts "<-W"
+	} else {
+		plug_dmp $bts "<-R"
 	}
 
 	if { $tp == "nodeaddress" } {
@@ -647,16 +732,17 @@ proc plug_outpp_b { in } {
 		set ni [lindex [lindex $m 1] 0]
 		if { $PLUG(NODEID) != $ni } {
 			set PLUG(NODEID) $ni
-			show_response $m
 		}
+		show_response $m
 		return 0
 	} elseif { $tp == "setreply" } {
 		# report only if change
 		set ni [lindex [lindex $m 1] 0]
 		if { $ni != $PLUG(LASTSRP) } {
+			# not needed ?
 			set PLUG(LASTSRP) $ni
-			show_response $m
 		}
+		show_response $m
 		return 0
 	}
 
@@ -689,7 +775,6 @@ proc plug_timeout_gooff { } {
 	global PLUG
 
 	set PLUG(PENDING) $PLUG(PENDING)
-	set PLUG(CB,TO) ""
 }
 
 proc plug_timeout_clear { } {
@@ -716,16 +801,10 @@ proc plug_renesas { } {
 ###	#######################################################################
 ###	#######################################################################
 
-	if ![info exists PLUG(MASTER)] {
-		# nothing to do, PLUG(MASTER) tells the identity of the master
-		# node
-		return
-	}
-
 	switch $PLUG(RSTATE) {
 
 	0 {
-		# start poll for get node info; TR <- number of tries
+		# start poll for node info; TR <- number of tries
 		set PLUG(TR) 1
 		set err [run_command "get address"]
 		if { $err != "" } {
@@ -746,36 +825,50 @@ proc plug_renesas { } {
 				pt_tout "ERROR: $err, Renesas callback\
 					terminates"
 			}
-			incr PLUG(RETRIES)
+			incr PLUG(TR)
 			plug_timeout_start $PLUG(RTIME)
 		} elseif { $PLUG(NODEID) == "" } {
 			# still don't know the node Id, keep polling
 			set PLUG(RSTATE) 0
 			plug_timeout_start $PLUG(LTIME)
+		} elseif { $PLUG(TAL) == "" } {
+			# no TAL to send
+			set PLUG(RSTATE) 0
+			plug_timeout_start $PLUG(PTIME)
 		} else {
 			set PLUG(TR) 1
-			set err [run_command "set master $PLUG(MASTER)"]
+			set err [run_command "set tal [join $PLUG(TAL)]"]
 			if { $err != "" } {
-				pt_tout "ERROR: $err, Renesas callback\
-					terminates"
+				pt_tout "Error sending set tal, $err,\
+					TAL cleared!"
+				set PLUG(TAL) ""
+				set PLUG(RSTATE) 0
+				plug_timeout_start $PLUG(PTIME)
+			} else {
+				# OK
+				set PLUG(PENDING) "settalreply"
+				set PLUG(RSTATE) 2
+				plug_timeout_start $PLUG(RTIME)
 			}
-			set PLUG(PENDING) "setreply"
-			set PLUG(RSTATE) 2
-			plug_timeout_start $PLUG(RTIME)
 		}
 		vwait PLUG(PENDING)
 	}
 
 	2 {
 		plug_timeout_clear
-		if { $PLUG(PENDING) != "" && $PLUG(TR) < $PLUG(RETRIES) } {
-			set err [run_command "set master $PLUG(MASTER)"]
+		if { $PLUG(PENDING) != "" && $PLUG(TR) < $PLUG(RETRIES) &&
+	 	    $PLUG(TAL) != "" } {
+			set err [run_command "set tal [join $PLUG(TAL)]"]
 			if { $err != "" } {
-				pt_tout "ERROR: $err, Renesas callback\
-					terminates"
+				pt_tout "Error sending set tal, $err,\
+					tal cleared!"
+				set PLUG(TAL) ""
+				set PLUG(RSTATE) 0
+				plug_timeout_start $PLUG(PTIME)
+			} else {
+				incr PLUG(TR)
+				plug_timeout_start $PLUG(RTIME)
 			}
-			incr PLUG(RETRIES)
-			plug_timeout_start $PLUG(RTIME)
 		} else {
 			# close the loop
 			set PLUG(RSTATE) 0
@@ -846,11 +939,6 @@ proc plug_parse_number { l } {
 			# found, remove the match
 			set line [string range $line [expr $ix + 1] end]
 			return $res
-		}
-		# check for the special case of illegal octal number
-		set so [string range $line $ix [expr $ix + 1]]
-		if [regexp {[0-7][8-9]} $so] {
-			error "illegal octal digit in '$so'"
 		}
 	}
 }

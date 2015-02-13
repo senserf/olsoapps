@@ -17,7 +17,7 @@
 
 	set lastgts $ts
 
-	# a sample qualifier: our network and sent by master
+	# a sample qualifier: our network and direct
 	if ![regexp -nocase "NID=4d,.*HOC=0," $line] {
 		return
 	}

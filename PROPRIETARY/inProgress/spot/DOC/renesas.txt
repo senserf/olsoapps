@@ -72,8 +72,17 @@ Renesas   	-> 91 08 NA NA 06
 
 Set tag association list:
 
-Renesas   	-> 13 nn 00 00 IX TI TI BM TI TI BM ... TI TI BM
+Renesas   	-> 13 nn lh lh IX TI TI BM TI TI BM ... TI TI BM
+		      note: the address in this case (lh) must actually match Node ID
 		      nn == 8 + 3 * list_length
+		      TI == tag Id
+		      BM == Button Mask
+		      
+		Learning mode:
+		-> 13 nn lh lh 14 xx xx fc (illegal table index, >= 20)
+		      fc == 0 -> learning mode on, fc == ff -> learning mode off
+		      true buttons are numbered from 0, so the mask starts from
+		      button 1 on the LSB
 
 	- max number of triplets: 20
 	- at TI, the triplets are stored in an array (or a pair of arrays)
