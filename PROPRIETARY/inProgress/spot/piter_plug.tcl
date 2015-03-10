@@ -90,7 +90,7 @@ set PLUG(RESP) {
 		}
 	}
 
-	{ { 0x01 wn wp wt bi bg bs bv br bp bj be } tagevent
+	{ { 0x01 wn wp wt bi bg bs bv br bq bj be } tagevent
 		{
 			set res "Event, peg = $p, tag = $t, adr = $j, tst = $s:"
 			set retr [expr { ($g >> 4) & 7 }]
@@ -107,7 +107,7 @@ set PLUG(RESP) {
 			append res "\n    button:   $i ($g $retr$noack)"
 			set v [expr { ((($v << 3) + 1000.0) / 4095.0) * 5.0 }]
 			append res "\n    voltage:  [format %4.2f $v]"
-			append res "\n    txpower:  $p"
+			append res "\n    txpower:  $q"
 			append res "\n    age:      $e"
 			return $res
 		}

@@ -5713,19 +5713,29 @@ proc dmp { hd buf } {
 
 proc initialize { } {
 
-	global ST RC argv
+	global ST PM argv
 
 	unames_init $ST(DEV) $ST(SYS)
 
 	# explicit device list
 	set edl ""
 
-	foreach a $argv {
+	set ar $argv
+	while { $ar != "" } {
+		set a [lindex $ar 0]
 		if { [string index $a 0] != "-" } {
 			lappend edl $a
 		} elseif { $a == "-D" } {
 			set ST(DBG) 1
+		} elseif { $a == "-C" } {
+			# explicit config file
+			set ar [lrange $ar 1 end]
+			set a [lindex $ar 0]
+			if { $a != "" } {
+				set PM(RCF) $a
+			}
 		}
+		set ar [lrange $ar 1 end]
 	}
 
 	# trc "Starting"
