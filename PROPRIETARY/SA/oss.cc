@@ -94,7 +94,7 @@ fsm oss_in {
 
 		pkb = tcv_rnp (LOOP, SFD);
 
-		if (((byte*)pkb) == OSS_CMD_NOP)
+		if (*((byte*)pkb) == OSS_CMD_NOP)
 			goto Ignore;
 
 		bufl = tcv_left (pkb);

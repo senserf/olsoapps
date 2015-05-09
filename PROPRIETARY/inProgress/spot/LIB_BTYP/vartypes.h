@@ -69,17 +69,17 @@ typedef pongPloadType0 pongPloadType;
 typedef pongPloadType1 pongPloadType;
 #endif
 
-#if defined(BOARD_ALPHATRONICS_BASE) || defined (BOARD_ALPHATRONICS_BASE_XCC430)
+#if defined(BOARD_ALPHANET_AP321_BASE) || defined(BOARD_ALPHANET_BASE_XCC430)
 #define BTYPE   BTYPE_AT_BASE
 typedef pongPloadType2 pongPloadType;
 #endif
 
-#ifdef BOARD_ALPHATRONICS_BUTTON
+#ifdef BOARD_ALPHANET_AP319_BUTTONS
 #define BTYPE   BTYPE_AT_BUT6
 typedef pongPloadType3 pongPloadType;
 #endif
 
-#ifdef BOARD_ALPHATRONICS_PANIC
+#if defined(BOARD_ALPHANET_AP320_PANIC) || defined(BOARD_ALPHANET_AP331_PANIC) || defined(BOARD_ALPHANET_PANIC_OLIMEX)
 #define BTYPE   BTYPE_AT_BUT1
 typedef pongPloadType4 pongPloadType;
 #endif
