@@ -6883,7 +6883,7 @@ set PREINIT { PARAMS {AST 1 LON 1 LOF {} FCE 868.03 BAN Single/rcv STA 4 ISD 1 G
 
 }
 
-if 1 {
+if 0 {
 
 # Alpha 1.0 for CC430 USB (38400)
 

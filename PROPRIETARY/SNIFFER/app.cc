@@ -11,6 +11,10 @@
 
 #define	MAX_PACKET_LENGTH 	CC1100_MAXPLEN
 
+#ifndef	NETID_TO_SNIFF
+#define	NETID_TO_SNIFF		0x0000
+#endif
+
 // ============================================================================
 
 sint sd_rf, sd_uart;
@@ -72,7 +76,7 @@ fsm root {
 
 	state RS_INIT:
 
-		word si = 0xffff;
+		word si = 0xFFFF;
 
 		phys_cc1100 (0, MAX_PACKET_LENGTH);
 		phys_uart (1, OSS_PACKET_LENGTH, 0);
@@ -82,6 +86,8 @@ fsm root {
 		sd_uart = tcv_open (WNONE, 1, 0);	// UART
 
 		tcv_control (sd_uart, PHYSOPT_SETSID, &si);
+		si = NETID_TO_SNIFF;
+		tcv_control (sd_rf, PHYSOPT_SETSID, &si);
 		tcv_control (sd_rf, PHYSOPT_RXON, NULL);
 
 		if (sd_rf < 0 || sd_uart < 0)

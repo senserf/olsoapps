@@ -13,5 +13,8 @@
 #define	UART_TCV_MODE	UART_TCV_MODE_N
 #define	UART_RATE	115200
 
-// Receve packets with bad checksum
-#define	RADIO_CRC_TRANSPARENT	1
+// Set to 1 to receive packets with bad checksum
+#define	RADIO_CRC_TRANSPARENT	0
+
+// Set to the NetID, undefine or 0x0000 for promiscuity
+#define	NETID_TO_SNIFF	0x004D
