@@ -36,6 +36,5 @@
 
 //#undef STACK_SZIE
 //#define STACK_SIZE 512
-//#define CC1100_OLD_DRIVER 1
 
 #define RADIO_DEFAULT_CHANNEL	21
