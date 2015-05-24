@@ -1,0 +1,16 @@
+// Note that diag messages are OK under the TCV mode of UART
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES	2
+
+#undef	UART_TCV
+#undef	UART_RATE
+#undef	UART_DRIVER
+
+#define	UART_TCV	1
+#define	UART_TCV_MODE	UART_TCV_MODE_N
+#define	UART_RATE	115200
+
+// We need no radio in the test
+#undef	CC1100
+#define	CC1100		0
+
