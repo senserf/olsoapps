@@ -5,6 +5,7 @@
 
 sint	sd_uart = -1;		// UART file descriptor
 byte	next_ref = 1;		// Next reference number for outgoing message
+word	sernum;
 
 static void update_ref () {
 
@@ -34,6 +35,7 @@ static void smpmsg () {
 	// Some random content
 	msgcnt->peg = rnd ();
 	msgcnt->tag = rnd ();
+	msgcnt->ser = sernum++;
 	for (i = 0; i < 32; i++)
 		msgcnt->rss [i] = (byte) rnd ();
 
@@ -46,7 +48,7 @@ fsm sender {
 
 	state SN_SLEEP:
 
-		delay ((rnd () & 0x0fff) + 2048, SN_SEND);
+		delay ((rnd () & 0x0fff) + 4096, SN_SEND);
 		release;
 
 	state SN_SEND:

@@ -24,6 +24,6 @@ typedef struct {
 
 typedef struct {
 	// Sample excluding the message header
-	word	peg, tag;
+	word	peg, tag, ser;
 	byte	rss [32];
 } msg_sample_t;
