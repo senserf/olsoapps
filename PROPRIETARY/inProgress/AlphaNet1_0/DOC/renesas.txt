@@ -1,0 +1,111 @@
+Packet format (escaped), all values HEX:
+
+02 TP LN NA NA ... DATA ... CC 03
+
+TP - content type (1 byte)
+LN - length (complete packet excepting escapes)
+NA - two byte NodeAddress
+CC - one byte XOR of everything from STX (02) to ETX (03) must be zero
+
+02, 03, 10 are escaped with 10
+
+====
+
+The PHY frames the packet and provides the escaped, we only deal with the cleartext stuff between TP and the last byte of DATA.
+
+====
+
+Protocol as of January 28, 2015
+
+=======================================================================================================
+
+Renesas		-> 11 09 00 00 01 00		- query for node address
+		               02 00		- query for master status
+			       03 00		- return fwd OFF status
+			       04 00		- report attempts to change master status
+			       
+Node responses:
+
+		01 00	<-	91 0b 00 00 01 00 NA NA (return node Id)
+		02 00	<-	91 0b 00 00 02 00 MA MA (return master node Id)
+		03 00	<-	91 0b 00 00 03 00 FS FS (return fwd off status)
+		04 00	<-	91 0f 00 00 04 00 NA NA SC SC AT HO
+						SC - seconds ago
+						AT - number of attempts
+						HO - hops away
+		
+=======================================================================================================
+		
+Renesas		-> 12 0b 00 00 01 00 NA NA	- set node address
+		               02 00 NA NA	- become master (NA must equal local_host)
+			       
+Node responses:
+
+		     	<-	92 08 00 00 06	- ACK
+			<-	92 08 00 00 15	- NAK
+			
+				Note: set node to/from 1 (hardwired master) is not allowed (NAK)
+				Note: become master is disabled (always NAK)
+				
+=======================================================================================================
+
+Event report by our node:
+
+			 
+			<- 01 13 NA NA PE PE TA TA IT IR TS VO RS TX AD AG
+
+		PE - peg address
+		TA - tag address
+		IT - input type (button number)
+		IR - input range 1 - global, 0 - local
+		TS - time stamp modulo 16
+		VO - voltage
+		RS - RSSI
+		TX - TX power
+		AD - rotary address
+		AG - ago
+		
+Renesas   	-> 91 08 NA NA 06
+			       15
+
+=======================================================================================================
+
+Set tag association list:
+
+Renesas   	-> 13 nn lh lh IX TI TI BM TI TI BM ... TI TI BM
+		      note: the address in this case (lh) must actually match Node ID
+		      nn == 8 + 3 * list_length
+		      TI == tag Id
+		      BM == Button Mask
+		      
+		Learning mode:
+		-> 13 nn lh lh 14 xx xx fc (illegal table index, >= 20)
+		      fc == 0 -> learning mode on, fc == ff -> learning mode off
+		      true buttons are numbered from 0, so the mask starts from
+		      button 1 on the LSB
+
+	- max number of triplets: 20
+	- at TI, the triplets are stored in an array (or a pair of arrays)
+	- IX is the index of first array entry to be filled (starting from 0)
+	- no matter how many entries are specified we stop at 19
+
+Node response	  	<- ACK or NAK, i.e., 93 08 00 00 06
+							 15
+							 
+=======================================================================================================
+
+Get tag association list:
+
+Renesas   	-> 14 nn 00 00 IX ... the rest ignored ...
+
+Node response	  	<- 94 nn 00 00 TI TI BM ... TI TI BM
+
+	- returns the list of associations starting from IX
+	- return none if out of range
+	
+=======================================================================================================
+
+Reset association list:
+
+Renesas   	-> 15 07 00 00
+Node response        	<- 95 08 00 00 06

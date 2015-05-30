@@ -422,7 +422,7 @@ proc pt_outln { m tag } {
 
 
 	set r [list 0x02]
-	set h [expr 0x02 ^ 0x03]
+	set h [expr { (-(0x02 + 0x03)) & 0xFF } ]
 
 	foreach v $m {
 
@@ -432,7 +432,7 @@ proc pt_outln { m tag } {
 
 		lappend r $v
 
-		set h [expr $h ^ $v]
+		set h [expr { ($h - $v) & 0xFF } ]
 	}
 
 	if { $h == 0x02 || $h == 0x03 || $h == 0x10 } {
@@ -531,7 +531,7 @@ proc plug_receive { bytes tag hexflag } {
 					set PLUG($tag,B) ""
 					set PLUG($tag,L) 0
 					# initialize the parity byte
-					set PLUG($tag,P) 1
+					set PLUG($tag,P) 5
 					break
 				}
 			}
@@ -577,7 +577,8 @@ proc plug_receive { bytes tag hexflag } {
 					set PLUG($tag,E) 0
 				}
 				lappend PLUG($tag,B) $c
-				set PLUG($tag,P) [expr { $PLUG($tag,P) ^ $c }]
+				set PLUG($tag,P) \
+					[expr { ($PLUG($tag,P) + $c) & 0xFF }]
 				incr PLUG($tag,L)
 			}
 			if $PLUG($tag,S) {
