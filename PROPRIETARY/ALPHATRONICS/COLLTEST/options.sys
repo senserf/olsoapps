@@ -10,6 +10,9 @@
 #define	UART_TCV_MODE	UART_TCV_MODE_N
 #define	UART_RATE	115200
 
+#undef	RADIO_USE_LEDS
+#define	RADIO_USE_LEDS	0
+
 // We need no radio in the test
 #undef	CC1100
 #define	CC1100		0

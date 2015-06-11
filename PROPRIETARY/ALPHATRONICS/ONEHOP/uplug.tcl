@@ -3,7 +3,7 @@
 ###############################################################################
 ###############################################################################
 
-proc plug_input { in tag } {
+proc vplug_input { in tag } {
 
 	global PLUG
 
@@ -441,7 +441,7 @@ proc pt_outln { m tag } {
 	uart_send $out $tag
 }
 
-proc plug_open { nodenum hostnum nodetype tag } {
+proc vplug_init { nodenum hostnum nodetype tag } {
 #
 # List: nodenum, hostnum, total, nodetype (txt)
 #
@@ -488,7 +488,7 @@ proc plug_open { nodenum hostnum nodetype tag } {
 
 ###############################################################################
 
-proc plug_receive { bytes tag hexflag } {
+proc vplug_receive { bytes tag hexflag } {
 
 	global PLUG
 
@@ -578,7 +578,7 @@ proc plug_receive { bytes tag hexflag } {
 	}
 }
 
-proc plug_close { tag } {
+proc vplug_close { tag } {
 
 	global PLUG
 

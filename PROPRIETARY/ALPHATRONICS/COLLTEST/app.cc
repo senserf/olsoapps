@@ -96,6 +96,8 @@ fsm root {
 
 		runfsm sender;
 
+		leds (0, 2);
+
 	state RS_CMD:
 
 		oss_hdr_t *cmd;
