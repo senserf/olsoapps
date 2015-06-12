@@ -1120,7 +1120,7 @@ proc vplug_receive { bytes t hex } {
 				}
 				lappend PLUG($t,B) $c
 				set PLUG($t,P) \
-					[expr { ($PLUG($,P) + $c) & 0xFF }]
+					[expr { ($PLUG($t,P) + $c) & 0xFF }]
 
 				incr PLUG($t,L)
 			}
