@@ -951,7 +951,7 @@ proc sh_dmp { lv th t { lev 1 } } {
 		if { $th == "" } {
 			set th "-"
 		}
-		sh_tout "${t}: \[[sh_toh $lv]\]" $t
+		sh_tout "${th}: \[[sh_toh $lv]\]" $t
 	}
 }
 
