@@ -1017,7 +1017,7 @@ proc ioutput { bts t } {
 
 	set ln [llength $bts]
 
-	if { $ln < 4 } {
+	if { $ln < 5 } {
 		# garbage
 		if $dump {
 			idmp $bts "<-E" $t
@@ -1028,6 +1028,7 @@ proc ioutput { bts t } {
 	set pay $bts
 	set seq [get_b pay]
 	set nid [get_w pay]
+	set opc [get_b pay]
 
 	set arq [expr { $seq & 0x80 }]
 	set seq [expr { $seq & 0x7f }]
@@ -1039,7 +1040,7 @@ proc ioutput { bts t } {
 		return
 	}
 
-	if { $ln == 4 } {
+	if { $opc == 0 } {
 		# this is an ACK, check last unacked frame sequence number
 		set lastosq [varvar ${ns}::plug(lastosq)]
 		if [expr { $quiet & 1 }] {
@@ -1073,8 +1074,6 @@ proc ioutput { bts t } {
 	}
 
 	# receive
-	set opc [get_b pay]
-
 	if { $opc == 0xff } {
 		# this is a report, minimum length is 5
 		set status [ireport $pay $t]
@@ -1119,6 +1118,7 @@ proc sendack { r t } {
 	set vals ""
 	put_b vals $isq
 	put_w vals $nodeid
+	put_b 0
 	if { $r && $laststat == 0 } {
 		# convert OK to DUPOK
 		set laststat $CODES(RC_DUPOK)
@@ -1724,11 +1724,16 @@ proc command_control { t } {
 			if { $cc == "" } {
 				error "a number expected after -nodeid"
 			}
-			if [catch { pl_valint $cc 1 65534 } cc] {
+			if [catch { pl_valint $cc 0 65534 } cc] {
 				error "the argument of -nodeid must be\
-					between 1 and 65534"
+					between 0 and 65534"
 			}
-			set pp(nodeid) $cc
+
+			if { $cc == 0 } {
+				set pp(nodeid) ""
+			} else {
+				set pp(nodeid) $cc
+			}
 		  }
 		}
 	}
