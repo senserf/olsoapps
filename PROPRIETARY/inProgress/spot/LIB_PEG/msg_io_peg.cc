@@ -14,12 +14,8 @@ void msg_master_in (char * buf) {
 	if (master_host != local_host)
 		return;
 
-	roma.nid = in_header(buf, snd);
-	roma.cnt++;
-	roma.hops = in_header(buf, hoc);
-	roma.ts = seconds();
 	trigger (TRIG_MBEAC);
-	app_diag_S ("master contra %u %u (%u)", roma.nid, roma.cnt, (word)roma.ts);
+	app_diag_S ("master contra %u (%u)", in_header(buf, snd), (word)seconds());
 }
 
 void msg_pong_in (char * buf, word rssi) {
@@ -39,20 +35,30 @@ void msg_pong_in (char * buf, word rssi) {
 }
 
 void msg_fwd_in (char * buf, word siz) {
-	msgFwdAckType ack = {{msg_fwdAck,0,0,0,0,0,0,0}};
-        ack.header.rcv = in_header(buf, snd);
-        ack.ref = in_fwd(buf, ref);
-        talk ((char *)&ack, sizeof(msgFwdAckType), TO_NET);
-        talk (buf, siz, TO_OSS);
+	msgFwdAckType ack;
+	if (in_fwd(buf, opref) & 0x80) {
+		memset (&ack, 0, sizeof(msgFwdAckType));
+		ack.header.msg_type = msg_fwdAck;
+		ack.header.rcv = in_header(buf, snd);
+		ack.optyp = in_fwd(buf, optyp);
+		ack.opref = in_fwd(buf, opref);
+		talk ((char *)&ack, sizeof(msgFwdAckType), TO_NET);
+	}
+    talk (buf, siz, TO_OSS);
 }
 
 void msg_report_in (char * buf, word siz) {
-
 	msgReportAckType ack = {{msg_reportAck,0,0,0,0,0,0,0}};
-	ack.header.rcv = in_header(buf, snd);
-	ack.ref = in_report(buf, ref);
-	ack.tagid = in_report(buf, tagid);
-	talk ((char *)&ack, sizeof(msgReportAckType), TO_NET);
+
+	// eliminate unnecessary RACKs for heartbeat 'alarms' (in 1.5, not in 1.0)
+	if (((pongDataType *)(buf + sizeof(msgReportType)))->alrm_id == 0) { // heartbeat
+		app_diag_D ("No RACK for alrm0 %u #%u", in_header(buf, snd), in_report(buf, ref));
+	} else {
+		ack.header.rcv = in_header(buf, snd);
+		ack.ref = in_report(buf, ref);
+		ack.tagid = in_report(buf, tagid);
+		talk ((char *)&ack, sizeof(msgReportAckType), TO_NET);
+	}
 	talk (buf, siz, TO_OSS);
 }
 

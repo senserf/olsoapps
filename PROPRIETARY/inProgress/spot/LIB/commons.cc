@@ -17,6 +17,9 @@ char * get_mem (word len, Boolean r) {
         return buf;
 }
 
+word get_word (byte * buf, word n) {
+	return ((word)buf[n+1] << 8) | buf[n];
+}
 
 /////////////////////// fifek //////////////////////////
 // it is used in all pegs and tags with stacked alarms, so it may be in commons

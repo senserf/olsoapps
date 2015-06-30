@@ -44,12 +44,14 @@ typedef struct pongPloadStruct5 {
 #define PTYPE_PEG	0
 #define PTYPE_TAG	1
 
-#define BTYPE_CHRONOS				0
-#define BTYPE_CHRONOS_WHITE			1
+#define BTYPE_SPARE0				0
+#define BTYPE_CHRONOS				3
+#define BTYPE_CHRONOS_WHITE			4
 #define BTYPE_AT_BASE				2
-#define BTYPE_AT_BUT6				3
-#define BTYPE_AT_BUT1				4
+#define BTYPE_AT_BUT6				6
+#define BTYPE_AT_BUT1				1
 #define BTYPE_WARSAW				5
+#define BTYPE_SPARE7				7
 
 #if defined PGMLABEL_warp || defined PGMLABEL_a321p
 #define PTYPE	PTYPE_PEG

@@ -97,7 +97,7 @@ fsm cmd_in {
 						memset (b, 0, l);
 						in_header(b, msg_type) = msg_fwd;
 						in_header(b, rcv) = w;
-						in_fwd(b, ref) = (word)seconds();
+						in_fwd(b, opref) = (byte)seconds();
 						// terminating NULL should fit in:
 						strcpy (b+sizeof(msgFwdType), ibuf+1);
 						talk (b, l, TO_ALL);
@@ -211,7 +211,7 @@ void oss_tx (char * b, word siz) {
 		incoming = in_header(b, snd) != 0 &&
 			in_header(b, snd) != local_host;
 		bu = form (NULL, "%s FWD #%u %u [%s]\r\n",
-		incoming ? "IN" : "OUT", in_fwd(b, ref),
+		incoming ? "IN" : "OUT", in_fwd(b, opref),
 		incoming ?  in_header(b, snd) : in_header(b, rcv),
 		incoming ?  b + sizeof(msgFwdType) : ".");
 		_oss_out (bu);
@@ -219,7 +219,7 @@ void oss_tx (char * b, word siz) {
 
 	    case msg_fwdAck:
 		bu = form (NULL, "FwdAck #%u fr %u\r\n",
-			in_fwd(b, ref), in_header(b, snd));
+			in_fwd(b, opref), in_header(b, snd));
 		_oss_out (bu);
 		break;
 

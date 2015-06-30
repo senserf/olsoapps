@@ -16,7 +16,6 @@ static void init () {
 	word pl = 7;
 
 	master_host = DEF_MHOST;
-	memset (&roma, 0, sizeof(roguemType));
 
 	init_inout ();
 	net_opt (PHYSOPT_SETPOWER, &pl);

@@ -16,7 +16,6 @@ overwrite alarms. Acks from Master remove (del) corresponding entries.
 ***************************************************************************/
 tagListType tagList;
 Boolean learn_mod = 0;
-roguemType	roma;
 
 #define	_TMGR_MAX_RELIABLE	12
 #define _TMGR_DBG	0
@@ -334,6 +333,7 @@ void b2treg (word l, byte * b) {
 #if _TMGR_DBG
 	app_diag_U ("TMGR(%u): b2treg (%u,%u)", (word)seconds(), l, (word)*b);
 #endif
+
 }
 
 // we don't want to mess with oss allocation here, caller must do it and put the index in *b

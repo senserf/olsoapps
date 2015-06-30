@@ -11,6 +11,9 @@
 #include "sysio.h"
 #include "msg_tarp.h"
 
+#define SYSVER_MAJ 1
+#define SYSVER_min 5
+
 #define DEF_NID 77
 #define DEF_MHOST 1
 
@@ -37,6 +40,63 @@
 #define TRIG_OSSO	5
 #define TRIG_MBEAC	6
 #define TRIG_OSSIN	7
+
+#define RC_OK		0
+#define RC_EVAL		1	// 0xFF // -1
+#define RC_EPAR		2	// 0xFE // -2
+#define RC_EADDR	3	// 0xFD // -3
+#define RC_ENIMP	4	// 0xFC // -4
+#define RC_DUPOK	5	// 0xFB // -5
+#define RC_ELEN		6	// 0xFA // -6
+#define RC_ERES		7	// resources
+#define RC_RMT		8	// remote
+
+#define CMD_GET		1
+#define CMD_SET		2
+
+#define CMD_SET_ASSOC	0x13
+#define CMD_GET_ASSOC	0x14
+#define CMD_CLR_ASSOC	0x15
+
+// this should be fixed in 2.0 or even 1.5 if Renesas cooperates
+#define CMD_RELAY_41	0x41
+#define CMD_RELAY_42	0x42
+#define CMD_RELAY_43	0x43
+
+#define CMD_TRACE		0x51
+#define CMD_ODR			0x52
+
+#define CMD_FWD			0xA1
+#define CMD_INJECT		0xA2
+
+// CMD_GET's params
+#define PAR_LH			0x01
+#define ATTR_ESN		0x02
+#define PAR_MID			0x03
+#define PAR_NID			0x04
+#define PAR_TARP		0x09
+#define ATTR_TARP_CNT	0x0A
+#define PAR_TAG_MGR		0x0B
+#define PAR_AUDIT		0x0C
+#define PAR_AUTOACK		0x0D
+#define PAR_BEAC		0x0E
+#define ATTR_VER		0x0F
+#define ATTR_UPTIME		0x1A
+#define ATTR_MEM1		0x1B
+#define ATTR_MEM2		0x1C
+#define PAR_SNIFF		0x1D
+// additional SET's
+#define PAR_TARP_L		0x05
+#define PAR_TARP_R		0x06
+#define PAR_TARP_S		0x07
+#define PAR_TARP_F		0x08
+
+// reports
+#define REP_EVENT		0
+#define REP_RELAY		1
+#define REP_FORWARD		0xA1
+#define REP_LOG			0xD1
+#define REP_SNIFF		0xE1
 
 /////////// tag-related structs ////////////////
 
@@ -90,13 +150,6 @@ typedef struct tagListStruct {
 	char  * nel;
 } tagListType;
 
-typedef struct roguemStruct {
-	lword 	ts;
-	word	nid;
-	word	cnt :8;
-	word	hops :8;
-} roguemType;
-
 ///////////// messages ////////////////////
 
 typedef enum {
@@ -144,13 +197,17 @@ typedef struct msgReportAckStruct {
 
 typedef struct msgFwdStruct {
         headerType      header;
-        word            ref;
+		word			optyp :8; // opcode now, but there should be just single 'relay'
+        word            opref :8;
+		word			len   :8; // I don't think we can trust RF packet's length (always even?)
+		word			spare :8;
 } msgFwdType;
 #define in_fwd(buf, field)   (((msgFwdType *)(buf))->field)
 
 typedef struct msgFwdAckStruct {
         headerType      header;
-        word            ref;
+		word			optyp :8; // opcode now, but there should be just a single (typed within) 'relay'
+        word            opref :8;
 } msgFwdAckType;
 #define in_fwdAck(buf, field)   (((msgFwdAckType *)(buf))->field)
 
@@ -175,5 +232,6 @@ char * fifek_pull (fifek_t *fif);
 ///////////////////////////////////////////
 
 char * get_mem (word len, Boolean reset);
+word get_word (byte * buf, word n);
 
 #endif
