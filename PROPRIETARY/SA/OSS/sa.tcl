@@ -4749,9 +4749,7 @@ proc inject_incr_value { val typ how } {
 		set v $val
 	}
 
-	if [catch { expr $v + $how } v] {
-		return $val
-	}
+	set v [expr { $v + $how }]
 
 	# format it properly
 	if { $typ == "hex" } {
@@ -4845,7 +4843,7 @@ proc inject_update_layout { this } {
 
 		if $in {
 			# increment/decrement test
-			if { [inject_incr_value $val $ty 1] == $val } {
+			if [catch { inject_incr_value $val $ty 1 } ] {
 				return "Component $ci: the value cannot be\
 					incremented or decremented"
 			}
@@ -5505,13 +5503,13 @@ proc inject_build_packet { this } {
 			append pkt $bb
 			if $in {
 				# increment/decrement
-				set v [inject_incr_value $va $ty $in]
-				if { $v != $va } {
+				if ![catch { inject_incr_value $va $ty $in } \
+				    v] {
 					set WN(INJ,$this,V$i) $v
 					if [catch { inject_value_to_bytes $v \
 					    $ty sz } vv] {
 						# something went wrong, revert
-						set v $val
+						set v $va
 					} else {
 						set bb $vv
 					}

@@ -1,0 +1,22 @@
+#undef  UART_DRIVER
+#define	UART_DRIVER		0
+
+#undef	DIAG_MESSAGES
+#define	DIAG_MESSAGES		0
+
+#undef	RADIO_USE_LEDS
+#define	RADIO_USE_LEDS		0
+
+#undef	ENTROPY_COLLECTION
+#define	ENTROPY_COLLECTION	1
+
+#ifdef 	BOARD_WARSAW
+// 868 MHz adjusted for the discrepancy noted in Alphatronics boards
+#define	CC1100_FREQ_FREQ2_VALUE	0x21
+#define	CC1100_FREQ_FREQ1_VALUE	0x62
+#define	CC1100_FREQ_FREQ0_VALUE	0xC2
+#define	RADIO_DEFAULT_BITRATE	2
+#else
+// Assume an ALPHA node
+#endif
+

@@ -1,0 +1,6 @@
+Event packet for SA injection:
+
+4d 00 04 ++ sn++ sn 01 00 00 02 ++ ++ tg++ tg 61 00 73 ++ 04 02 bd 09 00 01
+         sq          rcv  hc ho  ref    tag   rs ag po bu
+                                                 ntype = 3
+

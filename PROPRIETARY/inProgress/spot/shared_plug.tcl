@@ -532,6 +532,7 @@ set CODES(CMD_SET)			2
 set CODES(CMD_SET_ASSOC)		0x13
 set CODES(CMD_GET_ASSOC)		0x14
 set CODES(CMD_CLR_ASSOC)		0x15
+set CODES(CMD_RELAY)			0x41
 
 ###############################################################################
 
@@ -541,6 +542,8 @@ set CMDS(getparams)	"command_getparams"
 set CMDS(getassoc)	"command_getassoc"
 set CMDS(setparams)	"command_setparams"
 set CMDS(setassoc)	"command_setassoc"
+set CMDS(learning)	"command_learning"
+set CMDS(relay)		"command_relay"
 set CMDS(send)		"command_send"
 set CMDS(control)	"command_control"
 set CMDS(script)	"command_script"
@@ -557,7 +560,8 @@ set RESP(20)		"response_getassoc"
 variable REPO
 
 set REPO(0)		"report_event"
-set REPO(222)		"report_log"
+set REPO(1)		"report_relay"
+set REPO(209)		"report_log"
 
 ###############################################################################
 
@@ -741,7 +745,7 @@ proc iinit { ags t } {
 		variable plug
 
 		array set plug {
-			dump 		0
+			dump 		2
 			confirm		0
 			echo		1
 			repeat		0
@@ -958,14 +962,18 @@ proc iissue { code vals t { sopts "" } } {
 	}
 
 	# sequence number + Node Id + opcode + refnum
-	set out [list $osq 0 0 $code $ref]
-
 	if { $nodeid == "" } {
-		put_w out 0
+		set nid 0
 	} else {
-		put_w out $nodeid
+		set nid $nodeid
 	}
 
+	set out ""
+	put_b out $osq
+	put_w out $nid
+	put_b out $code
+	put_b out $ref
+	put_w out $nid
 	set out [concat $out $vals]
 
 	if $dump {
@@ -1195,7 +1203,7 @@ proc ireport { pay t } {
 	}
 
 	# uncharted
-	set nc [cns $t]
+	set ns [cns $t]
 	set quiet [varvar ${ns}::plug(quiet)]
 	if [expr { $quiet & 1 }] {
 		term_write "*REP: $opc <[toh $pay]>" $t
@@ -1220,9 +1228,9 @@ variable PARLIST {
 		  { "tarp"    	  9 	sg	bx	0	255	}
 		  { "tarpcnt" 	 10 	g	www			}
 		  { "tagmgr"  	 11 	sg	by	0	1	}
-		  { "audit"   	 12 	sg	b	0	255 	}
+		  { "audit"   	 12 	sg	w	0	0xffff 	}
 		  { "autoack"  	 13 	sg	by	0	1	}
-		  { "beacon"  	 14 	sg	b	0	255	}
+		  { "beacon"  	 14 	sg	w	0	0xffff	}
 		  { "version" 	 15 	g	ws			}
 		  { "uptime"  	 26 	g	l			}
 		  { "memstat" 	 27 	g	ww			}
@@ -2113,6 +2121,138 @@ proc command_setassoc { t } {
 	iissue $opc $vals $t $sopts
 }
 
+proc command_learning { t } {
+#
+# Turn the learning mode on and off
+#
+	variable STDOPTS
+	variable CODES
+
+	set slist [concat { "on" "off" "show" } $STDOPTS]
+	set which ""
+	set sopts ""
+
+	while 1 {
+
+		set sel [cselector]
+		if { $sel == "" } {
+			break
+		}
+
+		set k [pl_keymatch $sel $slist]
+
+		if { $k == "on" || $k == "off" || $k == "show" } {
+			if { $which != "" } {
+				error "only one of -on, -off, -show can be \
+					specified"
+			}
+			if { $k == "on" } {
+				set which 0
+			} elseif { $k == "off" } {
+				set which 255
+			} else {
+				set which 1
+			}
+		} else {
+			stdopts sopts $k
+		}
+	}
+
+	if { $which == "" } {
+		set which 0
+	}
+
+	checkempty
+
+	if { $which == 1 } {
+		# request learning status
+		set opc $CODES(CMD_GET_ASSOC)
+		set par [list 20]
+	} else {
+		set opc $CODES(CMD_SET_ASSOC)
+		set par [list 20 1 1 $which]
+	}
+
+	iissue $opc $par $t $sopts
+}
+
+proc command_relay { t } {
+#
+# Version 1.0 relay
+#
+	variable STDOPTS
+	variable CODES
+
+	set slist [concat { "mode" "destination" } $STDOPTS]
+	set which ""
+	set sopts ""
+	set dest ""
+	set payl ""
+
+	while 1 {
+
+		set sel [cselector]
+		if { $sel == "" } {
+			# check for a payload byte
+			set val [pl_parse -skip -number -return 1]
+			if { $val == "" } {
+				break
+			}
+			set val [expr { $val & 0xff }]
+			lappend payl $val
+			continue
+		}
+
+		set k [pl_keymatch $sel $slist]
+		if [info exists used($k)] {
+			error "duplicate parameter -$k"
+		}
+		set used($k) ""
+
+		if { $k == "mode" } {
+			set which [pl_parse -skip -number -return 1]
+			if [catch { pl_valint $which 0 2 } which] {
+				error "illegal argument of -mode, must be\
+					0, 1, or 2"
+			}
+			continue
+		}
+
+		if { $k == "destination" } {
+			set dest [pl_parse -skip -number -return 1]
+			if [catch { pl_valint $dest 1 65534 } dest] {
+				error "illegal destination Id, must be a number\
+					between 1 and 65534"
+			}
+			if { $dest == [varvar [cns $t]::plug(nodeid)] } {
+				error "the destination is THIS node"
+			}
+			continue
+		}
+
+		stdopts sopts $k
+	}
+
+	checkempty
+
+	if { $which == "" } {
+		set which 0
+	}
+
+	if { $dest == "" } {
+		error "destination not specified"
+	}
+
+	if { $payl == "" } {
+		error "no payload"
+	}
+
+	set opc [expr { $CODES(CMD_RELAY) + $which }]
+	set par ""
+	put_w par $dest
+	iissue $opc [concat $par $payl] $t $sopts
+}
+
 ###############################################################################
 # RESPONSES ###################################################################
 ###############################################################################
@@ -2224,10 +2364,40 @@ proc response_getparams { nid pay t } {
 }
 
 proc response_getassoc { nid pay t } {
-
+#
+# Returns the association list or the learning status
+#
 	variable CODES
 
 	set res "getassoc \[$nid\]:"
+
+	# the first byte of payload is the index
+	if { $pay == "" } {
+		append res " !trunc"
+		term_write $res $t
+		return $CODES(RC_EPAR)
+	}
+
+	set inx [get_b pay]
+
+	if { $inx >= 20 } {
+		# this is the learning status
+		set res "learning \[$nid\]:"
+		if [catch { get_b pay } val] {
+			append res " !trunc"
+			term_write $res $t
+			return $CODES(RC_EPAR)
+		}
+		if { $val == 0 } {
+			append res " off"
+		} else {
+			append res " on"
+		}
+		term_write $res $t
+		return $CODES(RC_OK)
+	}
+
+	append res " <$inx>"
 	set status $CODES(RC_OK)
 
 	while { $pay != "" } {
@@ -2240,8 +2410,12 @@ proc response_getassoc { nid pay t } {
 			set status $CODES(RC_EPAR)
 			break
 		}
-		set msk [format %02x $msk]
-		append res " tag=$tag/mask=$msk"
+		if { $tag == 0 } {
+			append res " void"
+		} else {
+			set msk [format %02x $msk]
+			append res " tag=$tag/mask=$msk"
+		}
 	}
 
 	term_write $res $t
@@ -2252,6 +2426,37 @@ proc response_getassoc { nid pay t } {
 ###############################################################################
 # REPORTS #####################################################################
 ###############################################################################
+
+proc report_relay { pay t } {
+
+	variable CODES
+
+	set res "relay:"
+
+	if [catch {
+		set mod [get_b pay]
+		set src [get_w pay]
+	} ] {
+		append res " !trunc"
+		term_write $res $t
+		return $CODES(RC_EPAR)
+	}
+
+	set mod [expr { $mod - $CODES(CMD_RELAY) }]
+	if { $mod < 0 || $mod > 2 } {
+		set mod "?"
+	}
+
+	append res "\[mode=$mod,src=$src\]"
+
+	if { $pay != "" } {
+		append res " <[toh $pay]>"
+	}
+
+	term_write $res $t
+
+	return $CODES(RC_OK)
+}
 
 proc report_event { pay t } {
 
@@ -2272,7 +2477,6 @@ proc report_event { pay t } {
 		append res " !trunc"
 		term_write $res $t
 		return $CODES(RC_EPAR)
-		return
 	}
 
 	set vol [format %1.2f \
@@ -2446,7 +2650,7 @@ proc vplug_init { nn hn tp t } {
 		return 0
 	}
 
-	iinit "" $t
+	::__plug__::iinit "" $t
 	# receiver state
 	set __ps($t,S) 0
 
@@ -2455,7 +2659,7 @@ proc vplug_init { nn hn tp t } {
 
 proc vplug_close { t } {
 
-	iclose $t
+	::__plug__::iclose $t
 }
 
 proc vplug_receive { bytes t hex } {
@@ -2519,7 +2723,7 @@ proc vplug_receive { bytes t hex } {
 						}
 						# remove the parity byte and
 						# process the message
-						ioutput [lrange \
+						::__plug__::ioutput [lrange \
 						    $__ps($t,B) 0 end-1] $t
 						break
 					}
@@ -2558,7 +2762,7 @@ proc vplug_input { in t } {
 
 	set inp [string trim $inp]
 
-	iinput $inp $t
+	::__plug__::iinput $inp $t
 
 	return 1
 }

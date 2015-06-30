@@ -1,1 +1,1 @@
-/dev/pty3 115200 E-scaped 1 82 /home/pawel/SOFTWARE/PICOS/Apps/PROPRIETARY/inProgress/AlphaNet1_0/shared_plug.tcl {}
+/dev/ttyS5 115200 E-scaped 1 82 /home/pawel/SOFTWARE/PICOS/Apps/PROPRIETARY/inProgress/AlphaNet1_0/tmpplug.tcl {}
