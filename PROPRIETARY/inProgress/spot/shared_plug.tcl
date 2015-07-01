@@ -745,11 +745,11 @@ proc iinit { ags t } {
 		variable plug
 
 		array set plug {
-			dump 		2
-			confirm		0
+			dump 		3
+			confirm		3
 			echo		1
 			repeat		0
-			quiet		1
+			quiet		3
 			nodeid		""
 			osq		1
 			lastosq		"none"
@@ -1157,38 +1157,41 @@ proc iresponse { opc pay t } {
 	set seq [expr { [get_b pay] & 0x7f }]
 	set orc [get_b pay]
 	set nid [get_w pay]
-
 	set ns [cns $t]
+
+	if $orc {
+		set hc "-"
+	} else {
+		set hc "+"
+	}
 
 	if [info exists RESP($opc)] {
 		set fun $RESP($opc)
 		set ret $CODES(RC_OK)
-		set hc "+"
 	} else {
 		set fun ""
 		set ret $CODES(RC_ENIMP)
 		set hc "!"
 	}
 
-	if { $orc == 0 } {
-		# OK response
-		if { $fun != "" } {
-			return [$fun $nid $pay $t]
-		}
-	} elseif { $fun != "" } {
-		set hc "-"
-	}
-
 	set quiet [varvar ${ns}::plug(quiet)]
 
-	# only report if reporting ACKs or if error
-	if { $orc || [expr { $quiet & 1 }] } {
+	if { $orc || ($fun == "" && [expr { $quiet & 1 }]) } {
+		# only report if reporting ACKs or if error
 		set lastref [varvar ${ns}::plug(lastref)]
 		term_write "${hc}RSP: $opc nid=$nid <[toh $pay]> \
 				seq=$seq ($lastref) rc=$orc" $t
 	}
 
-	return $CODES(RC_ENIMP)
+	if { $fun != "" } {
+		set ret [$fun $nid $pay $t]
+	}
+
+	if { $orc == 0 } {
+		return $ret
+	}
+
+	return $orc
 }
 
 proc ireport { pay t } {
@@ -2327,8 +2330,8 @@ proc response_getparams { nid pay t } {
 				set err 1
 				break
 			}
-			if { $ta == "nodeid" } {
-				# set the node Id
+			if { 0 && $ta == "nodeid" } {
+				# DISABLED!!! set the node Id
 				set [cns $t]::plug(nodeid) $val
 			}
 			if { [string index $vt 0] == "y" } {
