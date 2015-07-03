@@ -6,3 +6,6 @@
 
 #define	TAG_MIN		39600
 #define	TAG_MAX		39700
+
+#define	VOL_MIN		1750
+#define	VOL_MAX		2542

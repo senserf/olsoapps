@@ -68,7 +68,8 @@ static void fill_event_packet (address p) {
 	((byte*)p) [17] = seq;
 	// The rest
 	p  [9] = 0x0204;
-	p [10] = 0x09bd;
+	// Voltage
+	p [10] = genword (VOL_MIN, VOL_MAX);
 	p [11] = 0x0100;
 }
 
