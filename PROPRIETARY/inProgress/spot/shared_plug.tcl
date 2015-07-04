@@ -2613,13 +2613,16 @@ proc report_log { pay t sta } {
 	set res "log:"
 	set status $CODES(RC_OK)
 
-	if [catch { get_b pay } tp] {
+	if [catch {
+		set sv [get_b pay]
+		set tp [get_b pay]
+	} ] {
 		append res " !trunc"
 		set status $CODES(RC_EPAR)
 		return $res
 	}
 
-	append res " <$tp>"
+	append res " <sev=$sv,typ=$tp>"
 
 	set more 0
 	while { $pay != "" } {
