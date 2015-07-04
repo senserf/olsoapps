@@ -552,8 +552,12 @@ set CMDS(script)	"command_script"
 
 variable RESP
 
-set RESP(1)		"response_getparams"
-set RESP(20)		"response_getassoc"
+set RESP([expr $CODES(CMD_GET)])		"response_getparams"
+set RESP([expr $CODES(CMD_GET_ASSOC)])		"response_getassoc"
+set RESP([expr $CODES(CMD_SET)])		"response_setparams"
+set RESP([expr $CODES(CMD_SET_ASSOC)])		"response_setassoc"
+set RESP([expr $CODES(CMD_CLR_ASSOC)])		"response_clrassoc"
+set RESP([expr $CODES(CMD_RELAY)])		"response_relay"
 
 ###############################################################################
 
@@ -579,6 +583,21 @@ array set LOGTYPES {
 			210	"ls 1d"
 }
 
+###############################################################################
+
+variable BTYPES
+
+array set BTYPES {
+			0	"spar0"
+			1	"ap320"
+			2	"ap321"
+			3	"chrob"
+			4	"chrow"
+			5	"war"
+			6	"ap319"
+			7	"spar7"
+}
+			
 ###############################################################################
 
 proc cns { t } {
@@ -980,8 +999,8 @@ proc iissue { code vals t { sopts "" } } {
 		idmp $out "-->" $t
 	}
 
-	set ${ns}::plug(lastosq) $osq
-	set ${ns}::plug(lastref) $ref
+	set ${ns}::plug(lastosq) [expr { $osq & 0x7f }]
+	set ${ns}::plug(lastref) [expr { $ref & 0x7f }]
 
 	while 1 {
 		node_write $out $t
@@ -1047,7 +1066,7 @@ proc ioutput { bts t } {
 			# report ACKs?
 			if { $lastosq == $seq || [expr { $quiet & 2 }] } {
 				# only if expected or showing replicates
-				reportack $lastosq $seq $pay $t
+				reportack $nid $lastosq $seq $pay $t
 			}
 		}
 		# clear it
@@ -1132,9 +1151,26 @@ proc sendack { r t } {
 	node_write $vals $t
 }
 
-proc reportack { lsq seq pay t } {
+proc respcode { c } {
+#
+# Transform an ACK or response code into string
+#
+	variable CODES
 
-	set tr "seq=$seq"
+	foreach d [array names CODES] {
+		if { $CODES($d) == $c } {
+			if [regexp "^RC_(.+)" $d j m] {
+				return $m
+			}
+		}
+	}
+
+	return [format %02x $c]
+}
+
+proc reportack { nid lsq seq pay t } {
+
+	set tr "nid=$nid seq=$seq"
 	if { $lsq == $seq } {
 		set hc "-"
 	} else {
@@ -1145,7 +1181,7 @@ proc reportack { lsq seq pay t } {
 		append tr " ($lsq)"
 	}
 
-	term_write "${hc}ACK <[format %02x [lindex $pay 0]]> $tr" $t
+	term_write "${hc}ACK: [respcode [lindex $pay 0]] $tr" $t
 }
 
 proc iresponse { opc pay t } {
@@ -1157,41 +1193,42 @@ proc iresponse { opc pay t } {
 	set seq [expr { [get_b pay] & 0x7f }]
 	set orc [get_b pay]
 	set nid [get_w pay]
+
 	set ns [cns $t]
 
-	if $orc {
-		set hc "-"
-	} else {
-		set hc "+"
-	}
+	set lastref [varvar ${ns}::plug(lastref)]
 
 	if [info exists RESP($opc)] {
 		set fun $RESP($opc)
-		set ret $CODES(RC_OK)
+		set sta $CODES(RC_OK)
+		set hc "-"
 	} else {
 		set fun ""
-		set ret $CODES(RC_ENIMP)
+		set sta $CODES(RC_ENIMP)
 		set hc "!"
 	}
 
-	set quiet [varvar ${ns}::plug(quiet)]
+	set res "${hc}RSP: [respcode $orc] nid=$nid ref=$seq"
 
-	if { $orc || ($fun == "" && [expr { $quiet & 1 }]) } {
-		# only report if reporting ACKs or if error
-		set lastref [varvar ${ns}::plug(lastref)]
-		term_write "${hc}RSP: $opc nid=$nid <[toh $pay]> \
-				seq=$seq ($lastref) rc=$orc" $t
+	if { $seq != $lastref } {
+		append res " ($lastref)"
 	}
+
+	set ret ""
 
 	if { $fun != "" } {
-		set ret [$fun $nid $pay $t]
+		set ret [$fun $nid $pay $t sta]
+	} elseif { $pay != "" } {
+		set ret "<[toh $pay]>"
 	}
 
-	if { $orc == 0 } {
-		return $ret
+	if { $ret != "" } {
+		append res " $ret"
 	}
 
-	return $orc
+	term_write $res $t
+
+	return $sta
 }
 
 proc ireport { pay t } {
@@ -1201,18 +1238,26 @@ proc ireport { pay t } {
 
 	set opc [get_b pay]
 
+	set res "-REP:"
+
 	if [info exists REPO($opc)] {
-		return [$REPO($opc) $pay $t]
+		set sta $CODES(RC_OK)
+		set ret [$REPO($opc) $pay $t sta]
+	} else {
+		set sta $CODES(RC_ENIMP)
+		set ret $opc
+		if { $pay != "" } {
+			append ret " <[toh $pay]>"
+		}
 	}
 
-	# uncharted
-	set ns [cns $t]
-	set quiet [varvar ${ns}::plug(quiet)]
-	if [expr { $quiet & 1 }] {
-		term_write "*REP: $opc <[toh $pay]>" $t
+	if { $ret != "" } {
+		append res " $ret"
 	}
 
-	return $CODES(RC_ENIMP)
+	term_write $res $t
+
+	return $sta
 }
 
 ###############################################################################
@@ -2265,12 +2310,13 @@ proc command_relay { t } {
 # RESPONSES ###################################################################
 ###############################################################################
 
-proc response_getparams { nid pay t } {
+proc response_getparams { nid pay t sta } {
 
 	variable PARLIST
 	variable CODES
+	upvar $sta status
 
-	set res "getparams \[$nid\]:"
+	set res "getparams:"
 	set status $CODES(RC_OK)
 
 	while { $pay != "" } {
@@ -2366,47 +2412,45 @@ proc response_getparams { nid pay t } {
 		append res [join $rrr "/"]
 	}
 
-	term_write $res $t
-
-	return $status
+	return $res
 }
 
-proc response_getassoc { nid pay t } {
+proc response_getassoc { nid pay t sta } {
 #
 # Returns the association list or the learning status
 #
 	variable CODES
+	upvar $sta status
 
-	set res "getassoc \[$nid\]:"
+	set res "getassoc:"
+	set status $CODES(RC_OK)
 
 	# the first byte of payload is the index
 	if { $pay == "" } {
 		append res " !trunc"
-		term_write $res $t
-		return $CODES(RC_EPAR)
+		set status $CODES(RC_EPAR)
+		return $res
 	}
 
 	set inx [get_b pay]
 
 	if { $inx >= 20 } {
 		# this is the learning status
-		set res "learning \[$nid\]:"
+		set res "learning:"
 		if [catch { get_b pay } val] {
 			append res " !trunc"
-			term_write $res $t
-			return $CODES(RC_EPAR)
+			set status $CODES(RC_EPAR)
+			return $res
 		}
 		if { $val == 0 } {
 			append res " off"
 		} else {
 			append res " on"
 		}
-		term_write $res $t
-		return $CODES(RC_OK)
+		return $res
 	}
 
 	append res " <$inx>"
-	set status $CODES(RC_OK)
 
 	while { $pay != "" } {
 
@@ -2418,26 +2462,59 @@ proc response_getassoc { nid pay t } {
 			set status $CODES(RC_EPAR)
 			break
 		}
-		if { $tag == 0 } {
-			append res " void"
-		} else {
+		if $tag {
 			set msk [format %02x $msk]
 			append res " tag=$tag/mask=$msk"
 		}
 	}
 
-	term_write $res $t
-
-	return $status
+	return $res
 }
-	
+
+proc response_setparams { nid pay t sta } {
+
+	variable CODES
+	upvar $sta status
+
+	set status $CODES(RC_OK)
+	return "setparams"
+}
+
+proc response_setassoc { nid pay t sta } {
+
+	variable CODES
+	upvar $sta status
+
+	set status $CODES(RC_OK)
+	return "setassoc"
+}
+
+proc response_clrassoc { nid pay t sta } {
+
+	variable CODES
+	upvar $sta status
+
+	set status $CODES(RC_OK)
+	return "clrassoc"
+}
+
+proc response_relay { nid pay t sta } {
+
+	variable CODES
+	upvar $sta status
+
+	set status $CODES(RC_OK)
+	return "relay"
+}
+
 ###############################################################################
 # REPORTS #####################################################################
 ###############################################################################
 
-proc report_relay { pay t } {
+proc report_relay { pay t sta } {
 
 	variable CODES
+	upvar $sta status
 
 	set res "relay:"
 
@@ -2446,8 +2523,8 @@ proc report_relay { pay t } {
 		set src [get_w pay]
 	} ] {
 		append res " !trunc"
-		term_write $res $t
-		return $CODES(RC_EPAR)
+		set status $CODES(RC_EPAR)
+		return $res
 	}
 
 	set mod [expr { $mod - $CODES(CMD_RELAY) }]
@@ -2461,14 +2538,16 @@ proc report_relay { pay t } {
 		append res " <[toh $pay]>"
 	}
 
-	term_write $res $t
+	set status $CODES(RC_OK)
 
-	return $CODES(RC_OK)
+	return $res
 }
 
-proc report_event { pay t } {
+proc report_event { pay t sta } {
 
 	variable CODES
+	variable BTYPES
+	upvar $sta status
 
 	set res "event:"
 
@@ -2483,40 +2562,64 @@ proc report_event { pay t } {
 		set seq [get_b pay]
 	} ] {
 		append res " !trunc"
-		term_write $res $t
-		return $CODES(RC_EPAR)
+		set status $CODES(RC_EPAR)
+		return $res
 	}
 
 	set vol [format %1.2f \
 		[expr { ((($vol << 3) + 1000.0) / 4095.0) * 5.0 }]]
 
+	set bt [expr { $etp >> 4 }]
+
+	if [info exists BTYPES($bt)] {
+		set bt $BTYPES($bt)
+	} else {
+		set bt "?"
+	}
+
+	set as [expr { $etp & 0xf }]	
+
+
 	append res " peg=$peg tag=$tag del=$del vlt=$vol rss=$rss"
-	append res " xat=[format %02x $xat] typ=$etp seq=$seq"
+	append res " xat=[format %02x $xat] dev=$bt but=$as seq=$seq"
+
+	if { $pay != "" } {
+		set bb [get_b pay]
+		set tr [expr { $bb >> 4 }]
+		set gl [expr { $bb & 0xf }]
+		append res " glo=$gl try=$tr"
+	}
+
+	if { $pay != "" } {
+		set bb [get_b pay]
+		append res " dia=$bb"
+	}
 
 	if { $pay != "" } {
 		append res " <[toh $pay]>"
 	}
 
-	term_write $res $t
+	set status $CODES(RC_OK)
 
-	return $CODES(RC_OK)
+	return $res
 }
 
-proc report_log { pay t } {
+proc report_log { pay t sta } {
 
 	variable CODES
 	variable LOGTYPES
+	upvar $sta status
 
 	set res "log:"
+	set status $CODES(RC_OK)
 
 	if [catch { get_b pay } tp] {
 		append res " !trunc"
-		term_write $res $t
-		return $CODES(RC_EPAR)
+		set status $CODES(RC_EPAR)
+		return $res
 	}
 
 	append res " <$tp>"
-	set status $CODES(RC_OK)
 
 	set more 0
 	while { $pay != "" } {
@@ -2529,8 +2632,8 @@ proc report_log { pay t } {
 			while { $tp } {
 				if [catch { get_b pay } b] {
 					append res " !trunc"
-					term_write $res $t
-					return $CODES(RC_EPAR)
+					set status $CODES(RC_EPAR)
+					return $res
 				}
 				append res [format %c $b]
 				incr tp -1
@@ -2554,8 +2657,8 @@ proc report_log { pay t } {
 		set tp [expr { $tp - 96 }]
 		if ![info exists LOGTYPES($tp)] {
 			append res " !bad"
-			term_write $res $t
-			return $CODES(RC_EPAR)
+			set status $CODES(RC_EPAR)
+			return $res
 		}
 		while { $pay != "" } {
 			if [catch { logvalue res pay $LOGTYPES($tp) }] {
@@ -2565,8 +2668,7 @@ proc report_log { pay t } {
 		}
 	}
 
-	term_write $res $t
-	return $status
+	return $res
 }
 
 proc logvalue { r p tp } {
