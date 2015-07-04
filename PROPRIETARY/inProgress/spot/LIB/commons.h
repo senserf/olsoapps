@@ -49,7 +49,6 @@
 #define RC_DUPOK	5	// 0xFB // -5
 #define RC_ELEN		6	// 0xFA // -6
 #define RC_ERES		7	// resources
-#define RC_RMT		8	// remote
 
 #define CMD_GET		1
 #define CMD_SET		2

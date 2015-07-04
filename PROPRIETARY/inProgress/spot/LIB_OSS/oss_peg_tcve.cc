@@ -51,12 +51,12 @@ typedef struct statsStruct {
 */
 static void stats () {
 	word mmin, mem;
-	byte * b = (byte *)get_mem (25, NO);
+	byte * b = (byte *)get_mem (24 +1, NO);
 	if (b == NULL)
 		return;
 
 	mem = memfree(0, &mmin);
-	b[0]  = 25;
+	b[0]  = 24;
 	b[1]  = 0;
 	b[2]  = (byte)local_host;
 	b[3]  = (byte)(local_host >> 8);
@@ -221,10 +221,6 @@ static byte get_param (byte * ptr, byte pcode) {
 			memcpy (ptr+2, &w1, 2);
 			break;
 		case ATTR_MEM2:
-#ifdef __SMURPH__
-// dupa: temporary kludge
-#define maxfree(a,b) 0xffff
-#endif
 			w = maxfree(0, &w1);
 			w1 = stackfree();
 			memcpy (ptr, &w, 2);
@@ -448,15 +444,13 @@ static void cmd_relay (byte * buf, word len) {
 	in_fwd(b, optyp) = buf[3];
 	in_fwd(b, opref) = buf[4];
 	in_fwd(b, len) = w - sizeof(msgFwdType);
-	memcpy ((char *)(b+sizeof(msgFwdType)), (char *)buf, in_fwd(b, len));
+	memcpy ((char *)(b+sizeof(msgFwdType)), (char *)buf +9, in_fwd(b, len));
 	talk ((char *)b, w, TO_NET);
 	// show in emul for tests in vuee
 	app_diag_U ("fwd %x to %u #%u", in_fwd(b, optyp), in_header(b, rcv), in_fwd(b, opref));
 	ufree (b);
 	// note that likely we should NOT respond, fwdAck will if requested
-	// let's illustrate the RC_RMT as an add-on to local RC_OK, the diff will we well visible,
-	// although may require additional processing on the Tap (there will be 2 acks):
-	nop_resp (buf [3], buf [4], RC_OK);
+	// nop_resp (buf [3], buf [4], RC_OK);
 }
 
 static void process_cmd_in ( byte * buf, word len) {
@@ -562,146 +556,6 @@ fsm cmd_in {
 		// we assume FG_ACKR was served (may be a bad assumption, we'll see)
 		// tempting, but whole frame is needed(?): process_cmd_in ((byte *)(ib +3), plen -3);
 		process_cmd_in ((byte *)ib, plen);
-		
-#if 0
-		switch ((byte)(*ib)) {
-			case 0x11:
-				reply11 (ib);
-				break;
-
-			case 0x12:
-				if (ib[1] != 11) {
-					sack (0x12, 0, NO);
-					break;
-				}
-				switch (((address)ib)[2]) {
-					case 0x0001:
-						// shitty shit, see below in 0x0002
-						if (((address)ib)[3] && local_host != DEF_MHOST && ((address)ib)[3] != DEF_MHOST) {
-						// if (((address)ib)[3]) {
-							local_host = ((address)ib)[3];
-							sack (0x12, ((address)ib)[1], YES);
-						} else {
-							sack (0x12, ((address)ib)[1], NO);
-						}
-						break;
-						
-					case 0x0002:
-						// what a shitty shit...
-if (1) {
-						// disallow (temporarily?)
-						sack (0x12, ((address)ib)[1], NO);
-						break;
-}
-if (0) {
-						// ack on bad, as requested
-						if (local_host != ((address)ib)[3]) {
-							sack (0x12, ((address)ib)[1], YES);
-							break;
-						}
-						
-						if (local_host != master_host) {
-							master_host = local_host;
-							tarp_ctrl.param = 0xB0;
-							tagList.block = YES;
-							reset_tags();
-							killall (looper);
-							runfsm mbeacon;
-							app_diag_W ("I am M");
-#ifdef MASTER_STATUS_LED
-							leds (MASTER_STATUS_LED, 2);
-#endif
-						}
-						// apparently, it comes to the master for a twisted fun
-						sack (0x12, ((address)ib)[1], YES);
-						break;
-}
-
-					case 0x0003:
-						if (((address)ib)[3])
-							tarp_ctrl.param |= 1;
-						else
-							tarp_ctrl.param &= 0xFE;
-							
-						sack (0x12, ((address)ib)[1], YES);
-						break;
-						
-					case 0x0004:
-						// in case sb does need to send mbeacon (out of spec)
-						if (local_host == master_host) {
-							if (running (mbeacon)) {
-								trigger (TRIG_MBEAC);
-							} else {
-								runfsm mbeacon;
-							}
-							sack (0x12, ((address)ib)[1], YES);
-						} else {
-							sack (0x12, ((address)ib)[1], NO);
-						}
-						break;
-						
-					default:
-						sack (0x12, ((address)ib)[1], NO);
-				}
-				break;
-
-			case 0x13:
-				// assuming these moronic nacks would cause retries,
-				// so nack goes out only for a bad length
-				if (((address)ib)[1] != local_host) {
-					sack (0x13, ((address)ib)[1], YES);
-					break;
-				}
-				if ((w = ib[1] -8) % 3) {
-					sack (0x13, ((address)ib)[1], NO);
-					break;
-				}
-				sack (0x13, ((address)ib)[1], YES);
-				
-				w /= 3; // this is # of entries in the set cmd
-				b2treg (w, (byte *)(ib+4));
-				break;
-
-			case 0x14:
-				reply14 (ib);
-				break;
-
-			case 0x15:
-				sack (0x15, ((address)ib)[1], YES); // always?
-				if (((address)ib)[1] == local_host) // no bcast
-					reset_treg ();
-				break;
-
-			case 0x41:
-			case 0x42:
-			case 0x43:
-				if (((address)ib)[1] != local_host) {
-				    w = ib[1] -3 + sizeof(msgFwdType);
-
-				    if ((b = get_mem (w, NO)) != NULL) {
-						memset (b, 0, w);
-						in_header(b, msg_type) = msg_fwd;
-						in_header(b, rcv) = *((word *)(ib +2));
-						in_fwd(b, ref) = (word)seconds();
-						memcpy (b+sizeof(msgFwdType), ib, w - sizeof(msgFwdType));
-						talk (b, w, TO_NET); // not to stubborn renensas i/f
-						// send data to emul for tests in vuee
-						app_diag_U ("fwd %x to %u #%u", ((address)ib)[0],
-							in_header(b, rcv), in_fwd(b, ref));
-						ufree (b);
-						sack (ib[0], ((address)ib)[1], YES);
-						break;
-				    }
-				}
-				sack (ib[0], ((address)ib)[1], NO); // will error code be invented?
-				break;
-
-			default: // ?
-				// ignore? ack? nack?
-				app_diag_W ("ign cmd %x", ((address)ib)[0]);
-				// if we ever get there, we'll have a 0xD. dispatch here
-		}
-#endif
 
 goLisn:	tcv_endp ((address)ib);
 		proceed LISN;
@@ -825,7 +679,7 @@ void oss_tx (char * b, word siz) {
 				bu[16] |= 0x80;
 			// board specific will bu[16] |= global flag
 			// board-specific bu[17] = dial
-
+			board_out (b + sizeof(msgReportType), bu);
 			_oss_out (bu, NO);
 			break;
 
@@ -844,38 +698,38 @@ void oss_tx (char * b, word siz) {
 			}
 
 /*  
-	byte len = len + 9 (malloc ... +1)
+	byte len = len + 8 (malloc ... +1)
 	// out:
 	byte	seq;
 	word	lh;
 	byte	efef;
 	byte	reptype;	// REP_RELAY
 	byte	optyp;		// 0x41, 42, 43
-	byte	opref;		// from msg_fwd
+	// not now, we'll see later byte	opref;		// from msg_fwd
 	word	src;
 	byte[]  pload		// len from msg_fwd
 
 */			
 			// 
-			if ((bu = get_mem (in_fwd(b, len) +9 +1, NO)) == NULL) {			
+			if ((bu = get_mem (in_fwd(b, len) +8 +1, NO)) == NULL) {			
 				break;
 			}
-			bu [0] = in_fwd(b, len) +9;
+			bu [0] = in_fwd(b, len) +8;
 			bu [1] = 0;
 			bu [2] = (byte)local_host;
 			bu [3] = (byte)(local_host >> 8);
 			bu [4] = 0xFF;
 			bu [5] = REP_RELAY;
 			bu [6] = in_fwd(b, optyp);
-			bu [7] = in_fwd(b, opref);
-			bu [8] = (byte)in_header(b, snd);
-			bu [9] = (byte)(in_header(b, snd) >> 8);
-			memcpy (bu + 10, b + sizeof(msgFwdType), in_fwd(b, len));
+			// bu [7] = in_fwd(b, opref);
+			bu [7] = (byte)in_header(b, snd);
+			bu [8] = (byte)(in_header(b, snd) >> 8);
+			memcpy (bu + 9, b + sizeof(msgFwdType), in_fwd(b, len));
 			_oss_out (bu, NO);
 			break;
 
 	    case msg_fwdAck:
-			nop_resp (in_fwdAck(b, optyp), in_fwdAck(b, opref), RC_RMT);
+			nop_resp (in_fwdAck(b, optyp), in_fwdAck(b, opref), RC_OK);
 			app_diag_U ("fwdAck #%u fr%u", in_fwdAck(b, opref), in_header(b, snd));
 			break;
 
