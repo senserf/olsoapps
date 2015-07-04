@@ -2585,9 +2585,14 @@ proc report_event { pay t sta } {
 
 	if { $pay != "" } {
 		set bb [get_b pay]
-		set tr [expr { $bb >> 4 }]
+		if [expr { $bb & 0x80 }] {
+			set ak "no"
+		} else {
+			set ak "yes"
+		}
+		set tr [expr { ($bb >> 4) & 0x7 }]
 		set gl [expr { $bb & 0xf }]
-		append res " glo=$gl try=$tr"
+		append res " glo=$gl try=$tr ack=$ak"
 	}
 
 	if { $pay != "" } {
