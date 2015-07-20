@@ -181,7 +181,7 @@ fsm band_sampler {
 	state SAMPLE:
 
 		sacc += (rrf_get_reg (CCxxx0_RSSI) + 128);
-		if (RX_FIFO_READY)
+		if (CC1100_RX_FIFO_READY)
 			// make sure we are not stuck; this will seldom happen
 			rrf_enter_rx ();
 		scnt++;
@@ -235,7 +235,7 @@ fsm freq_sampler {
 
 	state FIFO_FLUSH:
 
-		if (RX_FIFO_READY) {
+		if (CC1100_RX_FIFO_READY) {
 			if (Mode > 1)
 				out_fifo (FIFO_FLUSH);
 			rrf_enter_rx ();
