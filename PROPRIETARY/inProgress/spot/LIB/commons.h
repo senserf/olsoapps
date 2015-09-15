@@ -15,6 +15,7 @@
 #define SYSVER_min 5
 
 #define DEF_NID 77
+#define	DEF_CHAN 0
 #define DEF_MHOST 1
 
 #define LED_R   0
