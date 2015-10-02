@@ -491,6 +491,15 @@ fsm root {
 			runfsm mbeacon;
 
 		if (profi_att & PROF_TAG) {
+			/* I may be missing a fundamental issue but both VUEE model and remaining flashed nodes
+			   remaining frtom the War Museum do not work as Treasure Tags. I remember they DID wotk, so
+			   I'm screwing things with this small updates or git preserved some old version.
+			   Reverse profile / alarm beacons:
+			*/
+			app_flags.freq_p = 0;
+			app_flags.freq_a = 2;
+			/* end of Oct. 2015 hack */
+
 			highlight_set (0, 0.0, NULL);
 			strcpy (d_alrm, "!TT!");
 			runfsm abeacon (0);
