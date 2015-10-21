@@ -32,6 +32,7 @@ void msg_pong_in (char * buf, word rssi) {
 
 	app_diag_D ("Pong %u", in_header(buf, snd));
 	ins_tag (buf, rssi);
+
 }
 
 void msg_fwd_in (char * buf, word siz) {
@@ -53,11 +54,15 @@ void msg_report_in (char * buf, word siz) {
 	// eliminate unnecessary RACKs for heartbeat 'alarms' (in 1.5, not in 1.0)
 	if (((pongDataType *)(buf + sizeof(msgReportType)))->alrm_id == 0) { // heartbeat
 		app_diag_D ("No RACK for alrm0 %u #%u", in_header(buf, snd), in_report(buf, ref));
+		highlight_set (1, 1.5,
+			"HB %u", in_header(buf, snd));
 	} else {
 		ack.header.rcv = in_header(buf, snd);
 		ack.ref = in_report(buf, ref);
 		ack.tagid = in_report(buf, tagid);
 		talk ((char *)&ack, sizeof(msgReportAckType), TO_NET);
+		highlight_set (0, 1.5,
+			"ALRM %u", in_header(buf, snd));
 	}
 	talk (buf, siz, TO_OSS);
 }
@@ -78,5 +83,7 @@ void msg_reportAck_in (char * buf) {
 	talk (buf, 77, TO_OSS); // note we get away with the lucky size
 
     }
+		highlight_set (0, 1.5,
+			"ACK %u", in_header(buf, snd));
 }
 
