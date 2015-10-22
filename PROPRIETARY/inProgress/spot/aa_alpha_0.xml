@@ -1,0 +1,50 @@
+
+<network nodes="7">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+
+	<display>
+		<roamer image="Alpha0.gif" width="54.44" length="38" nodesize="10"
+			display="yes"/>
+	</display>
+
+    <xi:include href="CHANNELS/tabulated.xml"/>
+	
+	<roamer>
+	<input source="string">
+	    M 6 10.0 10.0
+	    T +10.0
+	    R 6 [10.0 10.0] [54.0 10.0] [3.0 5.0] [0.5 0.5] -1
+	</input>
+    </roamer> 
+	
+    <nodes>	
+		<xi:include href="locations_alpha.xml"/>
+	
+	<node type="a321p" start="on" hid="0xBACA0001" default="board">
+		<xi:include href="uart.xml"/>
+	</node>
+	<node type="a321p" start="on" hid="0xBACA0002" default="board">
+		<xi:include href="uart.xml"/>
+	</node>
+	<node type="a321p" start="on" hid="0xBACA0003" default="board">
+		<xi:include href="uart.xml"/>
+	</node>
+	<node type="a321p" start="on" hid="0xBACA0004" default="board">
+		<xi:include href="uart.xml"/>
+	</node>
+	<node type="a321p" start="on" hid="0xBACA0005" default="board">
+		<xi:include href="uart.xml"/>
+	</node>
+	<node type="a321p" start="on" hid="0xBACA0006" default="board">
+		<xi:include href="uart.xml"/>
+	</node>
+	
+	<node number="6" type="a320t" start="on" hid="0xBACA0066" default="board">
+	    <location>10.0 10.0</location>
+		<color solid="red"/>
+	</node>
+	
+	
+    </nodes>
+</network>

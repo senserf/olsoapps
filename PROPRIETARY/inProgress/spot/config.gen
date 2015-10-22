@@ -1,1 +1,1 @@
-{MOD IHEX} {TFN Image_nnnn.a43} {CNT 1} {FRM 20} {IFN Image_a320t.a43} {SRD /home/pawel/SOFTWARE/PICOS/Apps/PROPRIETARY/inProgress/spot} {PFX BACA} {TRD /home/pawel/SOFTWARE/PICOS/Apps/PROPRIETARY/inProgress/spot} {IDN BACADEAD}
+{MOD IHEX} {TFN Image_nnnn.a43} {CNT 5} {FRM 201} {IFN Image_a320t.a43} {SRD C:/cygwin/home/pawel/SOFTWARE/PICOS/Apps/PROPRIETARY/inProgress/spot} {PFX BACA} {TRD C:/cygwin/home/pawel/SOFTWARE/PICOS/Apps/PROPRIETARY/inProgress/spot} {IDN BACADEAD}

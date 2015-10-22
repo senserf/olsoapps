@@ -49,6 +49,11 @@ static void stats_ () {
 		(word)((seconds() % 3600) / 60),
 		(word)(seconds() % 60), master_host,
 		mem, mmin);
+
+	if (b == NULL)
+		// Fixed PG
+		return;
+
 	app_diag_U (b);
 	ufree (b);
 }
