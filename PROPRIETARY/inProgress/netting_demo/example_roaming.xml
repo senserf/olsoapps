@@ -1,0 +1,50 @@
+<network nodes="12" radio="12">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer image="DATAFILES/facility.gif" width="90.0" display="yes"></roamer>
+    </display>
+    <xi:include href="DATAFILES/channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="DATAFILES/tag.xml"/>
+	<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<node number="0" start="on" hid="0xBACA000A">
+	</node>
+
+	<node number="1" start="on" hid="0xBACA0001">
+	</node>
+        <node number="2" start="on" hid="0xBACA0002">
+        </node>
+        <node number="3" start="on" hid="0xBACA0003">
+        </node>
+
+	<node number="4" start="on" hid="0xBACA0004">
+	</node>
+        <node number="5" start="on" hid="0xBACA0005">
+        </node>
+        <node number="6" start="on" hid="0xBACA0006">
+        </node>
+
+        <node number="7" start="on" hid="0xBACA0007">
+        </node>
+
+	<node number="8" start="on" hid="0xBACA0008">
+	</node>
+        <node number="9" start="on" hid="0xBACA0009">
+        </node>
+	        <node number="10" start="on" hid="0xBACA0065">
+        </node>
+	        <node number="11" start="on" hid="0xBACA0066">
+        </node>
+        <xi:include href="DATAFILES/roaming_locations.xml"/>
+
+    </nodes>
+    <roamer>
+	<input source="string">
+		R 10 [17.6 57.8 72.3 57.8] [0.2 1.0] [3.0 7.0] 0.0
+		R 11 [72.3 29.0 72.3 57.8] [0.2 1.0] [3.0 7.0] 0.0
+	</input>	
+    </roamer>	
+</network>

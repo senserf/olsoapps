@@ -1,0 +1,39 @@
+<network nodes="10" radio="10">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <display>
+    	<roamer image="DATAFILES/facility.gif" width="90.0" display="yes"></roamer>
+    </display>
+    <xi:include href="DATAFILES/channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="DATAFILES/tag.xml"/>
+	<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<node number="0" start="on" hid="0xBACA000A">
+	</node>
+
+	<node number="1" start="off" hid="0xBACA0001">
+	</node>
+        <node number="2" start="off" hid="0xBACA0002">
+        </node>
+        <node number="3" start="off" hid="0xBACA0003">
+        </node>
+
+	<node number="4" start="off" hid="0xBACA0004">
+	</node>
+        <node number="5" start="off" hid="0xBACA0005">
+        </node>
+        <node number="6" start="off" hid="0xBACA0006">
+        </node>
+
+        <node number="7" start="off" hid="0xBACA0007">
+        </node>
+
+	<node number="8" start="off" hid="0xBACA0008">
+	</node>
+        <node number="9" start="off" hid="0xBACA0009">
+        </node>
+        <xi:include href="DATAFILES/locations.xml"/>
+    </nodes>
+</network>
