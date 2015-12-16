@@ -1,0 +1,12 @@
+<network nodes="1000" radio="1000">
+    <grid>0.1m</grid>
+    <tolerance quality="2">1E-4</tolerance>
+    <xi:include href="DATAFILES/channel.xml"/>
+    <nodes>
+	<defaults>
+	<xi:include href="DATAFILES/tag.xml"/>
+	<highlight fg="black" bg="white">magenta blue</highlight>
+	</defaults>
+	<xi:include href="DATAFILES/thousand_nodes.xml"/>
+    </nodes>
+</network>
