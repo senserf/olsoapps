@@ -1,6 +1,7 @@
 	    <memory>8666 bytes</memory>
 	    <radio>
 	    	<power>7</power>
+		<rate>1</rate>
 	    	<preamble>32 bits</preamble>
 	    	<lbt>
 			delay			8msec
