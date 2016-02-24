@@ -920,6 +920,7 @@ proc iissue { code vals t { sopts "" } } {
 #			sequence	- force specific sequence number
 #			opref		- force specific opref
 #			repeat		- repetition count
+#                       remote		- remote Node Id
 #
 	set ns [cns $t]
 
@@ -977,10 +978,19 @@ proc iissue { code vals t { sopts "" } } {
 	}
 
 	# sequence number + Node Id + opcode + refnum
-	if { $nodeid == "" } {
+	if [dict exists $sopts "nodeid"] {
+		set nid [dict get $sopts "nodeid"]
+	} elseif { $nodeid == "" } {
 		set nid 0
 	} else {
 		set nid $nodeid
+	}
+
+	# remote Node Id
+	if [dict exists $sopts "remote"] {
+		set rid [dict get $sopts "remote"]
+	} else {
+		set rid $nid
 	}
 
 	set out ""
@@ -988,7 +998,7 @@ proc iissue { code vals t { sopts "" } } {
 	put_w out $nid
 	put_b out $code
 	put_b out $ref
-	put_w out $nid
+	put_w out $rid
 	set out [concat $out $vals]
 
 	if $dump {
@@ -1135,6 +1145,12 @@ proc sendack { r t } {
 		set $v [varvar ${ns}::plug($v)]
 	}
 
+	if { $nodeid != "" } {
+		set nid $nodeid
+	} else {
+		set nid 0
+	}
+
 	set vals ""
 	put_b vals $isq
 	put_w vals $nodeid
@@ -1232,6 +1248,11 @@ proc iresponse { opc pay t } {
 	return $sta
 }
 
+proc tstamp { } {
+
+	return [clock format [clock seconds] -format "%H:%M:%S"]
+}
+
 proc ireport { pay t } {
 
 	variable REPO
@@ -1239,7 +1260,7 @@ proc ireport { pay t } {
 
 	set opc [get_b pay]
 
-	set res "-REP:"
+	set res "[tstamp]-REP:"
 
 	if [info exists REPO($opc)] {
 		set sta $CODES(RC_OK)
@@ -1280,14 +1301,15 @@ variable PARLIST {
 		  { "audit"   	 12 	sg	w	0	0xffff 	}
 		  { "autoack"  	 13 	sg	by	0	1	}
 		  { "beacon"  	 14 	sg	w	0	0xffff	}
-		  { "version" 	 15 	g	ws			}
+		  { "version" 	 15 	g	wx			}
 		  { "uptime"  	 26 	g	l			}
 		  { "memstat" 	 27 	g	ww			}
 		  { "meminfo" 	 28 	g	ww			}
 		  { "sniff"   	 29 	sg	by	0	1	}
 	}
 
-variable STDOPTS { "ack" "response" "sequence" "opref" "repeat" }
+variable STDOPTS { "ack" "response" "sequence" "opref" "repeat" "remote"
+			"nodeid" }
 
 proc cselector { } {
 #
@@ -1363,14 +1385,14 @@ proc stdopts { r k } {
 		error "a numerical value expected after -$k"
 	}
 
+	set min 0
 	if { $k == "repeat" } {
 		set max 9
-		set min 0
+	} elseif { $k == "remote" || $k == "nodeid" } {
+		set max 65535
 	} else {
 		set max 127
-		if { $k == "opref" } {
-			set min 0
-		} else {
+		if { $k != "opref" } {
 			set min 1
 		}
 	}
@@ -2602,11 +2624,90 @@ proc report_event { pay t sta } {
 		append res " dia=$bb"
 	}
 
-	if { $pay != "" } {
-		append res " <[toh $pay]>"
+	if { [llength $pay] >= 5 && [get_b pay] } {
+		# location report
+		set ref [get_w pay]
+		set rss ""
+		while { $pay != "" } {
+			lappend rss [get_b pay]
+		}
+		append res "\n[out_location $peg $tag $ref $rss]"
 	}
 
 	set status $CODES(RC_OK)
+
+	return $res
+}
+
+proc nrssv { rss } {
+#
+# Normalize the RSS vector
+#
+	set nrs [llength $rss]
+
+	if { $nrs < 2 } {
+		error "less than 2 rss values"
+	}
+
+	if { $nrs > 8 } {
+		# multiple values per PL, must be divisible by 4
+		if { [expr { $nrs % 4 }] != 0 } {
+			error "rss vector length, $nrs, not divisible by 4"
+		}
+		set rsv ""
+		while { $rss != "" } {
+			set av 0
+			set ac 0
+			for { set i 0 } { $i < 4 } { incr i } {
+				set v [lindex $rss $i]
+				if { $v != 0 } {
+					set av [expr { $av + $v }]
+					incr ac
+				}
+			}
+			if { $ac > 1 } {
+				set av [expr { ($av + ($ac/2)) / $ac }]
+			}
+			lappend rsv $av
+			set rss [lrange $rss 4 end]
+		}
+		set rss $rsv
+		set nrs [expr { $nrs / 4 }]
+	}
+
+	if { $nrs < 8 } {
+		# fewer than NPL, stuff with zeros before the last value
+		set lv [lindex $rss end]
+		set rss [lrange $rss 0 end-1]
+		while { $nrs < 8 } {
+			lappend rss 0
+			incr nrs
+		}
+		lappend rss $lv
+	}
+
+	return $rss
+}
+
+proc out_location { peg tag ref rss } {
+
+	set res "location: peg=$peg tag=$tag ref=$ref\n"
+
+	# include the raw vector
+	append res "RAW:"
+	foreach r $rss {
+		append res " [format %3d $r]"
+	}
+	append res "\nNRM:"
+
+	if [catch { nrssv $rss } rss] {
+		append res " BAD RSS VECTOR: $rss!\n"
+		return $res
+	}
+
+	for { set pl 0 } { $pl < 8 } { incr pl } {
+		append res " [format %3d [lindex $rss $pl]]"
+	}
 
 	return $res
 }
@@ -2633,28 +2734,7 @@ proc report_location { pay t sta } {
 		return $res
 	}
 
-	append res " peg=$peg tag=$tag ref=$ref\n"
-
-	for { set pl 0 } { $pl < 8 } { incr pl } {
-		set ac 0
-		set nc 0
-		append res "    pl$pl ="
-		for { set i 0 } { $i < 4 } { incr i } {
-			set v [lindex $rss $i]
-			if $v {
-				incr nc
-				set ac [expr { $ac + $v }]
-			}
-			append res " [format %3d $v]"
-		}
-		if $nc {
-			set av [format %6.2f [expr { double($ac) / $nc }]]
-		} else {
-			set av " ------"
-		}
-		append res " | avg: $av\n"
-		set rss [lrange $rss 4 end]
-	}
+	set res [out_location $peg $tag $ref $rss]
 
 	set statuc $CODES(RC_OK)
 
