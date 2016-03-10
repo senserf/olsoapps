@@ -1296,7 +1296,7 @@ variable PARLIST {
 		  { "tarpslack"   6	s	b	0	3	}
 		  { "tarprrec"	  7	s	b	0	3	}
 		  { "tarpfwd"	  8	s	b	0	1	}
-		  { "tarp"    	  9 	sg	bx	0	255	}
+		  { "tarpall"  	  9 	sg	bx	0	255	}
 		  { "tarpcnt" 	 10 	g	www			}
 		  { "tagmgr"  	 11 	sg	by	0	1	}
 		  { "audit"   	 12 	sg	w	0	0xffff 	}
@@ -2368,7 +2368,7 @@ proc response_getparams { nid pay t sta } {
 
 		append res " $ta="
 
-		if { $ta == "tarp" } {
+		if { $ta == "tarpall" } {
 			# a special case 
 			if [catch { get_b pay } val] {
 				append res "!trunc"
