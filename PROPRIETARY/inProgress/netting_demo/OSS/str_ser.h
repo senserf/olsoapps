@@ -42,7 +42,7 @@ static trueconst char notset_str[] = "Not set\r\n";
 static trueconst char lck_str[] = "Locked\r\n";
 
 static trueconst char stats_str[] =
-	"%u at %lu: M %u at %lu mem %u.%u.%u bat %u trans %u ofmt %u\r\n";
+	"%u(%u) at %lu: M %u at %lu mem %u.%u.%u bat %u trans %u ofmt %u\r\n";
 
 static trueconst char tarp_str[] =
 	"Plev %u rx %u fwd %u slack %u rte %u tlev %u\r\n";

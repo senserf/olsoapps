@@ -34,6 +34,8 @@ char * get_mem (word state, word len) {
 }
 
 #define DEF_PLEV	1
+// #define DEF_PLEV        7
+
 void init () {
 	word pl;
 

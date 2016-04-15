@@ -315,6 +315,14 @@ fsm ossi_in {
 	state OI_SETS:
 		if (w == 1) proceed OI_STATS;
 		switch (ibuf[1]) {
+			case 'h':
+				if (scan (ibuf+2, "%u", &w) > 0 && w != 0)
+					local_host = w;
+				proceed OI_STATS;
+			case 'c':
+				if (scan (ibuf+2, "%u", &w) > 0 && w < 256)
+					net_opt (PHYSOPT_SETCHANNEL, &w);
+				proceed OI_STATS;
 			case 'd':
 				if (set_disp (ibuf+2))
 					proceed OI_LCK;
@@ -442,6 +450,7 @@ fsm ossi_in {
 		m[0] =  memfree (0, &m[1]);
 
 		cp = form (NULL, stats_str, local_host,
+				net_opt (PHYSOPT_GETCHANNEL, NULL),
 			       	seconds(), master_host, master_ts, m[0], m[1],
 			       	stackfree(), w, fim_set.f.stran,
 				fim_set.f.ofmt);

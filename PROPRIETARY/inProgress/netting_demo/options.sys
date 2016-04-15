@@ -67,8 +67,13 @@
 #define CC1100_FREQ_FREQ0_VALUE 0xE8
 
 #define TARP_RTR        	2
-#define	TARP_MAXHOPS		32
-#define	TARP_DEF_RSSITH		40
+
+#define TARP_MAXHOPS		32
+// #define TARP_MAXHOPS		10
+
+#define	TARP_DEF_RSSITH		90
+
+// for some testing this deviation from the default is prominent
 #define	TARP_DEF_PARAMS		0x81
 
 #define ODR_FILL_BCAST present
