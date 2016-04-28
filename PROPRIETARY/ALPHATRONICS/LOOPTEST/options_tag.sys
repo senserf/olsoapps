@@ -1,0 +1,8 @@
+// Insert here applications-specific options
+// #define	RADIO_WOR_MODE	1
+// #undef	BUTTONS
+
+#define	RADIO_WOR_MODE		1
+
+// Undefine to start with radio off
+#define	RADIO_INITIALLY_ON
