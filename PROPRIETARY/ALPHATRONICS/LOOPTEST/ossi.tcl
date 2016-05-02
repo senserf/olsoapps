@@ -28,11 +28,8 @@ oss_interface -id 0x00010022 -speed 115200 -length 56 \
 ##
 ## Commands:
 ##
-##	ping string
-##	turn [on] conf mode patt, turn off
-##	rreg n
-##	wreg n v
-##	wcmd n
+##	ping
+##	turn [on | off]
 ##
 ##	radio [on] [delay]	(sets the delay, cannot off->on)
 ##	radio off
@@ -42,32 +39,22 @@ oss_interface -id 0x00010022 -speed 115200 -length 56 \
 
 oss_command ping 0x01 {
 #
-	word	pval;
+	byte	pval;
 }
 
 oss_command turn 0x02 {
 #
 # Turn the device on/off
 #
-	byte	conf;
-	byte	mode;
-	word	patt;
-}
-
-oss_command rreg 0x03 {
-#
-	byte	reg;
-}
-
-oss_command wreg 0x04 {
-#
-	byte	reg;
-	byte	val;
-}
-
-oss_command wcmd 0x05 {
-#
 	byte	what;
+}
+
+oss_command dump 0x03 {
+#
+# Memory dump
+#
+	word	addr;
+	word	size;
 }
 
 oss_command radio 0x06 {
@@ -103,12 +90,11 @@ oss_message status 0x01 {
 	lword	status;
 }
 
-oss_message regval 0x02 {
+oss_message dump 0x03 {
 #
-# Accelerator reading
+# Memory dump
 #
-	byte	reg;
-	byte	val;
+	blob	bytes;
 }
 
 oss_message ap 0x80 {
@@ -155,10 +141,8 @@ proc parse_check_empty { } {
 variable CMDS
 
 set CMDS(ping)		"parse_cmd_ping"
+set CMDS(dump)		"parse_cmd_dump"
 set CMDS(turn)		"parse_cmd_turn"
-set CMDS(rreg)		"parse_cmd_rreg"
-set CMDS(wreg)		"parse_cmd_wreg"
-set CMDS(wcmd)		"parse_cmd_wcmd"
 set CMDS(radio)		"parse_cmd_radio"
 set CMDS(ap)		"parse_cmd_ap"
 
@@ -228,72 +212,51 @@ proc parse_cmd_ping { what } {
 }
 
 proc parse_cmd_turn { what } {
-#
-#
-#
-	set conf [oss_parse -skip -number -return 1]
-	if { $conf == "" } {
-		set conf 0
-		set mode 255
-		set patt 0
-		
+
+	if { $what != "" } {
+		set kl { "on" "off" }
+		if [catch { oss_keymatch $what $kl } what] {
+			error "expected one of on, off"
+		}
+	}
+
+	if { $what == "" || $what == "on" } {
+		set what 1
 	} else {
-		set mode [oss_parse -skip -number -return 1]
-		set patt [oss_parse -skip -number -return 1]
+		set what 0
 	}
 
 	parse_check_empty
 
-	oss_issuecommand 0x02 [oss_setvalues [list $conf $mode $patt] "turn"]
+	oss_issuecommand 0x02 [oss_setvalues [list $what] "turn"]
 }
 
-proc parse_cmd_rreg { what } {
-#
-#
-#
-	set reg [oss_parse -skip -number -return 1]
-	if { $reg == "" } {
-		error "register number expected"
-		
+proc parse_cmd_dump { what } {
+
+	if { $what != "" } {
+		error "unexpected $what"
 	}
 
-	parse_check_empty
-
-	oss_issuecommand 0x03 [oss_setvalues [list $reg] "rreg"]
-}
-
-proc parse_cmd_wreg { what } {
-#
-#
-#
-	set reg [oss_parse -skip -number -return 1]
-	if { $reg == "" } {
-		error "register number expected"
-		
-	}
 	set val [oss_parse -skip -number -return 1]
+
 	if { $val == "" } {
-		error "register value expected"
+		set val 65535
+		set len 0
+	} else {
+		if { $val < 0 || $val > 65534 } {
+			error "illegal address"
+		}
+		set len [oss_parse -skip -number -return 1]
+		if { $len == "" } {
+			set len 1
+		} elseif { $len < 1 || $len > 32 } {
+			error "illegal length, must be 1 to 32"
+		}
 	}
 
 	parse_check_empty
 
-	oss_issuecommand 0x04 [oss_setvalues [list $reg $val] "wreg"]
-}
-
-proc parse_cmd_wcmd { what } {
-#
-#
-#
-	set reg [oss_parse -skip -number -return 1]
-	if { $reg == "" } {
-		error "command code expected"
-		
-	}
-
-	parse_check_empty
-
-	oss_issuecommand 0x05 [oss_setvalues [list $reg] "wcmd"]
+	oss_issuecommand 0x03 [oss_setvalues [list $val $len] "dump"]
 }
 
 proc parse_cmd_radio { what } {
@@ -414,16 +377,20 @@ proc show_msg_status { msg } {
 
 	lassign [oss_getvalues $msg "status"] tst sta
 
-	set res "Time $tst, val [format X%04x $sta]\n"
+	set res "Time $tst --> [format %08X $sta]"
 
 	oss_ttyout $res
 }
 
-proc show_msg_regval { msg } {
+proc show_msg_dump { msg } {
 
-	lassign [oss_getvalues $msg "regval"] reg val
+	lassign [oss_getvalues $msg "dump"] mem
 
-	set res "Reg $reg, val [format X%02x $val]\n"
+	set res "DMP:"
+
+	foreach m $mem {
+		append res " [format %02X $m]"
+	}
 
 	oss_ttyout $res
 }

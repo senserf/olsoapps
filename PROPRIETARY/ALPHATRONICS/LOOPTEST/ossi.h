@@ -23,7 +23,7 @@ typedef	struct {
 
 #define	command_ping_code	1
 typedef struct {
-	word	pval;
+	byte	pval;
 } command_ping_t;
 
 #define	command_ap_code	128
@@ -36,26 +36,14 @@ typedef struct {
 
 #define	command_turn_code	2
 typedef struct {
-	byte	conf;
-	byte	mode;
-	word	patt;
+	byte	what;
 } command_turn_t;
 
-#define	command_rreg_code	3
+#define	command_dump_code	3
 typedef struct {
-	byte	reg;
-} command_rreg_t;
-
-#define	command_wreg_code	4
-typedef struct {
-	byte	reg;
-	byte	val;
-} command_wreg_t;
-
-#define	command_wcmd_code	5
-typedef struct {
-	byte	what;
-} command_wcmd_t;
+	word	addr;
+	word	size;
+} command_dump_t;
 
 #define	command_radio_code	6
 typedef struct {
@@ -80,11 +68,10 @@ typedef struct {
 	word	nodeid;
 } message_ap_t;
 
-#define	message_regval_code	2
+#define	message_dump_code	3
 typedef struct {
-	byte	reg;
-	byte	val;
-} message_regval_t;
+	blob	bytes;
+} message_dump_t;
 
 
 // ===================================

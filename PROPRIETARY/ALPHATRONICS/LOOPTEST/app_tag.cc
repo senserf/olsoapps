@@ -19,8 +19,39 @@ static sint RFC;
 static word RadioDelay = RADIO_WOR_IDLE_TIMEOUT;
 static byte LastRef;
 
+#define	DBBSIZE		32
+
+static byte dbb [DBBSIZE];
+
 #define SENSOR_EVENT	(&(SVal))
 
+// ============================================================================
+void debg (byte v) {
+
+	word i;
+
+	for (i = 1; i < DBBSIZE; i++)
+		dbb [i-1] = dbb [i];
+
+	dbb [DBBSIZE-1] = v;
+}
+
+void debh (byte n) {
+
+	byte c;
+
+	while (1) {
+		for (c = 0; c < n; c++) {
+			leds (3,1);
+			mdelay (100);
+			leds (3, 0);
+			mdelay (100);
+		}
+		mdelay (500);
+	}
+}
+
+// ============================================================================
 // ============================================================================
 
 static address new_msg (byte code, word len) {
@@ -48,6 +79,18 @@ static void oss_ack (word status) {
 	}
 }
 
+static void handle_dump (word addr, byte size) {
+
+	address msg;
+
+	if ((msg = new_msg (message_dump_code, 2 + size + (size & 1))) !=
+	    NULL) {
+		osspar (msg) [0] = size;
+		memcpy (osspar (msg) + 1, (address) addr, size);
+		tcv_endp (msg);
+	}
+}
+
 void switch_radio (byte on) {
 
 	word par [2];
@@ -70,8 +113,15 @@ fsm sensor_monitor {
 
 	address msg;
 
-	state AR_LOOP:
+	state AR_START:
 
+		when (SENSOR_EVENT, AR_ON);
+		delay (4096, AR_ON);
+		release;
+
+	state AR_ON:
+
+		as3932_on ();
 		when (SENSOR_EVENT, AR_EVENT);
 		wait_sensor (SENSOR_AS3932, AR_EVENT);
 		release;
@@ -87,12 +137,14 @@ fsm sensor_monitor {
 		}	
 
 		((lword*)(osspar (msg))) [0] = seconds ();
-		SVal.fwake = (SVal.fwake & 0x7f);
-		if (as3932_int)
-			SVal.fwake |= 0x80;
 		((lword*)(osspar (msg))) [1] = *((lword*)(&SVal));
+		((word*) (osspar (msg))) [4] = *(((word*)(&SVal)) + 2);
+
 		tcv_endp (msg);
-		sameas AR_LOOP;
+
+		as3932_off ();
+
+		sameas AR_START;
 }
 
 static void handle_rf_command (byte code, address par, word pml) {
@@ -119,57 +171,35 @@ BadLength:
 
 #define	pmt ((command_turn_t*)par)
 
-			if (pmt->conf == 0 && pmt->mode == 255) {
+			if (pmt->what == 0)
 				// Turn off
 				as3932_off ();
-			} else {
-				as3932_on (pmt->conf, pmt->mode, pmt->patt);
-			}
+			else
+				as3932_on ();
 				
 			goto OK;
 #undef	pmt
-		case command_rreg_code:
 
-			if (pml < sizeof (command_rreg_t))
+		case command_dump_code:
+
+			if (pml < sizeof (command_dump_t))
 				goto BadLength;
 
-#define	pmt ((command_rreg_t*)par)
-			if (pmt->reg > 13)
-				u = P1IN;
-			else
-				u = as3932_rreg (pmt->reg);
-			if ((msg = new_msg (message_regval_code,
-			    sizeof (message_regval_t))) != NULL) {
-				((byte*)(osspar (msg))) [0] = pmt->reg;
-				((byte*)(osspar (msg))) [1] = (byte) u;
-				tcv_endp (msg);
+#define	pmt ((command_dump_t*)par)
+
+			if (pmt->addr == WNONE) {
+				pmt->addr = (word)dbb;
+				pmt->size = DBBSIZE;
+			} else if (pmt->size < 1) {
+				pmt->size = 1;
+			} else if (pmt->size > 32) {
+				pmt->size = 32;
 			}
-#undef	pmt
-			return;
 
-		case command_wreg_code:
+			handle_dump (pmt->addr, pmt->size);
 
-			if (pml < sizeof (command_wreg_t))
-				goto BadLength;
-
-#define	pmt ((command_wreg_t*)par)
-
-			as3932_wreg (pmt->reg, pmt->val);
-#undef	pmt
 			goto OK;
-
-		case command_wcmd_code:
-
-			if (pml < sizeof (command_wcmd_t))
-				goto BadLength;
-
-#define	pmt ((command_wcmd_t*)par)
-
-			as3932_wcmd (pmt->what);
 #undef	pmt
-			goto OK;
-
-
 
 		case command_radio_code:
 
@@ -242,9 +272,6 @@ fsm root {
 		RFC = tcv_open (NONE, 0, 0);
 		sid = NETID;
 		tcv_control (RFC, PHYSOPT_SETSID, &sid);
-
-		// Start in default mode
-		as3932_on (0, 0, 0);
 
 		runfsm radio_receiver;
 		runfsm sensor_monitor;
