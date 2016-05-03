@@ -116,15 +116,17 @@ fsm sensor_monitor {
 	state AR_START:
 
 		when (SENSOR_EVENT, AR_ON);
-		delay (4096, AR_ON);
+		delay (1024, AR_ON);
 		release;
 
 	state AR_ON:
 
 		as3932_on ();
+
+	state AR_LOOP:
+
 		when (SENSOR_EVENT, AR_EVENT);
 		wait_sensor (SENSOR_AS3932, AR_EVENT);
-		release;
 
 	state AR_EVENT:
 
@@ -138,9 +140,12 @@ fsm sensor_monitor {
 
 		((lword*)(osspar (msg))) [0] = seconds ();
 		((lword*)(osspar (msg))) [1] = *((lword*)(&SVal));
-		((word*) (osspar (msg))) [4] = *(((word*)(&SVal)) + 2);
 
 		tcv_endp (msg);
+
+#if 0
+		sameas AR_LOOP;
+#endif
 
 		as3932_off ();
 
