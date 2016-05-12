@@ -109,6 +109,36 @@ void switch_radio (byte on) {
 
 // ============================================================================
 
+static word blink_count = 0;
+
+fsm blinker {
+
+	state BL_START:
+
+		if (blink_count == 0)
+			finish;
+
+		blink_count--;
+
+		leds (3, 1);
+
+		delay (480, BL_OFF);
+		release;
+
+	state BL_OFF:
+
+		leds (3, 0);
+		delay (360, BL_START);
+}
+
+static void blink () {
+
+	blink_count++;
+
+	if (!running (blinker))
+		runfsm blinker;
+}
+
 fsm sensor_monitor {
 
 	address msg;
@@ -130,7 +160,12 @@ fsm sensor_monitor {
 
 	state AR_EVENT:
 
+#define	LSV (*((lword*)(&SVal)))
+
 		read_sensor (AR_EVENT, SENSOR_AS3932, (address)(&SVal));
+
+		if (LSV != 0)
+			blink ();
 
 		if ((msg = new_msg (message_status_code,
 			    sizeof (message_status_t))) == NULL) {
@@ -139,14 +174,14 @@ fsm sensor_monitor {
 		}	
 
 		((lword*)(osspar (msg))) [0] = seconds ();
-		((lword*)(osspar (msg))) [1] = *((lword*)(&SVal));
+		((lword*)(osspar (msg))) [1] = LSV;
 
 		tcv_endp (msg);
+#undef LSV
 
 #if 0
 		sameas AR_LOOP;
 #endif
-
 		as3932_off ();
 
 		sameas AR_START;
