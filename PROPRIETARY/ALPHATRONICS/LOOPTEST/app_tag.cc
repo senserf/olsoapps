@@ -122,8 +122,18 @@ fsm blinker {
 
 		leds (3, 1);
 
-		delay (480, BL_OFF);
+		delay (128, BL_A1);
 		release;
+
+	state BL_A1:
+
+		leds (3, 0);
+		delay (128, BL_A2);
+
+	state BL_A2:
+
+		leds (3, 1);
+		delay (128, BL_OFF);
 
 	state BL_OFF:
 
