@@ -3,8 +3,7 @@
 		My SA shows RSSI = 60 when no traffic. Taken at its face value,
 	     	that means -108.0dBm background noise.
 	-->
-        <propagation type="sampled" samples="oo_samples.txt"
-		average="4,1.0">
+        <propagation type="sampled" samples="oo_samples.txt">
                 <!--
                         Based on the empirical data collected by Wlodek
                         and Gerry, and trying to take RSSI at its face

@@ -57,12 +57,34 @@ oss_command dump 0x03 {
 	word	size;
 }
 
+oss_command rreg 0x04 {
+#
+# Read register
+#
+	byte	reg;
+}
+
+oss_command wreg 0x05 {
+#
+# Write register
+#
+	byte	reg;
+	byte	val;
+}
+
 oss_command radio 0x06 {
 #
 # Set radio delay
 #
         # 0 == off
         word    delay;
+}
+
+oss_command wcmd 0x07 {
+#
+# Issue command
+#
+	byte	cmd;
 }
 
 oss_command ap 0x80 {
@@ -95,6 +117,14 @@ oss_message dump 0x03 {
 # Memory dump
 #
 	blob	bytes;
+}
+
+oss_message rreg 0x04 {
+#
+# Register value
+#
+	byte	reg;
+	byte	val;
 }
 
 oss_message ap 0x80 {
@@ -145,6 +175,9 @@ set CMDS(dump)		"parse_cmd_dump"
 set CMDS(turn)		"parse_cmd_turn"
 set CMDS(radio)		"parse_cmd_radio"
 set CMDS(ap)		"parse_cmd_ap"
+set CMDS(rreg)		"parse_cmd_rreg"
+set CMDS(wreg)		"parse_cmd_wreg"
+set CMDS(wcmd)		"parse_cmd_wcmd"
 
 set LASTCMD		""
 
@@ -288,6 +321,64 @@ proc parse_cmd_radio { what } {
 	oss_issuecommand 0x06 [oss_setvalues [list $val] "radio"]
 }
 
+proc parse_cmd_rreg { what } {
+
+	if { $what != "" } {
+		error "unexpected $what"
+	}
+
+	set reg [oss_parse -skip -number -return 1]
+
+	if { $reg < 0 || $reg > 13 } {
+		error "illegal register number, $reg"
+	}
+
+	parse_check_empty
+
+	oss_issuecommand 0x04 [oss_setvalues [list $reg] "rreg"]
+}
+
+proc parse_cmd_wreg { what } {
+
+	if { $what != "" } {
+		error "unexpected $what"
+	}
+
+	set reg [oss_parse -skip -number -return 1]
+
+	if { $reg < 0 || $reg > 13 } {
+		error "illegal register number, $reg"
+	}
+
+	set val [oss_parse -skip -number -return 1]
+
+	if { $val < 0 || $val > 255 } {
+		error "illegal register value, $val"
+	}
+
+	parse_check_empty
+
+	oss_issuecommand 0x05 [oss_setvalues [list $reg $val] "wreg"]
+}
+
+proc parse_cmd_wcmd { what } {
+
+	if { $what != "" } {
+		error "unexpected $what"
+	}
+
+	set cmd [oss_parse -skip -number -return 1]
+
+	if { $cmd < 0 || $cmd > 4 } {
+		error "illegal command code, $cmd"
+	}
+
+	parse_check_empty
+
+	oss_issuecommand 0x07 [oss_setvalues [list [expr { $cmd | 0xc0 }]] \
+		"wcmd"]
+}
+
 proc parse_cmd_ap { what } {
 
 	if { $what != "" } {
@@ -406,6 +497,13 @@ proc show_msg_ap { msg } {
 	append res "  Node:        $nodeid ([format %04X $nodeid])\n"
 
 	oss_ttyout $res
+}
+
+proc show_msg_rreg { msg } {
+
+	lassign [oss_getvalues $msg "rreg"] reg val
+
+	oss_ttyout "Reg $reg = [format %02x $val]\n"
 }
 
 ###############################################################################

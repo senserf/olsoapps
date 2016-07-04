@@ -155,6 +155,7 @@ fsm sensor_monitor {
 
 	state AR_START:
 
+#if 0
 		when (SENSOR_EVENT, AR_ON);
 		delay (1024, AR_ON);
 		release;
@@ -162,6 +163,7 @@ fsm sensor_monitor {
 	state AR_ON:
 
 		as3932_on ();
+#endif
 
 	state AR_LOOP:
 
@@ -189,7 +191,7 @@ fsm sensor_monitor {
 		tcv_endp (msg);
 #undef LSV
 
-#if 0
+#if 1
 		sameas AR_LOOP;
 #endif
 		as3932_off ();
@@ -248,6 +250,46 @@ BadLength:
 
 			handle_dump (pmt->addr, pmt->size);
 
+			goto OK;
+#undef	pmt
+
+		case command_rreg_code:
+
+			if (pml < sizeof (command_rreg_t))
+				goto BadLength;
+
+#define	pmt ((command_rreg_t*)par)
+
+			if ((msg = new_msg (message_rreg_code, 2)) != NULL) {
+				((message_rreg_t*)(osspar (msg)))->reg =
+					pmt->reg;
+				((message_rreg_t*)(osspar (msg)))->val =
+					as3932_rreg (pmt->reg);
+				tcv_endp (msg);
+			}
+
+			goto OK;
+#undef	pmt
+
+		case command_wreg_code:
+
+			if (pml < sizeof (command_wreg_t))
+				goto BadLength;
+
+#define	pmt ((command_wreg_t*)par)
+
+			as3932_wreg (pmt->reg, pmt->val);
+			goto OK;
+#undef	pmt
+
+		case command_wcmd_code:
+
+			if (pml < sizeof (command_wcmd_t))
+				goto BadLength;
+
+#define	pmt ((command_wcmd_t*)par)
+
+			as3932_wcmd (pmt->cmd);
 			goto OK;
 #undef	pmt
 
@@ -324,7 +366,12 @@ fsm root {
 		tcv_control (RFC, PHYSOPT_SETSID, &sid);
 
 		runfsm radio_receiver;
+as3932_on ();
 		runfsm sensor_monitor;
+
+
+
+
 
 #ifdef RADIO_INITIALLY_ON
 		switch_radio (1);

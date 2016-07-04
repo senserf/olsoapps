@@ -45,10 +45,26 @@ typedef struct {
 	word	size;
 } command_dump_t;
 
+#define	command_rreg_code	4
+typedef struct {
+	byte	reg;
+} command_rreg_t;
+
+#define	command_wreg_code	5
+typedef struct {
+	byte	reg;
+	byte	val;
+} command_wreg_t;
+
 #define	command_radio_code	6
 typedef struct {
 	word	delay;
 } command_radio_t;
+
+#define	command_wcmd_code	7
+typedef struct {
+	byte	cmd;
+} command_wcmd_t;
 
 // ==================
 // Message structures
@@ -72,6 +88,12 @@ typedef struct {
 typedef struct {
 	blob	bytes;
 } message_dump_t;
+
+#define	message_rreg_code	4
+typedef struct {
+	byte	reg;
+	byte	val;
+} message_rreg_t;
 
 
 // ===================================
