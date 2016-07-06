@@ -329,7 +329,7 @@ proc parse_cmd_rreg { what } {
 
 	set reg [oss_parse -skip -number -return 1]
 
-	if { $reg < 0 || $reg > 13 } {
+	if { $reg < 0 || $reg > 255 } {
 		error "illegal register number, $reg"
 	}
 
@@ -346,7 +346,7 @@ proc parse_cmd_wreg { what } {
 
 	set reg [oss_parse -skip -number -return 1]
 
-	if { $reg < 0 || $reg > 13 } {
+	if { $reg < 0 || $reg > 255 } {
 		error "illegal register number, $reg"
 	}
 

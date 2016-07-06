@@ -143,19 +143,19 @@ fsm blinker {
 
 static void blink () {
 
-	blink_count++;
+	if (blink_count < 8)
+		blink_count++;
 
 	if (!running (blinker))
 		runfsm blinker;
 }
 
-fsm sensor_monitor {
+fsm loop_monitor {
 
 	address msg;
 
 	state AR_START:
 
-#if 0
 		when (SENSOR_EVENT, AR_ON);
 		delay (1024, AR_ON);
 		release;
@@ -163,7 +163,6 @@ fsm sensor_monitor {
 	state AR_ON:
 
 		as3932_on ();
-#endif
 
 	state AR_LOOP:
 
@@ -190,10 +189,6 @@ fsm sensor_monitor {
 
 		tcv_endp (msg);
 #undef LSV
-
-#if 1
-		sameas AR_LOOP;
-#endif
 		as3932_off ();
 
 		sameas AR_START;
@@ -264,7 +259,9 @@ BadLength:
 				((message_rreg_t*)(osspar (msg)))->reg =
 					pmt->reg;
 				((message_rreg_t*)(osspar (msg)))->val =
-					as3932_rreg (pmt->reg);
+					(pmt->reg & 0x80) ?
+						bma250_rreg (pmt->reg & 0x7F) :
+						as3932_rreg (pmt->reg);
 				tcv_endp (msg);
 			}
 
@@ -278,7 +275,10 @@ BadLength:
 
 #define	pmt ((command_wreg_t*)par)
 
-			as3932_wreg (pmt->reg, pmt->val);
+			if (pmt->reg & 0x80)
+				bma250_wreg (pmt->reg & 0x7F, pmt->val);
+			else
+				as3932_wreg (pmt->reg, pmt->val);
 			goto OK;
 #undef	pmt
 
@@ -356,6 +356,7 @@ fsm root {
 
 		word sid;
 
+		// bma250_on (BMA250_RANGE_2G, 7, BMA250_STAT_MOVE);
 		powerdown ();
 
 		phys_cc1100 (0, MAX_PACKET_LENGTH);
@@ -366,12 +367,7 @@ fsm root {
 		tcv_control (RFC, PHYSOPT_SETSID, &sid);
 
 		runfsm radio_receiver;
-as3932_on ();
-		runfsm sensor_monitor;
-
-
-
-
+		runfsm loop_monitor;
 
 #ifdef RADIO_INITIALLY_ON
 		switch_radio (1);

@@ -6,3 +6,6 @@
 
 // Undefine to start with radio off
 #define	RADIO_INITIALLY_ON
+
+#define	AS3932_REGACCESS
+#define	BMA250_REGACCESS
