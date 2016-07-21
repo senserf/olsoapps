@@ -48,7 +48,7 @@ void init () {
 
 	(void)fim_read();
 
-	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0) {
+	if (net_init (PHYS_ID, INFO_PLUG_TARP) < 0) {
 		// diag issued from failing net_init diag ("net_init");
 		halt();
 	}

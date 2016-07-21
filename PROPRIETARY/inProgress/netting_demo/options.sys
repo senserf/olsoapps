@@ -78,5 +78,6 @@
 
 #define ODR_FILL_BCAST present
 
-#define RADIO_DEFAULT_CHANNEL	129
+#define RADIO_DEFAULT_CHANNEL	0
 
+#define	PHYS_ID			INFO_PHYS_CC1100
