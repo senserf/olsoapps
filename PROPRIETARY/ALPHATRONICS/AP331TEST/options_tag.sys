@@ -1,0 +1,6 @@
+#undef	LEDS_DRIVER
+#define	LEDS_DRIVER	1
+
+#undef	RADIO_USE_LEDS
+#define	RADIO_USE_LEDS	0
+

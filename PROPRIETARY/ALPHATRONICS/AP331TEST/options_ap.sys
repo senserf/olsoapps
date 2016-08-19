@@ -1,0 +1,12 @@
+#undef	LEDS_DRIVER
+#define	LEDS_DRIVER	1
+
+#undef	UART_DRIVER
+#define	UART_DRIVER	1
+
+#undef	UART_TCV
+#define	UART_TCV	0
+
+#undef	RADIO_USE_LEDS
+#define	RADIO_USE_LEDS	0
+
