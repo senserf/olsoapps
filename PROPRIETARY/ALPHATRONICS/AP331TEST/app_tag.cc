@@ -5,6 +5,7 @@
 #include "plug_null.h"
 #include "as3932.h"
 #include "bma250.h"
+#include "buttons.h"
 
 #include "netid.h"
 #include "blink.h"
@@ -13,10 +14,23 @@
 #define	MAX_IDLE_TIME	MAX_WORD
 
 sint	rfc;
-lword	last_tap = 0;
-lword	last_loop = 0;
+lword	last_tap = (lword)(-10);
+lword	last_loop = (lword)(-10);
+lword	last_but = (lword)(-10);
 
 // ============================================================================
+
+static void butpress_on (word but) {
+
+	if (but == BUTTON_PANIC) {
+		last_but = seconds ();
+		blink (THE_LED, 1, 1024, 0, 512);
+	}
+}
+
+static void butpress_off (word but) {
+
+}
 
 static start_devices () {
 
@@ -26,6 +40,8 @@ static start_devices () {
 	bma250_move (30, 1);
 	// bma250_tap (0, 10, 4, 0);
 	as3932_on ();
+	// Button
+	buttons_action (butpress_on);
 }
 
 static stop_devices () {
@@ -33,6 +49,7 @@ static stop_devices () {
 	as3932_off ();
 	bma250_off (0);
 	tcv_control (rfc, PHYSOPT_OFF, NULL);
+	buttons_action (butpress_off);
 }
 
 void send_status_packet () {
@@ -60,8 +77,14 @@ void send_status_packet () {
 
 	pkt [3] = (word) d;
 
+	d = seconds () - last_but;
+
+	if (d > MAX_WORD)
+		d = MAX_WORD;
+
+	pkt [4] = (word) d;
+
 	// Room for extra info
-	pkt [4] = 0;
 	pkt [5] = 0;
 	pkt [6] = 0;
 	pkt [7] = 0;

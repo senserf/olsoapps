@@ -54,6 +54,9 @@ fsm radio_receiver {
 		if (pkt [3] < 3)
 			blink (2, 3, 128, 128, 128);
 
+		if (pkt [4] < 3)
+			blink (2, 1, 1024, 0, 512);
+
 	state RR_SHOW:
 
 		ser_outf (RR_SHOW, "%x %x %x %x %x %x\r\n",
