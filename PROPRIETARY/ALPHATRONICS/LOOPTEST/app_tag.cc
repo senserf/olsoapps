@@ -12,6 +12,8 @@
 // ============================================================================
 // ============================================================================
 
+#define	LOOP_TIMEOUT	4096
+
 byte	RadioOn; 	// Just 0 or 1, RadioDelay indicates the RX open time
 as3932_data_t SVal;
 
@@ -167,6 +169,9 @@ fsm loop_monitor {
 	state AR_LOOP:
 
 		when (SENSOR_EVENT, AR_EVENT);
+#if LOOP_TIMEOUT
+		delay (LOOP_TIMEOUT, AR_EVENT);
+#endif
 		wait_sensor (SENSOR_AS3932, AR_EVENT);
 
 	state AR_EVENT:

@@ -11,6 +11,7 @@
 #include "blink.h"
 
 #define	THE_LED		3
+#define	THE_OTHER_LED	0
 #define	MAX_IDLE_TIME	MAX_WORD
 
 sint	rfc;
@@ -24,7 +25,7 @@ static void butpress_on (word but) {
 
 	if (but == BUTTON_PANIC) {
 		last_but = seconds ();
-		blink (THE_LED, 1, 1024, 0, 512);
+		blink (THE_OTHER_LED, 1, 1024, 0, 512);
 	}
 }
 
