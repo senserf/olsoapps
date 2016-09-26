@@ -19,6 +19,6 @@
 
 #define	MONITOR_INTERVAL	4096
 
-#define	TRIGGER_VALUE	0x800
+#define	TRIGGER_VALUE	0xB00
 
 #endif

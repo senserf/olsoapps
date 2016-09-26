@@ -7,11 +7,8 @@
 #include "plug_null.h"
 #include "ser.h"
 #include "serf.h"
-#ifdef	__SMURPH__
 #include "phys_cc1100.h"
-#else
 #include "cc1100.h"
-#endif
 
 #define	LY		0	// Yellow
 #define	LR		2	// Red
