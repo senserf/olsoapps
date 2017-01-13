@@ -382,10 +382,10 @@ void oss_get_in (word state) {
 		cmd_line[4] = br_ctrl.rep_freq & 1;
 		if ((p = running(st_rep)) != 0) {
 			p = ldleft (p, NULL);
-			if (p == MAX_UINT)
+			if (p == MAX_WORD)
 				p = 0;
 		} else
-			p = MAX_UINT; // not running
+			p = MAX_WORD; // not running
 		memcpy (cmd_line +5, &p, 2);
 		return;
 

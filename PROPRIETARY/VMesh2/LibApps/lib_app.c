@@ -317,10 +317,10 @@ process (cyc_man, void*)
 		if (cyc_ctrl.st == CYC_ST_SLEEP &&
 				cyc_ctrl.mod == CYC_MOD_NET) {
 			while (cyc_left != 0) {
-				if (cyc_left > MAX_UINT) {
-					cyc_left -= MAX_UINT;
+				if (cyc_left > MAX_WORD) {
+					cyc_left -= MAX_WORD;
 					HSTAT_OFF;
-					freeze (MAX_UINT);
+					freeze (MAX_WORD);
 				} else {
 					HSTAT_OFF;
 					freeze ((word)cyc_left);

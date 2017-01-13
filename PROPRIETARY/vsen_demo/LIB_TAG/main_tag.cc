@@ -669,9 +669,9 @@ fsm pong {
 	that was GLACIER:
 
 		while (lh_time != 0) {
-			if (lh_time > MAX_UINT) {
-				lh_time -= MAX_UINT;
-				freeze (MAX_UINT);
+			if (lh_time > MAX_WORD) {
+				lh_time -= MAX_WORD;
+				freeze (MAX_WORD);
 			} else {
 				diag ("ifreeze %d %d", (word)seconds(),
 						(word)lh_time);
