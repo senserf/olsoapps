@@ -29,6 +29,14 @@
 #endif
 #define CRYSTAL2_RATE   0
 
+#undef	UART_RATE
+#undef	UART_DRIVER
+#undef	UART_TCV
+
+#define	UART_RATE	9600
+#define	UART_DRIVER	1
+#define	UART_TCV	0
+
 #endif
 
 #endif
@@ -63,9 +71,15 @@
 // #define D_DEBUG	present
 
 // Europe:
-#define CC1100_FREQ_FREQ2_VALUE 0x20
-#define CC1100_FREQ_FREQ1_VALUE 0x65
-#define CC1100_FREQ_FREQ0_VALUE 0xE8
+// #define CC1100_FREQ_FREQ2_VALUE 0x20
+// #define CC1100_FREQ_FREQ1_VALUE 0x65
+// #define CC1100_FREQ_FREQ0_VALUE 0xE8
+
+// Alphanet (Warsaw)
+#define	CC1100_FREQ_FREQ2_VALUE	0x21
+#define	CC1100_FREQ_FREQ1_VALUE	0x62
+#define	CC1100_FREQ_FREQ0_VALUE	0xC2
+
 
 #define TARP_RTR        	2
 
@@ -83,6 +97,7 @@
 
 // This is the default radio
 #define	PHYS_ID			INFO_PHYS_CC1100
+#define	RADIO_DEFAULT_BITRATE	2
 
 #if defined(CC2420)
 #if CC2420
