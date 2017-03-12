@@ -22,7 +22,7 @@
 #define DEL_QUANT	(10 << 10)
 #define AUD_QUANT	(2* DEL_QUANT)
 #define MAS_QUANT	(3* DEL_QUANT)
-#define OSS_QUANT	MAX_UINT
+#define OSS_QUANT	MAX_WORD
 
 // on some WARSAW boards, _R is switched with _B
 #define LED_R   0
