@@ -71,7 +71,8 @@ thread (root)
 				fastblink (NO);
 			  }
 			  leds (w, bs);
-			  ser_outf (RS_RCMD, "Done with leds %d", is_fastblink);
+			  ser_outf (RS_RCMD, "Done with leds %d",
+				fastblinking ());
 			  proceed (RS_RCMD);
 		case 'r': reset();
 	}

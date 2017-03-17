@@ -414,7 +414,7 @@ void app_leds (const word act) {
 	switch (act) {
 		case LED_BLINK:
 			pin_write (LED_PIN0, 0);
-			if (is_fastblink)
+			if (fastblinking ())
 				pin_write (LED_PIN1, 0);
 			else
 				pin_write (LED_PIN1, 1);
