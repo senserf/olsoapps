@@ -4,6 +4,7 @@
 #define	NETID			0xBABA
 #define	PING_MAGIC		0xDEBE
 #define	REP_MAGIC		0xDEBF
+#define	STA_MAGIC		0xDEB0
 
 #define	PING_INTERVAL		1024
 

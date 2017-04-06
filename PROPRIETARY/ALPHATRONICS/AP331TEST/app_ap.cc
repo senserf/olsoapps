@@ -34,39 +34,51 @@ fsm ping_sender {
 
 fsm radio_receiver {
 
-		address pkt;
+	address pkt;
+	char h;
 
 	state RR_WAIT:
 
 		pkt = tcv_rnp (RR_WAIT, rfc);
 
-		if (tcv_left (pkt) < 18 || pkt [1] != REP_MAGIC) {
-			tcv_endp (pkt);
-			sameas RR_WAIT;
-		}
+		if (tcv_left (pkt) < 18)
+			goto Ignore;
 
-		// Report indication LED
-		blink (1, 1, 128, 0, 32);
+		if (pkt [1] == REP_MAGIC) {
 
-		if (pkt [2] < 3)
-			blink (0, 3, 128, 128, 128);
+			// Report indication LED
+			blink (1, 1, 128, 0, 32);
 
-		if (pkt [3] < 3)
+			if (pkt [2] < 3)
+				blink (0, 3, 128, 128, 128);
+
+			if (pkt [3] < 3)
 			blink (2, 3, 128, 128, 128);
+	
+			if (pkt [4] < 3)
+				blink (2, 1, 1024, 0, 512);
+			h = 'R';
 
-		if (pkt [4] < 3)
-			blink (2, 1, 1024, 0, 512);
+		} else if (pkt [1] == STA_MAGIC) {
+
+			blink (1, 3, 128, 128, 64);
+			h = 'D';
+		} else
+			goto Ignore;
+
+
 
 	state RR_SHOW:
 
-		ser_outf (RR_SHOW, "%x %x %x %x %x %x\r\n",
+		ser_outf (RR_SHOW, "%c: %x %x %x %x %x %x\r\n",
+			h,
 			pkt [2],
 			pkt [3],
 			pkt [4],
 			pkt [5],
 			pkt [6],
 			pkt [7]);
-
+Ignore:
 		tcv_endp (pkt);
 
 		sameas RR_WAIT;

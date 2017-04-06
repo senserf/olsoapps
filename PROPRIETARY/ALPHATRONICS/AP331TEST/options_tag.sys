@@ -4,3 +4,4 @@
 #undef	RADIO_USE_LEDS
 #define	RADIO_USE_LEDS	0
 
+#define	AS3932_REGACCESS
