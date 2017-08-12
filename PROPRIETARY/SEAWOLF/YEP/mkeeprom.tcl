@@ -83,34 +83,27 @@ proc msource { f } {
 		return
 	}
 
-	set dir "Scripts/Packages"
-	set lst ""
-
-	for { set i 0 } { $i < 10 } { incr i } {
-		set dir "../$dir"
-		set dno [file normalize $dir]
-		if { $dno == $lst } {
-			# no progress
-			break
-		}
-		if ![catch { uplevel #0 source [file join $dir $f] } ] {
-			# found it
-			return
-		}
+	set dir [auto_execok "picospath"]
+	if ![file executable $dir] {
+		set dir [eval [list exec] [list sh] [list $dir]]
+	} else {
+		set dir [eval [list exec] [list $dir]]
 	}
 
-	# failed
-	puts stderr "Cannot locate file $f 'sourced' by the script."
-	exit 99
-}
+	set dir [file join $dir "Scripts" "Packages" $f]
 
-msource xml.tcl
+	uplevel #0 source $dir
+}
 
 ###############################################################################
 
 proc abt { m } {
 	puts stderr $m
 	exit 99
+}
+
+if [catch { msource xml.tcl } err] {
+	abt "failed to source xml.tcl: $err"
 }
 
 proc bad_usage { } {

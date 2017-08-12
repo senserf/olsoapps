@@ -1,5 +1,8 @@
-#ifndef	__applib_types_h__
-#define	__applib_types_h__
+#ifndef	__sealib_h__
+#define	__sealib_h__
+
+#include "lcdg_dispman.h"
+#include "sealists.h"
 
 #define BEAC_FREQ	5
 
@@ -100,5 +103,24 @@ typedef struct {
 	word	cxt : 4;
 	word	spare : 8;
 } cflags_t;	// context (LCD) flags
+
+//+++ "sealib.c"
+
+word handle_nbh (word what, word id);
+word handle_ad (word what, word plod);
+void init_glo ();
+void process_incoming ();
+void update_line (word, word, word, word);
+void paint_nh ();
+void paint_scr (word);
+void display_rec (word);
+lcdg_dm_obj_t *mkrmenu ();
+
+extern nbh_menu_t 	nbh_menu;
+extern lcdg_dm_men_t   *lcd_menu;
+extern rf_rcv_t		rf_rcv, ad_rcv;
+extern cflags_t		cxt_flag;
+extern char *		ad_buf;
+extern sea_rec_t *	curr_rec;
 
 #endif

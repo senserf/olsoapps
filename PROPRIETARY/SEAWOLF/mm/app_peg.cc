@@ -305,7 +305,7 @@ fsm cmd_in {
 
 }
 
-static char * stateName (word state) {
+static const char * stateName (word state) {
 	switch ((tagStateType)state) {
 		case noTag:
 			return "noTag";
@@ -346,7 +346,7 @@ static char * locatName (word rssi, word pl) { // ignoring pl
 	return "rssi?";
 }
 #endif
-static char * descName (word info) {
+static const char * descName (word info) {
 	if (info & INFO_PRIV) return "private";
 	if (info & INFO_BIZ) return "business";
 	if (info & INFO_DESC) return "intro";
@@ -354,7 +354,7 @@ static char * descName (word info) {
 	return "noDesc";
 }
 
-static char * descMark (word info, word list) {
+static const char * descMark (word info, word list) {
 
 	if (list)
 		return "LT";

@@ -1,9 +1,6 @@
 #ifndef	__msg_h__
 #define	__msg_h__
 
-#include "vuee.h"
-
-#include "tarp.h"
 //+++ "msg.c"
 
 #include "msg_types.h"
@@ -13,46 +10,22 @@
 #define in_ad(buf, field)	(((msgAdType *)(buf))->field)
 #define in_adAck(buf, field)	(((msgAdAckType *)(buf))->field)
 
-#ifdef	__SMURPH__
-
-#define	myBeac		_daprx (myBeac)
-#define	myAct		_daprx (myAct)
-
-threadhdr (beacon, SeaNode) {
-
-	states { MSG_BEA_START, MSG_BEA_SEND };
-
-	perform;
-};
-
-threadhdr (rcv, SeaNode) {
-
-	states { MSG_RC_TRY };
-
-	perform;
-};
-
-#else
-
-procname (beacon);
-procname (rcv);
+fsm beacon;
+fsm rcv;
 
 // nothing else we do but beacons and acts - keep them ready
 extern msgBeacType myBeac;
 extern msgActType  myAct;
 
 // Expected by NET and TARP----------
-// In VUEE, they are node methods ---
-int tr_offset (headerType*);
-Boolean msg_isBind (msg_t);
-Boolean msg_isTrace (msg_t);
-Boolean msg_isMaster (msg_t);
-Boolean msg_isNew (msg_t);
-Boolean msg_isClear (byte);
-void set_master_chg (void);
+idiosyncratic int tr_offset (headerType*);
+idiosyncratic Boolean msg_isBind (msg_t);
+idiosyncratic Boolean msg_isTrace (msg_t);
+idiosyncratic Boolean msg_isMaster (msg_t);
+idiosyncratic Boolean msg_isNew (msg_t);
+idiosyncratic Boolean msg_isClear (byte);
+idiosyncratic void set_master_chg ();
 //------------------------------------
-
-#endif
 
 typedef word hop_t;
 

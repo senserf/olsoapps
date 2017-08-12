@@ -4,40 +4,30 @@
 /* ==================================================================== */
 
 #include "msg.h"
-#include "applib.h"
+#include "sealib.h"
 #include "net.h"
 
-#ifdef	__SMURPH__
-
-#else
-
-#include "msg_node_data.h"
-
-#define MSG_BEA_START	0
-#define MSG_BEA_SEND	1
-
-#define MSG_RC_TRY	0
-
-#endif
+msgBeacType	myBeac;
+msgActType	myAct;
 
 // ============================================================================
 
-thread (beacon)
+fsm beacon {
 
-	entry (MSG_BEA_START)
+	state MSG_BEA_START:
 		delay ((word)BEAC_FREQ * 1024 + rnd() % 2048, MSG_BEA_SEND);
 		release;
 
-	entry (MSG_BEA_SEND)
+	state MSG_BEA_SEND:
 		handle_nbh (NBH_AUDIT, 0);
 		// we'll be crying for all those shortcuts
 		(void)net_tx (WNONE, (char *)&myBeac, sizeof(msgBeacType), 0);
-		proceed (MSG_BEA_START);
-endthread
+		proceed MSG_BEA_START;
+}
 
-thread (rcv)
+fsm rcv {
 
-  entry (MSG_RC_TRY)
+  state MSG_RC_TRY:
 	if (rf_rcv.buf != NULL) {
 		ufree (rf_rcv.buf);
 		rf_rcv.buf = NULL;
@@ -46,7 +36,7 @@ thread (rcv)
 
 	if ((rf_rcv.len = net_rx (MSG_RC_TRY, &rf_rcv.buf, &rf_rcv.rss, 0)) <=
 	    0)
-		proceed (MSG_RC_TRY);
+		proceed MSG_RC_TRY;
 
 	// map rssi
 	if ((rf_rcv.rss >> 8) > 161)
@@ -57,9 +47,9 @@ thread (rcv)
 		rf_rcv.rss = 1;
 
 	process_incoming ();
-	proceed (MSG_RC_TRY);
+	proceed MSG_RC_TRY;
 
-endthread
+}
 
 // ============================================================================
 
@@ -129,31 +119,31 @@ int msg_send (msg_t t, nid_t r, hop_t h, word pload,
 /*
  * "Virtual" stuff needed by NET & TARP =======================================
  */
-__PUBLF (SeaNode, int, tr_offset) (headerType *h) {
+
+idiosyncratic int tr_offset (headerType *h) {
 	return 0;
 }
 
-__PUBLF (SeaNode, Boolean, msg_isBind) (msg_t m) {
+idiosyncratic Boolean msg_isBind (msg_t m) {
 	return NO;
 }
 
-__PUBLF (SeaNode, Boolean, msg_isTrace) (msg_t m) {
+idiosyncratic Boolean msg_isTrace (msg_t m) {
 	return NO;
 }
 
-__PUBLF (SeaNode, Boolean, msg_isMaster) (msg_t m) {
+idiosyncratic Boolean msg_isMaster (msg_t m) {
 	return (m == MSG_AD); // we'll see if mhopping makes sense at all
 }
 
-__PUBLF (SeaNode, Boolean, msg_isNew) (msg_t m) {
+idiosyncratic Boolean msg_isNew (msg_t m) {
 	return NO;
 }
 
-__PUBLF (SeaNode, Boolean, msg_isClear) (byte o) {
+idiosyncratic Boolean msg_isClear (byte o) {
 	return YES;
 }
 
-__PUBLF (SeaNode, void, set_master_chg) () {
+idiosyncratic void set_master_chg () {
 	return;
 }
-

@@ -8,84 +8,9 @@
 // ============================================================================
 // ============================================================================
 
-#ifdef __SMURPH__
-
-#define	SFD		_daprx (SFD)
-#define	objects		_daprx (objects)
-#define	ibuf		_daprx (ibuf)
-
-threadhdr (root, SeaNode) {
-
-#include "app_root_static.h"
-
-	states {
-			RS_INIT,
-			RS_RDCMD,
-			RS_RDCME,
-			RS_SST,
-			RS_DSP,
-			RS_CRE,
-			RS_GME,
-			RS_GME1,
-			RS_GTE,
-			RS_GTE1,
-			RS_LIS,
-			RS_LDM,
-			RS_LDM1,
-			RS_LIM,
-			RS_LIM1,
-			RS_DIS,
-			RS_ERA,
-			RS_SEN,
-			RS_RCV,
-			RS_ISW,
-			RS_ESW,
-			RS_MEM,
-			RS_MEM1,
-			RS_FME,
-			RS_LNB,
-			RS_NBH,
-			RS_HOS,
-			RS_HOS1
-	};
-
-	perform;
-};
-
-#else
-
-#define RS_INIT         0
-#define RS_RDCMD        1
-#define RS_RDCME        2
-#define RS_SST          3
-#define RS_DSP          4
-#define RS_CRE          5
-#define RS_GME          6
-#define RS_GME1         7
-#define RS_GTE          8
-#define RS_GTE1         9
-#define RS_LIS          10
-#define RS_LDM          11
-#define RS_LDM1         12
-#define RS_LIM          13
-#define RS_LIM1         14
-#define RS_DIS          15
-#define RS_ERA          16
-#define RS_SEN          17
-#define RS_RCV          18
-#define RS_ISW          19
-#define RS_ESW          20
-#define RS_MEM          21
-#define RS_MEM1         22
-#define RS_FME          23
-#define RS_LNB          24
-#define RS_NBH          25
-#define RS_HOS          26
-#define RS_HOS1         27
-
-#include "app_node_data.h"
-
-#endif
+static int SFD;
+static lcdg_dm_obj_t *objects [MAXOBJECTS];
+static char *ibuf;
 
 // ============================================================================
 // ============================================================================
@@ -359,21 +284,21 @@ static void fibuf () {
 	}
 }
 
-thread (root)
+fsm root {
 
-    word i;
-    char *line;
-    lword ef, el;
+    word c [NPVALUES];
+    byte Status;
+    char lbl [LABSIZE];
+    char **lines;
+    lcdg_im_hdr_t *isig;
 
-// With __SMUPRH__, the dirst include (at the top of this file) will take
-// precedence
-#include "app_root_static.h"
+    state RS_INIT:
 
-    entry (RS_INIT)
+	word i;
 
 	ee_open ();
 
-	init_glo();
+	init_glo ();
 
 	if (net_init (INFO_PHYS_CC1100, INFO_PLUG_TARP) < 0)
 		syserror (ERESOURCE, "cc1100");
@@ -416,10 +341,12 @@ thread (root)
 	lcdg_on (0);
 	preset_menus();
 	//top_switch ();
-	runthread (beacon);
-	runthread (rcv);
+	runfsm beacon;
+	runfsm rcv;
 
-    entry (RS_RDCMD)
+    state RS_RDCMD:
+
+	word i;
 
 	// Line of text
 	ibuf = ab_in (RS_RDCMD);
@@ -433,64 +360,64 @@ thread (root)
 		// off			display switched off
 		// on [u]		on + contrast set
 		// or                   refresh
-		case 'o' : proceed (RS_DSP);
+		case 'o' : proceed RS_DSP;
 
 		// ci n h x y			create an image object
 		// cm n nl fo bg fg x y w h	create a menu object
 		// ct n fo bg fg x y w		create a text object
-		case 'c' : proceed (RS_CRE);
+		case 'c' : proceed RS_CRE;
 
 		// fc n c			create event category list
 		// fr n c			create a record menu
-		case 'f' : proceed (RS_FME);
+		case 'f' : proceed RS_FME;
 
 		// lo				list dm objects
 		// li				list images
 	        // ln				list neighbours, boombuzz, ign
-		case 'l' : proceed (RS_LIS);
+		case 'l' : proceed RS_LIS;
 
 		// ns				nhood snd
 		// nr				nhood rcv
 		// nm				nhood move to / fr ign
-		case 'n': proceed (RS_NBH);
+		case 'n': proceed RS_NBH;
 
 		// da n				add object to dlist
 		// dd n				delete object from dlist
-		case 'd' : proceed (RS_DIS);
+		case 'd' : proceed RS_DIS;
 
 		// ee f l			erase eeprom
 		// ei handle			erase image
-		case 'e' : proceed (RS_ERA);
+		case 'e' : proceed RS_ERA;
 
 		// =========================
 
 		// si lid rqn handle		send indicated image
 		// se lid rqn f l		send EEPROM chunk
-		case 's' : proceed (RS_SEN);
+		case 's' : proceed RS_SEN;
 
 		// ri lid rqn x y label		receive image
 		// re lid rqn f l		receive EEPROM
-		case 'r' : proceed (RS_RCV);
+		case 'r' : proceed RS_RCV;
 
 		// m
-		case 'm' : proceed (RS_MEM);
+		case 'm' : proceed RS_MEM;
 
 	   	// host change
-		case 'h': proceed (RS_HOS);
+		case 'h': proceed RS_HOS;
 	}
 // ============================================================================
 Err:
 	fibuf ();
 
-    entry (RS_RDCME)
+    state RS_RDCME:
 
 	ab_outf (RS_RDCME, "Illegal command or parameter");
-	proceed (RS_RDCMD);
+	proceed RS_RDCMD;
 
 Ret:
 	fibuf ();
 
-    entry (RS_SST)
+    state RS_SST:
 
 	if (Status)
 		ab_outf (RS_SST, "Err: %u", Status);
@@ -498,11 +425,11 @@ Ret:
 		ab_outf (RS_SST, "OK");
 
 	Status = 0;
-	proceed (RS_RDCMD);
+	proceed RS_RDCMD;
 
 // ============================================================================
 
-    entry (RS_DSP)
+    state RS_DSP:
 
 	switch (ibuf [1]) {
 		case 'f' :
@@ -526,7 +453,9 @@ Ret:
 
 // ============================================================================
 
-    entry (RS_CRE)
+    state RS_CRE:
+
+	word i;
 
 	switch (ibuf [1]) {
 		case 'i' : goto Gim;
@@ -596,20 +525,22 @@ Men:	// ====================================================================
 
 	CN = 0;
 
-    entry (RS_GME)
+    state RS_GME:
 
 	// fibuf is idempotent
 	fibuf ();
 	ab_outf (RS_GME, "Enter %u lines", NL - CN);
 
-    entry (RS_GME1)
+    state RS_GME1:
+
+	word i;
 
 	ibuf = ab_in (RS_GME1);
 
 	for (i = 0; ibuf [i] == ' ' || ibuf [i] == '\t'; i++);
 
 	if (ibuf [i] == '\0')
-		proceed (RS_GME);
+		proceed RS_GME;
 
 	if ((lines [CN] = (char*) umalloc (strlen (ibuf + i) + 1)) == NULL) {
 		lcdg_dm_csa (lines, CN);
@@ -619,7 +550,7 @@ Men:	// ====================================================================
 	strcpy (lines [CN], ibuf + i);
 
 	if (++CN < NL)
-		proceed (RS_GME);
+		proceed RS_GME;
 
 	// Create the menu object
 	if (free_object (OIX)) {
@@ -667,19 +598,22 @@ Tex:	// ====================================================================
 
 	// Expect a line of text
 
-    entry (RS_GTE)
+    state RS_GTE:
 
 	fibuf ();
 	ab_outf (RS_GTE, "Enter a line");
 
-    entry (RS_GTE1)
+    state RS_GTE1:
+
+	char *line;
+	word i;
 
 	ibuf = ab_in (RS_GTE1);
 
 	for (i = 0; ibuf [i] == ' ' || ibuf [i] == '\t'; i++);
 
 	if (ibuf [i] == '\0')
-		proceed (RS_GTE);
+		proceed RS_GTE;
 
 	if ((line = (char*) umalloc (strlen (ibuf + i) + 1)) == NULL) {
 		Status = 103;
@@ -713,7 +647,7 @@ Tex:	// ====================================================================
 
 // ============================================================================
 
-    entry (RS_LIS)
+    state RS_LIS:
 
 	switch (ibuf [1]) {
 		case 'o' : goto Ldm;
@@ -727,7 +661,7 @@ Lnb: // =======================================================================
 
 	c[0] = 0;
 
-    entry (RS_LNB)
+    state RS_LNB:
 
 	ab_outf (RS_LNB, "NBH[%u] %u: %u %c %u", c[0], 
 			nbh_menu.mm[c[0]].id,
@@ -737,13 +671,13 @@ Lnb: // =======================================================================
 	if (++c[0] >= nbh_menu.li)
 		goto Ret;
 
-	proceed (RS_LNB);
+	proceed RS_LNB;
 		
 Ldm: // =======================================================================
 
 	OIX = 0;
 
-    entry (RS_LDM)
+    state RS_LDM:
 
 	while (OIX < MAXOBJECTS) {
 		if (objects [OIX] != NULL)
@@ -754,7 +688,7 @@ Ldm: // =======================================================================
 	if (OIX == MAXOBJECTS)
 		goto Ret;
 
-    entry (RS_LDM1) 
+    state RS_LDM1:
 
 	switch (objects [OIX] -> Type & LCDG_DMTYPE_MASK) {
 
@@ -800,7 +734,7 @@ Ldm: // =======================================================================
 #undef	COT
 
 	OIX++;
-	proceed (RS_LDM);
+	proceed RS_LDM;
 
 Lim: // =======================================================================
 
@@ -810,7 +744,7 @@ Lim: // =======================================================================
 		goto Ret;
 	}
 
-    entry (RS_LIM)
+    state RS_LIM:
 
 	if ((OIX = lcdg_im_find (NULL, 0, OIX)) == WNONE) {
 		// No more
@@ -823,12 +757,12 @@ Lim: // =======================================================================
 		// Skip it
 NLim:
 		// OIX++;
-		proceed (RS_LIM);
+		proceed RS_LIM;
 	}
 
 	isig->Label [LCDG_IM_LABLEN-1] = '\0';
 
-    entry (RS_LIM1)
+    state RS_LIM1:
 
 	ab_outf (RS_LIM1, "%u [%u,%u]: %s",
 		OIX, isig->X, isig->Y, isig->Label);
@@ -836,7 +770,7 @@ NLim:
 
 // ============================================================================
 
-    entry (RS_NBH)
+    state RS_NBH:
 
 	// s/r: type, who, hco, pload, [ads: lev, len <string>]
 	// m: id
@@ -925,7 +859,7 @@ Nbm:
 
 // ============================================================================
 
-    entry (RS_DIS)
+    state RS_DIS:
 
 	scan (ibuf+2, "%u", c+0);
 
@@ -949,7 +883,9 @@ DDis:
 
 // ============================================================================
 
-    entry (RS_ERA)
+    state RS_ERA:
+
+	lword ef, el;
 
 	switch (ibuf [1]) {
 
@@ -975,7 +911,7 @@ DDis:
 // ============================================================================
 // ============================================================================
 
-    entry (RS_SEN)
+    state RS_SEN:
 
 	switch (ibuf [1]) {
 
@@ -986,7 +922,7 @@ DDis:
 
 	goto Err;
 
-    entry (RS_RCV)
+    state RS_RCV:
 
 	switch (ibuf [1]) {
 
@@ -1002,16 +938,19 @@ ISen:
 	scan (ibuf+2, "%u %u %u", c+0, c+1, c+2);
 	fibuf ();
 	if ((Status = oep_im_snd (c [0], (byte)(c [1]), c [2])) != 0)
-		proceed (RS_SST);
+		proceed RS_SST;
 	// Accepted
 
-    entry (RS_ISW)
+    state RS_ISW:
+
+	word i;
+	lword ef, el;
 
 	Status = oep_wait (RS_ISW);
 	oep_im_cleanup ();
 	if (Status == OEP_STATUS_DONE)
 		Status = 0;
-	proceed (RS_SST);
+	proceed RS_SST;
 
 // ============================================================================
 
@@ -1019,16 +958,19 @@ ESen:
 	scan (ibuf+2, "%u %u %lu %lu", c+0, c+1, &ef, &el);
 	fibuf ();
 	if ((Status = oep_ee_snd (c [0], (byte) (c [1]), ef, el)) != 0)
-		proceed (RS_SST);
+		proceed RS_SST;
 	// Accepted
 
-    entry (RS_ESW)
+    state RS_ESW:
+
+	word i;
+	lword ef, el;
 
 	Status = oep_wait (RS_ESW);
 	oep_ee_cleanup ();
 	if (Status == OEP_STATUS_DONE)
 		Status = 0;
-	proceed (RS_SST);
+	proceed RS_SST;
 
 // ============================================================================
 
@@ -1044,7 +986,7 @@ IRcv:
 	if ((isig = (lcdg_im_hdr_t*) umalloc (sizeof (lcdg_im_hdr_t))) ==
 	    NULL) {
 		Status = 103;
-		proceed (RS_SST);
+		proceed RS_SST;
 	}
 	isig->X = (byte)(c [2]);
 	isig->Y = (byte)(c [3]);
@@ -1060,10 +1002,10 @@ IRcv:
 	Status = oep_im_rcv (isig, BNONE, BNONE);
 	ufree (isig);
 	if (Status != 0)
-		proceed (RS_SST);
+		proceed RS_SST;
 
 	// Waiting: same as for sending
-	proceed (RS_ISW);
+	proceed RS_ISW;
 
 // ============================================================================
 
@@ -1073,29 +1015,29 @@ ERcv:
 	oep_setlid (c [0]);
 	oep_setrqn (c [1]);
 	if ((Status = oep_ee_rcv (ef, el)) != 0)
-		proceed (RS_SST);
+		proceed RS_SST;
 
 	// Waiting
-	proceed (RS_ESW);
+	proceed RS_ESW;
 
-    entry (RS_MEM)
+    state RS_MEM:
 
 	c [0] = memfree (0, c + 1);
 	c [2] = stackfree ();
 
-    entry (RS_MEM1)
+    state RS_MEM1:
 
 	ab_outf (RS_MEM1, "MEMORY: %u %u %u", c [0], c [1], c [2]);
 	goto Ret;
 
 // ============================================================================
 
-    entry (RS_HOS)
+    state RS_HOS:
 
 	c[0] = local_host;
 	scan (ibuf+1, "%u", &c[0]);
 
-    entry (RS_HOS1)
+    state RS_HOS1:
 
 	ab_outf (RS_HOS1, "lhost %u -> %u", local_host, c[0]);
 	if (local_host != c[0]) {
@@ -1108,7 +1050,7 @@ ERcv:
 
 // ============================================================================
 
-    entry (RS_FME)
+    state RS_FME:
 
 	c [1] = 0;
 	scan (ibuf+2, "%u %u", c+0, c+1);
@@ -1144,8 +1086,6 @@ FRe:	// ====================================================================
 
 	goto Ret;
 	
-endthread
+}
 
 // ============================================================================
-
-praxis_starter (SeaNode);

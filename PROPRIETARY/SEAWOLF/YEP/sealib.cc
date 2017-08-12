@@ -4,22 +4,21 @@
 /* ==================================================================== */
 
 #include "msg.h"
-#include "applib.h"
+#include "sealib.h"
 #include "sealists.h"
 #include "net.h"
 #include "storage.h"
 
-#ifdef	__SMURPH__
-
-#else
-
-#include "applib_node_data.h"
-
-#endif
+lcdg_dm_men_t 	*lcd_menu;
+nbh_menu_t	nbh_menu;
+rf_rcv_t	rf_rcv, ad_rcv;
+cflags_t	cxt_flag;
+char 		*ad_buf;
+sea_rec_t	*curr_rec;
 
 // ============================================================================
 
-// I have moved here the part that made sealists.c dependent on applib - so I
+// I have moved here the part that made sealists.c dependent on sealib - so I
 // can test sealists.c independently; you can move it back there once things
 // work
 
@@ -266,7 +265,7 @@ void init_glo () {
 	myBeac.header.hco = 1;
 	myAct.header.hco = 1;
 
-	// applib
+	// sealib
 	memset (&rf_rcv, 0, sizeof(rf_rcv_t));
 	memset (&ad_rcv, 0, sizeof(rf_rcv_t));
 	memset (&nbh_menu, 0, sizeof(nbh_menu_t));

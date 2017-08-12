@@ -1,8 +1,6 @@
 #ifndef	__app_h__
 #define	__app_h__
 
-#include "vuee.h"
-
 #include "sysio.h"
 #include "pins.h"
 #include "oep.h"
@@ -15,7 +13,12 @@
 #include "sealists.h"
 #include "msg.h"
 #include "net.h"
-#include "applib.h"
-#include "app_types.h"
+#include "sealib.h"
+
+#define	MAXLINES	32
+#define	MAXOBJECTS	32
+
+#define	NPVALUES	12
+#define	LABSIZE		(LCDG_IM_LABLEN+2)
 
 #endif

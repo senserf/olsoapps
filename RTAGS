@@ -4,3 +4,9 @@ I have removed all formal git tags. See PICOS (PG170721A). The repository
 presently contains locaspot (which also exists as a separate repo named
 ALPHANET). We may remove locaspot or keep it around, but we should not
 treat it as Alphanet any longer.
+
+PG170812:
+
+	I have tweaked SEAWOLF/YEP to compile under picomp (i.e., PIP). The
+	idea is that there should be no single serious praxis that must be
+	compiled in the legacy mode.

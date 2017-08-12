@@ -1,8 +1,6 @@
 #ifndef __pg_sealists_h__
 #define __pg_sealists_h__
 
-#include "vuee.h"
-
 #include "oep.h"
 #include "lcdg_images.h"
 #include "lcdg_dispman.h"

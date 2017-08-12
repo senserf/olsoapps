@@ -460,7 +460,7 @@ void wt (const char *buf, int size) {
 	}
 }
 
-main () {
+int main () {
 
 	wt ((const char*)(&Header), sizeof (Header));
 	wt ((const char*)FONT6x8, sizeof (FONT6x8));
