@@ -8,6 +8,7 @@
 #include "msg_peg.h"
 
 #include "net.h"
+#include "tarp.h"
 
 
 void msg_data_out (nid_t peg, word info) {

@@ -11,10 +11,6 @@
 #define SENSOR_MOTION           1
 #endif
 
-// Note: this is just define or not, no value
-//#define	VUEE_LIB_PLUG_TARP
-//#define	VUEE_LIB_PLUG_NULL
-
 #ifdef BOARD_WARSAW_BLUE
 #define UART_DRIVER                     2
 #else

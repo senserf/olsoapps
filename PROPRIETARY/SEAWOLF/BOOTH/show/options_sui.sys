@@ -1,9 +1,3 @@
-#ifdef	__SMURPH__
-
-#define	VUEE_LIB_PLUG_NULL
-#define VUEE_LIB_PLUG_TARP
-
-#endif
 
 #ifdef BOARD_WARSAW_BLUE
 

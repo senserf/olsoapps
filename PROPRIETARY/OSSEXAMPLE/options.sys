@@ -4,5 +4,3 @@
 #define	UART_DRIVER		0
 #define UART_TCV		1
 
-#define	VUEE_LIB_XRS
-#define	VUEE_LIB_PLUG_NULL

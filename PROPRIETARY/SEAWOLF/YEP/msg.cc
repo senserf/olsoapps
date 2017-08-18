@@ -120,30 +120,30 @@ int msg_send (msg_t t, nid_t r, hop_t h, word pload,
  * "Virtual" stuff needed by NET & TARP =======================================
  */
 
-idiosyncratic int tr_offset (headerType *h) {
+int tr_offset (headerType *h) {
 	return 0;
 }
 
-idiosyncratic Boolean msg_isBind (msg_t m) {
+Boolean msg_isBind (msg_t m) {
 	return NO;
 }
 
-idiosyncratic Boolean msg_isTrace (msg_t m) {
+Boolean msg_isTrace (msg_t m) {
 	return NO;
 }
 
-idiosyncratic Boolean msg_isMaster (msg_t m) {
+Boolean msg_isMaster (msg_t m) {
 	return (m == MSG_AD); // we'll see if mhopping makes sense at all
 }
 
-idiosyncratic Boolean msg_isNew (msg_t m) {
+Boolean msg_isNew (msg_t m) {
 	return NO;
 }
 
-idiosyncratic Boolean msg_isClear (byte o) {
+Boolean msg_isClear (byte o) {
 	return YES;
 }
 
-idiosyncratic void set_master_chg () {
+void set_master_chg () {
 	return;
 }

@@ -9,12 +9,12 @@
 
 #include "tarp.h"
 
-idiosyncratic int tr_offset (headerType*);
-idiosyncratic Boolean msg_isBind (msg_t);
-idiosyncratic Boolean msg_isTrace (msg_t);
-idiosyncratic Boolean msg_isMaster (msg_t);
-idiosyncratic Boolean msg_isNew (msg_t);
-idiosyncratic Boolean msg_isClear (byte);
-idiosyncratic void set_master_chg ();
+int tr_offset (headerType*);
+Boolean msg_isBind (msg_t);
+Boolean msg_isTrace (msg_t);
+Boolean msg_isMaster (msg_t);
+Boolean msg_isNew (msg_t);
+Boolean msg_isClear (byte);
+void set_master_chg ();
 
 #endif

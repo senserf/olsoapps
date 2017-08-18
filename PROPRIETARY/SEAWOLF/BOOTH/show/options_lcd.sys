@@ -1,9 +1,3 @@
-#ifdef	__SMURPH__
-
-#define	VUEE_LIB_PLUG_NULL
-#define VUEE_LIB_PLUG_TARP
-
-#endif
 
 #ifdef CODE_LONG_INTS
 #undef CODE_LONG_INTS

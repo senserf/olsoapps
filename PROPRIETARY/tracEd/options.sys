@@ -4,8 +4,6 @@
 
 // VUEE doesn't inherit all from BOARDS, it needs some redefines:
 #ifdef  __SMURPH__
-#define VUEE_LIB_PLUG_TARP
-#define VUEE_LIB_PLUG_NULL
 
 #ifndef BOARD_CHRONOS
 // as it is in WARSAW board_options

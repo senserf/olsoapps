@@ -154,7 +154,7 @@ proc plug_reset { } {
 	pt_outln [pl_acmd RSB]
 }
 
-proc plug_init { a } {
+proc plug_init { m a } {
 
 	plug_reset
 }

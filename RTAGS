@@ -10,3 +10,9 @@ PG170812:
 	I have tweaked SEAWOLF/YEP to compile under picomp (i.e., PIP). The
 	idea is that there should be no single serious praxis that must be
 	compiled in the legacy mode.
+
+PG170818A:
+
+	Read PG170818A in PICOS. I have made YEP picomp-compliant and fixed
+	a few minor problems that surfaced after some PICOS system files
+	became picomp-compliant.

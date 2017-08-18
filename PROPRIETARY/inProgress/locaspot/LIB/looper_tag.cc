@@ -11,6 +11,7 @@
 
 #include "sysio.h"
 #include "diag.h"
+#include "tarp.h"
 #include "vartypes.h"
 #include "hold.h"
 #include "sensors.h"
