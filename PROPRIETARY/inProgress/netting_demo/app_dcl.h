@@ -26,6 +26,7 @@ char * get_mem (word state, word len);
 void  init ();
 word  fim_read ();
 word  fim_write();
+void  fim_erase ();
 
 // FSM announcements are only needed for PicOS. From the viewpoint of VUEE,
 // all FSM's are global (within the set of one praxis).

@@ -20,6 +20,17 @@ fim_t		fim_set;
 fsm root {
 
 	state RO_INIT:
+
+#if 0
+trace ("%d %d %d %d %d %d %d",
+	sizeof (headerType),
+	sizeof (msgMasterType),
+	sizeof (msgDispType),
+	sizeof (msgOdrType),
+	sizeof (msgTraceType),
+	sizeof (msgTraceAckType),
+	sizeof (out_t));
+#endif
 		init();
 		delay (DEL_QUANT, RO_AUDIT);
 		release; // let things going for a short while

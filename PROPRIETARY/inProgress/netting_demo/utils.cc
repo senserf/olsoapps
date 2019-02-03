@@ -46,7 +46,7 @@ void init () {
 	// tarp_ctrl.param = 0xA3 in tarp.h; level 2, rec 2, slack 1, fwd on
 	// inited in tarp
 
-	(void)fim_read();
+	(void) fim_read();
 
 	if (net_init (PHYS_ID, INFO_PLUG_TARP) < 0) {
 		// diag issued from failing net_init diag ("net_init");
@@ -73,6 +73,7 @@ void init () {
 }
 
 word fim_read() {
+#if INFO_FLASH
 	word i;
 	for (i = 0; i < IFLASH_SIZE; i++)
 		if (if_read (i) == 0xFFFF)
@@ -84,7 +85,6 @@ word fim_read() {
 		fim_set.f.ofmt = 0;  // same
 		return i;
 	}
-
 	// let's put defaults in
 	fim_set.f.tparam = tarp_ctrl.param;
 	fim_set.f.polev = DEF_PLEV;
@@ -92,9 +92,18 @@ word fim_read() {
 	fim_set.f.stran = 0;
 	fim_set.f.ofmt = 0;
 	return IFLASH_SIZE;
+#else
+	fim_set.f.tparam = tarp_ctrl.param;
+	fim_set.f.polev = DEF_PLEV;
+	fim_set.f.rx = 1;
+	fim_set.f.stran = 0;
+	fim_set.f.ofmt = 0;
+	return 0;
+#endif
 }
 
 word fim_write() {
+#if INFO_FLASH
 	word i;
 	fim_t f;
 
@@ -103,7 +112,7 @@ word fim_write() {
 			break;
 
 	if (i == IFLASH_SIZE) {
-		if_erase (-1);
+		fim_erase ();
 		return fim_write();
 	}
 
@@ -116,5 +125,13 @@ word fim_write() {
 	}
 	if_write (i, fim_set.w);
 	return i;
+#else
+	return 0;
+#endif
 }
 
+void fim_erase () {
+#if INFO_FLASH
+	if_erase (-1);
+#endif
+}

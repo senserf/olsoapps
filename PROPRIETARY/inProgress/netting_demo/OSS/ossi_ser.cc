@@ -426,7 +426,7 @@ fsm ossi_in {
 			break;
 
 		    case 'e':
-			if_erase (-1);
+			fim_erase ();
 			// through to read
 		    default:
 			w = fim_read();

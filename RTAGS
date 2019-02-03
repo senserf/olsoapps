@@ -16,3 +16,9 @@ PG170818A:
 	Read PG170818A in PICOS. I have made YEP picomp-compliant and fixed
 	a few minor problems that surfaced after some PICOS system files
 	became picomp-compliant.
+
+PG190203A:
+
+	Fixed netting_demo to work with CC1350 devices.
+
+	An old (pending) upgrade of my "septic tank" sensor.

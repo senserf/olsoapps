@@ -24,6 +24,7 @@ fsm root {
 
 	state INIT:
 
+		leds (0, 1);
 		phys_cc1100 (0, CC1100_MAXPLEN);
 		tcv_plug (0, &plug_null);
 		SFD = tcv_open (WNONE, 0, 0);
@@ -34,6 +35,7 @@ fsm root {
 
 	state RUN:
 
+		leds (0, 1);
 		Tries = 1;
 
 	state SEN0:
@@ -78,6 +80,7 @@ fsm root {
 		tcv_control (SFD, PHYSOPT_OFF, NULL);
 
 		next_run = seconds () + CYCLE_INTERVAL;
+		leds (0, 0);
 
 	state HIBERNATE:
 

@@ -95,13 +95,26 @@
 
 #define RADIO_DEFAULT_CHANNEL	0
 
-// This is the default radio
+#ifdef	CC1100
+#if	CC1100
 #define	PHYS_ID			INFO_PHYS_CC1100
 #define	RADIO_DEFAULT_BITRATE	2
+#endif
+#endif
 
-#if defined(CC2420)
-#if CC2420
-#undef	PHYS_ID
+#ifdef	CC2420
+#if	CC2420
 #define	PHYS_ID			INFO_PHYS_CC2420
 #endif
+#endif
+
+#ifdef	CC1350_RF
+#if	CC1350_RF
+#define	PHYS_ID			INFO_PHYS_CC1350
+#define	RADIO_DEFAULT_BITRATE	3
+#endif
+#endif
+
+#ifndef	PHYS_ID
+#error	"S: radio module undefined"
 #endif
