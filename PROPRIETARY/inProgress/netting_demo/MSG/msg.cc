@@ -188,11 +188,14 @@ fsm rcv {
                 }
 
 		// say, we want to study rcv on a particular node
-		highlight_set (0, 1.5,
-			"RCV (%u): %u %u %u",
-			psize, in_header(buf, msg_type),
-			in_header(buf, snd),
-	  		in_header(buf, hoc));
+#ifdef HIGHLIGHT_RCV
+		if (in_header (buf, rcv) != 0)
+			// Non-broadcast only
+			highlight_set (0, HIGHLIGHT_RCV, "RCV (%u): %x %u %u",
+				psize, in_header(buf, msg_type),
+				in_header(buf, snd),
+	  			in_header(buf, hoc));
+#endif
 
 #ifdef D_DEBUG
                 diag ("RCV (%d): %x-%u-%u-%u-%u-%u\r\n",
@@ -289,12 +292,19 @@ static void msg_odr_in (char * buf, word rssi, word siz) {
 
 static void msg_trace_in (char * buf, word rssi) {
         char * b;
-        word len;
+        word len, tcp;
+	Boolean overflow = NO;
 
-        if (in_header(buf, msg_type) != msg_traceB)
+        if (in_header(buf, msg_type) != msg_traceB) {
                 len = sizeof(msgTraceAckType) +
                         in_header(buf, hoc) * 2;
-        else
+		if (len > NET_MAXPAYLEN) {
+			overflow = YES;
+			len = NET_MAXPAYLEN;
+			tcp = len - sizeof (msgTraceAckType);
+		} else
+			tcp = (in_header(buf, hoc) - 1) * 2;
+        } else
                 len = sizeof(msgTraceAckType) + 2;
 
         b = get_mem (WNONE, len);
@@ -321,15 +331,19 @@ static void msg_trace_in (char * buf, word rssi) {
 
         // fwd part
         if (in_header(buf, msg_type) != msg_traceB &&
-                        in_header(buf, hoc) > 1)
+                        in_header(buf, hoc) > 1) {
+		// forward
                 memcpy (b + sizeof(msgTraceAckType),
                                 buf + sizeof(msgTraceType),
-                                2 * (in_header(buf, hoc) -1));
+					tcp);
+	}
 
-        // note that this node is counted in hoc, but is not appended yet, so:
-        *((byte *)b + len - 2) = (byte)local_host;
-        *((byte *)b + len - 1) = (byte)rssi;
+	if (!overflow) {
+        	// note that this node is counted in hoc, but is not appended
+		// yet, so:
+        	*((byte *)b + len - 2) = (byte)local_host;
+        	*((byte *)b + len - 1) = (byte)rssi;
+	}
         send_msg (b, len);
         ufree (b);
 }
-

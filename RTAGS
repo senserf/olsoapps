@@ -22,3 +22,14 @@ PG190203A:
 	Fixed netting_demo to work with CC1350 devices.
 
 	An old (pending) upgrade of my "septic tank" sensor.
+
+PG200109A:
+
+	Fixes to netting_demo:
+
+	1. Prevent packet overflow on trace messages.
+
+	2. Reduce the size of the message type field to 5 bits.
+
+	3. A few defines removed from options.sys and added to project config
+	   (extra defines), so it is easier to control them

@@ -533,7 +533,7 @@ fsm ossi_in {
 }
 
 void ossi_trace_out (char * buf, word rssi) {
-        sint i, num = 0, cnt = 0;
+        sint i, num = 0, cnt;
         char * ptr = buf;
 	char **lines;
 	out_t * out;
@@ -542,16 +542,24 @@ void ossi_trace_out (char * buf, word rssi) {
 		return;
 
 	ptr += (in_header(buf, msg_type) == msg_trace1) ?
-		sizeof (msgTraceType) : sizeof (msgTraceAckType);
+		(cnt = sizeof (msgTraceType)) :
+			(cnt = sizeof (msgTraceAckType));
 
         if (in_header(buf, msg_type) != msg_traceBAck &&
 			in_header(buf, msg_type) != msg_trace1)
                 num = in_traceAck(buf, fcount);
+
         if (in_header(buf, msg_type) != msg_traceFAck)
                 num += in_header(buf, hoc);
+
         if (in_header(buf, msg_type) == msg_traceAck ||
 		in_header(buf, msg_type) == msg_trace1)
                 num--; // dst counted twice
+
+	if (num > (cnt = NET_MAXPLEN - cnt) / 2)
+		// PG: don't exceed the packet size
+		num = cnt;
+	cnt = 0;
 
 	// num + 1st, last in words
 	if ((lines =  (char **)get_mem (WNONE, sizeof(char *)*(num +2))) ==

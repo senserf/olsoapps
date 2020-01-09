@@ -1,6 +1,9 @@
 <network nodes="1000" radio="1000">
     <grid>0.1m</grid>
     <tolerance quality="2">1E-4</tolerance>
+    <display>
+	<roamer display="yes"/>
+    </display>
     <xi:include href="DATAFILES/channel.xml"/>
     <nodes>
 	<defaults>

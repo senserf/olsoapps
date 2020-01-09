@@ -10,19 +10,17 @@
  * "Virtual" stuff needed by NET & TARP =======================================
  */
 
-// Here we have the actual definitions of TARP's "idiosyncratic" functions.
-// Nothing tricky. The keyword is ignored by PicOS,
-// while in VUEE it makes the functions node methods. In this case, we need
-// that because they are supposed to override virtual methods.
-// (The other case is of name clashes between multiple app_*.cc)
 idiosyncratic int tr_offset (headerType *h) {
 	sint i;
-	if (h->msg_type == msg_trace || h->msg_type == msg_traceF ||
-			h->msg_type == msg_trace1) // fwd dir
+	byte mt;
+
+	mt = tarp_mType (h->msg_type);
+
+	if (mt == msg_trace || mt == msg_traceF || mt == msg_trace1) // fwd dir
 		return 2 + sizeof(msgTraceType) + 2 * (h->hoc -1);
 
 	i = 2 + sizeof(msgTraceAckType) + 2 * h->hoc;
-	if (h->msg_type == msg_traceAck) // birectional
+	if (mt == msg_traceAck) // bidirectional
 		i += 2 * (((msgTraceAckType *)h)->fcount -1);
 
 	return i;
@@ -33,13 +31,13 @@ idiosyncratic Boolean msg_isBind (msg_t m) {
 }
 
 idiosyncratic Boolean msg_isTrace (msg_t m) {
-	m &= 0x3F;
+	m &= TARP_MSGTYPE_MASK;
 	return (m == msg_trace || m == msg_traceAck || m == msg_traceF ||
 			m == msg_traceBAck || m == msg_trace1);
 }
 
 idiosyncratic Boolean msg_isMaster (msg_t m) {
-	return (m == msg_master);
+	return ((m & TARP_MSGTYPE_MASK) == msg_master);
 }
 
 /*

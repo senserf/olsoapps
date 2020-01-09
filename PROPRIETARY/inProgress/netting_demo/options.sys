@@ -53,18 +53,17 @@
 #endif
 #define STORAGE_AT45XXX	0
 
-// TARP_RTR {
-#ifdef TCV_TIMERS
+#ifndef	TARP_RTR
+#define	TARP_RTR	2
+#endif
+
+#if TARP_RTR
 #undef TCV_TIMERS
-#endif
-#define TCV_TIMERS	1
-
-#ifdef TCV_HOOKS
 #undef TCV_HOOKS
-#endif
+#define TCV_TIMERS	1
 #define TCV_HOOKS	1
+#endif
 
-#define TARP_RTR        2
 // }TARP_RTR
 
 // debug diags
@@ -79,17 +78,6 @@
 #define	CC1100_FREQ_FREQ2_VALUE	0x21
 #define	CC1100_FREQ_FREQ1_VALUE	0x62
 #define	CC1100_FREQ_FREQ0_VALUE	0xC2
-
-
-#define TARP_RTR        	2
-
-#define TARP_MAXHOPS		32
-// #define TARP_MAXHOPS		10
-
-#define	TARP_DEF_RSSITH		90
-
-// for some testing this deviation from the default is prominent
-#define	TARP_DEF_PARAMS		0x81
 
 #define ODR_FILL_BCAST present
 
