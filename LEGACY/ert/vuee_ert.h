@@ -1,3 +1,11 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __vuee_ert_h__
 #define	__vuee_ert_h__
 

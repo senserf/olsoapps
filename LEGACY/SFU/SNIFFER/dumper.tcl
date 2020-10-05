@@ -1,4 +1,13 @@
 #!/usr/bin/tclsh
+#
+#	Copyright 2002-2020 (C) Olsonet Communications Corporation
+#	Programmed by Pawel Gburzynski & Wlodek Olesinski
+#	All rights reserved
+#
+#	This file is part of the PICOS platform
+#
+#
+
 ################
 
 array set CMD		{ BIND 0 UNBIND 64 RESET 16 STOP 32 ABORT 33 REPORT 48

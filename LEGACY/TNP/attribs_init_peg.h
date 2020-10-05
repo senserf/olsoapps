@@ -1,3 +1,11 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 
 	_da (ui_ibuf)		= NULL;
 	_da (ui_obuf)		= NULL;

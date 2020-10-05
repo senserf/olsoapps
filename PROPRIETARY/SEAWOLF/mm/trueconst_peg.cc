@@ -1,3 +1,11 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #include "sysio.h"
 
 trueconst char oss_out_f_str[] = "oss_out failed";

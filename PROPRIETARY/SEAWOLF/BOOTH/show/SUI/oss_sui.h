@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __oss_sui_h
 #define __oss_sui_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 //+++ oss_sui.cc
 

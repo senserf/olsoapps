@@ -1,13 +1,17 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #include "storage.h"
 #include "app.h"
 #include "codes.h"
 #include "msg_gene.h"
 #include "storage.h"
 
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 #define EE_NILLW	0xFFFFFFFF
 lword esns [2] = {0, 0};

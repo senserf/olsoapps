@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __msg_rtagStructs_h
 #define __msg_rtagStructs_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 #include "msg_tarp.h"
 #if 0

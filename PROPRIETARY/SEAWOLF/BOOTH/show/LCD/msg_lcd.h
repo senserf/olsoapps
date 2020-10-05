@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __msg_lcd_h
 #define __msg_lcd_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 #include "msg_tarp.h"
 
 typedef enum {

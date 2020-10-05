@@ -1,7 +1,11 @@
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2012                           */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 
 /* We have a fundamental problem: what is OSSI, what is UI, what are
    'other' i/f. There is no clear division (e.g. and actualtor can belong

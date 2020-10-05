@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __sat_peg_h
 #define __sat_peg_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2009.                          */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 // for now
 #define IS_DEFSATGAT	((host_id & 0xFFFF0000) == 0x5A7E0000)

@@ -1,16 +1,15 @@
 #!/bin/sh
+#
+#	Copyright 2002-2020 (C) Olsonet Communications Corporation
+#	Programmed by Pawel Gburzynski & Wlodek Olesinski
+#	All rights reserved
+#
+#	This file is part of the PICOS platform
+#
+#
 ###########################\
 exec tclsh "$0" "$@"
 
-#####################################################################
-#                                                                   #
-# This  scripts  periodically  connects  to  the EMS server to pull #
-# sensor data. The parameters are described in an XML configuration #
-# file.                                                             #
-#                                                                   #
-# Copyright (C) Olsonet Communications, 2009 All Rights Reserved    #
-#                                                                   #
-#####################################################################
 
 proc msource { f } {
 #

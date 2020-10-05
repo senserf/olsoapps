@@ -1,17 +1,15 @@
 #!/bin/sh
+#
+#	Copyright 2002-2020 (C) Olsonet Communications Corporation
+#	Programmed by Pawel Gburzynski & Wlodek Olesinski
+#	All rights reserved
+#
+#	This file is part of the PICOS platform
+#
+#
 ###########################\
 exec tclsh "$0" "$@"
 
-##################################################################
-# This  is  a  UART-over-socket  interface  daemon  to implement #
-# network/transparent connections to the  master  node  from  an #
-# OSSI  program running on a different host.   Perhaps it should #
-# have been programmed in C,  but this way we can easily run  it #
-# on Windows (cygwin or not) as well as UNIX.  And the bandwidth #
-# is trivially low, so who cares.                                #
-#                                                                #
-# Copyright (C) Olsonet Communications, 2008 All Rights Reserved #
-##################################################################
 
 set Files(LOG)		"userver_log"
 set Log(MAXSIZE)	1000000

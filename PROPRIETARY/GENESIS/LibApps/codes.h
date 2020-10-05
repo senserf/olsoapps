@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __codes_h
 #define __codes_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 // CHECK app.c::valid_input() when changing the codes
 #define CMD_GET 	0x01

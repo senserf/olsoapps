@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __app_h
 #define __app_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 #include "sysio.h"
 #include "eep_esn.h"
 #include "msg_tarp.h"

@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __diag_h__
 #define __diag_h__
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2013.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 // this here compared with mm saves 1882B for D_OFF (presumptions made in
 // mm for ..._diag constructs are false, although I thought I tested the crap

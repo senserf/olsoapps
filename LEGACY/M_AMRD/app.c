@@ -1,12 +1,11 @@
-/* ==================================================================== */
-/* Modified (scaled down and split) RTags.                              */
-/* SHADOW in DD cache (gbackoff delays).                                */
-/* 19200 havoc caused paranoic treatment of input data.                 */
-/* Not needed any more, not removed.                                    */
-/*                                                                      */
-/* Copyright (C) Olsonet Communications, 2002 - 2005.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #include "sysio.h"
 #include "form.h"
 #include "net.h"

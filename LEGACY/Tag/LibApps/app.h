@@ -1,11 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __app_h
 #define __app_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2004.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
-//+++ "lib_app.c"
-//+++ "msg_io.c"
 #include "sysio.h"
 #include "msg_tarp.h"
 typedef struct appCountStruct {

@@ -1,3 +1,12 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
+
 // see comments in global_pegs.h
 	_da (ui_ibuf)		= NULL;
 	_da (ui_obuf)		= NULL;

@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __app_tag_h
 #define __app_tag_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2011                    */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 //+++ "lib_app_tag.cc"
 //+++ "msg_io_tag.cc"

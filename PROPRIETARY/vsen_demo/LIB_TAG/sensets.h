@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __sensets_h
 #define __sensets_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2012                           */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 /* note that we condense and circumvent some board types and sensors.
    E.g., we consider PAR, PYR useless and leave out moisture sensors.

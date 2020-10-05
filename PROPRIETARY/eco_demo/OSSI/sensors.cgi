@@ -1,4 +1,12 @@
 #!/bin/sh
+#
+#	Copyright 2002-2020 (C) Olsonet Communications Corporation
+#	Programmed by Pawel Gburzynski & Wlodek Olesinski
+#	All rights reserved
+#
+#	This file is part of the PICOS platform
+#
+#
 ###########################\
 exec tclsh "$0" "$@"
 
@@ -9,9 +17,6 @@ set	Files(SMAP)	"sensors.xml"
 ###############################################################################
 
 package provide xml 1.0
-###############################################################################
-# Mini XML parser. Copyright (C) 2008-12 Olsonet Communications Corporation.
-###############################################################################
 
 ### Last modified PG111008A ###
 

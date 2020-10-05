@@ -1,12 +1,15 @@
 #!/bin/sh
+#
+#	Copyright 2002-2020 (C) Olsonet Communications Corporation
+#	Programmed by Pawel Gburzynski & Wlodek Olesinski
+#	All rights reserved
+#
+#	This file is part of the PICOS platform
+#
+#
 ###########################\
 exec tclsh "$0" "$@"
 
-##################################################################
-# The OSS module for ECO DEMO                                    #
-#                                                                #
-# Copyright (C) Olsonet Communications, 2008 All Rights Reserved #
-##################################################################
 
 ##################################################################
 ##################################################################
@@ -18,9 +21,6 @@ exec tclsh "$0" "$@"
 #
 
 package provide xml 1.0
-###############################################################################
-# Mini XML parser. Copyright (C) 2008-11 Olsonet Communications Corporation.
-###############################################################################
 
 namespace eval XML {
 
@@ -404,9 +404,6 @@ namespace import ::XML::*
 
 
 package provide log 1.0
-###############################################################################
-# Log functions. Copyright (C) 2008-11 Olsonet Communications Corporation.
-###############################################################################
 
 namespace eval LOGGING {
 

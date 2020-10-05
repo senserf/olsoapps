@@ -1,7 +1,11 @@
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2012                           */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 
 // for now, a modified copy from CHRONOS/RFTEST
 // perhaps we can have it lower and cheaper than form, later

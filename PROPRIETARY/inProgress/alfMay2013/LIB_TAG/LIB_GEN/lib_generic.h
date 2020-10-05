@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __lib_generic_h
 #define __lib_generic_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2012                           */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 //+++ "lib_generic.cc"
 

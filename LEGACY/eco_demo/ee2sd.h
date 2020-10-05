@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __ee2sd_h__
 #define __ee2sd_h__
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 #ifndef __SMURPH__
 #if STORAGE_SDCARD

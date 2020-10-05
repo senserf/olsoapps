@@ -33,3 +33,7 @@ PG200109A:
 
 	3. A few defines removed from options.sys and added to project config
 	   (extra defines), so it is easier to control them
+
+PG201005A:
+
+	Added a standard copyright notice to (almost) all (relevant) sources.

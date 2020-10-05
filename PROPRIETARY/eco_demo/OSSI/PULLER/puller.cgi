@@ -1,25 +1,18 @@
 #!/usr/bin/tclsh
+#
+#	Copyright 2002-2020 (C) Olsonet Communications Corporation
+#	Programmed by Pawel Gburzynski & Wlodek Olesinski
+#	All rights reserved
+#
+#	This file is part of the PICOS platform
+#
+#
 
-##########################################################
-#                                                        #
-# EMS data extractor                                     #
-#                                                        #
-# Copyright (C) 2009 Olsonet Communications Corporation  #
-#                                                        #
-##########################################################
 
 ###############################################################################
 
 package provide sdb 1.0
 
-#############################################################################
-#                                                                           #
-# This is a trivial database of sensor samples whereby each dayload of data #
-# takes one file whose name looks like YYYYMMDD.                            #
-#                                                                           #
-# Copyright (C) 2009 Olsonet Communications Corporation                     #
-#                                                                           #
-#############################################################################
 
 namespace eval SDB {
 

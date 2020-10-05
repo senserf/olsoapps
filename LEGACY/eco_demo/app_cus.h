@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __app_cus_h
 #define __app_cus_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2009.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 #define THREADNAME(a)   a ## _cus
 

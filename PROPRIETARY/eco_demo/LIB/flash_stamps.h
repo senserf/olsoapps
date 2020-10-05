@@ -1,9 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __flash_stamps_h
 #define __flash_stamps_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2011                           */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
 
 /*
    At the beginning of 2nd page of iflash we store special application

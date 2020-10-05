@@ -1,3 +1,12 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
+
 // This is the ID to be used for the collector; needed by autoconnect, i.e.,
 // the procedure of automatically locating the UART device to which the Peg
 // is attached

@@ -1,10 +1,13 @@
+/*
+	Copyright 2002-2020 (C) Olsonet Communications Corporation
+	Programmed by Pawel Gburzynski & Wlodek Olesinski
+	All rights reserved
+
+	This file is part of the PICOS platform
+
+*/
 #ifndef __eep_esn_h
 #define __eep_esn_h
-/* ==================================================================== */
-/* Copyright (C) Olsonet Communications, 2002 - 2006.                   */
-/* All rights reserved.                                                 */
-/* ==================================================================== */
-// #include "sysio.h"
 
 #define ESN_SIZE	1008
 #define SVEC_SIZE	(ESN_SIZE / 16)
