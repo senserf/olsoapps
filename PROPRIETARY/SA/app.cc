@@ -46,7 +46,7 @@ static byte LREQ = 0, LRSQ;
 #define	LED_GREEN	1
 #define	LED_YELLOW	2
 
-static led (word led, word mode) {
+static void led (word led, word mode) {
 
 	leds_all (0);
 	fastblink (0);

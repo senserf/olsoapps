@@ -9,6 +9,7 @@
 	<defaults>
 	<xi:include href="DATAFILES/tag.xml"/>
 	<highlight fg="black" bg="white">magenta blue</highlight>
+	<color solid="#FF7F50"/>
 	</defaults>
 	<node number="0" start="on" hid="0xBACA000A">
 	</node>

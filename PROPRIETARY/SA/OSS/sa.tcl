@@ -5834,7 +5834,7 @@ set WN(CAW) [expr $PM(NSA) * $WN(SEF)]
 set WN(CAH) 512
 
 # minimum separation between tick on horizontal axis
-set WN(MHT) 70
+set WN(MHT) 200
 
 # minimum separation between ticks on vertical axis
 set WN(MVT) 50

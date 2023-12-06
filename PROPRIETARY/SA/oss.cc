@@ -8,6 +8,7 @@
 */
 #include "oss.h"
 #include "tcvplug.h"
+#include "phys_uart.h"
 
 fsm oss_in;
 
