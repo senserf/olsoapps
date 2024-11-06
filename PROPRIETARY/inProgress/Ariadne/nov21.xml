@@ -10,7 +10,6 @@
 	    	<power>7</power>
 	    	<rate>1</rate>
 	    	<channel>0</channel>
-	    	<boost>0.0dB</boost>
 	    	<preamble>32 bits</preamble>
 	    	<lbt>
 			delay			8msec
